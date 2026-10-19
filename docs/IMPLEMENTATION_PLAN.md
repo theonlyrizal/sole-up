@@ -82,7 +82,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | Chunk | Title | Status | Branch | Date | Note |
 |---|---|---|---|---|---|
 | 0.1 | Record decisions and sync docs | done | chunk/0.1-decisions-docs | 2026-10-20 | ADRs 0001–0007 written; spec, data model, roadmap, architecture and README synced |
-| 0.2 | Project scaffold | todo | | | |
+| 0.2 | Project scaffold | done | chunk/0.2-project-scaffold | 2026-10-20 | Next.js 16.4 App Router, TS strict, ESLint + Prettier, Tailwind v4 light/dark tokens, Node 24 LTS pinned |
 | 0.3 | Environment and local Postgres | todo | | | |
 | 0.4 | Drizzle and migration workflow | todo | | | |
 | 0.5 | Test harness | todo | | | |
@@ -853,3 +853,28 @@ Template:
 - **Next chunk should know:** `docs/` was git-ignored at the start of this chunk; at the user's request it is now tracked (only `CLAUDE.md` stays ignored). Commit doc updates, including the Progress log and handoff notes, with your chunk.
 - **Unverified:** none (docs only; no build or test commands exist yet).
 - **Follow-ups:** `AGENT_PROMPTS.md` was not reviewed for consistency beyond the grep.
+
+### 0.2: Project scaffold (2026-10-20)
+- **Built:**
+  - A Next.js 16.4.2 App Router app in the repo root, generated with `create-next-app@16.4.2` (app-tw template): `src/app/` (layout, home page, `globals.css`), `@/*` → `src/*`, TypeScript strict.
+  - Toolchain: pnpm 11.24.0 (`packageManager`), Node 24.22.0 in `.nvmrc`, and `engines.node` `^24.19.0`. ESLint flat config (Next core-web-vitals + typescript + eslint-config-prettier), and Prettier with `prettier-plugin-tailwindcss`.
+  - Scripts: `dev`, `build`, `start`, `lint`, `typecheck` (`next typegen && tsc --noEmit`), `format`, `format:check`. Every dependency is pinned to an exact version.
+  - `.gitignore` covers env files (except `.env.example`), build output, coverage and Playwright output. It still ignores `CLAUDE.md`. `.gitattributes` forces LF line endings, so `format:check` passes on Windows checkouts with `autocrlf`.
+  - README setup steps.
+- **Deviations:** none.
+- **Decisions:**
+  1. **TypeScript 6.0.3, not 7.0.2.** `typescript-eslint`, which eslint-config-next uses, supports only `<6.1`.
+  2. **ESLint 9.39.5, not 10.** The react, import and jsx-a11y plugins bundled in eslint-config-next only declare support up to ESLint 9, and create-next-app itself installs `^9`. ESLint 9 is end-of-life upstream.
+  3. **Node 24 (Active LTS).** Node 26 is not LTS yet.
+  4. **Template defaults kept** in `next.config.ts`: `cacheComponents: true` and `partialPrefetching: true`. Tailwind runs through `@tailwindcss/turbopack`, so there is no PostCSS config.
+  5. **Design tokens.** Raw CSS variables live on `:root` (`--bg`, `--surface`, `--fg-muted`, `--corner-*`, `--fs-*`, `--space-unit`). `@theme inline` maps them to utilities such as `bg-surface`, `text-muted`, `border-border`, `rounded-md`, `text-lg` and the spacing scale. The theme follows the OS, and `data-theme="light"|"dark"` on `<html>` overrides it. All of this is documented in a comment in `globals.css`.
+- **Next chunk should know:**
+  - `next dev` rewrites a managed block in `AGENTS.md`. The file is committed so the tree stays clean. It never touches `CLAUDE.md`.
+  - Next 16 ships its docs in `node_modules/next/dist/docs/`. Check them for current APIs.
+  - With `cacheComponents` on, request-time data (cookies, sessions) must be read inside `<Suspense>`. This matters for 0.6.
+  - The two dark-theme token blocks in `globals.css` must stay identical.
+  - Prettier needs the `tailwindStylesheet` option to sort the custom token utilities.
+- **Unverified:** none. lint, typecheck, format:check and build pass. The home page renders under `pnpm dev` in light and dark, with no console errors.
+- **Follow-ups:**
+  - Move to ESLint 10 once eslint-config-next's plugins support it.
+  - Move to TypeScript 7 once typescript-eslint supports it.

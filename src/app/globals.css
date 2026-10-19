@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens.
+ *
+ * Raw tokens live on :root and switch per theme. @theme maps them to Tailwind
+ * utilities (bg-surface, text-muted, border-border, rounded-md, text-lg, p-4).
+ * Components use those utilities, never raw values.
+ *
+ * Theme follows the OS by default. Setting data-theme="light" or "dark" on
+ * <html> overrides it (wired to user preferences in a later chunk).
+ */
+:root {
+  color-scheme: light;
+
+  /* Color */
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-muted: #f4f4f2;
+  --fg: #1c1c1a;
+  --fg-muted: #5f5f5a;
+  --border: #e2e2de;
+  --accent: #2f6f5e;
+  --accent-fg: #ffffff;
+  --focus: #2f6f5e;
+  --danger: #b42318;
+  --success: #2e7d32;
+
+  /* Spacing: one unit of Tailwind's spacing scale (p-1 = 1 unit) */
+  --space-unit: 0.25rem;
+
+  /* Radius */
+  --corner-sm: 0.25rem;
+  --corner-md: 0.5rem;
+  --corner-lg: 0.75rem;
+
+  /* Type scale */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.5rem;
+  --fs-3xl: 1.875rem;
+}
+
+/* Keep the two dark blocks identical. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface: #1b1b1a;
+    --surface-muted: #242422;
+    --fg: #ececea;
+    --fg-muted: #a3a39d;
+    --border: #34342f;
+    --accent: #6fbfa6;
+    --accent-fg: #0d1f1a;
+    --focus: #6fbfa6;
+    --danger: #f97066;
+    --success: #73c27a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211;
+  --surface: #1b1b1a;
+  --surface-muted: #242422;
+  --fg: #ececea;
+  --fg-muted: #a3a39d;
+  --border: #34342f;
+  --accent: #6fbfa6;
+  --accent-fg: #0d1f1a;
+  --focus: #6fbfa6;
+  --danger: #f97066;
+  --success: #73c27a;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-fg: var(--fg);
+  --color-muted: var(--fg-muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-focus: var(--focus);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+
+  --spacing: var(--space-unit);
+
+  --radius-sm: var(--corner-sm);
+  --radius-md: var(--corner-md);
+  --radius-lg: var(--corner-lg);
+
+  --text-xs: var(--fs-xs);
+  --text-sm: var(--fs-sm);
+  --text-base: var(--fs-base);
+  --text-lg: var(--fs-lg);
+  --text-xl: var(--fs-xl);
+  --text-2xl: var(--fs-2xl);
+  --text-3xl: var(--fs-3xl);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
