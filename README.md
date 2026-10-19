@@ -17,15 +17,36 @@ A personal management app that helps you decide what matters, turn goals into re
 - [Decisions (ADRs)](docs/decisions/README.md): settled architecture and product decisions
 - [Agent prompts](docs/AGENT_PROMPTS.md): one session prompt per chunk
 
-## Setup
+## Local setup
 
-Requires Node 24 (see `.nvmrc`) and pnpm 11 (`corepack enable` picks up the version in `package.json`).
+Requires Node 24 (see `.nvmrc`), pnpm 11 (`corepack enable` picks up the version in `package.json`), and Docker with Compose v2.
 
-```bash
-pnpm install
-pnpm dev
-```
+1. Install dependencies:
 
-Then open http://localhost:3000.
+   ```bash
+   pnpm install
+   ```
 
-Checks: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`. `pnpm format` fixes formatting. Database and environment setup arrive in chunk 0.3.
+2. Start local Postgres (18, bound to `127.0.0.1:5432`). It creates two databases: `soleup_dev` for the app and `soleup_test` for integration tests.
+
+   ```bash
+   docker compose up -d --wait
+   ```
+
+   `--wait` returns once the healthcheck passes; `docker compose ps` should show the service as `healthy`. Data persists in the `soleup_postgres-data` volume. `docker compose down -v` deletes it, and the databases are recreated on the next start.
+
+3. Create your env file. The defaults in `.env.example` match the local Postgres; the auth variables can stay empty until sign-in exists.
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+4. Run the app and open http://localhost:3000:
+
+   ```bash
+   pnpm dev
+   ```
+
+The server validates its environment at startup (`src/server/env.ts`). If a variable is missing or malformed, it prints which ones and exits instead of starting. Server-only variables stay in `src/server/env.ts`; browser-visible `NEXT_PUBLIC_*` variables go in `src/lib/client-env.ts`.
+
+Checks: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`. The build does not need env variables; validation runs when the server starts. `pnpm format` fixes formatting.

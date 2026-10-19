@@ -83,7 +83,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 |---|---|---|---|---|---|
 | 0.1 | Record decisions and sync docs | done | chunk/0.1-decisions-docs | 2026-10-20 | ADRs 0001–0007 written; spec, data model, roadmap, architecture and README synced |
 | 0.2 | Project scaffold | done | chunk/0.2-project-scaffold | 2026-10-20 | Next.js 16.4 App Router, TS strict, ESLint + Prettier, Tailwind v4 light/dark tokens, Node 24 LTS pinned |
-| 0.3 | Environment and local Postgres | todo | | | |
+| 0.3 | Environment and local Postgres | done | chunk/0.3-env-postgres | 2026-10-20 | Postgres 18 via Docker Compose (dev + test DBs, healthcheck), Zod env validated at boot, .env.example, README setup |
 | 0.4 | Drizzle and migration workflow | todo | | | |
 | 0.5 | Test harness | todo | | | |
 | 0.6 | Authentication | todo | | | |
@@ -878,3 +878,25 @@ Template:
 - **Follow-ups:**
   - Move to ESLint 10 once eslint-config-next's plugins support it.
   - Move to TypeScript 7 once typescript-eslint supports it.
+
+### 0.3: Environment and local Postgres (2026-10-20)
+- **Built:**
+  - `docker-compose.yml`: `postgres:18.3-alpine`, port bound to `127.0.0.1:5432`, named volume `postgres-data`. `POSTGRES_DB` creates `soleup_dev`; `docker/postgres/init/01-create-test-database.sql` creates `soleup_test`. The healthcheck uses TCP (`-h 127.0.0.1`), which stays closed while init scripts run, so `healthy` means both databases exist.
+  - `src/server/env.ts` (`server-only`): Zod schema, `parseEnv(source)` throwing `EnvValidationError`, and `env` parsed at import. Errors name the variable and never echo its value. Empty values (`KEY=`) count as missing.
+  - `src/lib/client-env.ts`: the `NEXT_PUBLIC_*` schema (empty for now) and `readClientEnv()`. The server validates it together with its own schema.
+  - `src/instrumentation.ts` → `src/instrumentation-node.ts`: imports the env module at server start and calls `process.exit(1)` with the readable message on `EnvValidationError`. Verified with `next start` and `next dev`.
+  - `.env.example`, README "Local setup". Dependencies: `zod` 4.6.7, `server-only` 0.0.1 (pinned).
+- **Deviations:** "Done when" says the app is connected to the database. There is no Postgres driver until 0.4 (Drizzle), so this chunk proves the database is healthy and reachable from the host on 5432, and that the app boots with a valid `DATABASE_URL`, but the app does not open a connection yet.
+- **Decisions:**
+  1. **Postgres 18.** ADR 0003 only requires 15+, and no managed host has been picked yet. Pick the compose image to match the host in 0.14.
+  2. **Local dev credentials** (`soleup`/`soleup`) are written in `docker-compose.yml` and in `.env.example`'s `DATABASE_URL`, so a fresh clone works without editing. They are not secrets: the port is bound to localhost only. Every real secret in `.env.example` is empty.
+  3. **Auth variables are optional** until 0.6. They are validated only if set (`BETTER_AUTH_SECRET` ≥ 32 chars, `BETTER_AUTH_URL` a URL).
+  4. **Validation runs at server boot, not at build.** `pnpm build` passes with no env vars, which keeps CI (0.13) simple.
+- **Next chunk should know:**
+  - Import `env` from `@/server/env` instead of reading `process.env` in server code. Add new variables to the schema and to `.env.example` together.
+  - Public variables must be read with static `process.env.NEXT_PUBLIC_X` references inside `readClientEnv()`, or Next.js won't inline them.
+  - Instrumentation code that uses Node APIs must stay in `instrumentation-node.ts`; putting it in `instrumentation.ts` triggers an Edge-runtime build warning.
+  - There is no test database URL variable yet. 0.5 should add one (for example `TEST_DATABASE_URL` → `soleup_test`).
+  - `docker compose down -v` wipes both databases; the init script reruns on the next start.
+- **Unverified:** none. `docker compose up -d --wait` reports healthy (Postgres 18.3, both databases present). The app returns 200 under `next start` and `next dev` with `.env.local`, and both exit with code 1 and a readable list when `DATABASE_URL` is missing or malformed. format:check, lint, typecheck and build pass.
+- **Follow-ups:** no automated tests for `parseEnv` yet (no test runner until 0.5). Worth adding a unit test in 0.5.

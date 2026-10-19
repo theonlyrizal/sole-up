@@ -1,0 +1,37 @@
+# Local development Postgres. Not for production.
+# The credentials below are local-only defaults; the port is bound to 127.0.0.1.
+# Postgres 15+ is required for `ON DELETE SET NULL (column)`.
+name: soleup
+
+services:
+  postgres:
+    image: postgres:18.3-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: soleup
+      POSTGRES_PASSWORD: soleup
+      POSTGRES_DB: soleup_dev
+      # Lets the healthcheck connect over TCP with psql.
+      PGPASSWORD: soleup
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Postgres 18+ images keep data under a versioned subdirectory of this path.
+      - postgres-data:/var/lib/postgresql
+      # Runs once, on first start with an empty volume: creates soleup_test.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # TCP (-h 127.0.0.1) stays closed while init scripts run, so "healthy"
+      # means both databases exist and accept connections.
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready -h 127.0.0.1 -U soleup -d soleup_dev &&
+          psql -h 127.0.0.1 -U soleup -d soleup_test -tAc "select 1" > /dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:
