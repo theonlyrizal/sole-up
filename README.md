@@ -2,7 +2,7 @@
 
 A personal management app that helps you decide what matters, turn goals into realistic next steps, follow through, and review your progress. Core planning and tracking work without AI.
 
-**Status:** pre-code. Foundation decisions are recorded; implementation follows the chunked plan.
+**Status:** foundation in progress. The Next.js scaffold exists; features follow the chunked plan.
 
 **MVP at a glance:** life areas, goals and milestones, tasks with Today and Upcoming views, habits, notes, a weekly review, an internal calendar, and Web Push reminders. Built as a responsive, installable web app (PWA) with Next.js, TypeScript, PostgreSQL and Drizzle, signing in with Google or GitHub.
 
@@ -17,4 +17,15 @@ A personal management app that helps you decide what matters, turn goals into re
 - [Decisions (ADRs)](docs/decisions/README.md): settled architecture and product decisions
 - [Agent prompts](docs/AGENT_PROMPTS.md): one session prompt per chunk
 
-Setup instructions arrive with the project scaffold (chunk 0.2–0.3).
+## Setup
+
+Requires Node 24 (see `.nvmrc`) and pnpm 11 (`corepack enable` picks up the version in `package.json`).
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Then open http://localhost:3000.
+
+Checks: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`. `pnpm format` fixes formatting. Database and environment setup arrive in chunk 0.3.
