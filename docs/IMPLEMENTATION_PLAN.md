@@ -94,7 +94,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.3 | Environment and local Postgres | done | chunk/0.3-env-postgres | 2026-10-20 | Postgres 18 via Docker Compose (dev + test DBs, healthcheck), Zod env validated at boot, .env.example, README setup |
 | 0.4 | Drizzle and migration workflow | done | chunk/0.4-drizzle | 2026-10-20 | Drizzle 0.45 + pg pool (server-only), db:generate/migrate/studio/reset, baseline migration applied to dev and test, README conventions |
 | 0.5 | Test harness | done | chunk/0.5-test-harness | 2026-10-20 | Vitest 5 unit + integration projects (migrate once, truncate between tests, `_test` URL guard), Playwright 1.64 smoke test, test:* and verify scripts |
-| 0.6 | Authentication | todo | | | |
+| 0.6 | Authentication | done | chunk/0.6-auth | 2026-10-20 | Better Auth 1.7.11 (Drizzle, UUID IDs, plural tables), Google + GitHub, verified-email linking, DB sessions, rate limits, redacted auth logs, test fixtures and fail-closed e2e sign-in |
 | 0.7 | Authorization primitives | todo | | | |
 | 0.8 | Audit log infrastructure | todo | | | |
 | 0.9 | User preferences | todo | | | |
@@ -962,3 +962,34 @@ Template:
   - `.env.local` needs `TEST_DATABASE_URL`. This machine's `.env.local` was updated.
 - **Unverified:** none. `pnpm verify` (format:check, lint, typecheck, 6 unit tests, 9 integration tests) and `pnpm test:e2e` (1 test) pass, and `pnpm build` passes. The URL guard rejects `soleup_dev` with a readable error. The CI branch of the Playwright config (`build && start`) was not run.
 - **Follow-ups:** none.
+
+### 0.6: Authentication (2026-10-20)
+- **Built:**
+  - `better-auth` 1.7.11 (pinned). `src/server/auth/auth.ts`: Drizzle adapter (`usePlural`), `generateId: "uuid"`, Google and GitHub providers (enabled only when both ID and secret are set), database sessions (30 days, refreshed daily, no cookie cache), `soleup` cookie prefix, secure cookies on https, rate limiting, errors redirected to `/sign-in?error=<code>`, telemetry off.
+  - Schema `src/server/db/schema/auth.ts` + migration `0001_auth.sql`: `users`, `sessions`, `accounts`, `verifications`, all with UUID keys and `timestamptz`. FKs cascade from `users`. Unique `(provider_id, account_id)` on `accounts`.
+  - `src/server/auth/session.ts`: `getUserFromHeaders(headers)`, `getCurrentUser()`, `requireUser()` (redirects to `/sign-in`). `providers.ts`: `configuredProviders(env)`. `logger.ts`: redacting Better Auth logger.
+  - Routes: `api/auth/[...all]` (Better Auth handler, unexpected errors logged redacted → bare 500), `(public)/sign-in` (provider buttons, readable OAuth error messages, redirects signed-in users to `/home`), `(app)/layout.tsx` (session-aware shell with sign-out), `(app)/home` placeholder, landing page links to sign-in.
+  - Client: `src/lib/auth-client.ts`, `components/auth/sign-in-buttons.tsx`, `sign-out-button.tsx`. `src/lib/sign-in-errors.ts`.
+  - Env: `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` now required; a half-set provider pair is a boot error; `SOLEUP_TEST_SIGN_IN` added.
+  - Test support: `tests/integration/helpers/users.ts` (`createTestUser()`, `asUser(userId)` → `{ userId, headers }` with a real signed session cookie), built on `src/server/auth/test-session.ts`. Test-only `POST /api/test/sign-in` (`src/app/api/test/sign-in/route.ts`), gated by `isTestSignInEnabled` (`NODE_ENV === "test"` and `SOLEUP_TEST_SIGN_IN === "1"`, else 404 before importing anything else).
+  - Tests: unit (env, gate matrix + route 404 in every other mode, providers, error messages, logger), integration (fixtures, sessions, forged cookie, sign-out revocation, cascade, unique identity, account linking via Better Auth's real `handleOAuthUserInfo`, unconfigured provider → clean 4xx, rate limit 429, redacted logging on a DB failure), e2e (`tests/e2e/auth.spec.ts`: redirect when signed out, provider buttons, error messages, shortcut sign-in and sign-out).
+  - README "Authentication" (incl. OAuth console steps and callback URLs) and "Testing" updates; `.env.example`; DATA_MODEL User note.
+- **Deviations:**
+  1. **Sign-in and sign-out use the Better Auth browser client, not Server Actions.** Better Auth rate-limits only HTTP requests through its handler; `auth.api.*` calls bypass it.
+  2. **Playwright runs its own server on port 3100** in `NODE_ENV=test` against `soleup_test` (migrated in `tests/e2e/global-setup.ts`), with build folder `.next-e2e` (`SOLEUP_NEXT_DIST_DIR` in `next.config.ts`). Next refuses a second `next dev` on the same build folder, and with `NODE_ENV=test` Next does not load `.env.local`, so the config sets every variable. Next adds `.next-e2e` include paths to `tsconfig.json`; they are committed so e2e runs leave the tree clean.
+  3. **Build-phase env placeholders** (`src/server/env.ts`): route modules now import the env at build, so during `NEXT_PHASE=phase-production-build` only, missing required values get inert placeholders. Keeps 0.3's "build needs no env". Verified: `next start` without env still exits 1 with the readable list.
+  4. **Redacting logger + `onAPIError.throw`** (not in the chunk text): Better Auth's default logging printed SQL params (OAuth state, PKCE verifier, session tokens), violating "Never log". Found during the user's first real sign-in.
+- **Decisions:** `trustedProviders: []` and `requireLocalEmailVerified: true`, so linking needs a verified email on both sides; different emails never link. Rate limits in memory (one host, ADR 0003): 100/min per IP and path, 10/min for `/sign-in/*` and `/callback/*`. `timestamptz` for auth tables. Recorded in code comments and README > Authentication.
+- **Next chunk should know:**
+  - Call `requireUser()` first in every page/action/route; under `cacheComponents` the call must sit inside `<Suspense>`. Use `getUserFromHeaders(headers)` where there is no Next request scope (tests).
+  - Integration tests: `const user = await createTestUser(); const { userId, headers } = await asUser(user.id);`. A cross-user test is two `createTestUser()` calls.
+  - Integration workers get fixed auth env values and empty OAuth credentials from `vitest.config.mts`.
+  - Run `pnpm db:migrate` for the dev DB after adding a migration; integration and e2e setups migrate `soleup_test` themselves (this chunk forgot the dev DB at first).
+  - Dev server logs "Could not validate `instant`… NEXT_REDIRECT" when a signed-out visitor hits `/home`. It is Next's instant-navigation validator meeting the auth redirect; harmless. Next's guide suggests `'use cache: private'` on the user read, which was not adopted because it caches the user client-side for minutes after revocation. Decide in 0.10.
+  - Unexpected errors in Better Auth now throw to the route handler; `auth.api.*` callers in server code should expect throws for non-API errors.
+- **Unverified:** none. The user confirmed real sign-in with Google and with GitHub on 2026-10-20 (the specific linking outcome between the two was not reported separately; linking rules are covered by integration tests). The CI branch of the Playwright config (`build && start` with `NODE_ENV=test`) was not run.
+- **Follow-ups:**
+  - Production: set `advanced.ipAddress` (`trustedProxies` or `ipAddressHeaders`) for the host's proxy in 0.14, or every client shares one rate-limit bucket. Consider `storage: "database"` if more than one instance ever runs.
+  - Create production OAuth apps with production callback URLs in 0.14.
+  - 0.12 (observability) should route `logAuth` through pino with the same redaction.
+  - 0.13: confirm `next build` under `NODE_ENV=test` for the CI e2e path.

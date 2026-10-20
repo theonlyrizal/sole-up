@@ -57,6 +57,17 @@ export default defineConfig({
             // The app's db client reads DATABASE_URL, so point it at the
             // test database for every integration worker.
             DATABASE_URL: testDatabaseUrl,
+            // Better Auth needs these at import. Fixed, test-only values:
+            // this secret signs sessions in the test database only.
+            BETTER_AUTH_SECRET:
+              "integration-tests-only-secret-not-for-real-use",
+            BETTER_AUTH_URL: "http://localhost:3000",
+            // No OAuth credentials reach integration tests: no provider is
+            // configured, whatever the shell or .env.local holds.
+            GOOGLE_CLIENT_ID: "",
+            GOOGLE_CLIENT_SECRET: "",
+            GITHUB_CLIENT_ID: "",
+            GITHUB_CLIENT_SECRET: "",
           },
           globalSetup: ["tests/integration/helpers/global-setup.ts"],
           setupFiles: ["tests/integration/helpers/setup.ts"],
