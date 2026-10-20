@@ -67,6 +67,8 @@ Suggested fields:
 ### Goal
 A desired outcome. Rules settled in [ADR 0010](decisions/0010-goal-status-priority-progress.md).
 
+Implemented in chunk 1.1 as the `goals` table (`src/server/db/schema/goals.ts`): CHECKs on status, priority, date order and `completed_at` (set only while `completed`, or `archived` after completing), and `ON DELETE SET NULL (life_area_id)` on the composite area key so `user_id` is never cleared. Audit events: `goal.created`, `goal.updated` (changed field names; values only for area, priority and dates), `goal.status_changed`. Deleting a goal removes its events.
+
 Fields:
 - `id`
 - `user_id`

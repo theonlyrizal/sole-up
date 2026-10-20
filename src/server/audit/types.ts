@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import { isLocalDate } from "@/lib/dates";
+import {
+  GOAL_EDITABLE_FIELDS,
+  GOAL_PRIORITIES,
+  GOAL_STATUSES,
+} from "@/lib/goals";
 import { LIFE_AREA_COLORS, LIFE_AREA_STATUSES } from "@/lib/life-areas";
 import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
 
@@ -125,6 +131,7 @@ export function defineAuditEvents<const R extends AuditEventRegistry>(
 }
 
 const sortOrder = z.number().int().min(0);
+const localDate = z.string().refine(isLocalDate);
 
 /**
  * The allowlist. Add each new event here with its entity type and a strict
@@ -190,6 +197,35 @@ export const AUDIT_EVENTS = defineAuditEvents({
   },
   // No `life_area.deleted`: a hard delete removes the area's events with it
   // (ADR 0005).
+
+  // Goals. Title, description and reason are user content: `goal.updated`
+  // records which fields changed, plus old and new values for the
+  // structured ones (area, priority, dates) only.
+  "goal.created": {
+    entityType: "goal",
+    changes: z.strictObject({
+      status: auditChange(z.enum(GOAL_STATUSES)),
+      lifeAreaId: auditChange(z.uuid()),
+      priority: auditChange(z.enum(GOAL_PRIORITIES)),
+      startDate: auditChange(localDate),
+      targetDate: auditChange(localDate),
+    }),
+  },
+  "goal.updated": {
+    entityType: "goal",
+    changes: z.strictObject({
+      fields: z.array(z.enum(GOAL_EDITABLE_FIELDS)).min(1),
+      lifeAreaId: auditChange(z.uuid()).optional(),
+      priority: auditChange(z.enum(GOAL_PRIORITIES)).optional(),
+      startDate: auditChange(localDate).optional(),
+      targetDate: auditChange(localDate).optional(),
+    }),
+  },
+  "goal.status_changed": {
+    entityType: "goal",
+    changes: z.strictObject({ status: auditChange(z.enum(GOAL_STATUSES)) }),
+  },
+  // No `goal.deleted`, for the same reason as life areas (ADR 0005).
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;
