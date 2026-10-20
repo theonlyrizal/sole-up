@@ -143,3 +143,20 @@ export function startOfWeek(date: LocalDate, weekStart: WeekStart): LocalDate {
 export function formatLocalDate(date: LocalDate, locale: string): string {
   return parseLocalDate(date).toLocaleString(locale, { dateStyle: "medium" });
 }
+
+/**
+ * An instant for display, such as "12 Mar 2027, 14:05" in `en-GB`, as the
+ * wall-clock time in the user's `timeZone`.
+ */
+export function formatInstant(
+  instant: Date,
+  locale: string,
+  timeZone: string,
+): string {
+  toInstant(instant); // rejects an invalid Date
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  }).format(instant);
+}

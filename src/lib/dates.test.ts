@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDays,
   dayOfWeek,
+  formatInstant,
   formatLocalDate,
   instantFromLocal,
   isLocalDate,
@@ -219,5 +220,21 @@ describe("formatLocalDate", () => {
 
   it("rejects an invalid date", () => {
     expect(() => formatLocalDate("2027-02-30", "en-GB")).toThrow(RangeError);
+  });
+});
+
+describe("formatInstant", () => {
+  it("shows the wall-clock time in the user's time zone", () => {
+    const instant = at("2027-03-12T23:30:00Z");
+    expect(formatInstant(instant, "en-GB", "UTC")).toBe("12 Mar 2027, 23:30");
+    expect(formatInstant(instant, "en-GB", "Asia/Jakarta")).toBe(
+      "13 Mar 2027, 06:30",
+    );
+  });
+
+  it("rejects an invalid instant", () => {
+    expect(() => formatInstant(new Date(Number.NaN), "en-GB", "UTC")).toThrow(
+      RangeError,
+    );
   });
 });

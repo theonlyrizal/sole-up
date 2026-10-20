@@ -107,7 +107,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 1.0 | Decision gate: goals | done | chunk/1.0-goals-decisions | 2026-10-20 | ADR 0010: five statuses (restore → active), optional low/medium/high, milestone-count progress, local dates + order CHECK; 1.1–1.6 and DATA_MODEL synced |
 | 1.1 | Goals: schema and service | done | chunk/1.1-goals-schema-service | 2026-10-20 | `goals` (3 CHECKs + completed_at CHECK, composite area FK with hand-edited `SET NULL (life_area_id)`), Zod validation, service with ADR 0010 transitions and audit |
 | 1.2 | Goals: list and create/edit UI | done | chunk/1.2-goals-list-ui | 2026-10-21 | `/goals` grouped by life area with Active/Paused/Completed/Dropped filter (URL `?status=`), create/edit dialog (title only required, prominent "Why does this matter?"), kind status-action copy |
-| 1.3 | Goal detail page | todo | | | |
+| 1.3 | Goal detail page | done | chunk/1.3-goal-detail | 2026-10-21 | `/goals/[goalId]`: header, reason, milestone/task placeholders, history timeline from audit events (structured changes only), status actions incl. Restore, in-shell not-found |
 | 1.4 | Milestones: schema and service | todo | | | |
 | 1.5 | Milestones UI and progress | todo | | | |
 | 1.6 | Goal archive and delete flows | todo | | | |
@@ -1280,3 +1280,23 @@ Template:
   - An optional priority filter, if dogfooding wants one.
   - Deleting a life area still writes no `goal.updated` event for the goals it clears (1.1 follow-up, still open).
 
+### 1.3: Goal detail page (2026-10-21)
+- **Built:**
+  - Route `src/app/(app)/goals/[goalId]/`: `page.tsx` (UUID check before the query, `notFound()` for a missing or foreign goal; fixed tab title "Goal · SoleUp" so goal titles stay out of browser history), `not-found.tsx` (inside the shell), `error.tsx`.
+  - `src/components/goals/goal-detail.tsx`: header (title, status, area, priority label, start/target dates, "Completed on"), description, "Why it matters", placeholder Milestones and Tasks sections, status actions and Edit (reuses `GoalFormDialog`), and the History timeline (`<ol>`, newest first, `<time>` per entry). Back link returns to the filter the goal is listed under.
+  - `src/server/modules/goals/history.ts` (pure): `buildGoalHistory(events, { locale, timeZone, areaNames })` and `statusChangeSummary(from, to)`. Each event's `changes` is re-parsed with its `AUDIT_EVENTS` schema; an unknown or malformed event shows as "Changed" with no details.
+  - `getGoalDetail(userId, goalId)` in `queries.ts` (null when missing or another user's). `formatInstant(instant, locale, timeZone)` in `src/lib/dates.ts`.
+  - Goal titles on the Goals list now link to the detail page.
+  - Tests: unit `history.test.ts`, `formatInstant` in `dates.test.ts`, the archived action in `goals.test.ts`; integration `goal-detail.integration.test.ts` (5: header data, cross-user and missing → null, seven status changes incl. archive/restore and a no-op, completed date in the user's zone, edits shown without any text); e2e `tests/e2e/goal-detail.spec.ts` (list link, sections, Pause → Resume → Complete → Archive → Restore → Drop with the timeline checked after each step and after a reload, reason never in the history, back link, axe; not-found for a non-UUID and an unknown UUID inside the shell).
+- **Deviations:**
+  1. **A "Restore to Active" button on the detail page of an archived goal.** The done-when needs archive and restore in the UI, and the archive view is 1.6. `goalStatusActions("archived")` now returns it (previously empty); archived goals are still not on the Goals list. The label says where it lands (ADR 0010), so no confirmation dialog; 1.6 can add the confirmation it describes to the archive view.
+  2. **The timeline also shows `goal.updated` events** (area, priority and date changes with old → new values; edited text fields by name only, e.g. "Edited the title and why it matters"), not only status and date changes. The chunk text lists status and dates; the rest is the same structured data.
+- **Decisions:** area names in the timeline are looked up from the user's current areas at read time (never stored in events); a deleted area shows as "A deleted area". Event times show in the user's time zone and locale; "Completed on" is a local date. Recorded in `history.ts` comments.
+- **Next chunk should know:**
+  - 1.4/1.5: replace the Milestones placeholder in `goal-detail.tsx`; add `milestone.*` events to `AUDIT_EVENTS`. If milestone events should show in the goal's timeline, `getGoalDetail` queries only `entity_type = 'goal'` today: extend it (e.g. by goal ID in the event) and `buildGoalHistory`'s switch.
+  - Next keeps the previous route mounted but hidden after client navigation, so `getByText` in e2e can match hidden copies; use role-based locators (they skip hidden elements).
+  - Status buttons on the detail page are named by their label only (one goal per page), unlike the list's `"<Action>: <title>"`.
+- **Unverified:** none. `pnpm verify` (format, lint, typecheck, 229 unit, 147 integration), `pnpm build` and `pnpm test:e2e` (23 tests) pass. The detail journey takes about 17 s under parallel load, inside Playwright's 30 s limit.
+- **Follow-ups:**
+  - Deleting a life area still writes no `goal.updated` event, so its goals' timelines don't show losing the area (1.1 follow-up, still open).
+  - Archived goals are reachable only by URL until the archive view (1.6).
