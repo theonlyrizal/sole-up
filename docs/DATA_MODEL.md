@@ -65,39 +65,42 @@ Suggested fields:
 - `updated_at`
 
 ### Goal
-A desired outcome.
+A desired outcome. Rules settled in [ADR 0010](decisions/0010-goal-status-priority-progress.md).
 
-Suggested fields:
+Fields:
 - `id`
 - `user_id`
-- `life_area_id` (optional)
+- `life_area_id` (optional; composite FK, `SET NULL (life_area_id)` when the area is deleted)
 - `title`
-- `description`
-- `reason` or `why_it_matters`
-- `status` (e.g. active, paused, completed, archived)
-- `priority`
-- `start_date` (optional)
-- `target_date` (optional)
-- `measurement_type` (optional)
-- `target_value` and `current_value` only when meaningful for the measurement type
+- `description` (optional)
+- `reason` (optional; "why does this matter?")
+- `status`: `active | paused | completed | dropped | archived`, default `active`. `dropped` means priorities changed, not failure.
+- `priority` (optional): `low | medium | high`
+- `start_date` (optional local `date`)
+- `target_date` (optional local `date`; CHECK `target_date >= start_date` when both are set)
+- `completed_at` (optional instant; set on entering `completed`, kept when a completed goal is archived, cleared otherwise when leaving `completed` and on restore)
+- `status_changed_at`
 - `created_at`
 - `updated_at`
-- `completed_at` (optional)
 
-Do not force every goal into a numeric metric. Some goals are qualitative.
+Status transitions: any to any among `active`, `paused`, `completed` and `dropped`; any of those to `archived`; `archived` only to `active` (restore). Restore does not remember the status before archiving; the audit history does.
+
+Progress is derived, not stored: completed milestones out of non-dropped milestones ("2 of 5 milestones"), and nothing when there are none. Completing every milestone never completes the goal automatically.
+
+Do not force every goal into a numeric metric. Some goals are qualitative. Numeric targets (`measurement_type`, `target_value`, `current_value`) are deferred past v1.
 
 ### Milestone
 A checkpoint within a goal.
 
-Suggested fields:
+Fields:
 - `id`
 - `user_id`
-- `goal_id`
+- `goal_id` (composite FK; deleted with the goal)
 - `title`
 - `description` (optional)
-- `status`
-- `due_date` (optional)
-- `completed_at` (optional)
+- `status`: `open | completed | dropped`, default `open`. Dropped milestones don't count toward progress.
+- `due_date` (optional local `date`; not constrained by the goal's dates)
+- `completed_at` (optional instant; set on completion, cleared on reopen)
 - `sort_order`
 - `created_at`
 - `updated_at`
@@ -406,6 +409,7 @@ Settled:
 4. History: audit events in the same transaction, content-free, allowlisted types ([ADR 0005](decisions/0005-history-and-audit-log.md)).
 5. Account deletion: cascading hard delete ([ADR 0006](decisions/0006-deletion.md)).
 6. ORM and migrations: Drizzle and drizzle-kit ([ADR 0001](decisions/0001-stack.md)).
+7. Goal statuses, priority, progress and dates; numeric targets deferred ([ADR 0010](decisions/0010-goal-status-priority-progress.md)).
 
 Still open (decided at phase gates in the implementation plan):
 1. Time blocks and recurring events (Phase 4).

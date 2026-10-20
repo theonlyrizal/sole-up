@@ -37,10 +37,10 @@ Build a useful personal management product first. Add AI when the product has re
 - Basic privacy settings.
 
 ### 1B. Life areas and goals
-- Create, edit, pause, complete, and archive goals.
-- Optional life-area assignment.
-- Optional target date and measurement.
-- Milestones and progress display.
+- Create, edit, pause, complete, drop, and archive goals.
+- Optional life-area assignment and priority.
+- Optional start and target dates. Numeric measurement is deferred ([ADR 0010](decisions/0010-goal-status-priority-progress.md)).
+- Milestones and progress display (completed out of non-dropped milestones).
 - Goal detail page with linked activity.
 
 ### 1C. Tasks

@@ -15,3 +15,4 @@ To change a decision, add a new ADR that supersedes the old one and update the o
 | [0007](0007-platform-and-push.md) | Platform and push | Accepted |
 | [0008](0008-dates-and-time-zones.md) | Dates and time zones library | Accepted |
 | [0009](0009-production-hosting.md) | Production hosting providers | Accepted |
+| [0010](0010-goal-status-priority-progress.md) | Goal status, priority, progress and dates | Accepted |
