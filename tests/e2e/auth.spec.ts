@@ -43,6 +43,8 @@ test("sign in through the shortcut, then sign out", async ({ page }) => {
   const email = await signInAsNewUser(page, "Ada Lovelace");
 
   await page.goto("/home");
+  // First sign-in: the time zone must be confirmed before anything else.
+  await page.getByRole("button", { name: "Confirm and continue" }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Home" }),
   ).toBeVisible();

@@ -20,7 +20,7 @@
 ### User
 Represents the account and identity used for access control.
 
-Implemented in chunk 0.6 as the `users` table owned by Better Auth (`id` uuid, `name`, `email` unique, `email_verified`, `image`, timestamps). Provider identities live in `accounts` (one row per provider, unique on provider and provider account ID), and database sessions in `sessions`. Both cascade when the user is deleted. Preferences such as time zone, locale and week start are not on `users` yet; they arrive in chunk 0.9.
+Implemented in chunk 0.6 as the `users` table owned by Better Auth (`id` uuid, `name`, `email` unique, `email_verified`, `image`, timestamps). Provider identities live in `accounts` (one row per provider, unique on provider and provider account ID), and database sessions in `sessions`. Both cascade when the user is deleted. Time zone, locale and week start live in `user_preferences` (below), not on `users`.
 
 Suggested fields:
 - `id`
@@ -36,6 +36,8 @@ Do not store passwords directly if using an external authentication provider.
 
 ### UserPreference
 Stores explicit product preferences.
+
+Implemented in chunk 0.9 as `user_preferences`: one row per user (`user_id` is the primary key, cascading from `users`), created with defaults on first sign-in. Typed columns: `timezone` (IANA name, validated against the server runtime's zone list and stored in its canonical spelling; **null until the user confirms one**, since the browser's zone is only proposed), `locale` (BCP 47, default `en-US`), `week_start` (smallint 0–6, 0 = Sunday, default 1 = Monday, CHECK-constrained), `created_at`, `updated_at`. Changes are audited as `user_preferences.updated` with the changed fields' old and new values.
 
 Suggested fields:
 - `id`

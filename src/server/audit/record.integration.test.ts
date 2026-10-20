@@ -15,8 +15,8 @@ import {
 } from "./record";
 import { auditChange, defineAuditEvents } from "./types";
 
-// The app's allowlist is empty until 0.11, so these tests use their own
-// registry with the same writer.
+// These tests use their own registry with the same writer, so they don't
+// depend on the app's events.
 const testEvents = defineAuditEvents({
   "probe.archived": {
     entityType: "probe",
@@ -98,7 +98,7 @@ describe("recordAudit", () => {
     await expect(write).rejects.toThrow("Unknown audit event type");
   });
 
-  it("rejects the app's allowlist for any type while it is empty", async () => {
+  it("rejects a type missing from the app's allowlist", async () => {
     const user = await createTestUser();
     const write = db.transaction((tx) =>
       appRecordAudit(tx, {

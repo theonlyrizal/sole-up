@@ -97,7 +97,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.6 | Authentication | done | chunk/0.6-auth | 2026-10-20 | Better Auth 1.7.11 (Drizzle, UUID IDs, plural tables), Google + GitHub, verified-email linking, DB sessions, rate limits, redacted auth logs, test fixtures and fail-closed e2e sign-in |
 | 0.7 | Authorization primitives | done | chunk/0.7-authz | 2026-10-20 | `authedAction(schema, handler)`, `ActionResult` + `NotFound`/`Validation`/`Conflict` errors with user-safe messages, cookie-check proxy for (app) routes |
 | 0.8 | Audit log infrastructure | done | chunk/0.8-audit-log | 2026-10-20 | `audit_events` + 2 indexes, strict allowlist registry (empty until 0.11), `recordAudit(tx, event)`, `deleteAuditEventsForEntity(tx, ref)` |
-| 0.9 | User preferences | todo | | | |
+| 0.9 | User preferences | done | chunk/0.9-user-preferences | 2026-10-20 | `user_preferences` (typed, one row per user, tz null until confirmed), first-sign-in confirm gate, `lib/dates` on temporal-polyfill (ADR 0008), Settings page |
 | 0.10 | App shell and UI primitives | todo | | | |
 | 0.11 | Reference slice: Life Areas | todo | | | |
 | 0.12 | Observability and error handling | todo | | | |
@@ -1040,3 +1040,33 @@ Template:
   - The audit test for "no name is stored" (0.11) can read `audit_events` directly via `auditEvents` from `@/server/db/schema`.
 - **Unverified:** none. `pnpm verify` passes (format, lint, typecheck, 76 unit, 44 integration). `pnpm build` and `pnpm test:e2e` were not run (no route or UI changes). Dev DB migrated.
 - **Follow-ups:** none.
+
+### 0.9: User preferences (2026-10-20)
+- **Built:**
+  - Schema `src/server/db/schema/preferences.ts` + migration `0003_user_preferences.sql`: `user_preferences` (`user_id` PK → `users` on delete cascade, `timezone` text **nullable**, `locale` text default `en-US`, `week_start` smallint default 1 with CHECK 0–6, length CHECKs, `created_at`, `updated_at`).
+  - `src/lib/dates.ts` (pure, client-safe): `todayFor(tz, now?)`, `localDateOf`, `localDateTimeOf`, `instantFromLocal` (DST `"compatible"`), `startOfLocalDay`, `localDayRange`, `addDays`, `dayOfWeek`, `startOfWeek(date, weekStart)`, `isLocalDate`; types `LocalDate`, `WeekStart`.
+  - `src/lib/preferences.ts` (pure): `supportedTimeZones()` (runtime list + `UTC`), `canonicalTimeZone`, `matchTimeZoneOption`, `canonicalLocale`, `COMMON_LOCALES`, `localeOptions`, `localeLabel`, `WEEK_DAYS`.
+  - `src/server/modules/preferences/`: `validation.ts` (`savePreferencesSchema`, strict, canonicalizes), `service.ts` (`ensureUserPreferences`, `getUserPreferences`, `savePreferences` in one transaction with `SELECT … FOR UPDATE` and an audit event of changed fields only), `actions.ts` (`savePreferences` via `authedAction`, then `refresh()`).
+  - Audit event `user_preferences.updated` (entity ID = user ID) in `AUDIT_EVENTS`.
+  - Better Auth `databaseHooks.user.create.after` creates the row on first sign-in.
+  - UI: `src/components/preferences/preferences-form.tsx` (shared by both screens), the (app) layout gate ("Confirm your time zone" replaces page content until `timezone` is set), `src/app/(app)/settings/page.tsx`, a Settings link in the header. `settings` added to `APP_ROUTE_SEGMENTS`.
+  - Tests: unit `src/lib/dates.test.ts` (todayFor at midnight in 7 zones incl. half/quarter-hour offsets, UTC+14/−11, DST in New York, Santiago's missing midnight; conversions, DST gap/overlap, 23/25-hour days, week starts) and `src/lib/preferences.test.ts`; integration `src/server/modules/preferences/preferences.integration.test.ts` (row created by a real OAuth sign-in, safety-net creation, cascade, DB CHECK, audit only on change, cross-user, unauthenticated, field errors, fixed offsets rejected, `userId` key rejected); e2e `tests/e2e/preferences.spec.ts` (device zone proposed but not stored until confirmed; settings round-trip incl. reload and "Use it"). `auth.spec.ts` now confirms the zone after sign-in.
+  - Docs: ADR 0008, DATA_MODEL UserPreference, README "Dates and time zones".
+- **Deviations:**
+  1. **`timezone` is nullable** (null = not confirmed) instead of defaulting to a zone, so nothing is ever set silently.
+  2. **The confirmation form also proposes the browser's locale** and shows week start; it is the same form as Settings. Only an explicit save stores anything.
+  3. **Preference changes are audited** (`user_preferences.updated`), which the chunk text didn't mention, following the audit convention. The 0.8 test "rejects the app's allowlist while it is empty" was renamed since the allowlist is no longer empty.
+- **Decisions:**
+  1. **`temporal-polyfill` 1.0.5** (not 1.0.6, published a week ago) — see ADR 0008. Imported, not global; only `lib/dates.ts` uses it, so it isn't in the client bundle today.
+  2. **Zones are stored in the server runtime's canonical spelling.** Node 24's ICU uses legacy names (`Asia/Calcutta`, `Europe/Kiev`); browsers say `Asia/Kolkata`. `matchTimeZoneOption` maps the browser's zone onto the server's list. `UTC` is added (V8 omits it); `Etc/GMT±N` and offsets are not in the list, so they are rejected.
+  3. **Row creation is idempotent and also runs on read** (`getUserPreferences`), because Better Auth runs after-create hooks after its transaction commits; a failed hook must not leave a user without a row. Test users inserted directly rely on this.
+  4. **Locale labels are computed on the server** and passed to the form, so server and browser Intl differences can't cause a hydration mismatch. The device zone/locale are read with `useSyncExternalStore` (server snapshot `null`).
+- **Next chunk should know:**
+  - "Today" for a user: `const { timezone } = await getUserPreferences(userId); todayFor(timezone!)`. Inside (app) pages the layout guarantees a confirmed zone is shown before content, but a page still reads `null` in its type; handle it (or add a `requireConfirmedPreferences` helper when the first consumer needs one).
+  - e2e tests that sign in a new user must click "Confirm and continue" first. `test.use({ timezoneId })` controls the proposed zone.
+  - In dev, a gated render logs Next's "Could not validate … instant navigation … Dropped segment" for the page; harmless, same family as the 0.6 note. If 0.10 wants it gone, move confirmation to its own route outside `(app)` with a redirect.
+  - The `PreferencesForm` hand-rolls label/hint/error wiring; 0.10's `FormField`/`Select` primitives should replace it.
+- **Unverified:** none. `pnpm verify` (format, lint, typecheck, 106 unit, 56 integration), `pnpm build` and `pnpm test:e2e` (6 tests) pass. Dev DB migrated.
+- **Follow-ups:**
+  - Move to native Temporal when Node LTS and Safari ship it (ADR 0008).
+  - Zone labels are raw IANA names (with legacy spellings on Node 24, e.g. "Europe/Kiev"); consider friendlier labels or upgrading to Node 26 LTS when it lands.

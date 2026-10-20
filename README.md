@@ -131,6 +131,12 @@ Every service mutation records a content-free audit event in the same transactio
 - Call `recordAudit(tx, { type, userId, entityId, changes })` from `src/server/audit/record.ts` inside the transaction that makes the change. It only accepts a transaction handle; an unknown type or an extra key throws `InvalidAuditEventError`, which rolls the change back.
 - A hard delete calls `deleteAuditEventsForEntity(tx, { userId, entityType, entityId })` in the same transaction: `audit_events.entity_id` has no foreign key. Account deletion cascades through `user_id`.
 
+**Dates and time zones**
+
+- Use the helpers in `src/lib/dates.ts` ([ADR 0008](docs/decisions/0008-dates-and-time-zones.md)): `todayFor(tz)`, `localDateOf`, `localDateTimeOf`, `instantFromLocal`, `startOfLocalDay`, `localDayRange`, `addDays`, `startOfWeek`. Never use the server clock's date or UTC's date as "today".
+- Local dates are `YYYY-MM-DD` strings (Postgres `date`, string mode); instants are `Date` (`timestamptz`); zones are IANA names. Only `src/lib/dates.ts` imports `temporal-polyfill`.
+- The user's zone, locale and week start come from `getUserPreferences(userId)` (`src/server/modules/preferences/service.ts`). `timezone` is `null` until the user confirms it; the (app) layout shows the confirmation form until then.
+
 ## Testing
 
 | Command | Runs |

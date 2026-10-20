@@ -13,3 +13,4 @@ To change a decision, add a new ADR that supersedes the old one and update the o
 | [0005](0005-history-and-audit-log.md) | History and audit log | Accepted |
 | [0006](0006-deletion.md) | Deletion | Accepted |
 | [0007](0007-platform-and-push.md) | Platform and push | Accepted |
+| [0008](0008-dates-and-time-zones.md) | Dates and time zones library | Accepted |
