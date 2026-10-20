@@ -39,3 +39,10 @@ export const db = drizzle({
 });
 
 export type Db = typeof db;
+
+/**
+ * The handle passed to a `db.transaction()` callback. Functions that must run
+ * inside a caller's transaction (such as recordAudit) take this type, so
+ * passing the plain `db` is a type error.
+ */
+export type DbTransaction = Parameters<Parameters<Db["transaction"]>[0]>[0];

@@ -96,7 +96,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.5 | Test harness | done | chunk/0.5-test-harness | 2026-10-20 | Vitest 5 unit + integration projects (migrate once, truncate between tests, `_test` URL guard), Playwright 1.64 smoke test, test:* and verify scripts |
 | 0.6 | Authentication | done | chunk/0.6-auth | 2026-10-20 | Better Auth 1.7.11 (Drizzle, UUID IDs, plural tables), Google + GitHub, verified-email linking, DB sessions, rate limits, redacted auth logs, test fixtures and fail-closed e2e sign-in |
 | 0.7 | Authorization primitives | done | chunk/0.7-authz | 2026-10-20 | `authedAction(schema, handler)`, `ActionResult` + `NotFound`/`Validation`/`Conflict` errors with user-safe messages, cookie-check proxy for (app) routes |
-| 0.8 | Audit log infrastructure | todo | | | |
+| 0.8 | Audit log infrastructure | done | chunk/0.8-audit-log | 2026-10-20 | `audit_events` + 2 indexes, strict allowlist registry (empty until 0.11), `recordAudit(tx, event)`, `deleteAuditEventsForEntity(tx, ref)` |
 | 0.9 | User preferences | todo | | | |
 | 0.10 | App shell and UI primitives | todo | | | |
 | 0.11 | Reference slice: Life Areas | todo | | | |
@@ -1018,3 +1018,25 @@ Template:
   - 0.8 should decide whether `recordAudit` failures surface as `INTERNAL` (current default for any non-domain error).
   - 0.12: route `logUnexpectedActionError` through pino with request IDs.
   - A `FormData` → object helper when the first form-based action lands (0.11).
+
+### 0.8: Audit log infrastructure (2026-10-20)
+- **Built:**
+  - Schema `src/server/db/schema/audit.ts` + migration `0002_audit_events.sql`: `audit_events` (`id`, `user_id` → `users` on delete cascade, `event_type`, `entity_type`, `entity_id` uuid with no FK, `occurred_at` timestamptz default `now()`, `changes` jsonb), indexes `(user_id, occurred_at)` and `(user_id, entity_type, entity_id)`.
+  - `src/server/audit/types.ts`: `AUDIT_EVENTS` allowlist (each entry: `entityType` + a `changes` Zod schema), `defineAuditEvents()` (checks names and strictness at module load), `assertStrictAuditSchema()`, `auditChange(value)` → strict `{ from, to }`.
+  - `src/server/audit/record.ts`: `createAuditLog(registry)` → `recordAudit(tx, event)` and `deleteAuditEventsForEntity(tx, { userId, entityType, entityId })`; the app instances are exported. `InvalidAuditEventError`.
+  - `DbTransaction` type in `src/server/db/client.ts`.
+  - Tests: unit `src/server/audit/types.test.ts` (strictness guard, registry naming); integration `src/server/audit/record.integration.test.ts` (unknown type, inherited keys like `toString`, extra key in `changes`/nested change/envelope, bad values, rollback of the event with its transaction, rollback of the state change when the event is rejected, account-deletion cascade, scoped delete helper and its rollback).
+  - README > Database and migrations > Audit log.
+- **Deviations:** the allowlist is **empty**: no domain entity exists yet and 0.11 owns the first events (`life_area.*`). Tests use their own registry through `createAuditLog()`, the same code path as the app instance; one test proves the app instance rejects everything today. Also added the delete helper the user asked for (the chunk text only implies it via the audit rules).
+- **Decisions:**
+  1. **The event's `entity_type` comes from the registry**, not the caller, so a type and its entity can't disagree. Event types are `<entity_type>.<verb>`.
+  2. **Strictness is enforced at module load**: every object in a `changes` schema must be `z.strictObject`; records, `any`, `unknown` and `Date` are refused (dates go in as ISO strings). The event envelope is strict too.
+  3. **`recordAudit` takes a `DbTransaction`**, so passing the plain `db` is a type error.
+  4. **Rejected events throw `InvalidAuditEventError`** (not a `DomainError`), which rolls back the transaction and surfaces as `INTERNAL` through `authedAction` (answers the 0.7 follow-up). Its message lists the event type, paths, Zod issue codes and unrecognized key names only, never values; an unknown type is not echoed.
+  5. **`occurred_at` defaults to `now()`** (transaction start), so events in one transaction share a timestamp.
+- **Next chunk should know:**
+  - Pattern: `await db.transaction(async (tx) => { /* change */; await recordAudit(tx, { type: "life_area.archived", userId, entityId: id, changes: { status: auditChange(...) } }); });`. Add the event to `AUDIT_EVENTS` first; the `type` union is derived from it.
+  - Hard delete: call `deleteAuditEventsForEntity(tx, ...)` in the same transaction as the entity delete, and test it.
+  - The audit test for "no name is stored" (0.11) can read `audit_events` directly via `auditEvents` from `@/server/db/schema`.
+- **Unverified:** none. `pnpm verify` passes (format, lint, typecheck, 76 unit, 44 integration). `pnpm build` and `pnpm test:e2e` were not run (no route or UI changes). Dev DB migrated.
+- **Follow-ups:** none.
