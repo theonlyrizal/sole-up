@@ -7,12 +7,12 @@ export const metadata: Metadata = { title: "Home · SoleUp" };
 
 export default function HomePage() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-10">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-10">
       <h1 className="text-2xl font-semibold tracking-tight">Home</h1>
       <Suspense fallback={null}>
         <Greeting />
       </Suspense>
-    </main>
+    </div>
   );
 }
 

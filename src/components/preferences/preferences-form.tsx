@@ -2,6 +2,10 @@
 
 import { useId, useState, useSyncExternalStore, useTransition } from "react";
 
+import { Button } from "@/components/ui/button";
+import { cx, focusRing } from "@/components/ui/cx";
+import { FormField } from "@/components/ui/form-field";
+import { Select } from "@/components/ui/select";
 import type { WeekStart } from "@/lib/dates";
 import {
   WEEK_DAYS,
@@ -57,9 +61,6 @@ function zoneLabel(zone: string) {
   return zone.replaceAll("_", " ");
 }
 
-const fieldClass =
-  "w-full rounded-md border border-border bg-surface px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-invalid:border-danger";
-
 export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
   const ids = useId();
   const device = useDevice();
@@ -114,7 +115,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
-      <Field
+      <FormField
         id={`${ids}-timezone`}
         label="Time zone"
         hint={
@@ -124,19 +125,16 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
         }
         errors={fieldErrors.timezone}
       >
-        {(describedBy, invalid) => (
-          <select
-            id={`${ids}-timezone`}
+        {(control) => (
+          <Select
+            {...control}
             name="timezone"
             value={timezone}
             required
-            aria-describedby={describedBy}
-            aria-invalid={invalid || undefined}
             onChange={(event) => {
               setChosenZone(event.target.value);
               edited();
             }}
-            className={fieldClass}
           >
             {timezone === "" && <option value="">Choose a time zone</option>}
             {timeZones.map((zone) => (
@@ -144,9 +142,9 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
                 {zoneLabel(zone)}
               </option>
             ))}
-          </select>
+          </Select>
         )}
-      </Field>
+      </FormField>
 
       {showDeviceHint && (
         <p className="-mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -157,80 +155,73 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
               setChosenZone(deviceZone);
               edited();
             }}
-            className="rounded-sm underline underline-offset-2 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className={cx(
+              "rounded-sm underline underline-offset-2 hover:text-fg",
+              focusRing,
+            )}
           >
             Use it
           </button>
         </p>
       )}
 
-      <Field
+      <FormField
         id={`${ids}-locale`}
         label="Language and region"
         hint="Sets how dates and numbers are formatted."
         errors={fieldErrors.locale}
       >
-        {(describedBy, invalid) => (
-          <select
-            id={`${ids}-locale`}
+        {(control) => (
+          <Select
+            {...control}
             name="locale"
             value={locale}
-            aria-describedby={describedBy}
-            aria-invalid={invalid || undefined}
             onChange={(event) => {
               setChosenLocale(event.target.value);
               edited();
             }}
-            className={fieldClass}
           >
             {localeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </select>
+          </Select>
         )}
-      </Field>
+      </FormField>
 
-      <Field
+      <FormField
         id={`${ids}-week-start`}
         label="Week starts on"
         errors={fieldErrors.weekStart}
       >
-        {(describedBy, invalid) => (
-          <select
-            id={`${ids}-week-start`}
+        {(control) => (
+          <Select
+            {...control}
             name="weekStart"
             value={weekStart}
-            aria-describedby={describedBy}
-            aria-invalid={invalid || undefined}
             onChange={(event) => {
               setWeekStart(Number(event.target.value) as WeekStart);
               edited();
             }}
-            className={fieldClass}
           >
             {WEEK_DAYS.map((day, index) => (
               <option key={day} value={index}>
                 {day}
               </option>
             ))}
-          </select>
+          </Select>
         )}
-      </Field>
+      </FormField>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          disabled={pending || timezone === ""}
-          className="rounded-md bg-accent px-4 py-2 text-base font-medium text-accent-fg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-60"
-        >
+        <Button type="submit" disabled={pending || timezone === ""}>
           {pending
             ? "Saving…"
             : mode === "confirm"
               ? "Confirm and continue"
               : "Save"}
-        </button>
+        </Button>
         <p role="status" className="text-sm text-success">
           {saved && mode === "settings" ? "Saved." : null}
         </p>
@@ -239,44 +230,5 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
         {error && error.code !== "VALIDATION" ? error.message : null}
       </p>
     </form>
-  );
-}
-
-function Field({
-  id,
-  label,
-  hint,
-  errors,
-  children,
-}: {
-  id: string;
-  label: string;
-  hint?: string;
-  errors?: string[];
-  children: (
-    describedBy: string | undefined,
-    invalid: boolean,
-  ) => React.ReactNode;
-}) {
-  const hintId = hint ? `${id}-hint` : undefined;
-  const errorId = errors?.length ? `${id}-error` : undefined;
-  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
-      {children(describedBy, Boolean(errorId))}
-      {hint && (
-        <p id={hintId} className="text-sm text-muted">
-          {hint}
-        </p>
-      )}
-      {errorId && (
-        <p id={errorId} className="text-sm text-danger">
-          {errors!.join(" ")}
-        </p>
-      )}
-    </div>
   );
 }

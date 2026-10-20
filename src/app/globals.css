@@ -24,6 +24,7 @@
   --accent-fg: #ffffff;
   --focus: #2f6f5e;
   --danger: #b42318;
+  --danger-fg: #ffffff;
   --success: #2e7d32;
 
   /* Spacing: one unit of Tailwind's spacing scale (p-1 = 1 unit) */
@@ -58,6 +59,7 @@
     --accent-fg: #0d1f1a;
     --focus: #6fbfa6;
     --danger: #f97066;
+    --danger-fg: #2a0a07;
     --success: #73c27a;
   }
 }
@@ -74,6 +76,7 @@
   --accent-fg: #0d1f1a;
   --focus: #6fbfa6;
   --danger: #f97066;
+  --danger-fg: #2a0a07;
   --success: #73c27a;
 }
 
@@ -88,6 +91,7 @@
   --color-accent-fg: var(--accent-fg);
   --color-focus: var(--focus);
   --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
   --color-success: var(--success);
 
   --spacing: var(--space-unit);

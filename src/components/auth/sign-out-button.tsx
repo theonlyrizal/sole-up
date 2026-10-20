@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
 export function SignOutButton() {
@@ -30,14 +31,14 @@ export function SignOutButton() {
           Sign-out failed. Try again.
         </span>
       )}
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={signOut}
         disabled={pending}
-        className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
       >
         {pending ? "Signing out…" : "Sign out"}
-      </button>
+      </Button>
     </div>
   );
 }

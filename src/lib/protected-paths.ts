@@ -4,7 +4,12 @@
  * for the signed-in area. A unit test fails if a folder under src/app/(app)
  * is missing from it.
  */
-export const APP_ROUTE_SEGMENTS = ["home", "settings"] as const;
+export const APP_ROUTE_SEGMENTS = [
+  "home",
+  "goals",
+  "plan",
+  "settings",
+] as const;
 
 export const SIGN_IN_PATH = "/sign-in";
 
