@@ -20,6 +20,8 @@
 ### User
 Represents the account and identity used for access control.
 
+Implemented in chunk 0.6 as the `users` table owned by Better Auth (`id` uuid, `name`, `email` unique, `email_verified`, `image`, timestamps). Provider identities live in `accounts` (one row per provider, unique on provider and provider account ID), and database sessions in `sessions`. Both cascade when the user is deleted. Preferences such as time zone, locale and week start are not on `users` yet; they arrive in chunk 0.9.
+
 Suggested fields:
 - `id`
 - `email` or auth-provider subject

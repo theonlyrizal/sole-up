@@ -35,10 +35,11 @@ Requires Node 24 (see `.nvmrc`), pnpm 11 (`corepack enable` picks up the version
 
    `--wait` returns once the healthcheck passes; `docker compose ps` should show the service as `healthy`. Data persists in the `soleup_postgres-data` volume. `docker compose down -v` deletes it, and the databases are recreated on the next start.
 
-3. Create your env file. The defaults in `.env.example` match the local Postgres; the auth variables can stay empty until sign-in exists.
+3. Create your env file. The defaults in `.env.example` match the local Postgres. Set `BETTER_AUTH_SECRET` to a random value of at least 32 characters (the second command prints one). OAuth credentials are optional; without them the sign-in page says no provider is configured (see [Authentication](#authentication)).
 
    ```bash
    cp .env.example .env.local
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
    ```
 
 4. Run the app and open http://localhost:3000:
@@ -49,7 +50,49 @@ Requires Node 24 (see `.nvmrc`), pnpm 11 (`corepack enable` picks up the version
 
 The server validates its environment at startup (`src/server/env.ts`). If a variable is missing or malformed, it prints which ones and exits instead of starting. Server-only variables stay in `src/server/env.ts`; browser-visible `NEXT_PUBLIC_*` variables go in `src/lib/client-env.ts`.
 
-Checks: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`. The build does not need env variables; validation runs when the server starts. `pnpm format` fixes formatting.
+Checks: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`. The build does not need env variables: during `next build` only, missing required values get inert placeholders, and the real environment is validated when the server starts. `pnpm format` fixes formatting.
+
+## Authentication
+
+Sign-in uses [Better Auth](https://www.better-auth.com) (`src/server/auth/`) with Google and GitHub OAuth and database sessions; see [ADR 0002](docs/decisions/0002-auth.md). Its tables (`users`, `sessions`, `accounts`, `verifications`) are in `src/server/db/schema/auth.ts`, with UUID IDs.
+
+- **In code:** call `requireUser()` from `@/server/auth/session` first in every authenticated page, Server Action and route handler. It returns the user or redirects to `/sign-in`. The `(app)` layout also checks the session, but a layout is not an authorization boundary.
+- **Account linking:** signing in with a second provider joins the existing account only when that provider reports the same email as verified, and the existing account's email is verified too. Otherwise the sign-in page explains what happened.
+- **Rate limiting:** Better Auth's limiter (in memory) runs on every request through `/api/auth/*`: 100 requests a minute per IP and path, and 10 a minute for sign-in and OAuth callbacks. Sign-in and sign-out go through the Better Auth client for this reason; server-side `auth.api.*` calls are not limited.
+- **Providers** are enabled only when both their ID and secret are set. Setting only one of the pair stops the server at boot with a clear message.
+
+### Creating the OAuth apps
+
+Create one app per provider for each environment (local now, production in chunk 0.14) and put the credentials in `.env.local`. Never commit them. The callback URL is always `<BETTER_AUTH_URL>/api/auth/callback/<provider>`.
+
+| Provider | Local callback URL |
+|---|---|
+| Google | `http://localhost:3000/api/auth/callback/google` |
+| GitHub | `http://localhost:3000/api/auth/callback/github` |
+
+**Google** ([Google Cloud console](https://console.cloud.google.com)):
+
+1. Create a project (for example `soleup-dev`) and select it.
+2. Open **Google Auth Platform** (APIs & Services > OAuth consent screen) and click **Get started**. Enter the app name `SoleUp` and your support email, choose **External** as the audience, add your contact email, and accept the policy.
+3. Under **Audience**, keep the publishing status **Testing** and add your own Google account as a **test user**. Only test users can sign in while testing.
+4. Under **Data Access**, add nothing. Better Auth asks only for `openid`, `email` and `profile`.
+5. Under **Clients**, click **Create client**, choose **Web application**, and name it `SoleUp local`.
+   - **Authorized JavaScript origins:** `http://localhost:3000`
+   - **Authorized redirect URIs:** `http://localhost:3000/api/auth/callback/google`
+6. Click **Create**, then copy the client ID and client secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Copy the secret right away: the console may not show it again.
+
+**GitHub** ([Developer settings > OAuth Apps](https://github.com/settings/developers)):
+
+1. Click **New OAuth app**.
+   - **Application name:** `SoleUp (local)`
+   - **Homepage URL:** `http://localhost:3000`
+   - **Authorization callback URL:** `http://localhost:3000/api/auth/callback/github`
+   - Leave **Enable Device Flow** unchecked.
+2. Click **Register application**, copy the **Client ID** into `GITHUB_CLIENT_ID`, then click **Generate a new client secret** and copy it into `GITHUB_CLIENT_SECRET`.
+
+GitHub links to an existing SoleUp account only when your GitHub primary email is verified and matches that account's email.
+
+Restart `pnpm dev` after editing `.env.local`.
 
 ## Database and migrations
 
@@ -84,7 +127,7 @@ In PowerShell, set `$env:DATABASE_URL = "postgres://soleup:soleup@localhost:5432
 |---|---|
 | `pnpm test:unit` | Vitest `unit` project: `src/**/*.test.ts`, pure code, no database |
 | `pnpm test:integration` | Vitest `integration` project: `*.integration.test.ts` in `src/` or `tests/integration/`, against the real test database |
-| `pnpm test:e2e` | Playwright tests in `tests/e2e/`. Starts `pnpm dev` itself (or reuses a server already on port 3000); in CI (`CI` set) it builds and runs `pnpm start` |
+| `pnpm test:e2e` | Playwright tests in `tests/e2e/`. Starts its own server on port 3100 in test mode against the test database (`pnpm dev`, or a build plus `pnpm start` when `CI` is set). It uses the build folder `.next-e2e/`, so it can run next to `pnpm dev`, and reuses a server already on port 3100 locally |
 | `pnpm verify` | `format:check`, `lint`, `typecheck`, `test:unit` and `test:integration`. Run it before every commit |
 
 Before the first run:
@@ -99,5 +142,10 @@ How the integration project works:
 - Inside tests, the app's `db` client (`@/server/db/client`) points at the test database.
 - Before each test, every table in the `public` schema is truncated (identities restart). Tests never depend on data from another test.
 - Files run one at a time, because they share one database.
+
+Test users and sessions:
+
+- **Integration tests:** `createTestUser()` and `asUser(userId)` from `tests/integration/helpers/users.ts`. `asUser` creates a real database session and returns `{ userId, headers }`: pass `userId` to services and `headers` to code that reads the session.
+- **End-to-end tests:** `POST /api/test/sign-in` with `{ email?, name? }` signs the browser in without OAuth (see `tests/e2e/auth.spec.ts`). It works only when `NODE_ENV=test` and `SOLEUP_TEST_SIGN_IN=1` are both set, which the Playwright config does. In any other mode it answers 404. Never set `SOLEUP_TEST_SIGN_IN` anywhere else.
 
 `server-only` is replaced by a no-op in Vitest, so server modules can be tested directly. A module that parses the environment on import (like `src/server/env.ts`) needs the variables stubbed before it is imported; see `src/server/env.test.ts`.
