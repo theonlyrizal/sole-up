@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import type { WeekStart } from "@/lib/dates";
 import { recordAudit } from "@/server/audit/record";
@@ -107,4 +107,36 @@ export async function savePreferences(
     });
     return toPreferences(updated);
   });
+}
+
+/**
+ * Records the user's answer to the one-time starter life areas offer, inside
+ * the caller's transaction. Returns false, changing nothing, when the offer
+ * was already answered: it is shown once.
+ */
+export async function answerLifeAreaStarters(
+  tx: DbTransaction,
+  userId: string,
+  answer: "accepted" | "dismissed",
+): Promise<boolean> {
+  await ensureUserPreferences(userId, tx);
+  const [updated] = await tx
+    .update(userPreferences)
+    .set({ lifeAreaStarters: answer })
+    .where(
+      and(
+        eq(userPreferences.userId, userId),
+        isNull(userPreferences.lifeAreaStarters),
+      ),
+    )
+    .returning({ userId: userPreferences.userId });
+  if (!updated) return false;
+
+  await recordAudit(tx, {
+    type: "user_preferences.updated",
+    userId,
+    entityId: userId,
+    changes: { lifeAreaStarters: { from: null, to: answer } },
+  });
+  return true;
 }

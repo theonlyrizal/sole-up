@@ -3,4 +3,5 @@
 // drizzle-kit sees it and relational queries can use it.
 export * from "./auth";
 export * from "./audit";
+export * from "./life-areas";
 export * from "./preferences";

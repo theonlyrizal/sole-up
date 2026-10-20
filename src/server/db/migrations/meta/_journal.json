@@ -29,6 +29,13 @@
       "when": 1792486032600,
       "tag": "0003_user_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792492895638,
+      "tag": "0004_life_areas",
+      "breakpoints": true
     }
   ]
 }

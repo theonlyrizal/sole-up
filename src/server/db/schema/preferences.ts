@@ -28,6 +28,11 @@ export const userPreferences = pgTable(
     locale: text().notNull().default("en-US"),
     /** First day of the week: 0 = Sunday … 6 = Saturday. Default Monday. */
     weekStart: smallint().notNull().default(1),
+    /**
+     * The user's answer to the one-time starter life areas offer, or null
+     * while it hasn't been answered (src/server/modules/life-areas).
+     */
+    lifeAreaStarters: text().$type<"accepted" | "dismissed">(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
       .notNull()
@@ -42,6 +47,10 @@ export const userPreferences = pgTable(
     check(
       "user_preferences_timezone_length_check",
       sql`${table.timezone} is null or char_length(${table.timezone}) between 1 and 64`,
+    ),
+    check(
+      "user_preferences_life_area_starters_check",
+      sql`${table.lifeAreaStarters} is null or ${table.lifeAreaStarters} in ('accepted', 'dismissed')`,
     ),
     check(
       "user_preferences_locale_length_check",
