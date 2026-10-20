@@ -36,6 +36,13 @@
       "when": 1792492895638,
       "tag": "0004_life_areas",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792513658498,
+      "tag": "0005_goals",
+      "breakpoints": true
     }
   ]
 }

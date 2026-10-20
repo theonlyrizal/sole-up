@@ -105,7 +105,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.14 | First deploy | done | chunk/0.14-first-deploy | 2026-10-20 | Render Free (Singapore) + Neon Free (ADR 0009), render.yaml, `db:migrate:deploy` release step before traffic, docs/DEPLOY.md; user confirmed prod sign-in and persistence |
 | 0.✓ | Phase 0 exit check (user) | done | | 2026-10-20 | User confirmed fresh-clone setup, private routes in prod, CI/Render green; agent ran secret scan and `pnpm verify` on main |
 | 1.0 | Decision gate: goals | done | chunk/1.0-goals-decisions | 2026-10-20 | ADR 0010: five statuses (restore → active), optional low/medium/high, milestone-count progress, local dates + order CHECK; 1.1–1.6 and DATA_MODEL synced |
-| 1.1 | Goals: schema and service | todo | | | |
+| 1.1 | Goals: schema and service | done | chunk/1.1-goals-schema-service | 2026-10-20 | `goals` (3 CHECKs + completed_at CHECK, composite area FK with hand-edited `SET NULL (life_area_id)`), Zod validation, service with ADR 0010 transitions and audit |
 | 1.2 | Goals: list and create/edit UI | todo | | | |
 | 1.3 | Goal detail page | todo | | | |
 | 1.4 | Milestones: schema and service | todo | | | |
@@ -420,7 +420,7 @@ Decided 2026-10-20 in [ADR 0010](decisions/0010-goal-status-priority-progress.md
 - Service: create, update, `changeStatus`, delete. Transitions (ADR 0010): any to any among `active | paused | completed | dropped`; any of those to `archived`; `archived` only to `active`. Same status again is a no-op with no audit event. Every real change sets `status_changed_at`.
 - `completed_at`: set on entering `completed`; kept when a completed goal is archived; cleared on any other move out of `completed` and on restore.
 - Validation checks `start_date`/`target_date` together so the date-order error is a field error, not a database error.
-- Audit events: `goal.created`, `goal.updated` (structured fields only: area, priority, dates), `goal.status_changed`, `goal.deleted`.
+- Audit events: `goal.created`, `goal.updated` (structured fields only: area, priority, dates), `goal.status_changed`. No `goal.deleted`: a hard delete removes the goal's events in the same transaction (ADR 0005), as for life areas.
 - **Tests:** every allowed and rejected transition, the `completed_at` rules (including archive and restore), the date-order CHECK and its validation message, life area ownership, cross-user access, deleting a life area nulls the goal's area while keeping its `user_id`.
 
 ### 1.2 Goals: list and create/edit UI
@@ -1228,3 +1228,29 @@ Template:
 - **Next chunk should know:** 1.1 needs three CHECKs on `goals` (status, priority, date order) and `unique (id, user_id)`; validate the date pair together so the CHECK never surfaces as an INTERNAL error. `life_areas.status` is the pattern for text status + CHECK.
 - **Unverified:** none (docs only). `pnpm format:check` run on the changed docs.
 - **Follow-ups:** if restoring to `active` proves annoying while dogfooding, ADR 0010 names the alternative (four statuses + `archived_at`) to supersede it.
+
+### 1.1: Goals: schema and service (2026-10-20)
+- **Built:**
+  - `src/lib/goals.ts` (pure): statuses, priorities, length limits, `GOAL_EDITABLE_FIELDS`, `canChangeGoalStatus(from, to)`, `completedAtAfterStatusChange(...)`, the `Goal` type.
+  - Schema `src/server/db/schema/goals.ts` + migration `0005_goals.sql`: `goals` per the chunk, `unique (id, user_id)`, composite FK `(life_area_id, user_id) → life_areas(id, user_id)` **hand-edited** to `ON DELETE SET NULL ("life_area_id")`, indexes `(user_id, status)` and `(life_area_id, user_id)`, CHECKs for status, priority, date order, `completed_at`, and title/description/reason length.
+  - `src/server/modules/goals/`: `validation.ts` (`createGoalSchema`, `updateGoalSchema`, `changeGoalStatusSchema`, `goalIdSchema`; the date pair is checked together → `targetDate` field error), `service.ts` (`createGoal`, `updateGoal`, `changeGoalStatus`, `deleteGoal`).
+  - Audit events `goal.created|updated|status_changed`. `isForeignKeyViolation()` in `src/server/db/errors.ts`.
+  - Tests: unit `src/lib/goals.test.ts` (all 20 status pairs, `completed_at` rules), `validation.test.ts`, `errors.test.ts`; integration `goals.integration.test.ts` (44: CHECKs, composite FK, life-area delete keeps `user_id`, cascade, every allowed and rejected transition through the service, no-ops, `completed_at` incl. archive/restore, audit privacy, delete removes events, cross-user).
+- **Deviations:**
+  1. **No `goal.deleted` event** (user decision this session): ADR 0005 deletes an entity's events with it, as 0.11 did for life areas. Chunk text updated.
+  2. **No `actions.ts` or `queries.ts`** ("no UI" for this chunk); 1.2 adds them with the list and form.
+  3. **Extra CHECK `goals_completed_at_check`:** `completed` needs `completed_at`; `completed_at` only on `completed` or `archived`. Makes ADR 0010's rule hold for any write path.
+- **Decisions:**
+  1. A rejected transition (only `archived` → `paused|completed|dropped`) is a `ConflictError` ("Restore this goal to active before changing its status."). The same status again returns the goal unchanged.
+  2. `status_changed_at` and `completed_at` use SQL `now()`, so they equal the audit event's `occurred_at`.
+  3. A foreign or missing `lifeAreaId` is caught from the composite FK (race-safe, like 0.11's unique index) and returned as a `lifeAreaId` field error. Archived areas are still accepted; whether they stay selectable is for 1.2.
+  4. `goal.updated` records changed field names (including title/description/reason) plus from/to for area, priority and dates only.
+  5. `updateGoal` replaces every editable field (like life areas); status changes only go through `changeGoalStatus`.
+- **Next chunk should know:**
+  - `drizzle-kit` can't express `SET NULL (column)`; the snapshot says plain `set null`, so `db:generate` shows no drift. If the FK is ever regenerated, redo the hand edit (comment in the schema and the SQL). The life-area delete test fails loudly if it's lost (a plain SET NULL nulls `user_id`, which is NOT NULL).
+  - Milestones (1.4) reference `(goal_id, user_id) → goals(id, user_id)` via `goals_id_user_id_key`.
+  - The life-area delete confirmation (0.11 UI) doesn't mention goals yet.
+- **Unverified:** none. `pnpm verify` passes (format, lint, typecheck, 214 unit, 131 integration). `pnpm build` and `pnpm test:e2e` not run (no route or UI changes). Dev DB reset and migrated (local dev data was wiped by `db:reset`).
+- **Follow-ups:**
+  - Deleting a life area clears goals' `life_area_id` in the database with no `goal.updated` event, so 1.3's history won't show it. Consider recording it in `deleteLifeArea`.
+  - Life-area delete confirmation text should say its goals will lose their area (1.2 or 1.6).
