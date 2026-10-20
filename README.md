@@ -50,3 +50,30 @@ Requires Node 24 (see `.nvmrc`), pnpm 11 (`corepack enable` picks up the version
 The server validates its environment at startup (`src/server/env.ts`). If a variable is missing or malformed, it prints which ones and exits instead of starting. Server-only variables stay in `src/server/env.ts`; browser-visible `NEXT_PUBLIC_*` variables go in `src/lib/client-env.ts`.
 
 Checks: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`. The build does not need env variables; validation runs when the server starts. `pnpm format` fixes formatting.
+
+## Database and migrations
+
+The schema is defined with [Drizzle ORM](https://orm.drizzle.team) in `src/server/db/schema/` (one file per domain module, re-exported from `index.ts`). Server code uses the pooled, server-only handle from `src/server/db/client.ts`. TypeScript keys are camelCase; Drizzle maps them to snake_case columns.
+
+| Command | Does |
+|---|---|
+| `pnpm db:generate` | Diffs the schema against the last snapshot and writes a new SQL migration to `src/server/db/migrations/` |
+| `pnpm db:migrate` | Applies pending migrations. The journal lives in the `drizzle.__drizzle_migrations` table |
+| `pnpm db:studio` | Opens Drizzle Studio to browse the database |
+| `pnpm db:reset` | Drops every table in the database, then re-applies all migrations. Local only: refuses when `NODE_ENV=production` or when `DATABASE_URL` is not on `localhost` |
+
+These commands read `DATABASE_URL` from `.env.local`; a value set in the shell wins. To target the test database:
+
+```bash
+DATABASE_URL=postgres://soleup:soleup@localhost:5432/soleup_test pnpm db:migrate
+```
+
+In PowerShell, set `$env:DATABASE_URL = "postgres://soleup:soleup@localhost:5432/soleup_test"` first, and `Remove-Item Env:DATABASE_URL` afterwards.
+
+**Conventions**
+
+- Change the schema in TypeScript, run `pnpm db:generate --name=<what-changed>`, and read the generated SQL before committing it.
+- Commit every generated migration, together with `meta/` (the snapshots and `_journal.json`). Review migrations in the PR like any other code.
+- Never edit a migration that has been merged. Fix forward with a new one.
+- Hand-written SQL is allowed for what Drizzle can't express, such as `ON DELETE SET NULL (col)` on composite foreign keys, CHECK constraints it doesn't model, or data backfills. Create the file with `pnpm db:generate --custom --name=<what-it-does>` so it is registered in the journal, then cover the constraint with a test.
+- Migrations must preserve user data. A destructive change needs explicit approval and a recovery plan.

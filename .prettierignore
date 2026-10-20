@@ -9,3 +9,4 @@ CLAUDE.md
 docs/
 README.md
 AGENTS.md
+src/server/db/migrations/
