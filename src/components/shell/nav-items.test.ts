@@ -1,0 +1,41 @@
+import { describe, expect, it } from "vitest";
+
+import { APP_ROUTE_SEGMENTS } from "@/lib/protected-paths";
+
+import { NAV_ITEMS, isNavItemActive } from "./nav-items";
+
+describe("isNavItemActive", () => {
+  it.each([
+    ["/goals", "/goals"],
+    ["/goals/123", "/goals"],
+    ["/goals/", "/goals"],
+  ])("%s is inside %s", (pathname, href) => {
+    expect(isNavItemActive(pathname, href)).toBe(true);
+  });
+
+  it.each([
+    ["/goalsetting", "/goals"],
+    ["/home", "/goals"],
+    ["/", "/home"],
+  ])("%s is not inside %s", (pathname, href) => {
+    expect(isNavItemActive(pathname, href)).toBe(false);
+  });
+});
+
+describe("NAV_ITEMS", () => {
+  it("shows exactly Home, Goals, Plan and Settings, in that order", () => {
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual([
+      "Home",
+      "Goals",
+      "Plan",
+      "Settings",
+    ]);
+  });
+
+  it("only links to protected (app) pages", () => {
+    const segments: readonly string[] = APP_ROUTE_SEGMENTS;
+    for (const item of NAV_ITEMS) {
+      expect(segments).toContain(item.href.slice(1));
+    }
+  });
+});

@@ -32,6 +32,10 @@ export default defineConfig({
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
   reporter: isCI ? [["github"], ["html", { open: "never" }]] : "list",
+  // Locally the dev server compiles each route on its first visit, which
+  // can take several seconds while tests run in parallel. CI serves a
+  // production build and keeps the default.
+  expect: { timeout: isCI ? 5_000 : 15_000 },
   use: {
     baseURL,
     trace: "on-first-retry",
