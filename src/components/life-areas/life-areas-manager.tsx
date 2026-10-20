@@ -243,7 +243,7 @@ function DeleteAreaButton({ area }: { area: LifeArea }) {
         </Button>
       }
       title={`Delete “${area.name}”?`}
-      description="This permanently deletes the area and its history. It can't be undone. To keep it out of the way instead, archive it."
+      description="This permanently deletes the area and its history. Its goals are kept and move to No area. It can't be undone. To keep it out of the way instead, archive it."
       confirmLabel="Delete area"
       onConfirm={async () => {
         const result = await deleteLifeArea({ id: area.id });

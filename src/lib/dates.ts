@@ -135,3 +135,11 @@ export function startOfWeek(date: LocalDate, weekStart: WeekStart): LocalDate {
   const offset = (dayOfWeek(date) - weekStart + 7) % 7;
   return addDays(date, -offset);
 }
+
+/**
+ * A local date for display, such as "12 Mar 2027" in `en-GB`. Formatted as a
+ * calendar date, so no time zone can shift it to the day before or after.
+ */
+export function formatLocalDate(date: LocalDate, locale: string): string {
+  return parseLocalDate(date).toLocaleString(locale, { dateStyle: "medium" });
+}

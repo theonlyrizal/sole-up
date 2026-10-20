@@ -3,6 +3,7 @@
 import { useId, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/form-error";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -193,18 +194,4 @@ export function EditLifeAreaForm({ area, onDone, children }: EditProps) {
       </div>
     </form>
   );
-}
-
-/** A failure that doesn't belong to one field. */
-function FormError({ error }: { error: ActionError | null }) {
-  if (!error) return null;
-  const message =
-    error.code === "VALIDATION"
-      ? error.formErrors.join(" ") || null
-      : error.message;
-  return message ? (
-    <p role="alert" className="text-sm text-danger">
-      {message}
-    </p>
-  ) : null;
 }

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDays,
   dayOfWeek,
+  formatLocalDate,
   instantFromLocal,
   isLocalDate,
   localDateOf,
@@ -202,5 +203,21 @@ describe("calendar arithmetic", () => {
     expect(startOfWeek("2026-10-20", 3)).toBe("2026-10-14");
     // Across a year boundary.
     expect(startOfWeek("2027-01-01", 1)).toBe("2026-12-28");
+  });
+});
+
+describe("formatLocalDate", () => {
+  it("formats the calendar date in the user's locale", () => {
+    expect(formatLocalDate("2027-03-12", "en-GB")).toBe("12 Mar 2027");
+    expect(formatLocalDate("2027-03-12", "en-US")).toBe("Mar 12, 2027");
+  });
+
+  it("never shifts the day, whatever the process time zone", () => {
+    expect(formatLocalDate("2027-01-01", "en-GB")).toBe("1 Jan 2027");
+    expect(formatLocalDate("2026-12-31", "en-GB")).toBe("31 Dec 2026");
+  });
+
+  it("rejects an invalid date", () => {
+    expect(() => formatLocalDate("2027-02-30", "en-GB")).toThrow(RangeError);
   });
 });
