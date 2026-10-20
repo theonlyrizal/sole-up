@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { env } from "@/server/env";
+import { logger } from "@/server/logging/logger";
 
 import * as schema from "./schema";
 
@@ -14,10 +15,9 @@ const globalForDb = globalThis as typeof globalThis & {
 function createPool(): Pool {
   const pool = new Pool({ connectionString: env.DATABASE_URL });
   // An idle client can lose its connection (e.g. Postgres restarts). Without
-  // a listener, pg rethrows that error and crashes the process. Log only the
-  // message: it never contains query parameters.
+  // a listener, pg rethrows that error and crashes the process.
   pool.on("error", (error) => {
-    console.error("Postgres pool error:", error.message);
+    logger.error({ err: error, source: "db" }, "Postgres pool error");
   });
   return pool;
 }

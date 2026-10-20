@@ -6,11 +6,13 @@ import type { z } from "zod";
 import {
   DEFAULT_ERROR_MESSAGES,
   fail,
+  internalError,
   ok,
   type ActionResult,
   type FieldErrors,
 } from "@/lib/result";
 import { DomainError } from "@/server/errors";
+import { getRequestId, loggerFor } from "@/server/logging/request";
 
 import { getCurrentUser } from "./session";
 
@@ -62,11 +64,13 @@ export function createAuthedAction(resolveUserId: UserIdResolver) {
         // Let Next.js redirect()/notFound() calls through.
         unstable_rethrow(error);
         if (error instanceof DomainError) return fail(error.toActionError());
-        logUnexpectedActionError(error);
-        return fail({
-          code: "INTERNAL",
-          message: DEFAULT_ERROR_MESSAGES.INTERNAL,
-        });
+        // The log line and the user's message share the request ID.
+        const requestId = await getRequestId();
+        loggerFor(requestId).error(
+          { err: error, source: "action" },
+          "Unexpected error in a Server Action",
+        );
+        return fail(internalError(requestId));
       }
     };
   };
@@ -97,14 +101,4 @@ function issuesToErrors(issues: readonly z.core.$ZodIssue[]): {
     (fieldErrors[key] ??= []).push(issue.message);
   }
   return { fieldErrors, formErrors };
-}
-
-/**
- * Logs only the error's class name: messages and causes can carry SQL
- * parameters or user content (see "Never log"). 0.12 routes this through
- * pino with request IDs.
- */
-function logUnexpectedActionError(error: unknown) {
-  const name = error instanceof Error ? error.name : typeof error;
-  console.error(`[action] unexpected ${name}`);
 }

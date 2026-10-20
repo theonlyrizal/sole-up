@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/auth/[...all]/route";
 import { db } from "@/server/db/client";
 
+import { REQUEST_ID_HEADER } from "@/lib/request-id";
+
+import { captureLogs } from "../helpers/logs";
 import { asUser, createTestUser } from "./helpers/users";
 
 describe("auth error logging", () => {
@@ -19,13 +22,9 @@ describe("auth error logging", () => {
     const cookie = headers.get("cookie")!;
     const token = decodeURIComponent(cookie.split("=")[1]!).split(".")[0]!;
 
-    const lines: string[] = [];
-    const capture = (...args: unknown[]) => {
-      lines.push(args.map((arg) => String(arg)).join(" "));
-    };
-    vi.spyOn(console, "error").mockImplementation(capture);
-    vi.spyOn(console, "warn").mockImplementation(capture);
-    vi.spyOn(console, "log").mockImplementation(capture);
+    const logs = captureLogs();
+    const requestId = "0b6f3a4e-2c1d-4e5f-8a9b-1c2d3e4f5a6b";
+    headers.set(REQUEST_ID_HEADER, requestId);
 
     // Make the session lookup fail inside Better Auth.
     await db.$client.query(
@@ -38,10 +37,12 @@ describe("auth error logging", () => {
 
     expect(response.status).toBe(500);
     expect(await response.text()).not.toContain(token);
-    expect(lines.length).toBeGreaterThan(0);
-    const output = lines.join("\n");
+    const output = logs.text();
     expect(output).not.toContain(token);
     expect(output).not.toMatch(/params:/i);
     expect(output).toContain("42P01");
+    expect(logs.entries()).toContainEqual(
+      expect.objectContaining({ requestId, level: "error" }),
+    );
   });
 });

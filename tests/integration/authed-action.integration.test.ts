@@ -1,10 +1,14 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { authedAction } from "@/server/auth/authed-action";
 import { proxy } from "@/proxy";
 
+import { REQUEST_ID_HEADER } from "@/lib/request-id";
+import { DEFAULT_ERROR_MESSAGES } from "@/lib/result";
+
+import { captureLogs } from "../helpers/logs";
 import { asUser, createTestUser } from "./helpers/users";
 
 // Server Actions read the session from the request's headers. Outside a
@@ -25,6 +29,10 @@ function protectedAction() {
 
 beforeEach(() => {
   requestHeaders.current = new Headers();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("authedAction with real sessions", () => {
@@ -77,6 +85,37 @@ describe("authedAction with real sessions", () => {
       error: { code: "VALIDATION", fieldErrors: { title: ["Enter a title."] } },
     });
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("shows and logs the same request ID for an unexpected error, never its message", async () => {
+    const user = await createTestUser();
+    const requestId = "3d1f8c2a-5b6e-4f70-9a81-b2c3d4e5f607";
+    requestHeaders.current = new Headers((await asUser(user.id)).headers);
+    requestHeaders.current.set(REQUEST_ID_HEADER, requestId);
+    const logs = captureLogs();
+    const action = authedAction(schema, async () => {
+      throw new Error("insert failed: title 'My private goal'");
+    });
+
+    const result = await action({ title: "My private goal" });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "INTERNAL",
+        message: `${DEFAULT_ERROR_MESSAGES.INTERNAL} Reference: ${requestId}`,
+        requestId,
+      },
+    });
+    expect(logs.entries()).toEqual([
+      expect.objectContaining({
+        level: "error",
+        requestId,
+        source: "action",
+        msg: "Unexpected error in a Server Action",
+      }),
+    ]);
+    expect(logs.text()).not.toContain("private goal");
   });
 });
 

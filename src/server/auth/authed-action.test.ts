@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { DEFAULT_ERROR_MESSAGES } from "@/lib/result";
+import { captureLogs } from "../../../tests/helpers/logs";
 import { ConflictError, NotFoundError, ValidationError } from "@/server/errors";
 
 import { createAuthedAction } from "./authed-action";
@@ -128,7 +129,7 @@ describe("authedAction", () => {
   });
 
   it("hides unexpected errors behind a generic message and logs no details", async () => {
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logs = captureLogs();
     const action = signedIn(renameSchema, async () => {
       throw new Error('duplicate key: title "My private goal"');
     });
@@ -139,12 +140,19 @@ describe("authedAction", () => {
       ok: false,
       error: { code: "INTERNAL", message: DEFAULT_ERROR_MESSAGES.INTERNAL },
     });
-    expect(log).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(log.mock.calls)).not.toContain("private goal");
+    // Outside a request there is no request ID; the integration test covers
+    // the ID in the message and the log line.
+    expect(logs.entries()).toHaveLength(1);
+    expect(logs.entries()[0]).toMatchObject({
+      level: "error",
+      source: "action",
+      err: { type: "Error" },
+    });
+    expect(logs.text()).not.toContain("private goal");
   });
 
   it("treats a failing user lookup as unexpected, not as signed in", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    captureLogs();
     const handler = vi.fn(async () => "renamed");
     const action = createAuthedAction(async () => {
       throw new Error("database unavailable");

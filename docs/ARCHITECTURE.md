@@ -185,7 +185,7 @@ The intelligence layer must:
 
 - Record structured operational logs without sensitive payloads.
 - Track request failures, background job failures, and AI provider failures.
-- Use request IDs or trace IDs to investigate issues.
+- Use request IDs or trace IDs to investigate issues. Implemented in chunk 0.12: pino with field redaction, a request ID per request from the proxy, shown to users with unexpected errors, and `/api/health` (see the README, "Logging and errors").
 - Add rate limits to authentication and expensive operations.
 - Establish database backups and test restoration before relying on the app for important records.
 - Define retention and deletion behavior for logs and backups.

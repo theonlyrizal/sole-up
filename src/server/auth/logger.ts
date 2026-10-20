@@ -7,6 +7,8 @@
  * values). Every other argument is dropped.
  */
 
+import { currentRequestId, loggerFor } from "@/server/logging/request";
+
 type Level = "debug" | "info" | "warn" | "error";
 
 const SQLSTATE = /^[0-9A-Z]{5}$/;
@@ -52,9 +54,13 @@ export function formatAuthLog(
   return `[Better Auth] ${level.toUpperCase()} ${safeMessage(message)}${suffix}`;
 }
 
+/**
+ * Better Auth's `logger.log`. Writes through the app logger (pino), with the
+ * request ID the auth route handler sets (runWithRequestId).
+ */
 export function logAuth(level: Level, message: string, ...args: unknown[]) {
-  const line = formatAuthLog(level, message, args);
-  if (level === "error") console.error(line);
-  else if (level === "warn") console.warn(line);
-  else console.log(line);
+  loggerFor(currentRequestId())[level](
+    { source: "better-auth" },
+    formatAuthLog(level, message, args),
+  );
 }
