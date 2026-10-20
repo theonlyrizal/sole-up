@@ -100,7 +100,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.9 | User preferences | done | chunk/0.9-user-preferences | 2026-10-20 | `user_preferences` (typed, one row per user, tz null until confirmed), first-sign-in confirm gate, `lib/dates` on temporal-polyfill (ADR 0008), Settings page |
 | 0.10 | App shell and UI primitives | done | chunk/0.10-app-shell | 2026-10-20 | Responsive shell (sidebar / bottom bar, skip link), UI primitives (Radix dialogs/toasts, native select), root error/not-found/loading, manifest + icons, axe and keyboard e2e |
 | 0.11 | Reference slice: Life Areas | done | chunk/0.11-life-areas | 2026-10-20 | `life_areas` (unique active names ignoring case), service + audit, authed actions, `/goals/areas` with inline create/edit/reorder, archive, confirmed delete, one-time starters |
-| 0.12 | Observability and error handling | todo | | | |
+| 0.12 | Observability and error handling | done | chunk/0.12-observability | 2026-10-20 | pino 10.4 with deep key redaction, request ID per request in the proxy (matcher fixed), INTERNAL errors and error pages show a reference, `onRequestError` logging, `/api/health` |
 | 0.13 | Continuous integration | todo | | | |
 | 0.14 | First deploy | todo | | | |
 | 0.✓ | Phase 0 exit check (user) | todo | | | |
@@ -1132,3 +1132,32 @@ Template:
 - **Follow-ups:**
   - Deleting from the edit form leaves focus on the page body once the row is gone; consider moving focus to the list heading.
   - Drag-and-drop reorder could reuse the same `reorderLifeAreas` action later.
+
+### 0.12: Observability and error handling (2026-10-20)
+- **Built:**
+  - Dependency (pinned): `pino` 10.4.0 (the newest release at least two weeks old).
+  - `src/server/logging/`: `logger.ts` (`createLogger(write)`, the app `logger`; JSON lines, ISO UTC time), `redact.ts` (`REDACTED_KEYS`, `*token`/`*secret` suffixes, `redactDeep()`), `serialize-error.ts` (class, SQLSTATE code + constraint/table, stack frames, causes; never the message), `request.ts` (`getRequestId()`, `requestIdFrom(headers)`, `loggerFor(id)`, `getRequestLogger()`, `runWithRequestId()`/`currentRequestId()` on AsyncLocalStorage).
+  - `src/lib/request-id.ts` (`REQUEST_ID_HEADER`, `newRequestId`, `isRequestId`). `src/proxy.ts` sets a fresh `x-request-id` on every request and response, replacing any client value; its matcher now covers `/api/*`.
+  - `src/lib/result.ts`: `INTERNAL` errors carry `requestId`; `internalError(id)` appends `Reference: <id>` to the message, so every existing error display shows it. `authedAction` logs unexpected errors through pino with the ID (closes the 0.7 follow-up).
+  - `src/instrumentation.ts` `onRequestError` → `logRequestError` (request ID, digest, method, path without query, route path and type). Better Auth's logger, the auth route's catch (closes the 0.6 follow-up) and the pg pool error listener write through pino.
+  - `ErrorReference` (`src/components/ui/error-reference.tsx`), shown by the root and `/goals/areas` `error.tsx` with the error's digest.
+  - `GET /api/health` (`src/server/db/health.ts` `checkDatabase()`, 2 s timeout): 200 ok / 503 unavailable, `no-store`, no details.
+  - Test-only `/test-errors/action` and `/test-errors/render` (`src/app/(public)/test-errors/`), behind the test sign-in switch.
+  - Tests: unit `logger.test.ts` (every redacted key at top level, nested, in arrays and child bindings; header spellings; error messages, causes and `params` never written; pino's error-message fallback replaced), `request-id.test.ts`, `proxy.test.ts` (IDs on request/response/redirect, forged ID replaced), `health.test.ts`, `api/health/route.test.ts`; integration: same request ID in the action result and the log line, auth DB failure logs the ID and no token, health against the real DB; e2e `errors.spec.ts` (action error shows the ID the proxy put on the action's response, render error page with reference, health). `tests/helpers/logs.ts` `captureLogs()` reads logger output in tests.
+  - Docs: README "Logging and errors" (plus Authentication and UI shell notes), ARCHITECTURE §11.
+- **Deviations:**
+  1. **A rendering error shows the error's digest, not the request ID.** Next.js sends only the digest to the browser, and `error.tsx` can't read headers. The log line holds both, so the reference still finds it. Server Action errors (the common case) show the request ID itself. A digest identifies the error, not the request: the same failure repeated has the same digest.
+  2. **Redaction is by key at any depth over the finished line** (`redactDeep` on each JSON line), not pino's `redact` paths: paths can't say "any `body` field at any depth", and pino applies no formatter to child bindings.
+  3. **Fixed a pre-existing proxy bug:** the matcher's `\.` lost its backslash when compiled, so the proxy ran only on `/` and the signed-out redirect never happened in the proxy (pages still redirected via `requireUser()`). Now `[.]`.
+- **Decisions:** error messages are never logged, not even Postgres ones (they can quote input values); the SQLSTATE code, constraint and table identify the failure. An error logged without a message gets "Unexpected error" (pino would use `error.message`). Request IDs are always generated, never taken from the client. JSON logs in dev too (no pino-pretty transport: transports run in worker threads that Next bundling breaks). Recorded in code comments and the README.
+- **Next chunk should know:**
+  - Log with `(await getRequestLogger()).info({ field }, "Fixed message")`, or `loggerFor(requestIdFrom(request.headers))` in a route handler. Never put user content in the message. A new kind of sensitive field → add its key to `REDACTED_KEYS`.
+  - Tests that trigger logging should call `captureLogs()` (it also keeps the output quiet) and `vi.restoreAllMocks()` afterwards.
+  - Code that runs outside a request (the 5.1 worker) uses `logger` directly; a job ID can go in a child binding.
+  - 0.13: `/api/health` is ready for the deploy health check (0.14). The e2e test pages need `next build` with the test switch evaluated at request time (`connection()`); not run with a production build yet.
+- **Unverified:** the CI branch of the Playwright config (production build) was not run, so `/test-errors/*` behaviour in a production build is untested. When the test switch is off, those pages render the not-found UI from inside a Suspense boundary, so the HTTP status may be 200, not 404. Checks: `pnpm verify` (format, lint, typecheck, 168 unit, 87 integration), `pnpm build` and `pnpm test:e2e` (18 tests) pass. Manually: a forced action error showed `Reference: 6c87960b-…` in the browser and the same `requestId` in the server log; a forced render error showed digest `4246427389`, logged with its request ID.
+- **Follow-ups:**
+  - Next.js still prints its own `⨯ Error: <message>` with a code frame for uncaught rendering errors (outside pino), so a thrown message containing user content reaches stdout there. Consider filtering it in `instrumentation-node.ts` (or before 10.4's security review).
+  - 0.14: decide whether to trust the host's request ID header, where logs are shipped, and their retention (ARCHITECTURE §11).
+  - Better Auth's 404-style errors (e.g. "Provider not found") log at `error`; consider mapping them to `warn`.
+

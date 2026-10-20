@@ -1,13 +1,21 @@
 "use client";
 
+import { ErrorReference, errorDigest } from "@/components/ui/error-reference";
 import { ErrorState } from "@/components/ui/error-state";
 
 /**
  * Catches unexpected errors in any page. Shows fixed text only: an error's
  * message can carry user content or internals, so it is never displayed.
- * Reporting arrives with observability (chunk 0.12).
+ * The reference is the error's digest, which the server logs with the
+ * request ID (src/instrumentation-node.ts).
  */
-export default function RootError({ retry }: { retry: () => void }) {
+export default function RootError({
+  error,
+  retry,
+}: {
+  error: unknown;
+  retry: () => void;
+}) {
   return (
     <main
       id="main"
@@ -16,7 +24,15 @@ export default function RootError({ retry }: { retry: () => void }) {
       <ErrorState
         headingLevel={1}
         title="Something went wrong"
-        description="This page couldn't load. Your data is safe. Try again, and if it keeps happening, reload the page."
+        description={
+          <>
+            <p>
+              This page couldn&apos;t load. Your data is safe. Try again, and if
+              it keeps happening, reload the page.
+            </p>
+            <ErrorReference id={errorDigest(error)} />
+          </>
+        }
         onRetry={retry}
       />
     </main>

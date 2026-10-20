@@ -1,12 +1,19 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 
+import { isRequestId, REQUEST_ID_HEADER } from "@/lib/request-id";
+
 import { proxy } from "./proxy";
 
-function request(path: string, cookie?: string) {
+function request(path: string, cookie?: string, extra: HeadersInit = {}) {
   return new NextRequest(`http://localhost:3000${path}`, {
-    headers: cookie ? { cookie } : {},
+    headers: { ...(cookie ? { cookie } : {}), ...extra },
   });
+}
+
+/** The value the proxy set on the request passed on to the app. */
+function forwardedRequestId(response: Response) {
+  return response.headers.get(`x-middleware-request-${REQUEST_ID_HEADER}`);
 }
 
 function redirectLocation(response: Response) {
@@ -41,5 +48,38 @@ describe("proxy", () => {
   it.each(["/", "/sign-in"])("leaves public route %s alone", (path) => {
     const response = proxy(request(path));
     expect(redirectLocation(response)).toBeNull();
+  });
+
+  describe("request IDs", () => {
+    it.each(["/", "/api/health", "/home"])(
+      "gives %s a fresh ID on the request and the response",
+      (path) => {
+        const response = proxy(request(path, "soleup.session_token=abc.def"));
+        const id = forwardedRequestId(response);
+        expect(isRequestId(id)).toBe(true);
+        expect(response.headers.get(REQUEST_ID_HEADER)).toBe(id);
+      },
+    );
+
+    it("never trusts an ID sent by the client", () => {
+      const forged = "11111111-1111-4111-8111-111111111111";
+      const response = proxy(
+        request("/", undefined, { [REQUEST_ID_HEADER]: forged }),
+      );
+      expect(forwardedRequestId(response)).not.toBe(forged);
+      expect(isRequestId(forwardedRequestId(response))).toBe(true);
+    });
+
+    it("gives every request its own ID", () => {
+      const ids = new Set(
+        [1, 2, 3].map(() => forwardedRequestId(proxy(request("/")))),
+      );
+      expect(ids.size).toBe(3);
+    });
+
+    it("puts the ID on a sign-in redirect too", () => {
+      const response = proxy(request("/home"));
+      expect(isRequestId(response.headers.get(REQUEST_ID_HEADER))).toBe(true);
+    });
   });
 });

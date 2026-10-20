@@ -18,7 +18,12 @@ export type ActionError =
       formErrors: string[];
     }
   | { code: "CONFLICT"; message: string }
-  | { code: "INTERNAL"; message: string };
+  | {
+      code: "INTERNAL";
+      message: string;
+      /** The request's ID, also in the server log line for this error. */
+      requestId?: string;
+    };
 
 export type ActionErrorCode = ActionError["code"];
 
@@ -39,4 +44,19 @@ export function ok<T>(data: T): ActionResult<T> {
 
 export function fail<T = never>(error: ActionError): ActionResult<T> {
   return { ok: false, error };
+}
+
+/**
+ * The error for an unexpected failure. The message includes the request ID,
+ * so every place that shows `error.message` also shows the reference the
+ * user can quote.
+ */
+export function internalError(requestId?: string): ActionError {
+  return requestId
+    ? {
+        code: "INTERNAL",
+        message: `${DEFAULT_ERROR_MESSAGES.INTERNAL} Reference: ${requestId}`,
+        requestId,
+      }
+    : { code: "INTERNAL", message: DEFAULT_ERROR_MESSAGES.INTERNAL };
 }
