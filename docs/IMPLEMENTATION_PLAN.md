@@ -103,8 +103,8 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.12 | Observability and error handling | done | chunk/0.12-observability | 2026-10-20 | pino 10.4 with deep key redaction, request ID per request in the proxy (matcher fixed), INTERNAL errors and error pages show a reference, `onRequestError` logging, `/api/health` |
 | 0.13 | Continuous integration | done | chunk/0.13-ci | 2026-10-20 | GitHub Actions: ordered lint/test/build/e2e job on a fresh Postgres 18.3 service (migrate from zero), separate migration-drift job, pnpm cache, SHA-pinned actions |
 | 0.14 | First deploy | done | chunk/0.14-first-deploy | 2026-10-20 | Render Free (Singapore) + Neon Free (ADR 0009), render.yaml, `db:migrate:deploy` release step before traffic, docs/DEPLOY.md; user confirmed prod sign-in and persistence |
-| 0.✓ | Phase 0 exit check (user) | todo | | | |
-| 1.0 | Decision gate: goals | todo | | | |
+| 0.✓ | Phase 0 exit check (user) | done | | 2026-10-20 | User confirmed fresh-clone setup, private routes in prod, CI/Render green; agent ran secret scan and `pnpm verify` on main |
+| 1.0 | Decision gate: goals | done | chunk/1.0-goals-decisions | 2026-10-20 | ADR 0010: five statuses (restore → active), optional low/medium/high, milestone-count progress, local dates + order CHECK; 1.1–1.6 and DATA_MODEL synced |
 | 1.1 | Goals: schema and service | todo | | | |
 | 1.2 | Goals: list and create/edit UI | todo | | | |
 | 1.3 | Goal detail page | todo | | | |
@@ -407,42 +407,51 @@ This is the template every later entity copies.
 **Goal:** Turn an ambition into a goal with a reason and checkpoints (Journey A, first half).
 
 ### 1.0 Decision gate
-- **Goal statuses.** Recommended: `active | paused | completed | dropped | archived`. `dropped` covers changed priorities without implying failure.
-- **Priority.** Recommended: an optional `low | medium | high`, not numeric.
-- **Progress definition.** Recommended: completed milestones out of all non-dropped milestones, shown as "2 of 5 milestones". No percentage when there are none. Numeric targets are deferred.
-- **Start and target dates.** Recommended: local dates only.
+Decided 2026-10-20 in [ADR 0010](decisions/0010-goal-status-priority-progress.md); every recommendation was accepted.
+- **Goal statuses:** `active | paused | completed | dropped | archived`. `dropped` covers changed priorities without implying failure. Restore from `archived` always goes to `active`.
+- **Priority:** optional `low | medium | high`, not numeric.
+- **Progress:** completed milestones out of non-dropped milestones, shown as "2 of 5 milestones". Nothing shown with no countable milestones. Never auto-completes the goal. Numeric targets deferred.
+- **Start and target dates:** optional local dates, with `target_date >= start_date` enforced by a CHECK.
 
 ### 1.1 Goals: schema and service
-- Table `goals`: `life_area_id?` (composite FK, `SET NULL (life_area_id)`), `title`, `description?`, `reason?`, `status`, `priority?`, `start_date?`, `target_date?`, `completed_at?`, `status_changed_at`, timestamps.
-- Service: create, update, `changeStatus`, delete. The domain enforces allowed transitions. Leaving `completed` clears `completed_at`.
-- Audit events: `goal.created`, `goal.updated` (structured fields only), `goal.status_changed`, `goal.deleted`.
-- **Tests:** transition rules, life area ownership, cross-user access, deleting a life area nulls the goal's area while keeping its `user_id`.
+- Table `goals`: `life_area_id?` (composite FK, `SET NULL (life_area_id)`), `title`, `description?`, `reason?`, `status` (default `active`), `priority?`, `start_date?` (`date`), `target_date?` (`date`), `completed_at?`, `status_changed_at`, timestamps. `unique (id, user_id)` for milestones and tasks to reference.
+- CHECKs: `status in (active, paused, completed, dropped, archived)`, `priority in (low, medium, high)` or null, `target_date >= start_date` when both are set.
+- Index for the list: `(user_id, status)`.
+- Service: create, update, `changeStatus`, delete. Transitions (ADR 0010): any to any among `active | paused | completed | dropped`; any of those to `archived`; `archived` only to `active`. Same status again is a no-op with no audit event. Every real change sets `status_changed_at`.
+- `completed_at`: set on entering `completed`; kept when a completed goal is archived; cleared on any other move out of `completed` and on restore.
+- Validation checks `start_date`/`target_date` together so the date-order error is a field error, not a database error.
+- Audit events: `goal.created`, `goal.updated` (structured fields only: area, priority, dates), `goal.status_changed`, `goal.deleted`.
+- **Tests:** every allowed and rejected transition, the `completed_at` rules (including archive and restore), the date-order CHECK and its validation message, life area ownership, cross-user access, deleting a life area nulls the goal's area while keeping its `user_id`.
 
 ### 1.2 Goals: list and create/edit UI
-- Goals page grouped by life area, with filters by status (Active is the default).
-- Create/edit form. The "Why does this matter?" field is prominent but optional. Target date is optional.
-- Status actions: pause, resume, complete, drop, archive, with copy that doesn't shame.
+- Goals page grouped by life area, with filters by status: Active (default), Paused, Completed, Dropped. Archived goals appear only in the archive view (1.6).
+- Create/edit form. The "Why does this matter?" field is prominent but optional. Priority (none/low/medium/high), start date and target date are optional; a target before the start is a field error.
+- Priority shows as a small label, never as a score. No sorting by priority in v1 beyond an optional filter.
+- Status actions: pause, resume, complete, drop, archive, reopen (from completed or dropped), with copy that doesn't shame.
 - **Done when:** a goal can be created in under 30 seconds with only a title.
 
 ### 1.3 Goal detail page
-- Header (title, status, area, dates), the reason, and placeholder sections for milestones and tasks.
+- Header (title, status, priority, area, dates), the reason, and placeholder sections for milestones and tasks.
 - A history timeline built from audit events: status changes, date changes. No content.
-- **Done when:** the detail page shows correct history after several status changes.
+- **Done when:** the detail page shows correct history after several status changes, including archive and restore.
 
 ### 1.4 Milestones: schema and service
-- Table `milestones`: `goal_id` (composite FK, cascade delete), `title`, `description?`, `status` (`open | completed | dropped`), `due_date?`, `completed_at?`, `sort_order`, timestamps.
-- Service: create, edit, reorder, complete/reopen, drop, delete.
-- **Tests:** a milestone on another user's goal is rejected by the database (composite FK), reorder keeps the order dense, deleting a goal cascades its milestones.
+- Table `milestones`: `goal_id` (composite FK, cascade delete), `title`, `description?`, `status` (`open | completed | dropped`, CHECK, default `open`), `due_date?` (`date`, not constrained by the goal's dates), `completed_at?`, `sort_order`, timestamps. `unique (id, user_id)` for tasks to reference.
+- Service: create, edit, reorder, complete/reopen, drop/undrop, delete. Completing sets `completed_at`; reopening clears it.
+- A query returning progress per goal (completed count and non-dropped count), computed on read, never stored.
+- **Tests:** a milestone on another user's goal is rejected by the database (composite FK), reorder keeps the order dense, deleting a goal cascades its milestones, progress counts ignore dropped milestones, completing the last milestone leaves the goal's status unchanged.
 
 ### 1.5 Milestones UI and progress
-- A milestone list on goal detail: inline add, drag or keyboard reorder, complete checkbox.
-- The progress display uses the 1.0 definition, with its definition shown in a tooltip or help text.
-- **Done when:** keyboard reorder works, and progress is shown correctly when there are 0 milestones.
+- A milestone list on goal detail: inline add, drag or keyboard reorder, complete checkbox, drop action.
+- Progress per ADR 0010: "2 of 5 milestones", with the definition in help text ("dropped milestones don't count"). With no countable milestones, show nothing, not "0%". No percentage bar.
+- When every countable milestone is completed and the goal is not, offer (never force) "Mark goal complete?".
+- Show progress on the goals list (1.2) as well as on detail.
+- **Done when:** keyboard reorder works, and progress is correct with 0 milestones, all dropped, and all completed.
 
 ### 1.6 Goal archive and delete flows
-- An archive view that lists archived goals, with restore.
+- An archive view that lists archived goals, with restore. Restore makes the goal `active` (ADR 0010), and the confirmation says so. Show "completed on …" for archived goals that have `completed_at`.
 - Delete confirmation states exactly what happens: "3 milestones will be deleted; 7 tasks will move to your inbox." The task part is wired in Phase 2. Until then, show the milestone count.
-- **Done when:** an end-to-end test covers create → milestone → archive → restore → delete.
+- **Done when:** an end-to-end test covers create → milestone → archive → restore (lands in Active) → delete.
 
 **Phase 1 checkpoint:** create your real goals and use them for a few days.
 
@@ -1211,3 +1220,11 @@ Template:
   - `/test-errors/*` returns 200 with a static "Forced errors" heading when the test switch is off (no controls render). Move the heading inside the gate or return a real 404.
   - Neon PITR check and the client-IP warning check from DEPLOY.md, if not done yet; 10.6 (restore drill) builds on them.
   - Schedule the weekly `pg_dump` (manual for now).
+
+### 1.0: Decision gate: goals (2026-10-20)
+- **Built:** ADR 0010 (goal status, priority, progress and dates) and its index row. Chunks 1.0–1.6 rewritten to match; `DATA_MODEL.md` Goal and Milestone sections and §7; `ROADMAP.md` 1B; `PRODUCT_SPEC.md` §12 (the Phase 1 open question moved to Settled). No code.
+- **Deviations:** also edited `ROADMAP.md` and `PRODUCT_SPEC.md`, which still listed goal measurement as in scope and the Phase 1 question as open. Marked `0.✓` done at the user's request after they confirmed items 1, 3 and 5; the agent ran the secret scan and `pnpm verify` on main for items 2 and 4.
+- **Decisions:** the user accepted every recommendation. Details derived from those answers and recorded in ADR 0010 (not asked separately): the transition table (any to any among the four live statuses, any to `archived`, `archived` only to `active`; same status is a no-op with no audit event); `completed_at` is kept when a completed goal is archived and cleared on restore; completing the last milestone never completes the goal; milestone `due_date` is not constrained by the goal's dates; progress is computed on read, never stored.
+- **Next chunk should know:** 1.1 needs three CHECKs on `goals` (status, priority, date order) and `unique (id, user_id)`; validate the date pair together so the CHECK never surfaces as an INTERNAL error. `life_areas.status` is the pattern for text status + CHECK.
+- **Unverified:** none (docs only). `pnpm format:check` run on the changed docs.
+- **Follow-ups:** if restoring to `active` proves annoying while dogfooding, ADR 0010 names the alternative (four statuses + `archived_at`) to supersede it.

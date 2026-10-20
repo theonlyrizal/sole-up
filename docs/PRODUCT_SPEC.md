@@ -221,12 +221,12 @@ Do not optimize for time spent in the app. A good personal management tool may h
 - **Calendar for the first release:** internal events, shown alongside Today and Home, with no external sync. See [ADR 0007](decisions/0007-platform-and-push.md). Recurring events, time blocks and which views ship are decided at the Phase 4 decision gate (recommended: no recurring events or time blocks in v1; week and agenda views).
 - **Platform:** responsive web, installable as a PWA. See [ADR 0007](decisions/0007-platform-and-push.md).
 - **First audience:** the developer (dogfooding), with public-grade security. See [ADR 0002](decisions/0002-auth.md).
+- **Goals without numeric targets:** progress is completed milestones out of non-dropped milestones, and a goal can have none. Numeric targets are deferred. See [ADR 0010](decisions/0010-goal-status-priority-progress.md).
 
 ### Still open
 
 Resolve these at the phase decision gates in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), through prototyping or feedback rather than guessing:
 
-- How should users represent goals without numeric targets? (Phase 1 gate)
 - Which reminders should be supported initially? Web Push is the channel; the reminder types are open. (Phase 5 gate)
 - What is the minimum useful weekly review? (Phase 7 gate)
 - Should notes be simple, or should they support backlinks and tags? (Phase 8 gate)
