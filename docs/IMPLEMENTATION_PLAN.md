@@ -101,7 +101,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.10 | App shell and UI primitives | done | chunk/0.10-app-shell | 2026-10-20 | Responsive shell (sidebar / bottom bar, skip link), UI primitives (Radix dialogs/toasts, native select), root error/not-found/loading, manifest + icons, axe and keyboard e2e |
 | 0.11 | Reference slice: Life Areas | done | chunk/0.11-life-areas | 2026-10-20 | `life_areas` (unique active names ignoring case), service + audit, authed actions, `/goals/areas` with inline create/edit/reorder, archive, confirmed delete, one-time starters |
 | 0.12 | Observability and error handling | done | chunk/0.12-observability | 2026-10-20 | pino 10.4 with deep key redaction, request ID per request in the proxy (matcher fixed), INTERNAL errors and error pages show a reference, `onRequestError` logging, `/api/health` |
-| 0.13 | Continuous integration | todo | | | |
+| 0.13 | Continuous integration | done | chunk/0.13-ci | 2026-10-20 | GitHub Actions: ordered lint/test/build/e2e job on a fresh Postgres 18.3 service (migrate from zero), separate migration-drift job, pnpm cache, SHA-pinned actions |
 | 0.14 | First deploy | todo | | | |
 | 0.✓ | Phase 0 exit check (user) | todo | | | |
 | 1.0 | Decision gate: goals | todo | | | |
@@ -1161,3 +1161,25 @@ Template:
   - 0.14: decide whether to trust the host's request ID header, where logs are shipped, and their retention (ARCHITECTURE §11).
   - Better Auth's 404-style errors (e.g. "Provider not found") log at `error`; consider mapping them to `warn`.
 
+
+### 0.13: Continuous integration (2026-10-20)
+- **Built:**
+  - `.github/workflows/ci.yml`, on every pull request and on pushes to `main`. Job **Lint, test and build** (`ubuntu-24.04`, Postgres `18.3-alpine` service with an empty `soleup_test`): install (`--frozen-lockfile`), lint, format check, typecheck, unit tests, migrate from zero (`pnpm db:migrate`), integration tests, build, Playwright Chromium install (`--with-deps`), e2e; the Playwright report is uploaded on failure. Job **Migration drift**: `pnpm db:generate`, then fails if `git status` shows any change under `src/server/db/migrations` (modified or untracked).
+  - pnpm store cached via `actions/setup-node` (`cache: pnpm`); pnpm version from `packageManager`, Node from `.nvmrc`. `permissions: contents: read`; concurrency cancels superseded runs.
+  - `tsconfig.json`: `.next-e2e/types/**/*.ts` added to `include`. The CI e2e path (`next build` into `.next-e2e`) appends it otherwise and dirties the tree, like the dev paths 0.6 committed.
+  - README "Continuous integration".
+- **Deviations:**
+  1. **A format check step** runs after lint. The chunk's list doesn't name it, but `pnpm verify` and every chunk's done-when include it.
+  2. **"Migrate from zero" is its own step** (`pnpm db:migrate`, the drizzle-kit path) before the integration tests, whose global setup then finds nothing to apply.
+  3. **The drift check is a separate, parallel job**, so drift is reported in about a minute instead of after the e2e run, and it doesn't sit between the ordered steps.
+- **Decisions:**
+  1. **Actions pinned to commit SHAs** (version in a comment), choosing releases at least two weeks old: checkout v7.0.1, setup-node v7.0.0, pnpm/action-setup v6.1.0, upload-artifact v7.0.1.
+  2. **E2E still builds the app a second time** (`NODE_ENV=test` into `.next-e2e`, per `playwright.config.ts`) after the plain `pnpm build` step. The build step checks the production build; reusing it for e2e would need a different `NODE_ENV`. Revisit if CI time matters.
+  3. No Next.js build cache and no Playwright browser cache yet: not needed at the current size.
+- **Next chunk should know:**
+  - Required status checks for branch protection are the two job names: `Lint, test and build` and `Migration drift`.
+  - A schema change must be committed together with its generated migration, or `Migration drift` fails.
+  - CI has no `.env.local`; anything a step needs must be in the workflow. `pnpm build` needs no env (0.3/0.6 placeholders).
+- **Unverified:** the workflow has not run on GitHub yet (not pushed, at the user's request), so the service container, cache and SHA pins are untested there. Locally, every step ran in the workflow's order with `CI=true`, twice, each time in a fresh clone (no `.env.local`, no `node_modules`) against a fresh `postgres:18.3-alpine` container: install, lint, format check, typecheck, unit (168), migrate from zero (5 migrations), integration (87), build, e2e (18, production build, no retries), drift check (no changes); the tree was clean afterwards. This also covers the CI branch of the Playwright config left unverified since 0.5, and `/test-errors/*` in a production build (0.12). A deliberately unmigrated table made the drift check report the new migration files. Branch protection is set by the user.
+- **Follow-ups:**
+  - Dependabot (or Renovate) for the pinned action SHAs and npm dependencies.

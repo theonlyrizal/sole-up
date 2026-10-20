@@ -192,3 +192,14 @@ Test users and sessions:
 - **End-to-end tests:** `POST /api/test/sign-in` with `{ email?, name? }` signs the browser in without OAuth (see `tests/e2e/auth.spec.ts`). It works only when `NODE_ENV=test` and `SOLEUP_TEST_SIGN_IN=1` are both set, which the Playwright config does. In any other mode it answers 404. Never set `SOLEUP_TEST_SIGN_IN` anywhere else.
 
 `server-only` is replaced by a no-op in Vitest, so server modules can be tested directly. A module that parses the environment on import (like `src/server/env.ts`) needs the variables stubbed before it is imported; see `src/server/env.test.ts`.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`, in two jobs:
+
+- **Lint, test and build**, in this order: install (`--frozen-lockfile`), lint, format check, typecheck, unit tests, migrate from zero (`pnpm db:migrate` against an empty Postgres 18.3 service container), integration tests, build, then the e2e tests (Playwright builds and starts the app itself with `CI` set). The Playwright report is uploaded when the job fails.
+- **Migration drift**: runs `pnpm db:generate` and fails if it changes anything in `src/server/db/migrations`, meaning a schema change was committed without its migration.
+
+The pnpm store is cached by `actions/setup-node`. Actions are pinned to commit SHAs (the version is in a comment next to each).
+
+To reproduce CI locally, run the same commands in that order with `CI=true` and `TEST_DATABASE_URL` pointing at an empty local `_test` database, then `pnpm db:generate` and `git status`. With `CI` set, `pnpm test:e2e` builds into `.next-e2e/` with `NODE_ENV=test`, and port 3100 must be free (no server is reused).
