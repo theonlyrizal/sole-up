@@ -95,7 +95,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.4 | Drizzle and migration workflow | done | chunk/0.4-drizzle | 2026-10-20 | Drizzle 0.45 + pg pool (server-only), db:generate/migrate/studio/reset, baseline migration applied to dev and test, README conventions |
 | 0.5 | Test harness | done | chunk/0.5-test-harness | 2026-10-20 | Vitest 5 unit + integration projects (migrate once, truncate between tests, `_test` URL guard), Playwright 1.64 smoke test, test:* and verify scripts |
 | 0.6 | Authentication | done | chunk/0.6-auth | 2026-10-20 | Better Auth 1.7.11 (Drizzle, UUID IDs, plural tables), Google + GitHub, verified-email linking, DB sessions, rate limits, redacted auth logs, test fixtures and fail-closed e2e sign-in |
-| 0.7 | Authorization primitives | todo | | | |
+| 0.7 | Authorization primitives | done | chunk/0.7-authz | 2026-10-20 | `authedAction(schema, handler)`, `ActionResult` + `NotFound`/`Validation`/`Conflict` errors with user-safe messages, cookie-check proxy for (app) routes |
 | 0.8 | Audit log infrastructure | todo | | | |
 | 0.9 | User preferences | todo | | | |
 | 0.10 | App shell and UI primitives | todo | | | |
@@ -993,3 +993,28 @@ Template:
   - Create production OAuth apps with production callback URLs in 0.14.
   - 0.12 (observability) should route `logAuth` through pino with the same redaction.
   - 0.13: confirm `next build` under `NODE_ENV=test` for the CI e2e path.
+
+### 0.7: Authorization primitives (2026-10-20)
+- **Built:**
+  - `src/lib/result.ts`: `ActionResult<T>` (`{ ok: true, data }` or `{ ok: false, error }`), `ActionError` with codes `UNAUTHENTICATED`, `NOT_FOUND`, `VALIDATION` (`fieldErrors` by dotted path, `formErrors`), `CONFLICT`, `INTERNAL`, and `DEFAULT_ERROR_MESSAGES`. Pure, so client components can import it.
+  - `src/server/errors.ts`: `DomainError` base with `NotFoundError`, `ValidationError(fieldErrors, message?, formErrors?)` and `ConflictError`, each mapping itself to an `ActionError`.
+  - `src/server/auth/authed-action.ts`: `authedAction(schema, handler)` and `createAuthedAction(resolveUserId)` for tests. Order: authenticate → validate (`safeParseAsync`) → `handler(input, { userId })` → map errors. Next.js redirect/notFound errors are rethrown (`unstable_rethrow`).
+  - `src/proxy.ts` (Next 16's renamed middleware) + `src/lib/protected-paths.ts` (`APP_ROUTE_SEGMENTS`, `isAppPath`): redirects to `/sign-in` when the `soleup` session cookie is absent on (app) paths.
+  - Tests: unit (`authed-action.test.ts`, `proxy.test.ts`, `protected-paths.test.ts`), integration (`tests/integration/authed-action.integration.test.ts`: no cookie and forged cookie rejected, real session runs as the user, invalid input → field errors, proxy accepts a real session cookie).
+  - README > Authentication: how to use `authedAction`, the error classes and the proxy list.
+- **Deviations:**
+  1. **`requireUser()` keeps 0.6's return shape** (`CurrentUser`, with `id`, `name`, `email`, `image`) rather than `{ userId }`; the layout already uses `name`. Actions get `{ userId }` from `authedAction`.
+  2. **`authedAction` returns `UNAUTHENTICATED` instead of redirecting**, so a form can show "please sign in again" without losing input. Pages still redirect via `requireUser()`.
+  3. **The wrapper lives in `src/server/auth/`** (next to `requireUser()`), errors in `src/server/errors.ts`, result types in `src/lib/result.ts`.
+- **Decisions:** Authentication runs before validation, so anonymous callers learn nothing about the input shape. Unexpected errors log only the error class name (`console.error`), never the message, because messages can carry SQL params or user content. Error messages passed to the error classes are shown to users and must be fixed text. Recorded in code comments.
+- **Next chunk should know:**
+  - Action pattern: `export const renameGoal = authedAction(renameGoalSchema, (input, { userId }) => service.rename(userId, input));` in a `"use server"` file. The handler still must pass `userId` to every service call.
+  - Services throw `NotFoundError` for both missing and other users' records.
+  - Server Action arguments are typed `z.input<Schema>`; a `FormData` caller must convert to an object first (no helper yet).
+  - Add every new top-level folder under `src/app/(app)` to `APP_ROUTE_SEGMENTS`; `protected-paths.test.ts` fails otherwise.
+  - Integration tests can call real actions by mocking `next/headers` to return `asUser(...).headers` (see `authed-action.integration.test.ts`).
+- **Unverified:** `pnpm test:e2e` was not run in this session (the existing signed-out redirect test now goes through the proxy). `pnpm verify` (format, lint, typecheck, 60 unit, 28 integration) and `pnpm build` pass.
+- **Follow-ups:**
+  - 0.8 should decide whether `recordAudit` failures surface as `INTERNAL` (current default for any non-domain error).
+  - 0.12: route `logUnexpectedActionError` through pino with request IDs.
+  - A `FormData` → object helper when the first form-based action lands (0.11).
