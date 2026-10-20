@@ -33,7 +33,9 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
 /**
  * The signed-in user, or a redirect to the sign-in page. Call it first in
- * every authenticated page, Server Action and route handler.
+ * every authenticated page and route handler. Server Actions use
+ * authedAction() (./authed-action.ts), which returns an UNAUTHENTICATED
+ * result instead of redirecting.
  */
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
