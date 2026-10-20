@@ -102,7 +102,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.11 | Reference slice: Life Areas | done | chunk/0.11-life-areas | 2026-10-20 | `life_areas` (unique active names ignoring case), service + audit, authed actions, `/goals/areas` with inline create/edit/reorder, archive, confirmed delete, one-time starters |
 | 0.12 | Observability and error handling | done | chunk/0.12-observability | 2026-10-20 | pino 10.4 with deep key redaction, request ID per request in the proxy (matcher fixed), INTERNAL errors and error pages show a reference, `onRequestError` logging, `/api/health` |
 | 0.13 | Continuous integration | done | chunk/0.13-ci | 2026-10-20 | GitHub Actions: ordered lint/test/build/e2e job on a fresh Postgres 18.3 service (migrate from zero), separate migration-drift job, pnpm cache, SHA-pinned actions |
-| 0.14 | First deploy | todo | | | |
+| 0.14 | First deploy | in progress | chunk/0.14-first-deploy | | |
 | 0.✓ | Phase 0 exit check (user) | todo | | | |
 | 1.0 | Decision gate: goals | todo | | | |
 | 1.1 | Goals: schema and service | todo | | | |

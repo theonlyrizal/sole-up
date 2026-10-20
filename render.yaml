@@ -1,0 +1,51 @@
+# Render Blueprint for production. See docs/DEPLOY.md before changing it.
+# Database: Neon (not Render Postgres), so DATABASE_URL is entered by hand.
+services:
+  - type: web
+    name: soleup
+    runtime: node
+    # Free: sleeps after 15 idle minutes, no pre-deploy command, no workers.
+    # The Phase 5 worker needs a paid plan or another host (docs/DEPLOY.md).
+    plan: free
+    # Can't be changed after creation. Neon's project is in AWS ap-southeast-1.
+    region: singapore
+    branch: main
+    # Deploy a commit on main only after its GitHub checks (CI) pass.
+    autoDeployTrigger: checksPass
+    # Node comes from .nvmrc, pnpm from package.json "packageManager".
+    # The release step (db:migrate:deploy) is the last build command: Free
+    # has no preDeployCommand. It still runs before the new version serves
+    # traffic, and a failure fails the deploy while the old version keeps
+    # running. On a paid plan, move it to preDeployCommand.
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm build &&
+      pnpm db:migrate:deploy
+    startCommand: pnpm start
+    # Checks the database too. A new version that fails it never gets traffic.
+    healthCheckPath: /api/health
+    envVars:
+      # Don't set NODE_ENV: with it, pnpm install skips the dev dependencies
+      # the build needs. `next start` runs in production mode regardless.
+      - key: COREPACK_ENABLE_DOWNLOAD_PROMPT
+        value: "0"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # Neon direct (non-pooled) connection string with sslmode=verify-full.
+      - key: DATABASE_URL
+        sync: false
+      # 256 random bits, generated once by Render. Changing it signs everyone out.
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      # The public URL, e.g. https://soleup.onrender.com (no trailing slash).
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
