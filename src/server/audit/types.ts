@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { LIFE_AREA_COLORS, LIFE_AREA_STATUSES } from "@/lib/life-areas";
 import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
 
 // The audit event allowlist (ADR 0005). An event type that is not a key of
@@ -123,6 +124,8 @@ export function defineAuditEvents<const R extends AuditEventRegistry>(
   return registry;
 }
 
+const sortOrder = z.number().int().min(0);
+
 /**
  * The allowlist. Add each new event here with its entity type and a strict
  * `changes` schema, for example:
@@ -145,8 +148,48 @@ export const AUDIT_EVENTS = defineAuditEvents({
         z.string().refine((locale) => canonicalLocale(locale) === locale),
       ).optional(),
       weekStart: auditChange(z.number().int().min(0).max(6)).optional(),
+      lifeAreaStarters: auditChange(
+        z.enum(["accepted", "dismissed"]),
+      ).optional(),
     }),
   },
+
+  // Life areas. Names and descriptions are user content: `life_area.updated`
+  // records which fields changed, never their values.
+  "life_area.created": {
+    entityType: "life_area",
+    changes: z.strictObject({
+      status: auditChange(z.enum(LIFE_AREA_STATUSES)),
+      sortOrder: auditChange(sortOrder),
+      color: auditChange(z.enum(LIFE_AREA_COLORS)),
+    }),
+  },
+  "life_area.updated": {
+    entityType: "life_area",
+    changes: z.strictObject({
+      fields: z.array(z.enum(["name", "description", "color"])).min(1),
+      color: auditChange(z.enum(LIFE_AREA_COLORS)).optional(),
+    }),
+  },
+  "life_area.reordered": {
+    entityType: "life_area",
+    changes: z.strictObject({ sortOrder: auditChange(sortOrder) }),
+  },
+  "life_area.archived": {
+    entityType: "life_area",
+    changes: z.strictObject({
+      status: auditChange(z.enum(LIFE_AREA_STATUSES)),
+    }),
+  },
+  "life_area.unarchived": {
+    entityType: "life_area",
+    changes: z.strictObject({
+      status: auditChange(z.enum(LIFE_AREA_STATUSES)),
+      sortOrder: auditChange(sortOrder),
+    }),
+  },
+  // No `life_area.deleted`: a hard delete removes the area's events with it
+  // (ADR 0005).
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;

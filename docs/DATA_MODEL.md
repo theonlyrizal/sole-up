@@ -37,7 +37,7 @@ Do not store passwords directly if using an external authentication provider.
 ### UserPreference
 Stores explicit product preferences.
 
-Implemented in chunk 0.9 as `user_preferences`: one row per user (`user_id` is the primary key, cascading from `users`), created with defaults on first sign-in. Typed columns: `timezone` (IANA name, validated against the server runtime's zone list and stored in its canonical spelling; **null until the user confirms one**, since the browser's zone is only proposed), `locale` (BCP 47, default `en-US`), `week_start` (smallint 0–6, 0 = Sunday, default 1 = Monday, CHECK-constrained), `created_at`, `updated_at`. Changes are audited as `user_preferences.updated` with the changed fields' old and new values.
+Implemented in chunk 0.9 as `user_preferences`: one row per user (`user_id` is the primary key, cascading from `users`), created with defaults on first sign-in. Typed columns: `timezone` (IANA name, validated against the server runtime's zone list and stored in its canonical spelling; **null until the user confirms one**, since the browser's zone is only proposed), `locale` (BCP 47, default `en-US`), `week_start` (smallint 0–6, 0 = Sunday, default 1 = Monday, CHECK-constrained), `created_at`, `updated_at`. Changes are audited as `user_preferences.updated` with the changed fields' old and new values. Chunk 0.11 added `life_area_starters` (`accepted` | `dismissed`, null until answered): the answer to the one-time starter life areas offer.
 
 Suggested fields:
 - `id`
@@ -50,6 +50,8 @@ For important settings, prefer typed columns or validated structured data over a
 
 ### LifeArea
 A broad domain of life.
+
+Implemented in chunk 0.11 as `life_areas`: `id`, `user_id` (cascades from `users`), `name` (1–60 chars), `description` (optional, up to 500), `color` (optional key from a fixed palette, presentation only), `sort_order`, `status` (`active` | `archived`), `created_at`, `updated_at`. It has `unique (id, user_id)` for composite child keys. Active names are unique per user, ignoring case (`unique (user_id, lower(name)) where status = 'active'`), so an archived area's name can be reused; restoring that area then fails until one of them is renamed. Audited as `life_area.created`, `.updated` (the names of the changed fields, plus color; never the name or description text), `.reordered`, `.archived` and `.unarchived`. Delete is a hard delete that also removes the area's events. Starter areas (Learning, Career, Health, Relationships, Home, Finance) are offered once to a user with no areas; nothing is created unless the user picks some.
 
 Suggested fields:
 - `id`

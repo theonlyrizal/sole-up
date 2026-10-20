@@ -1,37 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+
 const NAV_LABELS = ["Home", "Goals", "Plan", "Settings"];
-
-/** Signs in a new user and confirms the proposed time zone. */
-async function signInAndConfirm(page: Page) {
-  const response = await page.request.post("/api/test/sign-in", {
-    data: { email: `e2e-${randomUUID()}@example.test`, name: "Alan Turing" },
-  });
-  expect(response.status()).toBe(200);
-  await page.goto("/home");
-  await page.getByRole("button", { name: "Confirm and continue" }).click();
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Home" }),
-  ).toBeVisible();
-}
-
-/** Fails on any serious or critical WCAG 2.x A/AA violation. */
-async function expectNoSeriousViolations(page: Page) {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  const serious = results.violations
-    .filter((v) => v.impact === "serious" || v.impact === "critical")
-    .map((v) => ({
-      id: v.id,
-      impact: v.impact,
-      targets: v.nodes.map((node) => node.target.join(" ")),
-    }));
-  expect(serious).toEqual([]);
-}
 
 function mainNav(page: Page) {
   return page.getByRole("navigation", { name: "Main" });

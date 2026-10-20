@@ -99,7 +99,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.8 | Audit log infrastructure | done | chunk/0.8-audit-log | 2026-10-20 | `audit_events` + 2 indexes, strict allowlist registry (empty until 0.11), `recordAudit(tx, event)`, `deleteAuditEventsForEntity(tx, ref)` |
 | 0.9 | User preferences | done | chunk/0.9-user-preferences | 2026-10-20 | `user_preferences` (typed, one row per user, tz null until confirmed), first-sign-in confirm gate, `lib/dates` on temporal-polyfill (ADR 0008), Settings page |
 | 0.10 | App shell and UI primitives | done | chunk/0.10-app-shell | 2026-10-20 | Responsive shell (sidebar / bottom bar, skip link), UI primitives (Radix dialogs/toasts, native select), root error/not-found/loading, manifest + icons, axe and keyboard e2e |
-| 0.11 | Reference slice: Life Areas | todo | | | |
+| 0.11 | Reference slice: Life Areas | done | chunk/0.11-life-areas | 2026-10-20 | `life_areas` (unique active names ignoring case), service + audit, authed actions, `/goals/areas` with inline create/edit/reorder, archive, confirmed delete, one-time starters |
 | 0.12 | Observability and error handling | todo | | | |
 | 0.13 | Continuous integration | todo | | | |
 | 0.14 | First deploy | todo | | | |
@@ -1104,3 +1104,31 @@ Template:
   - Not-found and error pages render outside the shell (root boundaries). An `(app)`-level `not-found.tsx` could keep the navigation when the first detail page calls `notFound()` (1.3).
   - The theme override (`data-theme`) is not wired to preferences yet.
   - The dev-only "Could not validate … instant navigation" logs remain (see the 0.6 and 0.9 notes); still harmless.
+
+### 0.11: Reference slice: Life Areas (2026-10-20)
+- **Built:**
+  - Schema `src/server/db/schema/life-areas.ts` + migration `0004_life_areas.sql`: `life_areas` (fields per the chunk), `unique (id, user_id)`, partial unique index `(user_id, lower(name)) where status = 'active'`, index `(user_id, sort_order)`, CHECKs for status, color, name and description length. Also `user_preferences.life_area_starters` (`accepted` | `dismissed` | null).
+  - `src/lib/life-areas.ts` (pure): statuses, color palette, limits, starter names, the `LifeArea` type.
+  - `src/server/modules/life-areas/`: `validation.ts`, `service.ts` (create, update, reorder, archive, unarchive, delete, `addStarterLifeAreas`, `dismissStarterLifeAreas`), `queries.ts` (`getLifeAreasView`), `actions.ts`. `answerLifeAreaStarters(tx, …)` in the preferences service. `src/server/db/errors.ts`: `isUniqueViolation(error, constraint)`.
+  - Audit events `life_area.created|updated|reordered|archived|unarchived`; `lifeAreaStarters` added to `user_preferences.updated`.
+  - UI: `src/app/(app)/goals/areas/` (page + `error.tsx`), linked from the Goals placeholder. `src/components/life-areas/`: the manager (list, move up/down keeping focus, archive, show-archived toggle, restore), inline create and edit forms, `ConfirmDialog` delete, the starter offer.
+  - Tests: unit `src/server/db/errors.test.ts`; integration `src/server/modules/life-areas/life-areas.integration.test.ts` (29 tests: DB constraints, domain rules, audit privacy, cross-user through the service and the actions, validation, starters); e2e `tests/e2e/life-areas.spec.ts` (starters; the full manage journey incl. keyboard reorder, Escape and focus return on the edit form and the confirm dialog, axe). `tests/e2e/helpers.ts` now holds `signInAndConfirm` and `expectNoSeriousViolations` (moved from `shell.spec.ts`, as the 0.10 note asked).
+  - Docs: README "Feature modules" (the recipe later chunks copy), DATA_MODEL LifeArea and UserPreference.
+- **Deviations:**
+  1. **Life Areas have their own page, `/goals/areas`**, linked from Goals, rather than a section on the Goals page, so Phase 1 can rebuild `/goals` without carrying them. Easy to move into a section if preferred.
+  2. **No `life_area.deleted` event**: a hard delete removes the area's events in the same transaction (ADR 0005), so a delete event would be removed with them.
+- **Decisions:**
+  1. **"Offered once" is stored** in `user_preferences.life_area_starters`, so a dismissal holds even while the user has no areas. The offer shows only while that is null and the user has no areas. Accepting is refused once answered (no second set on a double submit). Starter names are an enum on the server, not free input.
+  2. **Duplicate active names** return a `name` field error on create and edit, and a `ConflictError` on restore. They are caught from the unique index (race-safe), not pre-checked.
+  3. **Reorder takes every active ID in the new order.** A stale, partial or foreign list is a `ConflictError` and moves nothing. Only moved areas get an event. Archived areas keep their position; restoring appends to the end.
+  4. **`life_area.updated` records the changed field names** (`fields: ["name", …]`) plus color's old and new value, never name or description text.
+  5. **Color is a palette key** (CHECK-constrained), not a hex value.
+- **Next chunk should know:**
+  - Copy this module's shape (README "Feature modules"). `findForUpdate`, `guardDuplicateName` and the savepoint loop in `addStarterLifeAreas` are the patterns for row locking, unique-violation mapping and partial-success inserts.
+  - Services expect validated (trimmed) input; test them with clean values and test trimming through the action.
+  - 1.1: goals reference `(life_area_id, user_id) → life_areas(id, user_id)`. Deleting an area should `SET NULL (life_area_id)` in a hand-written migration, and the delete confirmation text should then mention goals.
+  - Decide in 1.0/1.2 whether archived areas stay selectable for goals.
+- **Unverified:** none. `pnpm verify` (format, lint, typecheck, 123 unit, 85 integration), `pnpm build` and `pnpm test:e2e` (15 tests) pass. Dev DB migrated. The `/goals/areas` `error.tsx` is not exercised by a test (same gap as the root one; 0.12).
+- **Follow-ups:**
+  - Deleting from the edit form leaves focus on the page body once the row is gone; consider moving focus to the list heading.
+  - Drag-and-drop reorder could reuse the same `reorderLifeAreas` action later.

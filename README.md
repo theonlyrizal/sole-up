@@ -103,6 +103,17 @@ Restart `pnpm dev` after editing `.env.local`.
 - **Root states:** `src/app/error.tsx` (fixed text, never the error's message), `not-found.tsx` and `loading.tsx`.
 - **Web app manifest:** `src/app/manifest.ts`. Icons are generated from the SVG artwork in `scripts/generate-icons.mts` (run `node scripts/generate-icons.mts` after changing it). Installing as an app also needs the service worker, which comes in Phase 5.
 
+## Feature modules
+
+Life areas (`src/server/modules/life-areas/`, chunk 0.11) are the reference slice. Copy their shape for each new entity:
+
+- **Schema** (`src/server/db/schema/life-areas.ts`): `user_id` cascading from `users`, `unique (id, user_id)` for composite child foreign keys, CHECK constraints for enums and lengths, and a partial unique index for "unique among active" rules. Shared constants (statuses, limits) live in a pure `src/lib/<entity>.ts`, which the schema imports with a relative path (drizzle-kit has no `@/` alias).
+- **`validation.ts`**: `z.strictObject` inputs with user-facing messages; blank optional text becomes `null`.
+- **`service.ts`**: every function takes `userId` and filters by it together with the record ID; a missing record and someone else's record are the same `NotFoundError`. Each mutation runs in one transaction with its audit event. Map unique violations with `isUniqueViolation(error, constraint)` (`src/server/db/errors.ts`) to a `ValidationError` (a field) or `ConflictError`, never the raw error.
+- **`queries.ts`**: read models for pages. **`actions.ts`**: `authedAction(schema, …)` → service → `refresh()`.
+- **UI**: the server page reads inside `<Suspense fallback={<LoadingState />}>`, a route `error.tsx` shows `ErrorState`, and a client component handles empty, pending, error and success states, with destructive actions behind `ConfirmDialog`.
+- **Tests**: an integration file covering domain rules, validation through the actions, a cross-user test, and that audit events hold no user content; an e2e journey with an axe check (`tests/e2e/helpers.ts`).
+
 ## Database and migrations
 
 The schema is defined with [Drizzle ORM](https://orm.drizzle.team) in `src/server/db/schema/` (one file per domain module, re-exported from `index.ts`). Server code uses the pooled, server-only handle from `src/server/db/client.ts`. TypeScript keys are camelCase; Drizzle maps them to snake_case columns.
