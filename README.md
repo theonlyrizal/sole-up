@@ -123,6 +123,14 @@ In PowerShell, set `$env:DATABASE_URL = "postgres://soleup:soleup@localhost:5432
 - Hand-written SQL is allowed for what Drizzle can't express, such as `ON DELETE SET NULL (col)` on composite foreign keys, CHECK constraints it doesn't model, or data backfills. Create the file with `pnpm db:generate --custom --name=<what-it-does>` so it is registered in the journal, then cover the constraint with a test.
 - Migrations must preserve user data. A destructive change needs explicit approval and a recovery plan.
 
+**Audit log**
+
+Every service mutation records a content-free audit event in the same transaction ([ADR 0005](docs/decisions/0005-history-and-audit-log.md)):
+
+- Add the event type to `AUDIT_EVENTS` in `src/server/audit/types.ts`, named `<entity_type>.<verb>`, with its entity type and a `z.strictObject()` schema for `changes` (use `auditChange(...)` for `{ from, to }` pairs). Only structured fields: status, dates as ISO strings, parent IDs, priority, ordering. Never titles, descriptions, notes or reasons. Loose objects, records, `unknown` and `Date` are rejected when the module loads.
+- Call `recordAudit(tx, { type, userId, entityId, changes })` from `src/server/audit/record.ts` inside the transaction that makes the change. It only accepts a transaction handle; an unknown type or an extra key throws `InvalidAuditEventError`, which rolls the change back.
+- A hard delete calls `deleteAuditEventsForEntity(tx, { userId, entityType, entityId })` in the same transaction: `audit_events.entity_id` has no foreign key. Account deletion cascades through `user_id`.
+
 ## Testing
 
 | Command | Runs |
