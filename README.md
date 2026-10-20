@@ -15,6 +15,7 @@ A personal management app that helps you decide what matters, turn goals into re
 - [Roadmap](docs/ROADMAP.md): product phases
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md): chunk-by-chunk build order and progress log
 - [Decisions (ADRs)](docs/decisions/README.md): settled architecture and product decisions
+- [Deploying](docs/DEPLOY.md): production on Render and Neon, environment, OAuth callbacks, deploy, rollback, backup and restore
 - [Agent prompts](docs/AGENT_PROMPTS.md): one session prompt per chunk
 
 ## Local setup
@@ -65,7 +66,7 @@ Sign-in uses [Better Auth](https://www.better-auth.com) (`src/server/auth/`) wit
 
 ### Creating the OAuth apps
 
-Create one app per provider for each environment (local now, production in chunk 0.14) and put the credentials in `.env.local`. Never commit them. The callback URL is always `<BETTER_AUTH_URL>/api/auth/callback/<provider>`.
+Create one app per provider for each environment and put the local credentials in `.env.local`. Production apps and their callback URLs are in [DEPLOY.md](docs/DEPLOY.md#oauth-production-callback-urls). Never commit them. The callback URL is always `<BETTER_AUTH_URL>/api/auth/callback/<provider>`.
 
 | Provider | Local callback URL |
 |---|---|

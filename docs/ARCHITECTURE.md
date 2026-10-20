@@ -187,7 +187,7 @@ The intelligence layer must:
 - Track request failures, background job failures, and AI provider failures.
 - Use request IDs or trace IDs to investigate issues. Implemented in chunk 0.12: pino with field redaction, a request ID per request from the proxy, shown to users with unexpected errors, and `/api/health` (see the README, "Logging and errors").
 - Add rate limits to authentication and expensive operations.
-- Establish database backups and test restoration before relying on the app for important records.
+- Establish database backups and test restoration before relying on the app for important records. Production backups, point-in-time recovery and restore steps: [DEPLOY.md](DEPLOY.md).
 - Define retention and deletion behavior for logs and backups.
 - Use feature flags or configuration to disable unstable AI functionality.
 

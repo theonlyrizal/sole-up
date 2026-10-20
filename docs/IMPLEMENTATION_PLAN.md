@@ -102,7 +102,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.11 | Reference slice: Life Areas | done | chunk/0.11-life-areas | 2026-10-20 | `life_areas` (unique active names ignoring case), service + audit, authed actions, `/goals/areas` with inline create/edit/reorder, archive, confirmed delete, one-time starters |
 | 0.12 | Observability and error handling | done | chunk/0.12-observability | 2026-10-20 | pino 10.4 with deep key redaction, request ID per request in the proxy (matcher fixed), INTERNAL errors and error pages show a reference, `onRequestError` logging, `/api/health` |
 | 0.13 | Continuous integration | done | chunk/0.13-ci | 2026-10-20 | GitHub Actions: ordered lint/test/build/e2e job on a fresh Postgres 18.3 service (migrate from zero), separate migration-drift job, pnpm cache, SHA-pinned actions |
-| 0.14 | First deploy | todo | | | |
+| 0.14 | First deploy | done | chunk/0.14-first-deploy | 2026-10-20 | Render Free (Singapore) + Neon Free (ADR 0009), render.yaml, `db:migrate:deploy` release step before traffic, docs/DEPLOY.md; user confirmed prod sign-in and persistence |
 | 0.✓ | Phase 0 exit check (user) | todo | | | |
 | 1.0 | Decision gate: goals | todo | | | |
 | 1.1 | Goals: schema and service | todo | | | |
@@ -1183,3 +1183,31 @@ Template:
 - **Unverified:** the workflow has not run on GitHub yet (not pushed, at the user's request), so the service container, cache and SHA pins are untested there. Locally, every step ran in the workflow's order with `CI=true`, twice, each time in a fresh clone (no `.env.local`, no `node_modules`) against a fresh `postgres:18.3-alpine` container: install, lint, format check, typecheck, unit (168), migrate from zero (5 migrations), integration (87), build, e2e (18, production build, no retries), drift check (no changes); the tree was clean afterwards. This also covers the CI branch of the Playwright config left unverified since 0.5, and `/test-errors/*` in a production build (0.12). A deliberately unmigrated table made the drift check report the new migration files. Branch protection is set by the user.
 - **Follow-ups:**
   - Dependabot (or Renovate) for the pinned action SHAs and npm dependencies.
+### 0.14: First deploy (2026-10-20)
+- **Built:**
+  - `render.yaml` (Render Blueprint): one free Node web service `soleup` in Singapore, branch `main`, `autoDeployTrigger: checksPass` (deploys only after CI passes), build `corepack enable && pnpm install --frozen-lockfile && pnpm build && pnpm db:migrate:deploy`, start `pnpm start`, health check `/api/health`. Secrets are `sync: false`; `BETTER_AUTH_SECRET` is `generateValue`.
+  - `scripts/db-migrate-deploy.mts` (`pnpm db:migrate:deploy`): the release step. drizzle-orm's migrator (same `drizzle.__drizzle_migrations` journal as `pnpm db:migrate`), process env only (no `.env.local`), all pending migrations in one transaction, 30 s connect timeout for a sleeping Neon compute, prints only db name, host and an error code (walks `cause` for the SQLSTATE).
+  - `docs/DEPLOY.md`: deploy flow, env vars, production OAuth callbacks, first-time provisioning, rollback, backups (Neon 6-hour PITR plus a manual `pg_dump`), a non-destructive PITR check, restore from PITR or a dump, logs, client-IP rate limiting, free-plan limits, moving to paid.
+  - ADR 0009 (production hosting providers); pointers in ADR 0003, the ADR index, README (Docs, Authentication), ARCHITECTURE §11, `.env.example`.
+- **Deviations:**
+  1. **Migrations run as the last build command, not a pre-deploy step.** Render's `preDeployCommand` is paid-only. It is the same point in the sequence (after build, before the new version takes traffic, old version still serving), and a failure fails the deploy. Move it to `preDeployCommand` on a paid plan.
+  2. **Free plans, chosen by the user** (no card): Neon Free's restore window is 6 hours, so DEPLOY.md adds a manual `pg_dump` weekly and before risky migrations.
+- **Decisions:**
+  1. **Neon direct connection (no pooler) with `sslmode=verify-full`**, one `DATABASE_URL` for app and migrations. pg 8.23 warns that `require` will weaken to libpq semantics in v9; `verify-full` keeps the certificate check.
+  2. **Don't set `NODE_ENV` on Render**: `pnpm install` would skip the dev dependencies the build needs; `next start` runs in production regardless.
+  3. **Request IDs stay app-generated** (the host's are ignored); logs stay in Render's log viewer, not shipped (closes the 0.12 follow-up).
+  4. **Rate-limit client IP:** kept Better Auth's default (`x-forwarded-for` with exactly one address). Verified locally under `next start`: Next fills the header from the socket when absent; one address → own bucket; several → shared bucket plus a one-time warning through pino. DEPLOY.md says how to check it on Render (closes the 0.6 follow-up, pending that check).
+  Recorded in ADR 0009, DEPLOY.md and comments in `render.yaml`.
+- **Next chunk should know:**
+  - Every migration must be backward compatible with the version still serving and the one you may roll back to (expand, then contract). Rollbacks reuse the old build and run no migrations; a dashboard rollback turns auto-deploy off.
+  - A new required env var must be added on Render before the deploy that needs it, or the new version fails its boot check (the old one keeps serving).
+  - The free web service sleeps after 15 idle minutes, and the plan has no background workers: **5.0 must revisit hosting** before reminders.
+- **Unverified:**
+  - The user confirmed on 2026-10-20: Google and GitHub sign-in on the production URL, a life area created, and still there after a redeploy.
+  - Not reported: the Neon PITR check (branch from past data), whether Render's proxy produces the "could not determine a client IP" warning on a normal sign-in, and Render's log retention on the free workspace.
+  - At close-out, `origin/main` did not yet contain this chunk (PR not merged), so the verified deploy did not come from `main`. After merging, confirm the Render service tracks `main` and that the next deploy waits for CI (`checksPass`).
+  - Checks: `pnpm verify` (format, lint, typecheck, 168 unit, 87 integration) and `pnpm build` pass; `pnpm start` with a production-like env against a fresh local DB (health 200, (app) redirects, OAuth start URL, test-only routes closed, rate-limit buckets). `db:migrate:deploy` tested from zero, re-run, bad password, host down, failing migration (nothing applied). Documented `pg_dump`/`pg_restore` commands run against local Postgres 18.3. `pnpm test:e2e` not run (no app code changed).
+- **Follow-ups:**
+  - `/test-errors/*` returns 200 with a static "Forced errors" heading when the test switch is off (no controls render). Move the heading inside the gate or return a real 404.
+  - Neon PITR check and the client-IP warning check from DEPLOY.md, if not done yet; 10.6 (restore drill) builds on them.
+  - Schedule the weekly `pg_dump` (manual for now).

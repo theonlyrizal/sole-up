@@ -22,3 +22,4 @@ Reminders and periodic reviews need reliable background execution that does not 
 - One provider bill and one database to back up and restore.
 - Queue load shares the database; revisit if job volume grows.
 - The worker arrives in Phase 5; until then the host runs only the web app.
+- Providers are chosen in [ADR 0009](0009-production-hosting.md) (Render Free + Neon Free). Their free plans have no worker, so Phase 5 must revisit the plan.
