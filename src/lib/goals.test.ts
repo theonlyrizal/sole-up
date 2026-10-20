@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   canChangeGoalStatus,
   completedAtAfterStatusChange,
+  GOAL_LIST_STATUSES,
   GOAL_STATUSES,
+  goalListStatus,
+  goalStatusActions,
   type GoalStatus,
 } from "./goals";
 
@@ -86,5 +89,68 @@ describe("completedAtAfterStatusChange", () => {
     expect(completedAtAfterStatusChange("active", "archived", null, now)).toBe(
       null,
     );
+  });
+});
+
+describe("goalListStatus", () => {
+  it("accepts each list status", () => {
+    for (const status of GOAL_LIST_STATUSES) {
+      expect(goalListStatus(status)).toBe(status);
+    }
+  });
+
+  it("falls back to active for anything else, including archived", () => {
+    for (const value of [undefined, "", "archived", "ACTIVE", ["paused"], 1]) {
+      expect(goalListStatus(value)).toBe("active");
+    }
+  });
+});
+
+describe("goalStatusActions", () => {
+  const targets = (status: GoalStatus) =>
+    goalStatusActions(status).map((action) => `${action.label}→${action.to}`);
+
+  it("offers the chunk's actions for each status", () => {
+    expect(targets("active")).toEqual([
+      "Mark complete→completed",
+      "Pause→paused",
+      "Drop→dropped",
+      "Archive→archived",
+    ]);
+    expect(targets("paused")).toEqual([
+      "Resume→active",
+      "Mark complete→completed",
+      "Drop→dropped",
+      "Archive→archived",
+    ]);
+    expect(targets("completed")).toEqual(["Reopen→active", "Archive→archived"]);
+    expect(targets("dropped")).toEqual(["Reopen→active", "Archive→archived"]);
+    expect(targets("archived")).toEqual([]);
+  });
+
+  it("only offers moves the status rules allow", () => {
+    for (const from of GOAL_STATUSES) {
+      for (const action of goalStatusActions(from)) {
+        expect(canChangeGoalStatus(from, action.to)).toBe(true);
+      }
+    }
+  });
+
+  it("uses copy that doesn't judge", () => {
+    const copy = GOAL_STATUSES.flatMap(goalStatusActions)
+      .flatMap((action) => [action.label, action.done])
+      .join(" ")
+      .toLowerCase();
+    for (const word of [
+      "fail",
+      "gave up",
+      "give up",
+      "quit",
+      "abandon",
+      "lazy",
+      "should",
+    ]) {
+      expect(copy).not.toContain(word);
+    }
   });
 });

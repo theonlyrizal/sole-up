@@ -82,3 +82,88 @@ export type Goal = {
   completedAt: Date | null;
   statusChangedAt: Date;
 };
+
+/** The statuses the Goals page filters by. Archived goals have their own view. */
+export const GOAL_LIST_STATUSES = [
+  "active",
+  "paused",
+  "completed",
+  "dropped",
+] as const satisfies readonly GoalStatus[];
+export type GoalListStatus = (typeof GOAL_LIST_STATUSES)[number];
+
+/** The filter a `?status=` value asks for; anything unknown is Active. */
+export function goalListStatus(value: unknown): GoalListStatus {
+  return GOAL_LIST_STATUSES.find((status) => status === value) ?? "active";
+}
+
+export const GOAL_STATUS_LABELS: Record<GoalStatus, string> = {
+  active: "Active",
+  paused: "Paused",
+  completed: "Completed",
+  dropped: "Dropped",
+  archived: "Archived",
+};
+
+/** Shown as a small label, never as a score or a sort key. */
+export const GOAL_PRIORITY_LABELS: Record<GoalPriority, string> = {
+  low: "Low priority",
+  medium: "Medium priority",
+  high: "High priority",
+};
+
+/** One status action on a goal: its button label and confirmation. */
+export type GoalStatusAction = {
+  to: GoalStatus;
+  label: string;
+  /** Toast after it succeeds. Plain and kind: no judgement about why. */
+  done: string;
+};
+
+const PAUSE: GoalStatusAction = {
+  to: "paused",
+  label: "Pause",
+  done: "Paused. Pick it up again whenever it suits you.",
+};
+const COMPLETE: GoalStatusAction = {
+  to: "completed",
+  label: "Mark complete",
+  done: "Marked complete. Nice work.",
+};
+const DROP: GoalStatusAction = {
+  to: "dropped",
+  label: "Drop",
+  done: "Dropped. Priorities change, and you can reopen it any time.",
+};
+const ARCHIVE: GoalStatusAction = {
+  to: "archived",
+  label: "Archive",
+  done: "Archived. It's out of the way and can be restored.",
+};
+
+/**
+ * The status actions offered for a goal on the Goals page, in display
+ * order. Resume and Reopen both go back to `active`. Archived goals are
+ * restored from the archive view (chunk 1.6), not here.
+ */
+export function goalStatusActions(status: GoalStatus): GoalStatusAction[] {
+  switch (status) {
+    case "active":
+      return [COMPLETE, PAUSE, DROP, ARCHIVE];
+    case "paused":
+      return [
+        { to: "active", label: "Resume", done: "Resumed. Welcome back." },
+        COMPLETE,
+        DROP,
+        ARCHIVE,
+      ];
+    case "completed":
+    case "dropped":
+      return [
+        { to: "active", label: "Reopen", done: "Reopened and back in Active." },
+        ARCHIVE,
+      ];
+    case "archived":
+      return [];
+  }
+}

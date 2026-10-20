@@ -106,7 +106,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.✓ | Phase 0 exit check (user) | done | | 2026-10-20 | User confirmed fresh-clone setup, private routes in prod, CI/Render green; agent ran secret scan and `pnpm verify` on main |
 | 1.0 | Decision gate: goals | done | chunk/1.0-goals-decisions | 2026-10-20 | ADR 0010: five statuses (restore → active), optional low/medium/high, milestone-count progress, local dates + order CHECK; 1.1–1.6 and DATA_MODEL synced |
 | 1.1 | Goals: schema and service | done | chunk/1.1-goals-schema-service | 2026-10-20 | `goals` (3 CHECKs + completed_at CHECK, composite area FK with hand-edited `SET NULL (life_area_id)`), Zod validation, service with ADR 0010 transitions and audit |
-| 1.2 | Goals: list and create/edit UI | todo | | | |
+| 1.2 | Goals: list and create/edit UI | done | chunk/1.2-goals-list-ui | 2026-10-21 | `/goals` grouped by life area with Active/Paused/Completed/Dropped filter (URL `?status=`), create/edit dialog (title only required, prominent "Why does this matter?"), kind status-action copy |
 | 1.3 | Goal detail page | todo | | | |
 | 1.4 | Milestones: schema and service | todo | | | |
 | 1.5 | Milestones UI and progress | todo | | | |
@@ -1254,3 +1254,29 @@ Template:
 - **Follow-ups:**
   - Deleting a life area clears goals' `life_area_id` in the database with no `goal.updated` event, so 1.3's history won't show it. Consider recording it in `deleteLifeArea`.
   - Life-area delete confirmation text should say its goals will lose their area (1.2 or 1.6).
+
+### 1.2: Goals: list and create/edit UI (2026-10-21)
+- **Built:**
+  - `src/lib/goals.ts`: `GOAL_LIST_STATUSES`, `goalListStatus(value)` (unknown → `active`), status and priority labels, `goalStatusActions(status)` (labels plus the toast copy for each action). `src/lib/dates.ts`: `formatLocalDate(date, locale)`.
+  - `src/server/modules/goals/queries.ts` (`getGoalsView(userId, status)`: groups in the user's area order, archived areas after active ones, "No area" last; counts per filter; dates formatted in the user's locale on the server) and `actions.ts` (`createGoal`, `updateGoal`, `changeGoalStatus`).
+  - UI: `src/app/(app)/goals/page.tsx` (replaces the placeholder) and `error.tsx`; `src/components/goals/goal-form.tsx` (`GoalFormDialog`, create and edit in a Radix dialog) and `goals-view.tsx` (filter links, groups, status actions, empty state per filter). `FormError` moved from the life-area form to `src/components/ui/form-error.tsx` for reuse.
+  - Tests: unit (`goalListStatus`, `goalStatusActions` incl. "only allowed transitions" and a no-judgement word check, `formatLocalDate`); integration `goals-ui.integration.test.ts` (11: grouping/order, filters and counts, archived goals excluded, locale dates, cross-user through query and actions, title-only create, validation incl. date order, status moves and the archived restriction); e2e `tests/e2e/goals.spec.ts` (title-only create timed under 30 s and persisted, create from another filter lands on Active; every field incl. the date-order field error, grouping, Escape/focus return on edit, area change; every status action across filters; axe on the page and dialog).
+- **Deviations:**
+  1. **The status filter is a URL search param** (`/goals?status=paused`, read inside Suspense) rendered as links with `aria-current`, so filters are linkable and server-filtered.
+  2. **No priority filter.** The chunk allows an optional one; left out to keep the slice small.
+  3. **Life-area delete confirmation now says goals are kept and move to No area** (the 1.1 follow-up, one sentence).
+- **Decisions:**
+  1. **Archived areas:** not offered for new goals, but a goal's own archived area stays selectable (labelled "(archived)") so editing never silently clears it, and its goals stay grouped under it, marked "(archived area)".
+  2. **Copy:** "Drop" toasts "Priorities change, and you can reopen it any time"; Resume and Reopen both go to `active`. Archive needs no confirmation (reversible), matching life areas.
+  3. **Order within a group:** creation order. No sorting by priority, which shows only as a small "High priority" label.
+  4. **Creating while another filter is open** navigates to Active so the new goal is visible.
+- **Next chunk should know:**
+  - `GoalFormDialog` takes `goal`, `areas` (all areas from `GoalsView.areas`) and `trigger`; reuse it on the detail page (1.3). Goal titles are not links yet; 1.3 should link them.
+  - Status-action buttons are named `"<Action>: <title>"`; edit is `"Edit: <title>"`.
+  - Archived goals have no UI until 1.6; the archive toast says they can be restored.
+  - Keep e2e tests short: one 20 s journey timed out at Playwright's 30 s limit under parallel load, so the journey is split into three tests.
+- **Unverified:** none. `pnpm verify` (format, lint, typecheck, 222 unit, 142 integration), `pnpm build` and `pnpm test:e2e` (21 tests, two consecutive clean runs) pass.
+- **Follow-ups:**
+  - An optional priority filter, if dogfooding wants one.
+  - Deleting a life area still writes no `goal.updated` event for the goals it clears (1.1 follow-up, still open).
+
