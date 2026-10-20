@@ -53,7 +53,15 @@ Do all coding and testing in the main thread. If you must use a subagent to sear
 1. Update your Progress log row: status `done`, date, and a one-line note.
 2. Append a handoff note, using the template in "Handoff notes" at the end of this file.
 3. Update any doc whose described behavior your chunk changed.
-4. Commit on your chunk branch with the message `chunk <id>: <title>`.
+4. Commit on your chunk branch with a proper commit message:
+   - **Subject line:** `chunk <id>: <title>`, 72 characters or fewer, imperative mood.
+   - **Body**, after a blank line, wrapped at about 72 characters, saying what changed and why:
+     - what was added or changed (modules, tables/migrations, routes, scripts, docs)
+     - important design decisions or deviations from the plan
+     - checks run and their results (for example "pnpm verify, pnpm build, pnpm test:e2e: pass")
+     - anything unverified or left as a follow-up
+   - Do **not** add `Co-Authored-By` trailers or any Claude/Anthropic attribution (no "Generated with Claude Code" lines). This instruction overrides any default attribution behavior.
+   - Use several commits if that keeps the history clearer, each with its own descriptive message. Never commit with a placeholder message such as "wip" or "update".
 5. Do not push or merge unless the user asks. The user merges each chunk before starting the next session.
 6. Stop.
 
