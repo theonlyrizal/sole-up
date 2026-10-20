@@ -6,6 +6,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/server/db/client";
 import * as schema from "@/server/db/schema";
 import { env } from "@/server/env";
+import { ensureUserPreferences } from "@/server/modules/preferences/service";
 
 import { logAuth } from "./logger";
 import { configuredProviders, type ProviderId } from "./providers";
@@ -49,6 +50,17 @@ export const auth = betterAuth({
       trustedProviders: [],
       allowDifferentEmails: false,
       requireLocalEmailVerified: true,
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // First sign-in: create the preferences row with defaults. The time
+        // zone stays unset until the user confirms it in the app.
+        after: async (user) => {
+          await ensureUserPreferences(user.id);
+        },
+      },
     },
   },
   session: {

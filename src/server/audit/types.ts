@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
+
 // The audit event allowlist (ADR 0005). An event type that is not a key of
 // AUDIT_EVENTS cannot be recorded.
 //
@@ -122,8 +124,7 @@ export function defineAuditEvents<const R extends AuditEventRegistry>(
 }
 
 /**
- * The allowlist. Empty until the first domain module lands (0.11 adds
- * `life_area.*`). Add each new event here with its entity type and a strict
+ * The allowlist. Add each new event here with its entity type and a strict
  * `changes` schema, for example:
  *
  *   "goal.archived": {
@@ -131,6 +132,21 @@ export function defineAuditEvents<const R extends AuditEventRegistry>(
  *     changes: z.strictObject({ status: auditChange(z.enum(goalStatuses)) }),
  *   },
  */
-export const AUDIT_EVENTS = defineAuditEvents({});
+export const AUDIT_EVENTS = defineAuditEvents({
+  // A user's preferences changed. The entity ID is the user's ID (one row
+  // per user). Only the fields that changed are present.
+  "user_preferences.updated": {
+    entityType: "user_preferences",
+    changes: z.strictObject({
+      timezone: auditChange(
+        z.string().refine((zone) => canonicalTimeZone(zone) === zone),
+      ).optional(),
+      locale: auditChange(
+        z.string().refine((locale) => canonicalLocale(locale) === locale),
+      ).optional(),
+      weekStart: auditChange(z.number().int().min(0).max(6)).optional(),
+    }),
+  },
+});
 
 export type AuditEvents = typeof AUDIT_EVENTS;
