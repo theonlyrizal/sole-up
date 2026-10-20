@@ -77,3 +77,27 @@ In PowerShell, set `$env:DATABASE_URL = "postgres://soleup:soleup@localhost:5432
 - Never edit a migration that has been merged. Fix forward with a new one.
 - Hand-written SQL is allowed for what Drizzle can't express, such as `ON DELETE SET NULL (col)` on composite foreign keys, CHECK constraints it doesn't model, or data backfills. Create the file with `pnpm db:generate --custom --name=<what-it-does>` so it is registered in the journal, then cover the constraint with a test.
 - Migrations must preserve user data. A destructive change needs explicit approval and a recovery plan.
+
+## Testing
+
+| Command | Runs |
+|---|---|
+| `pnpm test:unit` | Vitest `unit` project: `src/**/*.test.ts`, pure code, no database |
+| `pnpm test:integration` | Vitest `integration` project: `*.integration.test.ts` in `src/` or `tests/integration/`, against the real test database |
+| `pnpm test:e2e` | Playwright tests in `tests/e2e/`. Starts `pnpm dev` itself (or reuses a server already on port 3000); in CI (`CI` set) it builds and runs `pnpm start` |
+| `pnpm verify` | `format:check`, `lint`, `typecheck`, `test:unit` and `test:integration`. Run it before every commit |
+
+Before the first run:
+
+- `docker compose up -d --wait`. Integration tests need Postgres.
+- Set `TEST_DATABASE_URL` in `.env.local` (copy it from `.env.example`). It must be a local database whose name ends in `_test`; the tests refuse anything else, because they delete all data in it.
+- `pnpm exec playwright install chromium`, once per machine, for the end-to-end tests.
+
+How the integration project works:
+
+- Before any file runs, it applies all pending migrations to the test database (same journal as `pnpm db:migrate`).
+- Inside tests, the app's `db` client (`@/server/db/client`) points at the test database.
+- Before each test, every table in the `public` schema is truncated (identities restart). Tests never depend on data from another test.
+- Files run one at a time, because they share one database.
+
+`server-only` is replaced by a no-op in Vitest, so server modules can be tested directly. A module that parses the environment on import (like `src/server/env.ts`) needs the variables stubbed before it is imported; see `src/server/env.test.ts`.

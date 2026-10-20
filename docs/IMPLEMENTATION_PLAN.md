@@ -53,7 +53,15 @@ Do all coding and testing in the main thread. If you must use a subagent to sear
 1. Update your Progress log row: status `done`, date, and a one-line note.
 2. Append a handoff note, using the template in "Handoff notes" at the end of this file.
 3. Update any doc whose described behavior your chunk changed.
-4. Commit on your chunk branch with the message `chunk <id>: <title>`.
+4. Commit on your chunk branch with a proper commit message:
+   - **Subject line:** `chunk <id>: <title>`, 72 characters or fewer, imperative mood.
+   - **Body**, after a blank line, wrapped at about 72 characters, saying what changed and why:
+     - what was added or changed (modules, tables/migrations, routes, scripts, docs)
+     - important design decisions or deviations from the plan
+     - checks run and their results (for example "pnpm verify, pnpm build, pnpm test:e2e: pass")
+     - anything unverified or left as a follow-up
+   - Do **not** add `Co-Authored-By` trailers or any Claude/Anthropic attribution (no "Generated with Claude Code" lines). This instruction overrides any default attribution behavior.
+   - Use several commits if that keeps the history clearer, each with its own descriptive message. Never commit with a placeholder message such as "wip" or "update".
 5. Do not push or merge unless the user asks. The user merges each chunk before starting the next session.
 6. Stop.
 
@@ -85,7 +93,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.2 | Project scaffold | done | chunk/0.2-project-scaffold | 2026-10-20 | Next.js 16.4 App Router, TS strict, ESLint + Prettier, Tailwind v4 light/dark tokens, Node 24 LTS pinned |
 | 0.3 | Environment and local Postgres | done | chunk/0.3-env-postgres | 2026-10-20 | Postgres 18 via Docker Compose (dev + test DBs, healthcheck), Zod env validated at boot, .env.example, README setup |
 | 0.4 | Drizzle and migration workflow | done | chunk/0.4-drizzle | 2026-10-20 | Drizzle 0.45 + pg pool (server-only), db:generate/migrate/studio/reset, baseline migration applied to dev and test, README conventions |
-| 0.5 | Test harness | todo | | | |
+| 0.5 | Test harness | done | chunk/0.5-test-harness | 2026-10-20 | Vitest 5 unit + integration projects (migrate once, truncate between tests, `_test` URL guard), Playwright 1.64 smoke test, test:* and verify scripts |
 | 0.6 | Authentication | todo | | | |
 | 0.7 | Authorization primitives | todo | | | |
 | 0.8 | Audit log infrastructure | todo | | | |
@@ -926,3 +934,31 @@ Template:
   - `scripts/*.mts` run directly with Node 24's type stripping. Keep them to erasable TypeScript syntax and self-contained (no `@/` imports).
 - **Unverified:** none. `pnpm db:reset` (drop + migrate from scratch) succeeded on `soleup_dev` and `soleup_test`, each with one journal row; a repeat `db:migrate` is a no-op; `db:reset` exits 1 with `NODE_ENV=production` and with a non-local host. `db:studio` starts. lint, typecheck, format:check and build pass.
 - **Follow-ups:** `meta/0000_snapshot.json` and `_journal.json` were reformatted once by Prettier before the ignore rule was added; content is unchanged and drizzle-kit reads them fine.
+
+### 0.5: Test harness (2026-10-20)
+- **Built:**
+  - Dev dependencies (pinned): `vitest` 5.0.5, `vite` 8.3.4 (Vitest's peer), `@playwright/test` 1.64.1.
+  - `vitest.config.mts` with two projects. `unit`: `src/**/*.test.{ts,tsx}` minus integration files. `integration`: `*.integration.test.{ts,tsx}` in `src/` or `tests/integration/`, with `fileParallelism: false`, and `DATABASE_URL` set to `TEST_DATABASE_URL` for its workers.
+  - `tests/integration/helpers/`:
+    - `database.ts`: `assertTestDatabaseUrl()` (local host and a name ending in `_test`, or it throws) and `truncateUserTables()` (every `public` table, `RESTART IDENTITY CASCADE`).
+    - `global-setup.ts`: checks the URL, then migrates once with drizzle-orm's migrator (same `drizzle.__drizzle_migrations` journal as `db:migrate`).
+    - `setup.ts`: re-checks the URL, truncates before each test, and closes the pool after each file.
+  - `playwright.config.ts`: Chromium only, starts `pnpm dev` locally (reusing a server already on :3000), and `pnpm build && pnpm start` when `CI` is set.
+  - Sample tests: `src/server/env.test.ts` (unit, `parseEnv`; closes the 0.3 follow-up), `tests/integration/database.integration.test.ts` (migrated test DB, truncation between tests, URL guard), `tests/e2e/smoke.spec.ts` (home page).
+  - Scripts `test:unit`, `test:integration`, `test:e2e`, `verify`. `TEST_DATABASE_URL` added to `.env.example`. README "Testing".
+- **Deviations:** none.
+- **Decisions:**
+  1. **Integration files are named `*.integration.test.ts`** so they can sit next to the module they test (as the code layout suggests) without the unit project picking them up.
+  2. **`TEST_DATABASE_URL` is read by the Vitest config only**, not added to the app's env schema: the app never uses it. The config parses `.env.local` instead of loading it, so the dev `DATABASE_URL` cannot leak into test workers.
+  3. **The truncation guard is strict** (local host and a `_test` name) because a wrong URL would wipe data. It runs in global setup and again in every file.
+  4. **`server-only` is aliased to its no-op entry** in Vitest, so server modules are importable in tests.
+  5. **E2E uses `next dev` locally** for fast startup, and a production build in CI. 0.13 can change this if CI time matters.
+  6. **Vitest 5 over 4.1**: 4.1.12 is a maintenance release published the same day as 5.0.5, and 5.x has had point releases since September.
+- **Next chunk should know:**
+  - `src/server/env.ts` parses `process.env` on import. Integration workers have `DATABASE_URL` set, so importing `@/server/db/client` just works there. Unit tests that import it must stub the env first; see `env.test.ts`.
+  - For 0.6 fixtures: put them in `tests/integration/helpers/`. Truncation already covers any new `public` table (users, sessions, accounts) with no extra work.
+  - Tests in one integration file share a pool and run in order; each test starts with empty tables.
+  - Playwright browsers live outside the repo: run `pnpm exec playwright install chromium` once per machine (CI too, in 0.13: `--with-deps`).
+  - `.env.local` needs `TEST_DATABASE_URL`. This machine's `.env.local` was updated.
+- **Unverified:** none. `pnpm verify` (format:check, lint, typecheck, 6 unit tests, 9 integration tests) and `pnpm test:e2e` (1 test) pass, and `pnpm build` passes. The URL guard rejects `soleup_dev` with a readable error. The CI branch of the Playwright config (`build && start`) was not run.
+- **Follow-ups:** none.
