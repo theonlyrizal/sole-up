@@ -84,7 +84,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 0.1 | Record decisions and sync docs | done | chunk/0.1-decisions-docs | 2026-10-20 | ADRs 0001–0007 written; spec, data model, roadmap, architecture and README synced |
 | 0.2 | Project scaffold | done | chunk/0.2-project-scaffold | 2026-10-20 | Next.js 16.4 App Router, TS strict, ESLint + Prettier, Tailwind v4 light/dark tokens, Node 24 LTS pinned |
 | 0.3 | Environment and local Postgres | done | chunk/0.3-env-postgres | 2026-10-20 | Postgres 18 via Docker Compose (dev + test DBs, healthcheck), Zod env validated at boot, .env.example, README setup |
-| 0.4 | Drizzle and migration workflow | todo | | | |
+| 0.4 | Drizzle and migration workflow | done | chunk/0.4-drizzle | 2026-10-20 | Drizzle 0.45 + pg pool (server-only), db:generate/migrate/studio/reset, baseline migration applied to dev and test, README conventions |
 | 0.5 | Test harness | todo | | | |
 | 0.6 | Authentication | todo | | | |
 | 0.7 | Authorization primitives | todo | | | |
@@ -900,3 +900,29 @@ Template:
   - `docker compose down -v` wipes both databases; the init script reruns on the next start.
 - **Unverified:** none. `docker compose up -d --wait` reports healthy (Postgres 18.3, both databases present). The app returns 200 under `next start` and `next dev` with `.env.local`, and both exit with code 1 and a readable list when `DATABASE_URL` is missing or malformed. format:check, lint, typecheck and build pass.
 - **Follow-ups:** no automated tests for `parseEnv` yet (no test runner until 0.5). Worth adding a unit test in 0.5.
+
+### 0.4: Drizzle and migration workflow (2026-10-20)
+- **Built:**
+  - Dependencies (pinned): `drizzle-orm` 0.45.4, `pg` 8.23.1; dev `drizzle-kit` 0.31.11, `@types/pg` 8.23.1. `esbuild`'s build script is denied in `pnpm-workspace.yaml` (drizzle-kit works without it).
+  - `drizzle.config.ts`: schema `src/server/db/schema/index.ts`, output `src/server/db/migrations`, `casing: "snake_case"`, `strict`, `verbose`.
+  - `src/server/db/client.ts` (`server-only`): one `pg.Pool` from `env.DATABASE_URL`, cached on `globalThis` outside production so hot reloads don't leak pools, with a pool `error` listener. Exports `db` (Drizzle, with the schema) and the `Db` type.
+  - `src/server/db/schema/index.ts`: empty schema entry point.
+  - `src/server/db/migrations/0000_init.sql` (+ `meta/`): a custom baseline migration (`SELECT 1;`) that only starts the journal.
+  - Scripts: `db:generate`, `db:migrate`, `db:studio`, `db:reset` (`scripts/db-reset.mts` drops the `drizzle` and `public` schemas, then `drizzle-kit migrate` runs).
+  - README "Database and migrations": commands, targeting the test DB, and migration conventions.
+- **Deviations:** none.
+- **Decisions:**
+  1. **`pg` (node-postgres) as the driver**, not postgres.js: pg-boss (5.1) uses `pg`, so the app keeps one driver.
+  2. **snake_case casing** set in both `drizzle.config.ts` and `client.ts`, so schema files use camelCase keys without naming each column.
+  3. **The schema entry is `schema/index.ts`, not the folder.** Every new schema file must be re-exported from it; that also makes it visible to relational queries.
+  4. **drizzle.config.ts and db-reset load `.env.local` with `process.loadEnvFile`.** They cannot import `@/server/env` (`server-only` throws outside Next.js). Shell variables win over `.env.local`, which is how commands target `soleup_test`.
+  5. **`db:reset` also refuses non-local hosts** (`localhost`, `127.0.0.1`, `[::1]`), on top of the required `NODE_ENV=production` refusal, so a stray managed-DB URL can't be wiped.
+  6. **Migrations are excluded from Prettier** (`.prettierignore`) so drizzle-kit's output is committed as generated.
+- **Next chunk should know:**
+  - Import `db` from `@/server/db/client`. Nothing imports it yet, so the app still opens no connection until a module uses it.
+  - Hand-written SQL: `pnpm db:generate --custom --name=<slug>` creates a journaled empty file.
+  - To migrate or reset the test DB: `DATABASE_URL=postgres://soleup:soleup@localhost:5432/soleup_test pnpm db:migrate` (or `db:reset`). 0.5 can wrap this behind `TEST_DATABASE_URL`.
+  - The migration journal lives in the `drizzle` schema, which `db:reset` drops.
+  - `scripts/*.mts` run directly with Node 24's type stripping. Keep them to erasable TypeScript syntax and self-contained (no `@/` imports).
+- **Unverified:** none. `pnpm db:reset` (drop + migrate from scratch) succeeded on `soleup_dev` and `soleup_test`, each with one journal row; a repeat `db:migrate` is a no-op; `db:reset` exits 1 with `NODE_ENV=production` and with a non-local host. `db:studio` starts. lint, typecheck, format:check and build pass.
+- **Follow-ups:** `meta/0000_snapshot.json` and `_journal.json` were reformatted once by Prettier before the ignore rule was added; content is unchanged and drizzle-kit reads them fine.
