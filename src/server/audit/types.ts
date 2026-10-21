@@ -7,6 +7,10 @@ import {
   GOAL_STATUSES,
 } from "@/lib/goals";
 import { LIFE_AREA_COLORS, LIFE_AREA_STATUSES } from "@/lib/life-areas";
+import {
+  MILESTONE_EDITABLE_FIELDS,
+  MILESTONE_STATUSES,
+} from "@/lib/milestones";
 import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
 
 // The audit event allowlist (ADR 0005). An event type that is not a key of
@@ -226,6 +230,37 @@ export const AUDIT_EVENTS = defineAuditEvents({
     changes: z.strictObject({ status: auditChange(z.enum(GOAL_STATUSES)) }),
   },
   // No `goal.deleted`, for the same reason as life areas (ADR 0005).
+
+  // Milestones. Title and description are user content:
+  // `milestone.updated` records which fields changed, plus old and new
+  // values for the due date only. `milestone.created` names the parent goal.
+  "milestone.created": {
+    entityType: "milestone",
+    changes: z.strictObject({
+      goalId: auditChange(z.uuid()),
+      status: auditChange(z.enum(MILESTONE_STATUSES)),
+      sortOrder: auditChange(sortOrder),
+      dueDate: auditChange(localDate),
+    }),
+  },
+  "milestone.updated": {
+    entityType: "milestone",
+    changes: z.strictObject({
+      fields: z.array(z.enum(MILESTONE_EDITABLE_FIELDS)).min(1),
+      dueDate: auditChange(localDate).optional(),
+    }),
+  },
+  "milestone.reordered": {
+    entityType: "milestone",
+    changes: z.strictObject({ sortOrder: auditChange(sortOrder) }),
+  },
+  "milestone.status_changed": {
+    entityType: "milestone",
+    changes: z.strictObject({
+      status: auditChange(z.enum(MILESTONE_STATUSES)),
+    }),
+  },
+  // No `milestone.deleted`, for the same reason as life areas (ADR 0005).
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;

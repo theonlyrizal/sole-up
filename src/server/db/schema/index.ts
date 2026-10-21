@@ -5,4 +5,5 @@ export * from "./auth";
 export * from "./audit";
 export * from "./goals";
 export * from "./life-areas";
+export * from "./milestones";
 export * from "./preferences";

@@ -108,7 +108,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 1.1 | Goals: schema and service | done | chunk/1.1-goals-schema-service | 2026-10-20 | `goals` (3 CHECKs + completed_at CHECK, composite area FK with hand-edited `SET NULL (life_area_id)`), Zod validation, service with ADR 0010 transitions and audit |
 | 1.2 | Goals: list and create/edit UI | done | chunk/1.2-goals-list-ui | 2026-10-21 | `/goals` grouped by life area with Active/Paused/Completed/Dropped filter (URL `?status=`), create/edit dialog (title only required, prominent "Why does this matter?"), kind status-action copy |
 | 1.3 | Goal detail page | done | chunk/1.3-goal-detail | 2026-10-21 | `/goals/[goalId]`: header, reason, milestone/task placeholders, history timeline from audit events (structured changes only), status actions incl. Restore, in-shell not-found |
-| 1.4 | Milestones: schema and service | todo | | | |
+| 1.4 | Milestones: schema and service | done | chunk/1.4-milestones-schema-service | 2026-10-21 | `milestones` (composite goal FK, cascade; status/completed_at CHECKs), service with dense per-goal order and audit, progress query; goal delete removes milestone events |
 | 1.5 | Milestones UI and progress | todo | | | |
 | 1.6 | Goal archive and delete flows | todo | | | |
 | 1.✓ | Phase 1 checkpoint (user) | todo | | | |
@@ -1300,3 +1300,28 @@ Template:
 - **Follow-ups:**
   - Deleting a life area still writes no `goal.updated` event, so its goals' timelines don't show losing the area (1.1 follow-up, still open).
   - Archived goals are reachable only by URL until the archive view (1.6).
+
+### 1.4: Milestones: schema and service (2026-10-21)
+- **Built:**
+  - `src/lib/milestones.ts` (pure): statuses, length limits, `MILESTONE_EDITABLE_FIELDS`, `completedAtAfterMilestoneStatusChange`, the `Milestone` and `MilestoneProgress` types.
+  - Schema `src/server/db/schema/milestones.ts` + migration `0006_milestones.sql` (generated, no hand edit): `milestones` per the chunk, `unique (id, user_id)`, composite FK `(goal_id, user_id) → goals(id, user_id) ON DELETE CASCADE`, index `(goal_id, user_id, sort_order)`, CHECKs for status, `completed_at` (set exactly while completed), `sort_order >= 0`, title/description length.
+  - `src/server/modules/milestones/`: `validation.ts` (create, update, reorder, change status, id), `service.ts` (`createMilestone`, `updateMilestone`, `reorderMilestones`, `changeMilestoneStatus`, `deleteMilestone`, `deleteMilestoneEventsForGoal`), `queries.ts` (`getMilestoneProgress(userId, goalIds)`).
+  - Audit events `milestone.created|updated|reordered|status_changed`. `deleteGoal` now removes its milestones' events in the same transaction (the rows go by cascade).
+  - Tests: unit `validation.test.ts` (8); integration `milestones.integration.test.ts` (21: composite-FK rejection with SQLSTATE and constraint name, CHECKs, goal-delete cascade incl. milestone events, account cascade, append order, audit privacy, due date outside the goal's dates, dense reorder and stale/partial/foreign lists, every status move and `completed_at`, no-op, last milestone leaves the goal alone, delete closes the gap, progress with mixed/all dropped/all completed/none, cross-user).
+- **Deviations:**
+  1. **One `changeMilestoneStatus(id, status)`** covers complete, reopen, drop and undrop (any of the three statuses to any other), following `changeGoalStatus`. Dropping a completed milestone clears `completed_at`.
+  2. **No `actions.ts`** ("no UI" for this chunk); 1.5 adds them.
+  3. **Delete also closes the gap** in the goal's order, writing `milestone.reordered` for each shifted sibling, so the order stays dense after any write, not only after reorder.
+- **Decisions:**
+  1. `sort_order` is per goal, dense 0..n-1, across every status (dropped milestones keep their place). No unique index on `(goal_id, sort_order)`: the service keeps it dense and a unique index would need deferring during reorder.
+  2. Create, reorder and delete lock the goal row (`FOR UPDATE`) first, so concurrent writers can't share a position; locks are always goal first, then milestones. A missing or foreign goal is `NotFoundError` (the composite FK is the backstop).
+  3. Milestones can be added to a goal in any status, archived included; 1.5 decides what the UI offers.
+  4. `milestone.created` records `goalId`; `milestone.updated` records changed field names plus the due date's old/new value only.
+  5. Progress returns `{ completed, countable }` per goal; goals with no milestones are absent from the map, all-dropped goals have `countable: 0`. Callers show nothing for either.
+- **Next chunk should know:**
+  - Reorder takes every milestone of the goal (any status) in the new order; a partial list is a `ConflictError`.
+  - Events in one transaction share `occurred_at`; sort reorder events by their `sortOrder.to` in tests, not by time.
+  - The goal timeline (`getGoalDetail`) still reads only `entity_type = 'goal'`; milestone events carry `goalId` on create only, so showing them there needs a lookup through the milestone (or adding `goalId` to more events).
+  - 1.6's delete confirmation can count milestones with a plain `count(*)` on `milestones` by goal and user.
+- **Unverified:** none. `pnpm verify` passes (format, lint, typecheck, 237 unit, 168 integration). `pnpm db:generate` shows no drift. Dev DB migrated. `pnpm build` and `pnpm test:e2e` not run (no route or UI changes).
+- **Follow-ups:** none new; the 1.1 life-area-delete event gap is still open.
