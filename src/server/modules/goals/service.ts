@@ -13,6 +13,7 @@ import { db, type DbTransaction } from "@/server/db/client";
 import { isForeignKeyViolation } from "@/server/db/errors";
 import { goals } from "@/server/db/schema";
 import { ConflictError, NotFoundError, ValidationError } from "@/server/errors";
+import { deleteMilestoneEventsForGoal } from "@/server/modules/milestones/service";
 
 import type {
   ChangeGoalStatusInput,
@@ -202,12 +203,16 @@ export async function changeGoalStatus(
   });
 }
 
-/** Hard delete (ADR 0006). Removes the goal's audit events with it. */
+/**
+ * Hard delete (ADR 0006). The database cascades the goal's milestones;
+ * the goal's and its milestones' audit events are removed here.
+ */
 export async function deleteGoal(
   userId: string,
   { id }: GoalIdInput,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    await deleteMilestoneEventsForGoal(tx, userId, id);
     const [deleted] = await tx
       .delete(goals)
       .where(and(eq(goals.id, id), eq(goals.userId, userId)))

@@ -103,7 +103,7 @@ Fields:
 - `status`: `open | completed | dropped`, default `open`. Dropped milestones don't count toward progress.
 - `due_date` (optional local `date`; not constrained by the goal's dates)
 - `completed_at` (optional instant; set on completion, cleared on reopen)
-- `sort_order`
+- `sort_order` (dense per goal, 0..n-1, across every status)
 - `created_at`
 - `updated_at`
 

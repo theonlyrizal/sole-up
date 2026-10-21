@@ -43,6 +43,13 @@
       "when": 1792513658498,
       "tag": "0005_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792597422785,
+      "tag": "0006_milestones",
+      "breakpoints": true
     }
   ]
 }
