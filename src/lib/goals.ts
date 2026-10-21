@@ -142,9 +142,10 @@ const ARCHIVE: GoalStatusAction = {
 };
 
 /**
- * The status actions offered for a goal on the Goals page, in display
- * order. Resume and Reopen both go back to `active`. Archived goals are
- * restored from the archive view (chunk 1.6), not here.
+ * The status actions offered for a goal, in display order. Resume, Reopen
+ * and Restore all go back to `active` (ADR 0010: restore always lands in
+ * Active). Archived goals aren't on the Goals page, so Restore shows only
+ * on the goal's detail page until the archive view (chunk 1.6).
  */
 export function goalStatusActions(status: GoalStatus): GoalStatusAction[] {
   switch (status) {
@@ -164,6 +165,12 @@ export function goalStatusActions(status: GoalStatus): GoalStatusAction[] {
         ARCHIVE,
       ];
     case "archived":
-      return [];
+      return [
+        {
+          to: "active",
+          label: "Restore to Active",
+          done: "Restored and back in Active.",
+        },
+      ];
   }
 }

@@ -217,7 +217,14 @@ function GoalSummary({ goal }: { goal: GoalListItem }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="font-medium break-words">{goal.title}</h3>
+        <h3 className="font-medium break-words">
+          <Link
+            href={`/goals/${goal.id}`}
+            className={cx("rounded-sm hover:underline", focusRing)}
+          >
+            {goal.title}
+          </Link>
+        </h3>
         {goal.priority && (
           <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs text-muted">
             {GOAL_PRIORITY_LABELS[goal.priority]}

@@ -125,7 +125,7 @@ describe("goalStatusActions", () => {
     ]);
     expect(targets("completed")).toEqual(["Reopen→active", "Archive→archived"]);
     expect(targets("dropped")).toEqual(["Reopen→active", "Archive→archived"]);
-    expect(targets("archived")).toEqual([]);
+    expect(targets("archived")).toEqual(["Restore to Active→active"]);
   });
 
   it("only offers moves the status rules allow", () => {
