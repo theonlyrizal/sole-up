@@ -10,10 +10,13 @@ import { getUserPreferences } from "@/server/modules/preferences/service";
 import { listTaskParentOptions } from "./queries";
 import * as service from "./service";
 import {
+  changeTaskStatusSchema,
   createTaskSchema,
   moveTasksSchema,
   noInputSchema,
+  scheduleTaskSchema,
   taskIdsSchema,
+  updateTaskSchema,
 } from "./validation";
 
 // Auth → validate → service (scoped to the user) → refresh the page's
@@ -60,5 +63,35 @@ export const moveTasks = authedAction(
     const tasks = await service.moveTasks(userId, input);
     refresh();
     return { count: tasks.length };
+  },
+);
+
+/** The edit form: title, notes, priority and estimate. */
+export const updateTask = authedAction(
+  updateTaskSchema,
+  async (input, { userId }) => {
+    const task = await service.updateTask(userId, input);
+    refresh();
+    return task;
+  },
+);
+
+/** Complete, reopen or cancel. */
+export const changeTaskStatus = authedAction(
+  changeTaskStatusSchema,
+  async (input, { userId }) => {
+    const task = await service.changeTaskStatus(userId, input);
+    refresh();
+    return task;
+  },
+);
+
+/** The Plan page's inline edit of planned date, deadline and parent. */
+export const scheduleTask = authedAction(
+  scheduleTaskSchema,
+  async (input, { userId }) => {
+    const task = await service.scheduleTask(userId, input);
+    refresh();
+    return task;
   },
 );

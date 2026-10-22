@@ -16,7 +16,7 @@ export type NavItem = (typeof NAV_ITEMS)[number];
  * pages show them as their own row (PlanSubnav).
  */
 export const PLAN_SUB_ITEMS = [
-  { href: "/plan", label: "Overview" },
+  { href: "/plan", label: "All tasks" },
   { href: "/plan/inbox", label: "Inbox" },
 ] as const;
 

@@ -23,6 +23,7 @@ import type {
   PlanTaskInput,
   PlanTasksInput,
   RescheduleTaskDueInput,
+  ScheduleTaskInput,
   TaskIdInput,
   UpdateTaskInput,
 } from "./validation";
@@ -309,35 +310,45 @@ export async function planTasks(
   return rows.map(toTask);
 }
 
+/** Reschedules one locked task's deadline; the same one again is a no-op. */
+async function dueInTx(
+  tx: DbTransaction,
+  userId: string,
+  id: string,
+  next: DueColumns,
+): Promise<TaskRow> {
+  const current = await findForUpdate(tx, userId, id);
+  if (sameDue(current, next)) return current;
+
+  const [updated] = await tx
+    .update(tasks)
+    .set(next)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+    .returning();
+  if (!updated) throw new NotFoundError();
+
+  await recordAudit(tx, {
+    type: "task.due_changed",
+    userId,
+    entityId: id,
+    changes: {
+      dueDate: { from: current.dueDate, to: updated.dueDate },
+      dueAt: { from: iso(current.dueAt), to: iso(updated.dueAt) },
+      dueTz: { from: current.dueTz, to: updated.dueTz },
+    },
+  });
+  return updated;
+}
+
 /** Sets, changes or clears the deadline, all-day or timed. */
 export async function rescheduleTaskDue(
   userId: string,
   { id, ...due }: RescheduleTaskDueInput,
 ): Promise<Task> {
-  const next = dueColumns(due);
-  return db.transaction(async (tx) => {
-    const current = await findForUpdate(tx, userId, id);
-    if (sameDue(current, next)) return toTask(current);
-
-    const [updated] = await tx
-      .update(tasks)
-      .set(next)
-      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
-      .returning();
-    if (!updated) throw new NotFoundError();
-
-    await recordAudit(tx, {
-      type: "task.due_changed",
-      userId,
-      entityId: id,
-      changes: {
-        dueDate: { from: current.dueDate, to: updated.dueDate },
-        dueAt: { from: iso(current.dueAt), to: iso(updated.dueAt) },
-        dueTz: { from: current.dueTz, to: updated.dueTz },
-      },
-    });
-    return toTask(updated);
-  });
+  const row = await db.transaction((tx) =>
+    dueInTx(tx, userId, id, dueColumns(due)),
+  );
+  return toTask(row);
 }
 
 type Parent = { goalId: string | null; milestoneId: string | null };
@@ -405,6 +416,33 @@ export async function moveTasks(
     }),
   );
   return rows.map(toTask);
+}
+
+/**
+ * The Plan page's inline edit: planned date, deadline and parent together,
+ * all or none. Each part that changed records its own event (`task.planned`,
+ * `task.due_changed`, `task.moved`), as if set one at a time.
+ */
+export async function scheduleTask(
+  userId: string,
+  {
+    id,
+    plannedDate,
+    dueDate,
+    dueTime,
+    dueTz,
+    goalId,
+    milestoneId,
+  }: ScheduleTaskInput,
+): Promise<Task> {
+  const row = await guardParent(() =>
+    db.transaction(async (tx) => {
+      await planInTx(tx, userId, id, plannedDate);
+      await dueInTx(tx, userId, id, dueColumns({ dueDate, dueTime, dueTz }));
+      return moveInTx(tx, userId, id, { goalId, milestoneId });
+    }),
+  );
+  return toTask(row);
 }
 
 /** Hard delete (ADR 0006). Removes the task's audit events with it. */
