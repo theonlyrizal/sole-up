@@ -190,7 +190,7 @@ export function dateWindowInstants(
   };
 }
 
-type SortableTask = Pick<
+export type SortableTask = Pick<
   Task,
   | "id"
   | "dueDate"

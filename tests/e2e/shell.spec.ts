@@ -5,15 +5,15 @@ import { expect, test, type Page } from "@playwright/test";
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 
 const NAV_LABELS = ["Home", "Goals", "Plan", "Settings"];
-/** The sidebar also lists Inbox under Plan. */
-const SIDEBAR_LABELS = ["Home", "Goals", "Plan", "Inbox", "Settings"];
+/** The sidebar also lists Today and Inbox under Plan. */
+const SIDEBAR_LABELS = ["Home", "Goals", "Plan", "Today", "Inbox", "Settings"];
 
 function mainNav(page: Page) {
   return page.getByRole("navigation", { name: "Main" });
 }
 
 test.describe("desktop", () => {
-  test("the sidebar shows only Home, Goals, Plan (with Inbox) and Settings", async ({
+  test("the sidebar shows only Home, Goals, Plan (with Today and Inbox) and Settings", async ({
     page,
   }) => {
     await signInAndConfirm(page);
@@ -63,7 +63,13 @@ test.describe("desktop", () => {
     await signInAndConfirm(page);
     await expectNoSeriousViolations(page);
 
-    for (const path of ["/goals", "/plan", "/plan/inbox", "/settings"]) {
+    for (const path of [
+      "/goals",
+      "/plan",
+      "/plan/today",
+      "/plan/inbox",
+      "/settings",
+    ]) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expectNoSeriousViolations(page);
@@ -86,7 +92,7 @@ test.describe("desktop", () => {
     await expect(page.locator("main")).toBeFocused();
 
     // From the top: skip link, brand, Add task, the destinations (with
-    // Inbox under Plan), sign out.
+    // Today and Inbox under Plan), sign out.
     await page.goto("/home");
     await expect(
       page.getByRole("heading", { level: 1, name: "Home" }),
@@ -110,7 +116,9 @@ test.describe("desktop", () => {
       expect(outline).not.toBe("none");
     }
 
-    // Shift+Tab back to Plan and follow it with Enter.
+    // Shift+Tab back to Plan (past Settings, Inbox and Today) and follow
+    // it with Enter.
+    await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Shift+Tab");

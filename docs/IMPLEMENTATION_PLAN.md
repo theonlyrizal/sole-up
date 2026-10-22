@@ -117,7 +117,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 2.2 | Tasks: service | done | chunk/2.2-tasks-service | 2026-10-22 | Service (create, edit, status, plan, reschedule due, move, delete) with ADR 0011 rules and eight `task.*` events, `goalOf` and inbox queries; no UI |
 | 2.3 | Quick add and Inbox | done | chunk/2.3-quick-add-inbox | 2026-10-23 | Global quick add (Add task button + Q key; title, Enter), `/plan/inbox` with bulk plan today and assign to goal, Inbox under Plan in the sidebar and a Plan sub-nav |
 | 2.4 | Plan page: task list and filters | done | chunk/2.4-plan-task-list | 2026-10-23 | `/plan` task list: goal/area/priority/planned/due filters and due/planned/priority sort in the URL, inline dates + parent, edit dialog (priority, estimate), closed tasks behind a toggle |
-| 2.5 | Today view | todo | | | |
+| 2.5 | Today view | done | chunk/2.5-today-view | 2026-10-23 | `/plan/today`: four sections (precedence planned → decide → due → earlier), "Add to today" picker (due soon + active goals' next actions), one-tap complete/plan/tomorrow/pick a date/unplan/new due date, calm empty state |
 | 2.6 | Upcoming view | todo | | | |
 | 2.7 | Tasks in goals and milestones | todo | | | |
 | 2.8 | End-to-end journey test | todo | | | |
@@ -1501,3 +1501,32 @@ Template:
   - The list is unpaginated; fine for one person's tasks, revisit if it grows past a few hundred.
   - Drag to reorder (`sort_order`) and a "manual" sort are not built.
   - Earlier follow-ups still open: goal/milestone deletes move tasks with no `task.moved` event (2.7); the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs in integration output.
+
+### 2.5: Today view (2026-10-23)
+- **Built:**
+  - `src/lib/today.ts` (pure): `TODAY_SECTIONS` (display order), labels and hints, `todayClock(timeZone, now?)` (today plus its `[dayStart, dayEnd)` instants), `relativeDay`, `todaySection(task, clock)`, `groupTodayTasks` (sorted per section), `plannedSummary` ("3 tasks · 1 h 30 min estimated, 1 without an estimate"). `formatLocalDate` takes an optional `dateStyle` ("full" for the page's date line).
+  - `tasks/queries.ts`: the goal/milestone join is now `selectPlanTaskItems(where)`, shared by `listPlanTasks`, `listTodayTasks(userId, clock, timeZone)` and `listTodaySuggestions(userId, clock, timeZone)`. `SortableTask` exported from `task-list.ts`.
+  - Actions `planTaskForDay` (`{ id, day: "today" | "tomorrow" }`, from the saved zone on the server), `planTask` (pick a date, or null to unplan) and `rescheduleTaskDue`; `planTasksToday` now shares the `userDay` helper. `planTaskForDaySchema` in `validation.ts`.
+  - Route `src/app/(app)/plan/today/` (`page.tsx`, `error.tsx`); `src/components/tasks/today-view.tsx` (sections, rows, inline date editor, refresh when the user's day changes) and `add-to-today.tsx` (the picker dialog). "Today" added to `PLAN_SUB_ITEMS` (sub-nav and sidebar, between All tasks and Inbox).
+  - Tests: unit `src/lib/today.test.ts` (10: clock at 23:59/00:01 in Tokyo and a 25-hour Berlin day, every section and precedence pair, closed tasks, sorting, summary, no judgement words), nav test; integration `today.integration.test.ts` (13: sections at 23:59 and 00:01 Tokyo incl. a plan from yesterday under "Earlier, not done" with its date and events unchanged, one section per task, open only/goal join/cross-user, suggestions windows/active goals/limits/dedupe/cross-user, actions at 00:01 Tokyo with a faked clock, unplan, timed reschedule keeps time and zone, foreign task/anonymous/bad day/no zone); e2e `tests/e2e/today.spec.ts` (2, browser in Tokyo: empty state, empty and filled picker, complete and tomorrow in one tap, axe on page and dialog; yesterday's plan survives a reload, Needs a decision not coloured differently, plan for today, pick a date with Escape/focus return, unplan back to the inbox, new due date). `shell.spec.ts` updated for the Today link.
+  - DATA_MODEL Task rules: Today's sections and their precedence.
+- **Deviations:**
+  1. **Today is `/plan/today`**, a Plan sub-page (PRODUCT_SPEC §7: Plan holds inbox, Today, Upcoming), not a fifth bottom-bar item.
+  2. **"Reschedule" depends on the section.** Planned for today and Earlier, not done change the planned date ("Tomorrow", "Pick a date"); Due today and Needs a decision change the deadline ("New due date"), since a new plan date alone would leave a passed deadline where it is. A timed deadline keeps its time of day and zone.
+  3. **Extras not in the chunk text:** a summary of today's estimates under "Planned for today" (Journey B: a realistic set), and a client refresh when the user's next day begins (timer plus `visibilitychange`), so a page left open overnight shows the new day. It only re-reads; nothing is written.
+- **Decisions:**
+  1. **Section precedence** (the chunk asked for one): Planned for today → Needs a decision → Due today → Earlier, not done. Planning a task today is a decision already made, even with a passed deadline; a passed deadline (a timed one earlier today included, per the chunk's "`due_at` before now") outranks a deadline still to come today; a deadline today outranks an old plan. A task planned for a later day with a passed deadline still shows under Needs a decision. Recorded in `todaySection`'s comment and DATA_MODEL.
+  2. **Ordering:** planned by priority (high first), due today and needs a decision by deadline (all-day before timed), earlier by planned date, oldest first; ties by position.
+  3. **Suggestions** are open tasks with no planned date that aren't on Today: up to 10 due in the next 7 days (the Plan page's window), then up to 3 per active goal (direct or under an open milestone), soonest deadline first. Paused/finished goals and closed milestones aren't suggested; a task is listed once. Inbox tasks with no deadline aren't suggested.
+  4. **Only "Planned for today" always shows**; other sections appear only when they have tasks. Its empty state is "Nothing planned for today" with a "leave the day open" message, and "Add to today" sits in its header.
+  5. Relative days ("today", "tomorrow") are worked out on the server from the saved zone; the client never sends its own today.
+- **Next chunk should know:**
+  - 2.6: reuse `selectPlanTaskItems` (private in `queries.ts`; export it if needed) and `todayClock`/`localDayRange` for local days; a timed deadline's local day is `localDateOf(dueAt, userZone)`.
+  - Row controls are named `"Complete: <title>"`, `"Plan for today: <title>"`, `"Move to tomorrow: <title>"`, `"Pick a date: <title>"`, `"New due date: <title>"`, `"Unplan: <title>"`; the date editor is a form named `"Plan for: <title>"` or `"New due date: <title>"`. Sections are regions named by their heading. Picker groups are fieldsets ("Due soon", then each goal's title).
+  - Integration tests can fake only the clock with `vi.useFakeTimers({ toFake: ["Date"] })` so pg keeps working; restore with `vi.useRealTimers()`.
+  - Python edits on this Windows checkout write CRLF; `.gitattributes` normalises on commit, but run Prettier or strip `\r` before `format:check`.
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 327 unit, 273 integration), `pnpm build` and `pnpm test:e2e` (35 tests) pass; `today.spec.ts` passed 8 of 8 with `--repeat-each=4`. No schema change, so no migration. The midnight refresh was not exercised by a test (it only calls `router.refresh()`). A manual pass with a screen reader and on a phone is not done.
+- **Follow-ups:**
+  - Undo in the "Task completed" toast, if completing by mistake on Today turns out common.
+  - A bulk "plan all for today" in Earlier, not done, if it piles up while dogfooding (the 2.0 note).
+  - Earlier follow-ups still open: goal/milestone deletes move tasks with no `task.moved` event (2.7); the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs; the `preferences.spec.ts` first-sign-in flake (did not fail in this chunk's runs).

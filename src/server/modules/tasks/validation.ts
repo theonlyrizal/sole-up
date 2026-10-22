@@ -198,6 +198,16 @@ export const planTaskSchema = z.strictObject({
 });
 export type PlanTaskInput = z.output<typeof planTaskSchema>;
 
+/** Today's and tomorrow's dates come from the user's saved zone. */
+export const RELATIVE_PLAN_DAYS = ["today", "tomorrow"] as const;
+
+/** Today's one-tap "plan for today" and "move to tomorrow". */
+export const planTaskForDaySchema = z.strictObject({
+  id: idSchema,
+  day: z.enum(RELATIVE_PLAN_DAYS, { error: "Choose today or tomorrow." }),
+});
+export type PlanTaskForDayInput = z.output<typeof planTaskForDaySchema>;
+
 /** Sets, changes or clears the deadline; all three fields blank clears it. */
 export const rescheduleTaskDueSchema = z
   .strictObject({ id: idSchema, ...dueFields })
