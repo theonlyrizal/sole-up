@@ -12,6 +12,13 @@ import {
   MILESTONE_STATUSES,
 } from "@/lib/milestones";
 import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
+import { PRIORITIES } from "@/lib/priorities";
+import {
+  TASK_EDITABLE_FIELDS,
+  TASK_ESTIMATE_MAX_MINUTES,
+  TASK_ESTIMATE_MIN_MINUTES,
+  TASK_STATUSES,
+} from "@/lib/tasks";
 
 // The audit event allowlist (ADR 0005). An event type that is not a key of
 // AUDIT_EVENTS cannot be recorded.
@@ -136,6 +143,15 @@ export function defineAuditEvents<const R extends AuditEventRegistry>(
 
 const sortOrder = z.number().int().min(0);
 const localDate = z.string().refine(isLocalDate);
+/** A UTC instant as ISO 8601, e.g. "2027-03-12T14:00:00.000Z". */
+const instant = z.iso.datetime();
+const timeZone = z.string().refine((zone) => canonicalTimeZone(zone) === zone);
+const estimate = z
+  .number()
+  .int()
+  .min(TASK_ESTIMATE_MIN_MINUTES)
+  .max(TASK_ESTIMATE_MAX_MINUTES);
+const taskStatus = auditChange(z.enum(TASK_STATUSES));
 
 /**
  * The allowlist. Add each new event here with its entity type and a strict
@@ -152,9 +168,7 @@ export const AUDIT_EVENTS = defineAuditEvents({
   "user_preferences.updated": {
     entityType: "user_preferences",
     changes: z.strictObject({
-      timezone: auditChange(
-        z.string().refine((zone) => canonicalTimeZone(zone) === zone),
-      ).optional(),
+      timezone: auditChange(timeZone).optional(),
       locale: auditChange(
         z.string().refine((locale) => canonicalLocale(locale) === locale),
       ).optional(),
@@ -261,6 +275,67 @@ export const AUDIT_EVENTS = defineAuditEvents({
     }),
   },
   // No `milestone.deleted`, for the same reason as life areas (ADR 0005).
+
+  // Tasks (ADR 0011). Title and notes are user content: `task.updated`
+  // records which fields changed, plus old and new values for priority and
+  // estimate only. Plan, deadline and parent changes have their own events,
+  // which reschedule history and planned-versus-completed metrics read.
+  "task.created": {
+    entityType: "task",
+    changes: z.strictObject({
+      status: taskStatus,
+      goalId: auditChange(z.uuid()),
+      milestoneId: auditChange(z.uuid()),
+      priority: auditChange(z.enum(PRIORITIES)),
+      estimatedMinutes: auditChange(estimate),
+      plannedDate: auditChange(localDate),
+      dueDate: auditChange(localDate),
+      dueAt: auditChange(instant),
+      dueTz: auditChange(timeZone),
+    }),
+  },
+  "task.updated": {
+    entityType: "task",
+    changes: z.strictObject({
+      fields: z.array(z.enum(TASK_EDITABLE_FIELDS)).min(1),
+      priority: auditChange(z.enum(PRIORITIES)).optional(),
+      estimatedMinutes: auditChange(estimate).optional(),
+    }),
+  },
+  "task.completed": {
+    entityType: "task",
+    changes: z.strictObject({ status: taskStatus }),
+  },
+  "task.reopened": {
+    entityType: "task",
+    changes: z.strictObject({ status: taskStatus }),
+  },
+  "task.cancelled": {
+    entityType: "task",
+    changes: z.strictObject({ status: taskStatus }),
+  },
+  "task.planned": {
+    entityType: "task",
+    changes: z.strictObject({ plannedDate: auditChange(localDate) }),
+  },
+  // All three deadline columns, so a switch between an all-day and a timed
+  // deadline is one event.
+  "task.due_changed": {
+    entityType: "task",
+    changes: z.strictObject({
+      dueDate: auditChange(localDate),
+      dueAt: auditChange(instant),
+      dueTz: auditChange(timeZone),
+    }),
+  },
+  "task.moved": {
+    entityType: "task",
+    changes: z.strictObject({
+      goalId: auditChange(z.uuid()),
+      milestoneId: auditChange(z.uuid()),
+    }),
+  },
+  // No `task.deleted`, for the same reason as life areas (ADR 0005).
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;
