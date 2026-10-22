@@ -17,6 +17,7 @@ export type NavItem = (typeof NAV_ITEMS)[number];
  */
 export const PLAN_SUB_ITEMS = [
   { href: "/plan", label: "All tasks" },
+  { href: "/plan/today", label: "Today" },
   { href: "/plan/inbox", label: "Inbox" },
 ] as const;
 

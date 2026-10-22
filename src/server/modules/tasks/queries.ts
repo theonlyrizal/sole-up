@@ -4,6 +4,7 @@ import {
   and,
   asc,
   eq,
+  gt,
   gte,
   inArray,
   isNull,
@@ -14,7 +15,7 @@ import {
   sql,
 } from "drizzle-orm";
 
-import type { LocalDate } from "@/lib/dates";
+import { addDays, type LocalDate, startOfLocalDay } from "@/lib/dates";
 import type { GoalStatus } from "@/lib/goals";
 import type { LifeAreaStatus } from "@/lib/life-areas";
 import type { MilestoneStatus } from "@/lib/milestones";
@@ -26,6 +27,11 @@ import {
   type TaskListFilters,
 } from "@/lib/task-list";
 import type { Task } from "@/lib/tasks";
+import {
+  groupTodayTasks,
+  type TodayClock,
+  type TodaySection,
+} from "@/lib/today";
 import { db } from "@/server/db/client";
 import { goals, lifeAreas, milestones, tasks } from "@/server/db/schema";
 import { NotFoundError } from "@/server/errors";
@@ -224,6 +230,28 @@ export async function listPlanTasks(
         ? eq(tasks.priority, filters.priority)
         : undefined;
 
+  const items = await selectPlanTaskItems(
+    and(
+      eq(tasks.userId, userId),
+      statusCondition,
+      goalCondition,
+      filters.area ? eq(goals.lifeAreaId, filters.area) : undefined,
+      priorityCondition,
+      filters.planned ? plannedCondition(filters.planned, today) : undefined,
+      filters.due ? dueCondition(filters.due, today, timeZone) : undefined,
+    ),
+  );
+  return items.sort(compareTasksBy(filters.sort, timeZone));
+}
+
+/**
+ * Tasks matching `where`, each with its goal (direct, or its milestone's)
+ * and milestone, unsorted. `where` must scope to the user, and may filter
+ * on the joined goal and milestone columns.
+ */
+async function selectPlanTaskItems(
+  where: SQL | undefined,
+): Promise<PlanTaskItem[]> {
   const rows = await db
     .select({
       task: tasks,
@@ -249,25 +277,118 @@ export async function listPlanTasks(
         eq(goals.userId, tasks.userId),
       ),
     )
-    .where(
-      and(
-        eq(tasks.userId, userId),
-        statusCondition,
-        goalCondition,
-        filters.area ? eq(goals.lifeAreaId, filters.area) : undefined,
-        priorityCondition,
-        filters.planned ? plannedCondition(filters.planned, today) : undefined,
-        filters.due ? dueCondition(filters.due, today, timeZone) : undefined,
-      ),
-    );
+    .where(where);
 
-  return rows
-    .map(({ task, goal, milestone }) => ({
-      ...toTask(task),
-      goal,
-      milestone,
-    }))
-    .sort(compareTasksBy(filters.sort, timeZone));
+  return rows.map(({ task, goal, milestone }) => ({
+    ...toTask(task),
+    goal,
+    milestone,
+  }));
+}
+
+/** Today's sections for the user, worked out at `clock` (chunk 2.5). */
+export type TodayTasks = Record<TodaySection, PlanTaskItem[]>;
+
+/**
+ * The Today view: open tasks planned for today or earlier, or due by the
+ * end of today (passed deadlines included), each in exactly one section.
+ * `clock` comes from `todayClock(userZone, now)`.
+ */
+export async function listTodayTasks(
+  userId: string,
+  clock: TodayClock,
+  timeZone: string,
+): Promise<TodayTasks> {
+  const items = await selectPlanTaskItems(
+    and(
+      eq(tasks.userId, userId),
+      eq(tasks.status, "open"),
+      or(
+        lte(tasks.plannedDate, clock.today),
+        lte(tasks.dueDate, clock.today),
+        lt(tasks.dueAt, clock.dayEnd),
+      ),
+    ),
+  );
+  return groupTodayTasks(items, clock, timeZone);
+}
+
+/** Most suggestions per group in the "Add to today" picker. */
+export const TODAY_SUGGESTIONS_DUE_SOON_MAX = 10;
+export const TODAY_SUGGESTIONS_PER_GOAL_MAX = 3;
+
+/** What the "Add to today" picker offers. */
+export type TodaySuggestions = {
+  /** Deadlines in the next 7 days (tomorrow through today + 7). */
+  dueSoon: PlanTaskItem[];
+  /** Next actions under each active goal, in the goals' order. */
+  goals: { id: string; title: string; tasks: PlanTaskItem[] }[];
+};
+
+/**
+ * Suggestions for "Add to today": open tasks with no plan yet that aren't
+ * on Today already (no deadline today or before). First those due in the
+ * next 7 days; then, for each active goal, its next few actions (directly
+ * under it, or under one of its open milestones), soonest deadline first.
+ * A task is suggested once, under "due soon" if it qualifies for both.
+ */
+export async function listTodaySuggestions(
+  userId: string,
+  clock: TodayClock,
+  timeZone: string,
+): Promise<TodaySuggestions> {
+  // The Plan page's "next 7 days" window, as dates and as instants.
+  const soonFrom = addDays(clock.today, 1);
+  const soonTo = addDays(clock.today, 7);
+  const soonEnd = startOfLocalDay(addDays(soonTo, 1), timeZone);
+  const notOnToday = and(
+    eq(tasks.userId, userId),
+    eq(tasks.status, "open"),
+    isNull(tasks.plannedDate),
+    or(isNull(tasks.dueDate), gt(tasks.dueDate, clock.today)),
+    or(isNull(tasks.dueAt), gte(tasks.dueAt, clock.dayEnd)),
+  );
+  const dueSoonCondition = or(
+    and(gte(tasks.dueDate, soonFrom), lte(tasks.dueDate, soonTo)),
+    and(gte(tasks.dueAt, clock.dayEnd), lt(tasks.dueAt, soonEnd)),
+  );
+
+  const [dueSoonRows, goalRows, activeGoals] = await Promise.all([
+    selectPlanTaskItems(and(notOnToday, dueSoonCondition)),
+    selectPlanTaskItems(
+      and(
+        notOnToday,
+        eq(goals.status, "active"),
+        or(isNull(tasks.milestoneId), eq(milestones.status, "open")),
+      ),
+    ),
+    db
+      .select({ id: goals.id, title: goals.title })
+      .from(goals)
+      .where(and(eq(goals.userId, userId), eq(goals.status, "active")))
+      .orderBy(asc(goals.createdAt), asc(goals.id)),
+  ]);
+
+  const byDue = compareTasksBy("due", timeZone);
+  const dueSoon = dueSoonRows
+    .sort(byDue)
+    .slice(0, TODAY_SUGGESTIONS_DUE_SOON_MAX);
+  const suggested = new Set(dueSoon.map((task) => task.id));
+  const goalTasks = goalRows
+    .filter((task) => !suggested.has(task.id))
+    .sort(byDue);
+
+  return {
+    dueSoon,
+    goals: activeGoals
+      .map((goal) => ({
+        ...goal,
+        tasks: goalTasks
+          .filter((task) => task.goal?.id === goal.id)
+          .slice(0, TODAY_SUGGESTIONS_PER_GOAL_MAX),
+      }))
+      .filter((goal) => goal.tasks.length > 0),
+  };
 }
 
 /** What the Plan page's goal and life-area filters offer. */

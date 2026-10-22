@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 
-import { todayFor } from "@/lib/dates";
+import { relativeDay } from "@/lib/today";
 import { authedAction } from "@/server/auth/authed-action";
 import { ValidationError } from "@/server/errors";
 import { getUserPreferences } from "@/server/modules/preferences/service";
@@ -14,6 +14,9 @@ import {
   createTaskSchema,
   moveTasksSchema,
   noInputSchema,
+  planTaskForDaySchema,
+  planTaskSchema,
+  rescheduleTaskDueSchema,
   scheduleTaskSchema,
   taskIdsSchema,
   updateTaskSchema,
@@ -41,18 +44,54 @@ export const getTaskParentOptions = authedAction(
 const NO_TIME_ZONE = "Confirm your time zone in Settings first.";
 
 /**
- * Bulk "plan today". Today is worked out here from the user's saved time
- * zone, never from the device's clock.
+ * The user's date `days` after today, from their saved time zone, never
+ * from the device's or the server's clock.
  */
+async function userDay(userId: string, days: number) {
+  const { timezone } = await getUserPreferences(userId);
+  if (!timezone) throw new ValidationError({}, NO_TIME_ZONE, [NO_TIME_ZONE]);
+  return relativeDay(timezone, days);
+}
+
+/** Bulk "plan today", and Today's "Add to today" picker. */
 export const planTasksToday = authedAction(
   taskIdsSchema,
   async ({ ids }, { userId }) => {
-    const { timezone } = await getUserPreferences(userId);
-    if (!timezone) throw new ValidationError({}, NO_TIME_ZONE, [NO_TIME_ZONE]);
-    const plannedDate = todayFor(timezone);
+    const plannedDate = await userDay(userId, 0);
     const tasks = await service.planTasks(userId, { ids, plannedDate });
     refresh();
     return { plannedDate, count: tasks.length };
+  },
+);
+
+/** Plan one task for today or tomorrow in the user's zone. */
+export const planTaskForDay = authedAction(
+  planTaskForDaySchema,
+  async ({ id, day }, { userId }) => {
+    const plannedDate = await userDay(userId, day === "today" ? 0 : 1);
+    const task = await service.planTask(userId, { id, plannedDate });
+    refresh();
+    return task;
+  },
+);
+
+/** Plan one task for a picked date, or unplan it with null. */
+export const planTask = authedAction(
+  planTaskSchema,
+  async (input, { userId }) => {
+    const task = await service.planTask(userId, input);
+    refresh();
+    return task;
+  },
+);
+
+/** A new deadline for one task (Today's "New due date"). */
+export const rescheduleTaskDue = authedAction(
+  rescheduleTaskDueSchema,
+  async (input, { userId }) => {
+    const task = await service.rescheduleTaskDue(userId, input);
+    refresh();
+    return task;
   },
 );
 
