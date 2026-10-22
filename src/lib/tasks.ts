@@ -71,3 +71,47 @@ export type Task = {
   sortOrder: number;
   createdAt: Date;
 };
+
+/**
+ * A task's parent as one `<select>` value: "" (no parent), "goal:<id>" or
+ * "milestone:<id>". Lets one picker offer goals and their milestones.
+ */
+export type TaskParentChoice = "" | `goal:${string}` | `milestone:${string}`;
+
+export function taskParentChoice(parent: {
+  goalId: string | null;
+  milestoneId: string | null;
+}): TaskParentChoice {
+  if (parent.milestoneId) return `milestone:${parent.milestoneId}`;
+  if (parent.goalId) return `goal:${parent.goalId}`;
+  return "";
+}
+
+/** The goal and milestone IDs for a picker value; anything else is no parent. */
+export function parentFromChoice(choice: string): {
+  goalId: string | null;
+  milestoneId: string | null;
+} {
+  const [kind, id] = choice.split(":", 2);
+  if (kind === "goal" && id) return { goalId: id, milestoneId: null };
+  if (kind === "milestone" && id) return { goalId: null, milestoneId: id };
+  return { goalId: null, milestoneId: null };
+}
+
+/**
+ * True when a task with these fields lands in the inbox (ADR 0011): open,
+ * no parent and no planned date. A due date alone doesn't matter.
+ */
+export function isInboxTask(task: {
+  status: TaskStatus;
+  goalId: string | null;
+  milestoneId: string | null;
+  plannedDate: LocalDate | null;
+}): boolean {
+  return (
+    task.status === "open" &&
+    !task.goalId &&
+    !task.milestoneId &&
+    !task.plannedDate
+  );
+}

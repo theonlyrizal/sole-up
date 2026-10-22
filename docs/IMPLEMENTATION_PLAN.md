@@ -115,7 +115,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 2.0 | Decision gate: tasks | done | chunk/2.0-tasks-decisions | 2026-10-22 | ADR 0011: open/completed/cancelled, inbox = no parent + no plan, "Earlier, not done" never auto-moved, goal priority scale, estimates 1–1440 min, no `task.deleted`; 2.1–2.8 and DATA_MODEL synced |
 | 2.1 | Tasks: schema | done | chunk/2.1-tasks-schema | 2026-10-22 | `tasks` with composite goal/milestone FKs (hand-edited `SET NULL` per column), parent/deadline/status/priority/estimate/timestamp CHECKs, five indexes; priority scale moved to `src/lib/priorities.ts`; schema tests |
 | 2.2 | Tasks: service | done | chunk/2.2-tasks-service | 2026-10-22 | Service (create, edit, status, plan, reschedule due, move, delete) with ADR 0011 rules and eight `task.*` events, `goalOf` and inbox queries; no UI |
-| 2.3 | Quick add and Inbox | todo | | | |
+| 2.3 | Quick add and Inbox | done | chunk/2.3-quick-add-inbox | 2026-10-23 | Global quick add (Add task button + Q key; title, Enter), `/plan/inbox` with bulk plan today and assign to goal, Inbox under Plan in the sidebar and a Plan sub-nav |
 | 2.4 | Plan page: task list and filters | todo | | | |
 | 2.5 | Today view | todo | | | |
 | 2.6 | Upcoming view | todo | | | |
@@ -1446,3 +1446,29 @@ Template:
 - **Unverified:** none. `pnpm verify` passes (format, lint, typecheck, 267 unit, 223 integration). No schema change, so no migration. `pnpm build` and `pnpm test:e2e` not run (no route or UI changes).
 - **Follow-ups:**
   - Goal and milestone deletes still clear tasks' parents with no `task.moved` event (2.0/2.1 follow-up; decide in 2.7).
+
+### 2.3: Quick add and Inbox (2026-10-23)
+- **Built:**
+  - `src/components/tasks/quick-add.tsx`: "Add task" button in the shell header (sidebar on desktop, top bar on phones) and the **Q** key anywhere outside a field or open dialog (`aria-keyshortcuts="Q"`). Dialog with Title focused; Enter adds. "More options" reveals Goal or milestone, Plan for and Due (all-day). Toast says "Task added to your inbox" or "Task added".
+  - Route `src/app/(app)/plan/inbox/` (`page.tsx`, `error.tsx`) and `src/components/tasks/inbox-view.tsx`: inbox tasks (title, due), per-task checkboxes, Select all (indeterminate), "Plan for today", and a goal/milestone picker with "Assign to goal". Empty state "Your inbox is clear".
+  - `src/components/tasks/task-parent-select.tsx` (goals as optgroups with their open milestones) and `plan-subnav.tsx` (Overview | Inbox row on the Plan pages).
+  - Navigation: `PLAN_SUB_ITEMS` / `NAV_SUB_ITEMS` in `nav-items.ts`; the sidebar lists Inbox under Plan (`md` up). On Inbox, Plan has `aria-current="true"` and Inbox `"page"`.
+  - Server: `tasks/actions.ts` (`createTask`, `getTaskParentOptions`, `planTasksToday`, `moveTasks`); service `planTasks` and `moveTasks` (all or none, one event per changed task) built on shared `planInTx` / `moveInTx`, which `planTask` / `moveTask` now use too; `listTaskParentOptions` query; `taskIdsSchema`, `planTasksSchema`, `moveTasksSchema` (1–200 IDs, duplicates dropped).
+  - `src/lib/tasks.ts`: `taskParentChoice` / `parentFromChoice` ("goal:<id>" / "milestone:<id>" picker values) and `isInboxTask`.
+  - Tests: unit (parent choices, `isInboxTask`, bulk schemas, nav sub-items); integration `tasks-ui.integration.test.ts` (16: quick add title-only lands in inbox, blank form strings, milestone + plan + due, blank title, foreign goal, anonymous; parent options order/filtering/other users; plan today in Pacific/Kiritimati with dedupe and events, all-or-none on a foreign task, empty selection; assign to goal/milestone, foreign goal refused, all-or-none; no-op event); e2e `tests/e2e/inbox.spec.ts` (Q → title → Enter lands in the inbox and survives reload; Q inside a field is a letter; quick add from Goals with a goal and dates stays out of the inbox; bulk plan today then assign to goal; mobile reaches Inbox from Plan; axe). `shell.spec.ts` updated for the Add task button and the Inbox link.
+- **Deviations:**
+  1. **Due in quick add is all-day only.** Timed deadlines (time + zone) need more fields than a quick capture should have; the service supports them and 2.4's inline edit can set them.
+  2. **Inbox lives at `/plan/inbox`, not in the bottom bar.** The phone bar keeps its four top-level items; a Plan sub-nav reaches Inbox there. The `/plan` placeholder now shows that sub-nav.
+- **Decisions:**
+  1. **Shortcut is Q** (no modifier), ignored while typing in a field, with a modifier held, or with any dialog open.
+  2. **Plan today uses the user's saved zone on the server** (`todayFor(preferences.timezone)`), never the device clock. No confirmed zone is a form error.
+  3. **Bulk actions are all or none**: one missing or foreign task (or a foreign goal) changes nothing, in one transaction. Each changed task still gets its own `task.planned` / `task.moved` event; unchanged ones get none.
+  4. **Pickers offer active goals, then paused, with open milestones only.** Completed, dropped and archived goals and closed milestones aren't offered. Quick add loads them via an action when "More options" first opens; the Inbox page loads them server-side.
+- **Next chunk should know:**
+  - Reuse `TaskParentSelect` + `parentFromChoice` for 2.4's inline parent edit, and `planTasks` / `moveTasks` for any other bulk action.
+  - The quick-add dialog's submit button is also named "Add task"; scope e2e locators to the dialog. Toasts also render in an `aria-live` region, so match toast text with `{ exact: true }`.
+  - In e2e, the Q shortcut works only after hydration; `captureWithKeyboard` in `inbox.spec.ts` retries until the dialog opens.
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 289 unit, 239 integration), `pnpm build` and `pnpm test:e2e` (30 tests) pass; `inbox.spec.ts` passed 12 of 12 with `--repeat-each=3`. No schema change, so no migration. A manual pass with a screen reader is not done.
+- **Follow-ups:**
+  - Undo for bulk actions (a toast action that unplans or moves back) if dogfooding shows mistakes.
+  - Earlier follow-ups still open: goal/milestone deletes move tasks with no `task.moved` event (2.7); the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs in integration output.

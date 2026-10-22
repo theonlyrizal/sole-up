@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { PlanSubnav } from "@/components/tasks/plan-subnav";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/server/auth/session";
 
@@ -11,6 +12,7 @@ export default function PlanPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
       <h1 className="text-2xl font-semibold tracking-tight">Plan</h1>
+      <PlanSubnav />
       <Suspense fallback={null}>
         <Placeholder />
       </Suspense>
@@ -23,7 +25,7 @@ async function Placeholder() {
   return (
     <EmptyState
       title="Nothing planned yet"
-      description="Tasks, Today and Upcoming are coming soon. You'll be able to capture tasks and decide when to do them."
+      description="Today and Upcoming are coming soon. Capture a task with Add task or the Q key, and find unsorted ones in your inbox."
     />
   );
 }

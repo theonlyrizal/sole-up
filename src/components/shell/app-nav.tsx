@@ -5,12 +5,19 @@ import { usePathname } from "next/navigation";
 
 import { cx, focusRing } from "@/components/ui/cx";
 
-import { NAV_ITEMS, isNavItemActive, type NavIcon } from "./nav-items";
+import {
+  NAV_ITEMS,
+  NAV_SUB_ITEMS,
+  isNavItemActive,
+  type NavIcon,
+} from "./nav-items";
 
 /**
  * The main navigation. One element for every screen size: a bar fixed to
  * the bottom on phones, a vertical list in the sidebar from `md` up. The
- * current page is marked with `aria-current="page"`.
+ * current page is marked with `aria-current="page"`. Sub-pages (Inbox
+ * under Plan) are listed beneath their parent in the sidebar only; the bar
+ * on phones has room for top-level pages.
  */
 export function AppNav() {
   const pathname = usePathname();
@@ -21,12 +28,16 @@ export function AppNav() {
     >
       <ul className="grid grid-cols-4 md:flex md:flex-col md:gap-1">
         {NAV_ITEMS.map((item) => {
+          const subItems = NAV_SUB_ITEMS[item.href] ?? [];
+          const activeSub = subItems.find((sub) => pathname === sub.href);
           const active = isNavItemActive(pathname, item.href);
           return (
-            <li key={item.href} className="flex">
+            <li key={item.href} className="flex md:flex-col">
               <Link
                 href={item.href}
-                aria-current={active ? "page" : undefined}
+                // On a sub-page the parent is marked as the current section,
+                // and the sub-page link as the current page.
+                aria-current={activeSub ? "true" : active ? "page" : undefined}
                 className={cx(
                   "flex flex-1 flex-col items-center gap-1 px-1 py-2 text-xs font-medium md:flex-row md:gap-3 md:rounded-md md:px-3 md:text-sm",
                   focusRing,
@@ -39,6 +50,27 @@ export function AppNav() {
                 <NavIconSvg icon={item.icon} />
                 {item.label}
               </Link>
+              {subItems.length > 0 && (
+                <ul className="hidden md:mt-1 md:flex md:flex-col md:gap-1">
+                  {subItems.map((sub) => (
+                    <li key={sub.href} className="flex">
+                      <Link
+                        href={sub.href}
+                        aria-current={activeSub === sub ? "page" : undefined}
+                        className={cx(
+                          "flex-1 rounded-md py-1.5 pr-3 pl-11 text-sm",
+                          focusRing,
+                          activeSub === sub
+                            ? "font-medium text-fg"
+                            : "text-muted hover:bg-surface-muted hover:text-fg",
+                        )}
+                      >
+                        {sub.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           );
         })}

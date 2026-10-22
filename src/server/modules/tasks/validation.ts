@@ -206,3 +206,32 @@ export type MoveTaskInput = z.output<typeof moveTaskSchema>;
 
 export const taskIdSchema = z.strictObject({ id: idSchema });
 export type TaskIdInput = z.output<typeof taskIdSchema>;
+
+/** Most tasks one bulk action may change at once. */
+export const TASK_BULK_MAX = 200;
+
+/** One or more of the user's tasks, duplicates dropped. */
+const idsSchema = z
+  .array(idSchema, { error: "Choose at least one task." })
+  .min(1, "Choose at least one task.")
+  .max(TASK_BULK_MAX, `Choose ${TASK_BULK_MAX} tasks or fewer.`)
+  .transform((ids) => [...new Set(ids)]);
+
+/** Bulk "plan today": the server works out the user's today. */
+export const taskIdsSchema = z.strictObject({ ids: idsSchema });
+export type TaskIdsInput = z.output<typeof taskIdsSchema>;
+
+export const planTasksSchema = z.strictObject({
+  ids: idsSchema,
+  plannedDate: localDateSchema,
+});
+export type PlanTasksInput = z.output<typeof planTasksSchema>;
+
+/** Bulk "assign to a goal" (or a milestone, or back to no parent). */
+export const moveTasksSchema = z
+  .strictObject({ ids: idsSchema, ...parentFields })
+  .superRefine(checkOneParent);
+export type MoveTasksInput = z.output<typeof moveTasksSchema>;
+
+/** The parent options a picker offers take no input. */
+export const noInputSchema = z.strictObject({});
