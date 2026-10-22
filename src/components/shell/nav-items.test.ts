@@ -46,9 +46,10 @@ describe("NAV_ITEMS", () => {
 });
 
 describe("Plan sub-pages", () => {
-  it("lists Today and Inbox under Plan", () => {
+  it("lists Today, Upcoming and Inbox under Plan", () => {
     expect(NAV_SUB_ITEMS["/plan"]).toEqual([
       { href: "/plan/today", label: "Today" },
+      { href: "/plan/upcoming", label: "Upcoming" },
       { href: "/plan/inbox", label: "Inbox" },
     ]);
   });

@@ -118,7 +118,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 2.3 | Quick add and Inbox | done | chunk/2.3-quick-add-inbox | 2026-10-23 | Global quick add (Add task button + Q key; title, Enter), `/plan/inbox` with bulk plan today and assign to goal, Inbox under Plan in the sidebar and a Plan sub-nav |
 | 2.4 | Plan page: task list and filters | done | chunk/2.4-plan-task-list | 2026-10-23 | `/plan` task list: goal/area/priority/planned/due filters and due/planned/priority sort in the URL, inline dates + parent, edit dialog (priority, estimate), closed tasks behind a toggle |
 | 2.5 | Today view | done | chunk/2.5-today-view | 2026-10-23 | `/plan/today`: four sections (precedence planned → decide → due → earlier), "Add to today" picker (due soon + active goals' next actions), one-tap complete/plan/tomorrow/pick a date/unplan/new due date, calm empty state |
-| 2.6 | Upcoming view | todo | | | |
+| 2.6 | Upcoming view | done | chunk/2.6-upcoming-view | 2026-10-23 | `/plan/upcoming`: tomorrow through day 14 (or 30 via `?days=30`) by local date, plans and deadlines merged (both days shown, same day once), timed deadlines on their local day in the user's zone |
 | 2.7 | Tasks in goals and milestones | todo | | | |
 | 2.8 | End-to-end journey test | todo | | | |
 | 2.✓ | Phase 2 checkpoint (user) | todo | | | |
@@ -1530,3 +1530,28 @@ Template:
   - Undo in the "Task completed" toast, if completing by mistake on Today turns out common.
   - A bulk "plan all for today" in Earlier, not done, if it piles up while dogfooding (the 2.0 note).
   - Earlier follow-ups still open: goal/milestone deletes move tasks with no `task.moved` event (2.7); the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs; the `preferences.spec.ts` first-sign-in flake (did not fail in this chunk's runs).
+
+### 2.6: Upcoming view (2026-10-23)
+- **Built:**
+  - `src/lib/upcoming.ts` (pure): `UPCOMING_RANGES` (14, 30), `parseUpcomingRange` (anything else → 14), `upcomingHref`, `upcomingWindow(today, days, zone)` (local dates plus the `[start, end)` instants), `dueDayOf`, `groupUpcomingTasks` (days with entries `{ task, planned, due }`), `upcomingDayLabel` ("Tomorrow · …"), `upcomingEntryDetails`. `formatTimeOfDay` in `src/lib/dates.ts`.
+  - `listUpcomingTasks(userId, window, timeZone)` in `tasks/queries.ts` (open tasks, planned or all-day due dates in the window, timed deadlines in its instant range; reuses `selectPlanTaskItems`).
+  - Route `src/app/(app)/plan/upcoming/` (`page.tsx`, `error.tsx`); `src/components/tasks/upcoming-view.tsx` (a "Days to show" nav with Next 14 days / Next 30 days links, one region per day headed by its `<time>`, calm empty state with "Show the next 30 days"). "Upcoming" added to `PLAN_SUB_ITEMS` between Today and Inbox. `useRefreshOnNewDay` moved out of `today-view.tsx` into `use-refresh-on-new-day.ts` and shared by both views.
+  - Tests: unit `src/lib/upcoming.test.ts` (15: range parsing, window in Tokyo and across Berlin's DST change, timed deadlines on the Tokyo day incl. one set in New York and both window edges, merging, closed tasks, order within a day, labels) and `formatTimeOfDay`; integration `upcoming.integration.test.ts` (5, Tokyo at 23:59 and 00:01: window moves at local midnight, 30 days, timed deadlines at 00:30/23:59/00:00 and from New York, merged entries with goal/milestone, open only and cross-user); e2e `tests/e2e/upcoming.spec.ts` (2, browser in Tokyo: empty state, toggle in the URL, sub-nav order, axe; a deadline at 00:30 set inline on the Plan page shows on its Tokyo day and not the UTC day before, plan + deadline on two days and on one, today's plan and day 20 left out, 30 days survives a reload). `shell.spec.ts` updated for the Upcoming link.
+  - DATA_MODEL Task rules: how Upcoming is derived.
+- **Deviations:**
+  1. **Upcoming starts tomorrow**, not today: Today already covers today (passed deadlines included), and "next 7 days" on the Plan page also starts tomorrow. Day 14 is today + 14.
+  2. **Rows are read-only** (title, priority, goal › milestone link, what it is that day, its other date, estimate). The chunk lists no actions; complete/plan from here is a follow-up.
+- **Decisions:**
+  1. **Merging:** a task planned for one day and due on another shows on both days ("Planned · Due 29 Oct" and "Due · Planned 27 Oct"); planned and due the same day is one entry ("Planned, due"). Only the parts inside the window show.
+  2. **Days with nothing are left out**, rather than listing 14 or 30 empty headings.
+  3. **Order within a day:** all-day deadlines, then plans by priority (high first), then timed deadlines by time; ties by position.
+  4. **The 30-day toggle is a URL param** (`/plan/upcoming?days=30`, links with `aria-current`), like the Goals status filter, so it is bookmarkable and server-filtered.
+  5. A timed deadline's day and time are shown in the user's saved zone, not the task's `due_tz`.
+- **Next chunk should know:**
+  - Day regions are named by their heading ("Tomorrow · Saturday, …" or the full date in the user's locale); in e2e find a day by `h2 time[datetime="YYYY-MM-DD"]` instead of the localized name (see `day()` in `upcoming.spec.ts`).
+  - `upcomingWindow` + `listUpcomingTasks` are reusable for Home's "upcoming commitments" (3.2) and the review's "deadlines next week" (7.1).
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 344 unit, 278 integration), `pnpm build` and `pnpm test:e2e` (37 tests) pass; `upcoming.spec.ts` passed 8 of 8 with `--repeat-each=4`. The full e2e suite failed twice in a row on `preferences.spec.ts` "first sign-in proposes the device's time zone…" (the known flake: the reload still showed the proposed zone) and passed on the third run; that spec passed 10 of 10 alone with `--repeat-each=5`. No schema change, so no migration. A manual pass with a screen reader and on a phone is not done.
+- **Follow-ups:**
+  - One-tap actions on Upcoming (complete, plan for today, pick a date), if dogfooding wants them.
+  - The `preferences.spec.ts` first-sign-in flake now fails more often under full-suite load (two of three runs here). Fix it with the retry the 2.4 note describes (re-select until the value sticks, or wait for the save's POST before reloading).
+  - Earlier follow-ups still open: goal/milestone deletes move tasks with no `task.moved` event (2.7); the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs.
