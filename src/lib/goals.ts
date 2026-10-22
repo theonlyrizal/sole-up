@@ -3,6 +3,7 @@
 // The rules come from docs/decisions/0010-goal-status-priority-progress.md.
 
 import type { LocalDate } from "./dates";
+import type { Priority } from "./priorities";
 
 export const GOAL_STATUSES = [
   "active",
@@ -13,8 +14,12 @@ export const GOAL_STATUSES = [
 ] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];
 
-export const GOAL_PRIORITIES = ["low", "medium", "high"] as const;
-export type GoalPriority = (typeof GOAL_PRIORITIES)[number];
+// Goals use the shared scale; these names stay so existing imports keep working.
+export {
+  PRIORITIES as GOAL_PRIORITIES,
+  PRIORITY_LABELS as GOAL_PRIORITY_LABELS,
+} from "./priorities";
+export type GoalPriority = Priority;
 
 export const GOAL_TITLE_MAX = 200;
 export const GOAL_DESCRIPTION_MAX = 2000;
@@ -103,13 +108,6 @@ export const GOAL_STATUS_LABELS: Record<GoalStatus, string> = {
   completed: "Completed",
   dropped: "Dropped",
   archived: "Archived",
-};
-
-/** Shown as a small label, never as a score or a sort key. */
-export const GOAL_PRIORITY_LABELS: Record<GoalPriority, string> = {
-  low: "Low priority",
-  medium: "Medium priority",
-  high: "High priority",
 };
 
 /** One status action on a goal: its button label and confirmation. */

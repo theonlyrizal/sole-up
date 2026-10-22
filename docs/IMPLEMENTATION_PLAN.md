@@ -113,7 +113,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 1.6 | Goal archive and delete flows | done | chunk/1.6-goal-archive-delete | 2026-10-22 | `/goals/archived` with confirmed Restore to Active and "completed on …", delete confirmation naming the milestone count (detail page and archive), `deleteGoal` action |
 | 1.✓ | Phase 1 checkpoint (user) | done | | 2026-10-22 | User checked the Phase 1 features in one sitting rather than a few days of real use |
 | 2.0 | Decision gate: tasks | done | chunk/2.0-tasks-decisions | 2026-10-22 | ADR 0011: open/completed/cancelled, inbox = no parent + no plan, "Earlier, not done" never auto-moved, goal priority scale, estimates 1–1440 min, no `task.deleted`; 2.1–2.8 and DATA_MODEL synced |
-| 2.1 | Tasks: schema | todo | | | |
+| 2.1 | Tasks: schema | done | chunk/2.1-tasks-schema | 2026-10-22 | `tasks` with composite goal/milestone FKs (hand-edited `SET NULL` per column), parent/deadline/status/priority/estimate/timestamp CHECKs, five indexes; priority scale moved to `src/lib/priorities.ts`; schema tests |
 | 2.2 | Tasks: service | todo | | | |
 | 2.3 | Quick add and Inbox | todo | | | |
 | 2.4 | Plan page: task list and filters | todo | | | |
@@ -1398,3 +1398,27 @@ Template:
 - **Follow-ups:**
   - Goal and milestone deletes clear tasks' parents in the database with no `task.moved` event (the same gap as life-area delete → goals). Consider recording it in 2.7.
   - If dogfooding shows "Earlier, not done" piling up, revisit with a bulk action rather than automatic moves (ADR 0011).
+
+### 2.1: Tasks: schema (2026-10-22)
+- **Built:**
+  - `src/lib/tasks.ts` (pure): `TASK_STATUSES`, title/notes length limits, estimate bounds (1–1440).
+  - `src/lib/priorities.ts` (pure): the shared `PRIORITIES` scale and `PRIORITY_LABELS`. `src/lib/goals.ts` re-exports them under the old goal names, so no goal import changed.
+  - Schema `src/server/db/schema/tasks.ts` (exported from `schema/index.ts`) + migration `0007_tasks.sql`: all columns from the chunk, `unique (id, user_id)`, composite FKs `(goal_id, user_id)` and `(milestone_id, user_id)` hand-edited to `ON DELETE SET NULL ("goal_id")` / `("milestone_id")`, indexes `(user_id, status, planned_date)`, `(user_id, status, due_date)`, `(user_id, status, due_at)`, `(user_id, milestone_id)`, `(user_id, goal_id)`, and CHECKs `tasks_parent_check`, `tasks_deadline_check`, `tasks_due_tz_check`, `tasks_status_check`, `tasks_priority_check`, `tasks_estimated_minutes_check`, `tasks_completed_at_check`, `tasks_cancelled_at_check`, `tasks_sort_order_check`, `tasks_title_length_check`, `tasks_notes_length_check`.
+  - Tests `src/server/db/schema/tasks.integration.test.ts` (11): defaults; each CHECK rejects a bad row; cross-user goal and milestone rejected; deleting a milestone or goal nulls only its parent column and keeps the task and `user_id`.
+- **Deviations:**
+  1. **`sort_order` defaults to 0.** The chunk did not say; this keeps inserts simple, with the service to assign real order later.
+  2. **Migration file named `0007_tasks.sql`** (drizzle-kit generated a random name; renamed and the journal tag updated to match the existing `000N_<name>` style).
+  3. **Shared priority module:** the chunk asked to move the goal priorities rather than copy them. Goal imports keep their old names via re-export.
+  4. **Branch stacked on `chunk/2.0-tasks-decisions`:** 2.0 (ADR 0011) is not yet merged to `main`, and 2.1 depends on its decisions. Merge 2.0 first, or rebase this branch onto `main` after that.
+- **Decisions:**
+  1. Each parent FK is one composite FK with a column-list `SET NULL`, as for `goals.life_area_id`. The schema comment and the migration both say the hand edit must be kept if the FK is regenerated.
+  2. Deadline rule: `due_date` and `due_at` cannot both be set (`tasks_deadline_check`), and `due_at`/`due_tz` are both set or both null (`tasks_due_tz_check`). A task may have neither.
+  3. `completed_at` and `cancelled_at` are each set exactly while their status holds (ADR 0011).
+- **Next chunk should know:**
+  - The service must set `completed_at`/`cancelled_at` in the same write as the status, or the CHECKs reject it.
+  - `tasks_*` constraint names are stable; tests match them by name.
+  - Estimate bounds and length limits live in `src/lib/tasks.ts`; validation should import them rather than repeat the numbers.
+- **Unverified:** none. `pnpm verify` passes (format, lint, typecheck, 244 unit, 194 integration). `pnpm db:generate` reports no schema changes. `pnpm build` and `pnpm test:e2e` not run (no route or UI changes).
+- **Follow-ups:**
+  - The goal and milestone delete paths clear tasks' parents with no `task.moved` event (see 2.0). Decide in 2.7.
+  - Integration output shows noisy `Provider not found` Better Auth logs from existing auth tests. Not caused by this chunk; worth a look in a later hardening pass.
