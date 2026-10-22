@@ -18,6 +18,7 @@ import {
   type GoalStatusAction,
 } from "@/lib/goals";
 import type { LifeArea } from "@/lib/life-areas";
+import { milestoneProgressLabel } from "@/lib/milestones";
 import { changeGoalStatus } from "@/server/modules/goals/actions";
 import type {
   GoalGroup,
@@ -210,9 +211,10 @@ function GoalGroupSection({
 }
 
 function GoalSummary({ goal }: { goal: GoalListItem }) {
-  const dates = [
+  const details = [
     goal.startDateLabel && `Starts ${goal.startDateLabel}`,
     goal.targetDateLabel && `Target ${goal.targetDateLabel}`,
+    milestoneProgressLabel(goal.progress),
   ].filter(Boolean);
   return (
     <div className="flex min-w-0 flex-col gap-1">
@@ -236,8 +238,8 @@ function GoalSummary({ goal }: { goal: GoalListItem }) {
           {goal.reason}
         </p>
       )}
-      {dates.length > 0 && (
-        <p className="text-sm text-muted">{dates.join(" · ")}</p>
+      {details.length > 0 && (
+        <p className="text-sm text-muted">{details.join(" · ")}</p>
       )}
     </div>
   );

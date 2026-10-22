@@ -36,6 +36,36 @@ export type MilestoneProgress = {
   countable: number;
 };
 
+/** The definition shown next to progress, so the number is never a mystery. */
+export const MILESTONE_PROGRESS_HELP =
+  "Progress counts completed milestones out of all milestones. Dropped milestones don't count.";
+
+/**
+ * "2 of 5 milestones", or null when nothing can be counted (no milestones, or
+ * all dropped). Callers show no progress at all in that case, never "0%".
+ */
+export function milestoneProgressLabel(
+  progress: MilestoneProgress | null,
+): string | null {
+  if (!progress || progress.countable === 0) return null;
+  const noun = progress.countable === 1 ? "milestone" : "milestones";
+  return `${progress.completed} of ${progress.countable} ${noun}`;
+}
+
+/**
+ * Every countable milestone is done. The UI may offer to complete the goal,
+ * but never does it on its own (ADR 0010).
+ */
+export function allCountableMilestonesDone(
+  progress: MilestoneProgress | null,
+): boolean {
+  return (
+    progress !== null &&
+    progress.countable > 0 &&
+    progress.completed === progress.countable
+  );
+}
+
 /** What the UI receives for one milestone. */
 export type Milestone = {
   id: string;
