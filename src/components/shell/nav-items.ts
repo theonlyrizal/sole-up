@@ -10,6 +10,22 @@ export const NAV_ITEMS = [
 ] as const;
 
 export type NavItem = (typeof NAV_ITEMS)[number];
+
+/**
+ * Pages inside Plan. The sidebar lists them under Plan; on phones the Plan
+ * pages show them as their own row (PlanSubnav).
+ */
+export const PLAN_SUB_ITEMS = [
+  { href: "/plan", label: "Overview" },
+  { href: "/plan/inbox", label: "Inbox" },
+] as const;
+
+/** Sub-pages listed under a main destination in the sidebar. */
+export const NAV_SUB_ITEMS: Partial<
+  Record<NavItem["href"], readonly { href: string; label: string }[]>
+> = {
+  "/plan": PLAN_SUB_ITEMS.filter((item) => item.href !== "/plan"),
+};
 export type NavIcon = NavItem["icon"];
 
 /** True when `pathname` is the destination itself or a page inside it. */

@@ -5,9 +5,12 @@ import {
   changeTaskStatusSchema,
   createTaskSchema,
   moveTaskSchema,
+  moveTasksSchema,
   ONE_PARENT,
   planTaskSchema,
   rescheduleTaskDueSchema,
+  TASK_BULK_MAX,
+  taskIdsSchema,
   updateTaskSchema,
 } from "./validation";
 
@@ -244,5 +247,50 @@ describe("moveTaskSchema", () => {
     expect(
       fieldErrors(moveTaskSchema.safeParse({ id: ID, goalId: "nope" })),
     ).toEqual({ goalId: ["Choose one of your goals."] });
+  });
+});
+
+describe("taskIdsSchema", () => {
+  it("drops duplicate IDs", () => {
+    expect(taskIdsSchema.parse({ ids: [ID, OTHER_ID, ID] })).toEqual({
+      ids: [ID, OTHER_ID],
+    });
+  });
+
+  it("needs at least one task", () => {
+    expect(fieldErrors(taskIdsSchema.safeParse({ ids: [] })).ids).toEqual([
+      "Choose at least one task.",
+    ]);
+  });
+
+  it(`takes at most ${TASK_BULK_MAX} tasks`, () => {
+    const ids = Array.from({ length: TASK_BULK_MAX + 1 }, () => ID);
+    expect(taskIdsSchema.safeParse({ ids }).success).toBe(false);
+  });
+
+  it("rejects an ID that isn't a UUID", () => {
+    expect(taskIdsSchema.safeParse({ ids: ["nope"] }).success).toBe(false);
+  });
+});
+
+describe("moveTasksSchema", () => {
+  it("takes a goal for several tasks", () => {
+    expect(moveTasksSchema.parse({ ids: [ID], goalId: OTHER_ID })).toEqual({
+      ids: [ID],
+      goalId: OTHER_ID,
+      milestoneId: null,
+    });
+  });
+
+  it("refuses a goal and a milestone together", () => {
+    expect(
+      fieldErrors(
+        moveTasksSchema.safeParse({
+          ids: [ID],
+          goalId: OTHER_ID,
+          milestoneId: OTHER_ID,
+        }),
+      ).milestoneId,
+    ).toEqual([ONE_PARENT]);
   });
 });

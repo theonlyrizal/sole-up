@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { APP_ROUTE_SEGMENTS } from "@/lib/protected-paths";
 
-import { NAV_ITEMS, isNavItemActive } from "./nav-items";
+import {
+  NAV_ITEMS,
+  NAV_SUB_ITEMS,
+  PLAN_SUB_ITEMS,
+  isNavItemActive,
+} from "./nav-items";
 
 describe("isNavItemActive", () => {
   it.each([
@@ -36,6 +41,20 @@ describe("NAV_ITEMS", () => {
     const segments: readonly string[] = APP_ROUTE_SEGMENTS;
     for (const item of NAV_ITEMS) {
       expect(segments).toContain(item.href.slice(1));
+    }
+  });
+});
+
+describe("Plan sub-pages", () => {
+  it("lists Inbox under Plan", () => {
+    expect(NAV_SUB_ITEMS["/plan"]).toEqual([
+      { href: "/plan/inbox", label: "Inbox" },
+    ]);
+  });
+
+  it("keeps every Plan sub-page inside Plan", () => {
+    for (const item of PLAN_SUB_ITEMS) {
+      expect(isNavItemActive(item.href, "/plan")).toBe(true);
     }
   });
 });

@@ -5,19 +5,21 @@ import { expect, test, type Page } from "@playwright/test";
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 
 const NAV_LABELS = ["Home", "Goals", "Plan", "Settings"];
+/** The sidebar also lists Inbox under Plan. */
+const SIDEBAR_LABELS = ["Home", "Goals", "Plan", "Inbox", "Settings"];
 
 function mainNav(page: Page) {
   return page.getByRole("navigation", { name: "Main" });
 }
 
 test.describe("desktop", () => {
-  test("the sidebar shows only Home, Goals, Plan and Settings", async ({
+  test("the sidebar shows only Home, Goals, Plan (with Inbox) and Settings", async ({
     page,
   }) => {
     await signInAndConfirm(page);
 
     const nav = mainNav(page);
-    await expect(nav.getByRole("link")).toHaveText(NAV_LABELS);
+    await expect(nav.getByRole("link")).toHaveText(SIDEBAR_LABELS);
     await expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute(
       "aria-current",
       "page",
@@ -39,6 +41,20 @@ test.describe("desktop", () => {
       );
       await expect(nav.locator("[aria-current]")).toHaveCount(1);
     }
+
+    // On Inbox, Plan is the current section and Inbox the current page.
+    await nav.getByRole("link", { name: "Inbox" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Inbox" }),
+    ).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Inbox" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(nav.getByRole("link", { name: "Plan" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
   });
 
   test("the shell has no serious accessibility violations", async ({
@@ -47,7 +63,7 @@ test.describe("desktop", () => {
     await signInAndConfirm(page);
     await expectNoSeriousViolations(page);
 
-    for (const path of ["/goals", "/plan", "/settings"]) {
+    for (const path of ["/goals", "/plan", "/plan/inbox", "/settings"]) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expectNoSeriousViolations(page);
@@ -69,7 +85,8 @@ test.describe("desktop", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator("main")).toBeFocused();
 
-    // From the top: skip link, brand, the four destinations, sign out.
+    // From the top: skip link, brand, Add task, the destinations (with
+    // Inbox under Plan), sign out.
     await page.goto("/home");
     await expect(
       page.getByRole("heading", { level: 1, name: "Home" }),
@@ -77,7 +94,8 @@ test.describe("desktop", () => {
     const expected = [
       skipLink,
       page.getByRole("link", { name: "SoleUp" }),
-      ...NAV_LABELS.map((label) =>
+      page.getByRole("button", { name: "Add task" }),
+      ...SIDEBAR_LABELS.map((label) =>
         mainNav(page).getByRole("link", { name: label }),
       ),
       page.getByRole("button", { name: "Sign out" }),
@@ -93,6 +111,7 @@ test.describe("desktop", () => {
     }
 
     // Shift+Tab back to Plan and follow it with Enter.
+    await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Shift+Tab");
     const plan = mainNav(page).getByRole("link", { name: "Plan" });
@@ -129,6 +148,7 @@ test.describe("mobile", () => {
   }) => {
     await signInAndConfirm(page);
 
+    // Inbox isn't in the bottom bar; the Plan pages link to it.
     const nav = mainNav(page);
     await expect(nav.getByRole("link")).toHaveText(NAV_LABELS);
     const navBox = (await nav.boundingBox())!;

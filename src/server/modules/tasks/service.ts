@@ -19,7 +19,9 @@ import type {
   ChangeTaskStatusInput,
   CreateTaskInput,
   MoveTaskInput,
+  MoveTasksInput,
   PlanTaskInput,
+  PlanTasksInput,
   RescheduleTaskDueInput,
   TaskIdInput,
   UpdateTaskInput,
@@ -248,6 +250,32 @@ export async function changeTaskStatus(
   });
 }
 
+/** Plans one locked task; the same date again is a no-op with no event. */
+async function planInTx(
+  tx: DbTransaction,
+  userId: string,
+  id: string,
+  plannedDate: LocalDate | null,
+): Promise<TaskRow> {
+  const current = await findForUpdate(tx, userId, id);
+  if (current.plannedDate === plannedDate) return current;
+
+  const [updated] = await tx
+    .update(tasks)
+    .set({ plannedDate })
+    .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+    .returning();
+  if (!updated) throw new NotFoundError();
+
+  await recordAudit(tx, {
+    type: "task.planned",
+    userId,
+    entityId: id,
+    changes: { plannedDate: { from: current.plannedDate, to: plannedDate } },
+  });
+  return updated;
+}
+
 /**
  * Plans the task for a local date, or unplans it with null. Any date is
  * allowed, past ones included (backfill). Nothing else ever changes a
@@ -257,25 +285,28 @@ export async function planTask(
   userId: string,
   { id, plannedDate }: PlanTaskInput,
 ): Promise<Task> {
-  return db.transaction(async (tx) => {
-    const current = await findForUpdate(tx, userId, id);
-    if (current.plannedDate === plannedDate) return toTask(current);
+  const row = await db.transaction((tx) =>
+    planInTx(tx, userId, id, plannedDate),
+  );
+  return toTask(row);
+}
 
-    const [updated] = await tx
-      .update(tasks)
-      .set({ plannedDate })
-      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
-      .returning();
-    if (!updated) throw new NotFoundError();
-
-    await recordAudit(tx, {
-      type: "task.planned",
-      userId,
-      entityId: id,
-      changes: { plannedDate: { from: current.plannedDate, to: plannedDate } },
-    });
-    return toTask(updated);
+/**
+ * Plans several tasks for the same date, all or none: one missing or
+ * foreign task fails the lot. Each changed task gets its own event.
+ */
+export async function planTasks(
+  userId: string,
+  { ids, plannedDate }: PlanTasksInput,
+): Promise<Task[]> {
+  const rows = await db.transaction(async (tx) => {
+    const planned: TaskRow[] = [];
+    for (const id of ids) {
+      planned.push(await planInTx(tx, userId, id, plannedDate));
+    }
+    return planned;
   });
+  return rows.map(toTask);
 }
 
 /** Sets, changes or clears the deadline, all-day or timed. */
@@ -309,41 +340,71 @@ export async function rescheduleTaskDue(
   });
 }
 
+type Parent = { goalId: string | null; milestoneId: string | null };
+
+/** Moves one locked task; the same parent again is a no-op with no event. */
+async function moveInTx(
+  tx: DbTransaction,
+  userId: string,
+  id: string,
+  { goalId, milestoneId }: Parent,
+): Promise<TaskRow> {
+  const current = await findForUpdate(tx, userId, id);
+  if (current.goalId === goalId && current.milestoneId === milestoneId) {
+    return current;
+  }
+
+  const [updated] = await tx
+    .update(tasks)
+    .set({ goalId, milestoneId })
+    .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+    .returning();
+  if (!updated) throw new NotFoundError();
+
+  await recordAudit(tx, {
+    type: "task.moved",
+    userId,
+    entityId: id,
+    changes: {
+      goalId: { from: current.goalId, to: goalId },
+      milestoneId: { from: current.milestoneId, to: milestoneId },
+    },
+  });
+  return updated;
+}
+
 /**
  * Moves the task under one of the user's goals or milestones, or to no
  * parent. Another user's (or a missing) parent is a field error.
  */
 export async function moveTask(
   userId: string,
-  { id, goalId, milestoneId }: MoveTaskInput,
+  { id, ...parent }: MoveTaskInput,
 ): Promise<Task> {
   const row = await guardParent(() =>
-    db.transaction(async (tx) => {
-      const current = await findForUpdate(tx, userId, id);
-      if (current.goalId === goalId && current.milestoneId === milestoneId) {
-        return current;
-      }
-
-      const [updated] = await tx
-        .update(tasks)
-        .set({ goalId, milestoneId })
-        .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
-        .returning();
-      if (!updated) throw new NotFoundError();
-
-      await recordAudit(tx, {
-        type: "task.moved",
-        userId,
-        entityId: id,
-        changes: {
-          goalId: { from: current.goalId, to: goalId },
-          milestoneId: { from: current.milestoneId, to: milestoneId },
-        },
-      });
-      return updated;
-    }),
+    db.transaction((tx) => moveInTx(tx, userId, id, parent)),
   );
   return toTask(row);
+}
+
+/**
+ * Moves several tasks under the same parent, all or none: one missing or
+ * foreign task, or a foreign parent, fails the lot.
+ */
+export async function moveTasks(
+  userId: string,
+  { ids, ...parent }: MoveTasksInput,
+): Promise<Task[]> {
+  const rows = await guardParent(() =>
+    db.transaction(async (tx) => {
+      const moved: TaskRow[] = [];
+      for (const id of ids) {
+        moved.push(await moveInTx(tx, userId, id, parent));
+      }
+      return moved;
+    }),
+  );
+  return rows.map(toTask);
 }
 
 /** Hard delete (ADR 0006). Removes the task's audit events with it. */
