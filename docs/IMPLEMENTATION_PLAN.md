@@ -114,7 +114,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 1.✓ | Phase 1 checkpoint (user) | done | | 2026-10-22 | User checked the Phase 1 features in one sitting rather than a few days of real use |
 | 2.0 | Decision gate: tasks | done | chunk/2.0-tasks-decisions | 2026-10-22 | ADR 0011: open/completed/cancelled, inbox = no parent + no plan, "Earlier, not done" never auto-moved, goal priority scale, estimates 1–1440 min, no `task.deleted`; 2.1–2.8 and DATA_MODEL synced |
 | 2.1 | Tasks: schema | done | chunk/2.1-tasks-schema | 2026-10-22 | `tasks` with composite goal/milestone FKs (hand-edited `SET NULL` per column), parent/deadline/status/priority/estimate/timestamp CHECKs, five indexes; priority scale moved to `src/lib/priorities.ts`; schema tests |
-| 2.2 | Tasks: service | todo | | | |
+| 2.2 | Tasks: service | done | chunk/2.2-tasks-service | 2026-10-22 | Service (create, edit, status, plan, reschedule due, move, delete) with ADR 0011 rules and eight `task.*` events, `goalOf` and inbox queries; no UI |
 | 2.3 | Quick add and Inbox | todo | | | |
 | 2.4 | Plan page: task list and filters | todo | | | |
 | 2.5 | Today view | todo | | | |
@@ -1422,3 +1422,27 @@ Template:
 - **Follow-ups:**
   - The goal and milestone delete paths clear tasks' parents with no `task.moved` event (see 2.0). Decide in 2.7.
   - Integration output shows noisy `Provider not found` Better Auth logs from existing auth tests. Not caused by this chunk; worth a look in a later hardening pass.
+
+### 2.2: Tasks: service (2026-10-22)
+- **Built:**
+  - `src/lib/tasks.ts`: `TASK_EDITABLE_FIELDS`, `TASK_STATUS_EVENTS` (status entered → event type), `timestampsAfterTaskStatusChange(to, now)`, the `Task` type.
+  - `src/server/modules/tasks/`: `validation.ts` (create, update, change status, plan, reschedule due, move, id), `service.ts` (`createTask`, `updateTask`, `changeTaskStatus`, `planTask`, `rescheduleTaskDue`, `moveTask`, `deleteTask`), `queries.ts` (`goalOf(userId, taskId)`, `listInboxTasks(userId)`).
+  - Audit events `task.created|updated|completed|reopened|cancelled|planned|due_changed|moved` in `AUDIT_EVENTS`, with an ISO-instant and a canonical-zone schema for timed deadlines.
+  - Tests: unit `src/lib/tasks.test.ts` (every status pair's timestamps, event names) and `tasks/validation.test.ts` (16); integration `tasks.integration.test.ts` (29: all nine status pairs incl. no-ops with `completed_at`/`cancelled_at` and parent unchanged, reopen clears `completed_at`, timed-deadline round trip New York → UTC → back and seen from London/Tokyo, DST offset, all-day ↔ timed ↔ none with old/new in `task.due_changed`, past-date planning and unplanning, planning a completed task, moves with events, another user's goal/milestone rejected on create and move with nothing changed, `goalOf` direct/via milestone/none/foreign, inbox includes due-only and excludes planned/parented/closed/other users', delete removes only that task's events, every operation on another user's task is `NotFound`, no title or notes in events).
+- **Deviations:** no `actions.ts` ("no UI"; 2.3 adds them), as in 1.1 and 1.4.
+- **Decisions:**
+  1. **Deadline input is three flat form fields** (`dueDate`, `dueTime` "HH:MM", `dueTz`): date alone → `due_date`; all three → `due_at` = `instantFromLocal(date, time, zone)` ("compatible" DST rule) plus `due_tz`. A time without a date or zone, or a zone without a time, is a field error. Zones are stored canonical (`canonicalTimeZone`).
+  2. **`updateTask` edits title, notes, priority and estimate only.** Plan, deadline, parent and status each have their own operation, so each change gets its own event (`task.updated` never carries dates or parents).
+  3. **Status events are named by the status entered**: `open` → `task.reopened`, etc.; each records `status` from/to. `completed_at`/`cancelled_at` use SQL `now()`, equal to the event's `occurred_at`.
+  4. **`task.due_changed` always carries all three deadline columns** (from/to), so a switch between all-day and timed is one event. Same deadline again (instant compared by value) is a no-op.
+  5. **A foreign or missing parent is a field error** (`goalId` / `milestoneId`), caught from the composite FK like goals' life area, on create and move.
+  6. **`sort_order` on create is max + 1 across the user's tasks** (no lock; ties fall back to creation time). Inbox order: `sort_order`, `created_at`, `id`.
+  7. **`goalOf` throws `NotFoundError`** for a missing or foreign task, so `null` only ever means "no goal".
+  8. Planning is allowed for any status and any date (backfill).
+- **Next chunk should know:**
+  - 2.3: wire `createTask` (quick add sends `{ title }`), `listInboxTasks`, and the other operations through `authedAction`; services expect validated input. Form errors come back on `goalId`, `milestoneId`, `dueDate`, `dueTime`, `dueTz`, `estimatedMinutes`.
+  - To show a timed deadline, use `localDateTimeOf(task.dueAt, task.dueTz)` for its own zone, or the user's zone for "your time".
+  - `goalOf` is a single-task query; list views (2.7) will want a batched join instead.
+- **Unverified:** none. `pnpm verify` passes (format, lint, typecheck, 267 unit, 223 integration). No schema change, so no migration. `pnpm build` and `pnpm test:e2e` not run (no route or UI changes).
+- **Follow-ups:**
+  - Goal and milestone deletes still clear tasks' parents with no `task.moved` event (2.0/2.1 follow-up; decide in 2.7).
