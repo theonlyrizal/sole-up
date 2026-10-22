@@ -111,7 +111,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 1.4 | Milestones: schema and service | done | chunk/1.4-milestones-schema-service | 2026-10-21 | `milestones` (composite goal FK, cascade; status/completed_at CHECKs), service with dense per-goal order and audit, progress query; goal delete removes milestone events |
 | 1.5 | Milestones UI and progress | done | chunk/1.5-milestones-ui | 2026-10-22 | Milestone list on goal detail (inline add, move buttons, complete, drop, offer to complete), ADR 0010 progress with help text on detail and goals list |
 | 1.6 | Goal archive and delete flows | done | chunk/1.6-goal-archive-delete | 2026-10-22 | `/goals/archived` with confirmed Restore to Active and "completed on …", delete confirmation naming the milestone count (detail page and archive), `deleteGoal` action |
-| 1.✓ | Phase 1 checkpoint (user) | todo | | | |
+| 1.✓ | Phase 1 checkpoint (user) | done | | 2026-10-22 | User checked the Phase 1 features in one sitting rather than a few days of real use |
 | 2.0 | Decision gate: tasks | todo | | | |
 | 2.1 | Tasks: schema | todo | | | |
 | 2.2 | Tasks: service | todo | | | |
