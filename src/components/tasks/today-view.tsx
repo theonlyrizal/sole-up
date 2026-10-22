@@ -1,15 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  useEffect,
-  useId,
-  useOptimistic,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { useId, useOptimistic, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
@@ -47,6 +39,7 @@ import type {
 } from "@/server/modules/tasks/queries";
 
 import { AddToToday } from "./add-to-today";
+import { useRefreshOnNewDay } from "./use-refresh-on-new-day";
 
 type TodayViewProps = {
   /** The user's today, such as "Friday, 23 October 2026". */
@@ -59,30 +52,6 @@ type TodayViewProps = {
   locale: string;
   timeZone: string;
 };
-
-/**
- * Reads the page again once the user's day has changed, so a page left open
- * overnight shows the new day. Only the view changes: no task is moved.
- */
-function useRefreshOnNewDay(nextDayStartsAt: string) {
-  const router = useRouter();
-  useEffect(() => {
-    const at = Date.parse(nextDayStartsAt);
-    const refreshIfNewDay = () => {
-      if (Date.now() >= at) router.refresh();
-    };
-    const timer = setTimeout(
-      refreshIfNewDay,
-      Math.max(0, at - Date.now()) + 1_000,
-    );
-    // Timers pause while a device sleeps; check again when the tab returns.
-    document.addEventListener("visibilitychange", refreshIfNewDay);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", refreshIfNewDay);
-    };
-  }, [nextDayStartsAt, router]);
-}
 
 /**
  * Today (chunk 2.5): planned for today, due today, deadlines that need a

@@ -32,6 +32,11 @@ import {
   type TodayClock,
   type TodaySection,
 } from "@/lib/today";
+import {
+  groupUpcomingTasks,
+  type UpcomingDay,
+  type UpcomingWindow,
+} from "@/lib/upcoming";
 import { db } from "@/server/db/client";
 import { goals, lifeAreas, milestones, tasks } from "@/server/db/schema";
 import { NotFoundError } from "@/server/errors";
@@ -311,6 +316,33 @@ export async function listTodayTasks(
     ),
   );
   return groupTodayTasks(items, clock, timeZone);
+}
+
+/**
+ * The Upcoming view (chunk 2.6): open tasks planned for, or due on, a day
+ * in `window`, merged onto those days. A timed deadline counts on its local
+ * day in `timeZone` (the user's), so the window is an instant range for it.
+ */
+export async function listUpcomingTasks(
+  userId: string,
+  window: UpcomingWindow,
+  timeZone: string,
+): Promise<UpcomingDay<PlanTaskItem>[]> {
+  const items = await selectPlanTaskItems(
+    and(
+      eq(tasks.userId, userId),
+      eq(tasks.status, "open"),
+      or(
+        and(
+          gte(tasks.plannedDate, window.from),
+          lte(tasks.plannedDate, window.to),
+        ),
+        and(gte(tasks.dueDate, window.from), lte(tasks.dueDate, window.to)),
+        and(gte(tasks.dueAt, window.start), lt(tasks.dueAt, window.end)),
+      ),
+    ),
+  );
+  return groupUpcomingTasks(items, window, timeZone);
 }
 
 /** Most suggestions per group in the "Add to today" picker. */

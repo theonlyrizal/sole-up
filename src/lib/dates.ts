@@ -165,3 +165,19 @@ export function formatInstant(
     timeZone,
   }).format(instant);
 }
+
+/**
+ * The wall-clock time of an instant in the user's `timeZone`, such as
+ * "14:05" in `en-GB` or "2:05 PM" in `en-US`.
+ */
+export function formatTimeOfDay(
+  instant: Date,
+  locale: string,
+  timeZone: string,
+): string {
+  toInstant(instant); // rejects an invalid Date
+  return new Intl.DateTimeFormat(locale, {
+    timeStyle: "short",
+    timeZone,
+  }).format(instant);
+}

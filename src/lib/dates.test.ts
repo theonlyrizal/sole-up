@@ -5,6 +5,7 @@ import {
   dayOfWeek,
   formatInstant,
   formatLocalDate,
+  formatTimeOfDay,
   instantFromLocal,
   isLocalDate,
   localDateOf,
@@ -220,6 +221,23 @@ describe("formatLocalDate", () => {
 
   it("rejects an invalid date", () => {
     expect(() => formatLocalDate("2027-02-30", "en-GB")).toThrow(RangeError);
+  });
+});
+
+describe("formatTimeOfDay", () => {
+  it("shows the wall-clock time in the user's time zone", () => {
+    const instant = at("2027-03-12T23:30:00Z");
+    expect(formatTimeOfDay(instant, "en-GB", "UTC")).toBe("23:30");
+    expect(formatTimeOfDay(instant, "en-GB", "Asia/Jakarta")).toBe("06:30");
+    expect(formatTimeOfDay(instant, "en-US", "Asia/Jakarta")).toMatch(
+      /^6:30\sAM$/,
+    );
+  });
+
+  it("rejects an invalid instant", () => {
+    expect(() => formatTimeOfDay(new Date(Number.NaN), "en-GB", "UTC")).toThrow(
+      RangeError,
+    );
   });
 });
 

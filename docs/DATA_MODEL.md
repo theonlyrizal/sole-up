@@ -149,6 +149,7 @@ Fields ([ADR 0004](decisions/0004-task-hierarchy-and-dates.md), [ADR 0011](decis
 Rules:
 - **Inbox** is derived, not a status: open tasks with no parent and no `planned_date`. A due date alone doesn't take a task out of the inbox.
 - **Today's sections** are derived on read from the user's local today and the current instant, never stored. Each open task shows in one section, the first that applies: Planned for today (`planned_date` is today), Needs a decision (`due_date` before today or `due_at` before now), Due today (`due_date` today or `due_at` later today), Earlier, not done (`planned_date` before today). See `todaySection` in `src/lib/today.ts`.
+- **Upcoming** is derived on read too: open tasks planned for, or due on, tomorrow through today + 14 days (or + 30), grouped by the user's local date. A timed deadline falls on the local day of `due_at` in the user's zone, whatever its `due_tz`. A task planned for one day and due on another shows on both; on the same day it shows once. See `groupUpcomingTasks` in `src/lib/upcoming.ts`.
 - Completing or cancelling a task never changes its milestone or goal; goal progress stays milestone-based ([ADR 0010](decisions/0010-goal-status-priority-progress.md)).
 - `unique (id, user_id)`, so later tables (reminders, note links) can reference tasks with composite keys.
 - Deleting a task is a confirmed hard delete that removes its audit events in the same transaction; there is no `task.deleted` event ([ADR 0005](decisions/0005-history-and-audit-log.md)).

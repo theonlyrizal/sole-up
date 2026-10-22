@@ -5,15 +5,23 @@ import { expect, test, type Page } from "@playwright/test";
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 
 const NAV_LABELS = ["Home", "Goals", "Plan", "Settings"];
-/** The sidebar also lists Today and Inbox under Plan. */
-const SIDEBAR_LABELS = ["Home", "Goals", "Plan", "Today", "Inbox", "Settings"];
+/** The sidebar also lists Today, Upcoming and Inbox under Plan. */
+const SIDEBAR_LABELS = [
+  "Home",
+  "Goals",
+  "Plan",
+  "Today",
+  "Upcoming",
+  "Inbox",
+  "Settings",
+];
 
 function mainNav(page: Page) {
   return page.getByRole("navigation", { name: "Main" });
 }
 
 test.describe("desktop", () => {
-  test("the sidebar shows only Home, Goals, Plan (with Today and Inbox) and Settings", async ({
+  test("the sidebar shows only Home, Goals, Plan (with its sub-pages) and Settings", async ({
     page,
   }) => {
     await signInAndConfirm(page);
@@ -67,6 +75,7 @@ test.describe("desktop", () => {
       "/goals",
       "/plan",
       "/plan/today",
+      "/plan/upcoming",
       "/plan/inbox",
       "/settings",
     ]) {
@@ -92,7 +101,7 @@ test.describe("desktop", () => {
     await expect(page.locator("main")).toBeFocused();
 
     // From the top: skip link, brand, Add task, the destinations (with
-    // Today and Inbox under Plan), sign out.
+    // Today, Upcoming and Inbox under Plan), sign out.
     await page.goto("/home");
     await expect(
       page.getByRole("heading", { level: 1, name: "Home" }),
@@ -116,12 +125,11 @@ test.describe("desktop", () => {
       expect(outline).not.toBe("none");
     }
 
-    // Shift+Tab back to Plan (past Settings, Inbox and Today) and follow
-    // it with Enter.
-    await page.keyboard.press("Shift+Tab");
-    await page.keyboard.press("Shift+Tab");
-    await page.keyboard.press("Shift+Tab");
-    await page.keyboard.press("Shift+Tab");
+    // Shift+Tab back to Plan (past Settings, Inbox, Upcoming and Today)
+    // and follow it with Enter.
+    for (let step = 0; step < 5; step += 1) {
+      await page.keyboard.press("Shift+Tab");
+    }
     const plan = mainNav(page).getByRole("link", { name: "Plan" });
     await expect(plan).toBeFocused();
     await page.keyboard.press("Enter");
