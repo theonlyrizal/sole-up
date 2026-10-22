@@ -40,16 +40,22 @@ const prioritySchema = z
 
 const ESTIMATE_MESSAGE = `Enter whole minutes from ${TASK_ESTIMATE_MIN_MINUTES} to ${TASK_ESTIMATE_MAX_MINUTES}.`;
 
-/** Optional whole minutes. A form's blank string becomes null. */
+/**
+ * Optional whole minutes. A form's blank string becomes null. The union's
+ * own error replaces Zod's generic "Invalid input" when neither branch fits.
+ */
 const estimateSchema = z
-  .union([
-    z.literal("").transform(() => null),
-    z.coerce
-      .number({ error: ESTIMATE_MESSAGE })
-      .int(ESTIMATE_MESSAGE)
-      .min(TASK_ESTIMATE_MIN_MINUTES, ESTIMATE_MESSAGE)
-      .max(TASK_ESTIMATE_MAX_MINUTES, ESTIMATE_MESSAGE),
-  ])
+  .union(
+    [
+      z.literal("").transform(() => null),
+      z.coerce
+        .number({ error: ESTIMATE_MESSAGE })
+        .int(ESTIMATE_MESSAGE)
+        .min(TASK_ESTIMATE_MIN_MINUTES, ESTIMATE_MESSAGE)
+        .max(TASK_ESTIMATE_MAX_MINUTES, ESTIMATE_MESSAGE),
+    ],
+    { error: ESTIMATE_MESSAGE },
+  )
   .nullish()
   .transform((value) => value ?? null);
 
@@ -203,6 +209,23 @@ export const moveTaskSchema = z
   .strictObject({ id: idSchema, ...parentFields })
   .superRefine(checkOneParent);
 export type MoveTaskInput = z.output<typeof moveTaskSchema>;
+
+/**
+ * The Plan page's inline edit: planned date, deadline and parent in one
+ * save. Blank fields clear them.
+ */
+export const scheduleTaskSchema = z
+  .strictObject({
+    id: idSchema,
+    plannedDate: localDateSchema,
+    ...dueFields,
+    ...parentFields,
+  })
+  .superRefine((task, context) => {
+    checkOneParent(task, context);
+    checkDueShape(task, context);
+  });
+export type ScheduleTaskInput = z.output<typeof scheduleTaskSchema>;
 
 export const taskIdSchema = z.strictObject({ id: idSchema });
 export type TaskIdInput = z.output<typeof taskIdSchema>;

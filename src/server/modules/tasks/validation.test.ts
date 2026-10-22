@@ -9,6 +9,7 @@ import {
   ONE_PARENT,
   planTaskSchema,
   rescheduleTaskDueSchema,
+  scheduleTaskSchema,
   TASK_BULK_MAX,
   taskIdsSchema,
   updateTaskSchema,
@@ -84,12 +85,12 @@ describe("createTaskSchema", () => {
       createTaskSchema.parse({ title: "T", estimatedMinutes: 1440 })
         .estimatedMinutes,
     ).toBe(1440);
-    for (const bad of [0, 1441, 2.5, "abc", -5]) {
+    for (const bad of [0, 1441, 2.5, "abc", -5, "0", "1441"]) {
       expect(
         fieldErrors(
           createTaskSchema.safeParse({ title: "T", estimatedMinutes: bad }),
-        ),
-      ).toHaveProperty("estimatedMinutes");
+        ).estimatedMinutes,
+      ).toEqual(["Enter whole minutes from 1 to 1440."]);
     }
   });
 
@@ -292,5 +293,70 @@ describe("moveTasksSchema", () => {
         }),
       ).milestoneId,
     ).toEqual([ONE_PARENT]);
+  });
+});
+
+describe("scheduleTaskSchema", () => {
+  it("takes the inline edit's blank form strings as clearing everything", () => {
+    expect(
+      scheduleTaskSchema.parse({
+        id: ID,
+        plannedDate: "",
+        dueDate: "",
+        dueTime: "",
+        dueTz: "",
+        goalId: null,
+        milestoneId: null,
+      }),
+    ).toEqual({
+      id: ID,
+      plannedDate: null,
+      dueDate: null,
+      dueTime: null,
+      dueTz: null,
+      goalId: null,
+      milestoneId: null,
+    });
+  });
+
+  it("takes a plan, a timed deadline and a milestone together", () => {
+    expect(
+      scheduleTaskSchema.parse({
+        id: ID,
+        plannedDate: "2026-10-24",
+        dueDate: "2026-10-30",
+        dueTime: "17:30",
+        dueTz: "Europe/London",
+        milestoneId: OTHER_ID,
+      }),
+    ).toMatchObject({
+      plannedDate: "2026-10-24",
+      dueTime: "17:30",
+      dueTz: "Europe/London",
+      goalId: null,
+      milestoneId: OTHER_ID,
+    });
+  });
+
+  it("checks the deadline's shape and the single parent", () => {
+    const errors = fieldErrors(
+      scheduleTaskSchema.safeParse({
+        id: ID,
+        plannedDate: "2026-02-30",
+        dueTime: "09:00",
+        goalId: ID,
+        milestoneId: OTHER_ID,
+      }),
+    );
+    expect(errors.plannedDate).toEqual(["Enter a valid date."]);
+    expect(errors.dueDate).toEqual(["Pick a date for this time."]);
+    expect(errors.dueTz).toEqual(["Choose a time zone."]);
+    expect(errors.milestoneId).toEqual([ONE_PARENT]);
+  });
+
+  it("refuses fields it doesn't own", () => {
+    expect(
+      scheduleTaskSchema.safeParse({ id: ID, title: "Renamed" }).success,
+    ).toBe(false);
   });
 });
