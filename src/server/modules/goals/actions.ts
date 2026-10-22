@@ -8,6 +8,7 @@ import * as service from "./service";
 import {
   changeGoalStatusSchema,
   createGoalSchema,
+  goalIdSchema,
   updateGoalSchema,
 } from "./validation";
 
@@ -38,5 +39,15 @@ export const changeGoalStatus = authedAction(
     const goal = await service.changeGoalStatus(userId, input);
     refresh();
     return goal;
+  },
+);
+
+// No refresh(): the detail page navigates away after a delete, and
+// refreshing it first would render its not-found. Callers refresh or
+// navigate themselves.
+export const deleteGoal = authedAction(
+  goalIdSchema,
+  async (input, { userId }) => {
+    await service.deleteGoal(userId, input);
   },
 );

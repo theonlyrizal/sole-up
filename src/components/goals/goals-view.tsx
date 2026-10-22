@@ -89,6 +89,15 @@ export function GoalsView({ view }: { view: GoalsViewData }) {
         <Link href="/goals/areas" className={buttonClass({ variant: "ghost" })}>
           Life areas
         </Link>
+        <Link
+          href="/goals/archived"
+          className={buttonClass({ variant: "ghost" })}
+        >
+          Archived
+          <span className="text-muted tabular-nums">
+            ({view.archivedCount})
+          </span>
+        </Link>
       </div>
 
       <nav aria-label="Filter goals by status">

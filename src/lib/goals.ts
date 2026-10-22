@@ -144,8 +144,9 @@ const ARCHIVE: GoalStatusAction = {
 /**
  * The status actions offered for a goal, in display order. Resume, Reopen
  * and Restore all go back to `active` (ADR 0010: restore always lands in
- * Active). Archived goals aren't on the Goals page, so Restore shows only
- * on the goal's detail page until the archive view (chunk 1.6).
+ * Active). Archived goals aren't on the Goals page; the archive view
+ * (/goals/archived) restores them with a confirmation, and the detail page
+ * offers this same action.
  */
 export function goalStatusActions(status: GoalStatus): GoalStatusAction[] {
   switch (status) {
@@ -173,4 +174,15 @@ export function goalStatusActions(status: GoalStatus): GoalStatusAction[] {
         },
       ];
   }
+}
+
+/**
+ * What deleting a goal removes, for its confirmation. Deleting is a hard
+ * delete (ADR 0006): the goal, its milestones and its history go.
+ * Phase 2 adds how many tasks move to the inbox.
+ */
+export function goalDeleteConsequences(milestoneCount: number): string {
+  if (milestoneCount === 0) return "It has no milestones.";
+  if (milestoneCount === 1) return "1 milestone will be deleted.";
+  return `${milestoneCount} milestones will be deleted.`;
 }

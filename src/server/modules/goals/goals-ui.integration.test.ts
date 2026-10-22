@@ -57,6 +57,7 @@ describe("getGoalsView", () => {
     expect(view).toEqual({
       status: "active",
       counts: { active: 0, paused: 0, completed: 0, dropped: 0 },
+      archivedCount: 0,
       groups: [],
       areas: [],
     });

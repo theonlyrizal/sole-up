@@ -110,7 +110,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 1.3 | Goal detail page | done | chunk/1.3-goal-detail | 2026-10-21 | `/goals/[goalId]`: header, reason, milestone/task placeholders, history timeline from audit events (structured changes only), status actions incl. Restore, in-shell not-found |
 | 1.4 | Milestones: schema and service | done | chunk/1.4-milestones-schema-service | 2026-10-21 | `milestones` (composite goal FK, cascade; status/completed_at CHECKs), service with dense per-goal order and audit, progress query; goal delete removes milestone events |
 | 1.5 | Milestones UI and progress | done | chunk/1.5-milestones-ui | 2026-10-22 | Milestone list on goal detail (inline add, move buttons, complete, drop, offer to complete), ADR 0010 progress with help text on detail and goals list |
-| 1.6 | Goal archive and delete flows | todo | | | |
+| 1.6 | Goal archive and delete flows | done | chunk/1.6-goal-archive-delete | 2026-10-22 | `/goals/archived` with confirmed Restore to Active and "completed on …", delete confirmation naming the milestone count (detail page and archive), `deleteGoal` action |
 | 1.✓ | Phase 1 checkpoint (user) | todo | | | |
 | 2.0 | Decision gate: tasks | todo | | | |
 | 2.1 | Tasks: schema | todo | | | |
@@ -1352,3 +1352,25 @@ Template:
   - Edit a milestone's title, description and due date (`updateMilestone` needs an action and a dialog or inline editor).
   - Milestone events don't appear in the goal's history timeline yet (the 1.4 note still applies).
   - The `Route "/home": Could not validate that a segment in your UI has instant navigation` message appears in dev-server logs during e2e. It isn't from this chunk.
+
+### 1.6: Goal archive and delete flows (2026-10-22)
+- **Built:**
+  - Route `src/app/(app)/goals/archived/` (`page.tsx`, `error.tsx`) and `src/components/goals/archived-goals-view.tsx`: archived goals, most recently archived first, each with its area, "Completed on …" when it has `completed_at`, "Archived on …", a Restore confirmation ("It moves back to Active…"; for a completed goal it also says the completed date is cleared) and Delete. Empty state "Nothing archived".
+  - `src/components/goals/delete-goal-dialog.tsx`: the shared delete confirmation, used on the archive view and on the goal detail page. Text from `goalDeleteConsequences(milestoneCount)` in `src/lib/goals.ts` ("3 milestones will be deleted." / "It has no milestones."). Live goals are also pointed at archiving.
+  - `deleteGoal` Server Action (`goals/actions.ts`). `getArchivedGoals(userId)` in `goals/queries.ts`; `GoalsView.archivedCount` drives an "Archived (n)" link on the Goals page. `countMilestones(userId, goalIds)` in `milestones/queries.ts` (any status).
+  - Tests: unit `goalDeleteConsequences`; integration `goal-archive.integration.test.ts` (9: empty, order and count, completed/archived labels in the user's zone, milestone count across statuses and area, cross-user list, action unauthenticated/invalid ID, delete removes the goal, its milestones and every goal and milestone event while another goal keeps its events, cross-user delete refused with nothing removed); e2e `tests/e2e/goal-archive.spec.ts` (create → 3 milestones → archive → archive view → confirmed restore lands in Active with milestones → delete from detail stating "3 milestones will be deleted." → gone; completed-then-archived shows its dates, delete from the archive with Cancel then confirm, axe on the view and the restore dialog).
+- **Deviations:**
+  1. **The hard-delete transaction was already in place** from 1.1/1.4 (`deleteGoal` removes milestone events, cascades milestones, removes goal events in one transaction). This chunk added the action and UI; no service change.
+  2. **Delete is offered on the detail page for any status**, as well as on the archive view, not only on archived goals. The confirmation suggests archiving instead for live goals.
+  3. **The detail page's back link for an archived goal now goes to `/goals/archived`** (it went to `/goals`). Its "Restore to Active" button from 1.3 stays without a confirmation: its label already says where it lands. The archive view's Restore confirms.
+- **Decisions:**
+  1. The `deleteGoal` action doesn't call `refresh()`: refreshing the detail page after its goal is gone would render not-found before the client navigates. The detail page `router.replace`s to where the goal was listed; the archive view calls `router.refresh()`. Comment in `actions.ts`.
+  2. The milestone count in the confirmation counts every milestone, dropped ones included, since all of them are deleted. It comes from the page's data at load time, so a milestone added in another tab after loading isn't counted.
+  3. Archive order is `status_changed_at` descending (when it was archived).
+- **Next chunk should know:**
+  - 2.7: extend `goalDeleteConsequences` with the task count ("7 tasks will move to your inbox"), and pass it from `getGoalDetail` and `getArchivedGoals` the same way as `milestoneCount`.
+  - Archive-view buttons are named `"Restore: <title>"` and `"Delete: <title>"`; the detail page's Delete is named "Delete".
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 244 unit, 183 integration), `pnpm build` and `pnpm test:e2e` (26 tests) pass. The new spec passed 8 of 8 with `--repeat-each=4`.
+- **Follow-ups:**
+  - `tests/e2e/preferences.spec.ts` "first sign-in proposes the device's time zone…" is flaky on `main` too (failed 1 of 5 there with `--repeat-each=5`, and once in the first full run here): after "Confirm and continue" and the Settings heading, a reload sometimes still shows the proposed zone. Not from this chunk; likely the reload races the save, as in the 1.5 note about waiting for the POST.
+  - Earlier follow-ups still open: life-area delete writes no `goal.updated` event; milestone events aren't in the goal timeline; milestone edit/delete UI.

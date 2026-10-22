@@ -5,6 +5,7 @@ import {
   completedAtAfterStatusChange,
   GOAL_LIST_STATUSES,
   GOAL_STATUSES,
+  goalDeleteConsequences,
   goalListStatus,
   goalStatusActions,
   type GoalStatus,
@@ -152,5 +153,13 @@ describe("goalStatusActions", () => {
     ]) {
       expect(copy).not.toContain(word);
     }
+  });
+});
+
+describe("goalDeleteConsequences", () => {
+  it("states exactly how many milestones go", () => {
+    expect(goalDeleteConsequences(0)).toBe("It has no milestones.");
+    expect(goalDeleteConsequences(1)).toBe("1 milestone will be deleted.");
+    expect(goalDeleteConsequences(3)).toBe("3 milestones will be deleted.");
   });
 });
