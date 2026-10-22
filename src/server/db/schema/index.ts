@@ -7,3 +7,4 @@ export * from "./goals";
 export * from "./life-areas";
 export * from "./milestones";
 export * from "./preferences";
+export * from "./tasks";
