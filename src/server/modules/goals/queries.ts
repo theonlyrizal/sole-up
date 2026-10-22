@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq } from "drizzle-orm";
 
 import { formatLocalDate, localDateOf } from "@/lib/dates";
 import {
@@ -14,6 +14,7 @@ import { db } from "@/server/db/client";
 import { auditEvents, goals, lifeAreas } from "@/server/db/schema";
 import { toLifeArea } from "@/server/modules/life-areas/service";
 import {
+  countMilestones,
   getMilestoneProgress,
   listMilestones,
 } from "@/server/modules/milestones/queries";
@@ -40,6 +41,8 @@ export type GoalsView = {
   status: GoalListStatus;
   /** How many goals each filter holds, for the filter labels. */
   counts: Record<GoalListStatus, number>;
+  /** How many goals are archived, for the link to the archive view. */
+  archivedCount: number;
   groups: GoalGroup[];
   /**
    * Every area, active first. The form offers the active ones, plus a
@@ -71,7 +74,7 @@ export async function getGoalsView(
     db
       .select({ status: goals.status, count: count() })
       .from(goals)
-      .where(and(eq(goals.userId, userId), ne(goals.status, "archived")))
+      .where(eq(goals.userId, userId))
       .groupBy(goals.status),
     getUserPreferences(userId),
   ]);
@@ -113,7 +116,57 @@ export async function getGoalsView(
     ]),
   ) as Record<GoalListStatus, number>;
 
-  return { status, counts, groups, areas: ordered };
+  const archivedCount =
+    countRows.find((row) => row.status === "archived")?.count ?? 0;
+
+  return { status, counts, archivedCount, groups, areas: ordered };
+}
+
+/** An archived goal as the archive view shows it. */
+export type ArchivedGoalItem = Goal & {
+  area: LifeArea | null;
+  /** Set when the goal was completed before it was archived. */
+  completedAtLabel: string | null;
+  archivedAtLabel: string;
+  /** Every milestone, any status: what a delete would remove. */
+  milestoneCount: number;
+};
+
+/** The user's archived goals, most recently archived first. */
+export async function getArchivedGoals(
+  userId: string,
+): Promise<ArchivedGoalItem[]> {
+  const [goalRows, areaRows, preferences] = await Promise.all([
+    db
+      .select()
+      .from(goals)
+      .where(and(eq(goals.userId, userId), eq(goals.status, "archived")))
+      .orderBy(desc(goals.statusChangedAt), asc(goals.id)),
+    db.select().from(lifeAreas).where(eq(lifeAreas.userId, userId)),
+    getUserPreferences(userId),
+  ]);
+  const milestoneCounts = await countMilestones(
+    userId,
+    goalRows.map((row) => row.id),
+  );
+
+  const { locale } = preferences;
+  // As on the detail page: UTC only covers a race with the zone prompt.
+  const timeZone = preferences.timezone ?? "UTC";
+  const dayOf = (instant: Date) =>
+    formatLocalDate(localDateOf(instant, timeZone), locale);
+  const areas = areaRows.map(toLifeArea);
+
+  return goalRows.map((row) => {
+    const goal = toGoal(row);
+    return {
+      ...goal,
+      area: areas.find((area) => area.id === goal.lifeAreaId) ?? null,
+      completedAtLabel: goal.completedAt ? dayOf(goal.completedAt) : null,
+      archivedAtLabel: dayOf(goal.statusChangedAt),
+      milestoneCount: milestoneCounts.get(goal.id) ?? 0,
+    };
+  });
 }
 
 export type GoalDetail = {

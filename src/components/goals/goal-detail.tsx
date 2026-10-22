@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ColorSwatch } from "@/components/life-areas/life-area-colors";
@@ -18,12 +19,14 @@ import { changeGoalStatus } from "@/server/modules/goals/actions";
 import type { GoalHistoryEntry } from "@/server/modules/goals/history";
 import type { GoalDetail } from "@/server/modules/goals/queries";
 
+import { DeleteGoalDialog } from "./delete-goal-dialog";
 import { GoalFormDialog } from "./goal-form";
 import { MilestoneList } from "./milestone-list";
 
 /** The goal's own page: header, reason, what's coming, and its history. */
 export function GoalDetailView({ detail }: { detail: GoalDetail }) {
   const { goal, area, areas, history, milestones, progress } = detail;
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -36,14 +39,16 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
     });
   }
 
-  // Back to the filter this goal is listed under; archived goals have none.
+  // Back to the filter this goal is listed under, or the archive view.
   const listStatus = GOAL_LIST_STATUSES.find(
     (status) => status === goal.status,
   );
   const backHref =
-    listStatus && listStatus !== "active"
-      ? `/goals?status=${listStatus}`
-      : "/goals";
+    goal.status === "archived"
+      ? "/goals/archived"
+      : listStatus && listStatus !== "active"
+        ? `/goals?status=${listStatus}`
+        : "/goals";
   const dates = [
     goal.startDateLabel && `Starts ${goal.startDateLabel}`,
     goal.targetDateLabel && `Target ${goal.targetDateLabel}`,
@@ -119,6 +124,12 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
                 Edit
               </Button>
             }
+          />
+          <DeleteGoalDialog
+            goal={goal}
+            milestoneCount={milestones.length}
+            // This page is gone; go where the goal was listed.
+            onDeleted={() => router.replace(backHref)}
           />
         </div>
         <p role="alert" className="text-sm text-danger empty:hidden">

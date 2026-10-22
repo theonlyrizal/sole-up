@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 
 import type { Milestone, MilestoneProgress } from "@/lib/milestones";
 import { db } from "@/server/db/client";
@@ -55,4 +55,28 @@ export async function getMilestoneProgress(
       { completed, countable },
     ]),
   );
+}
+
+/**
+ * How many milestones, in any status, each of the user's goals in `goalIds`
+ * has. Goals with none, and other users' goals, are absent from the map.
+ */
+export async function countMilestones(
+  userId: string,
+  goalIds: readonly string[],
+): Promise<Map<string, number>> {
+  if (goalIds.length === 0) return new Map();
+
+  const rows = await db
+    .select({ goalId: milestones.goalId, count: count() })
+    .from(milestones)
+    .where(
+      and(
+        eq(milestones.userId, userId),
+        inArray(milestones.goalId, [...goalIds]),
+      ),
+    )
+    .groupBy(milestones.goalId);
+
+  return new Map(rows.map(({ goalId, count }) => [goalId, count]));
 }
