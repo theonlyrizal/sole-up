@@ -19,10 +19,11 @@ import type { GoalHistoryEntry } from "@/server/modules/goals/history";
 import type { GoalDetail } from "@/server/modules/goals/queries";
 
 import { GoalFormDialog } from "./goal-form";
+import { MilestoneList } from "./milestone-list";
 
 /** The goal's own page: header, reason, what's coming, and its history. */
 export function GoalDetailView({ detail }: { detail: GoalDetail }) {
-  const { goal, area, areas, history } = detail;
+  const { goal, area, areas, history, milestones, progress } = detail;
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -136,9 +137,12 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
       </Section>
 
       <Section title="Milestones">
-        <p className="text-muted">
-          Checkpoints for this goal will appear here.
-        </p>
+        <MilestoneList
+          goalId={goal.id}
+          goalStatus={goal.status}
+          milestones={milestones}
+          progress={progress}
+        />
       </Section>
 
       <Section title="Tasks">

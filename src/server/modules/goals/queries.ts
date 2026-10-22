@@ -9,18 +9,25 @@ import {
   type GoalListStatus,
 } from "@/lib/goals";
 import type { LifeArea } from "@/lib/life-areas";
+import type { Milestone, MilestoneProgress } from "@/lib/milestones";
 import { db } from "@/server/db/client";
 import { auditEvents, goals, lifeAreas } from "@/server/db/schema";
 import { toLifeArea } from "@/server/modules/life-areas/service";
+import {
+  getMilestoneProgress,
+  listMilestones,
+} from "@/server/modules/milestones/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
 
 import { buildGoalHistory, type GoalHistoryEntry } from "./history";
 import { toGoal } from "./service";
 
-/** A goal as the list shows it, with its dates formatted for the user. */
+/** A goal as the list shows it, with its dates and progress ready to show. */
 export type GoalListItem = Goal & {
   startDateLabel: string | null;
   targetDateLabel: string | null;
+  /** Null with no milestones; `countable: 0` when all are dropped (ADR 0010). */
+  progress: MilestoneProgress | null;
 };
 
 /** One life area's goals, or the goals with no area (`area: null`). */
@@ -68,6 +75,10 @@ export async function getGoalsView(
       .groupBy(goals.status),
     getUserPreferences(userId),
   ]);
+  const progress = await getMilestoneProgress(
+    userId,
+    goalRows.map((row) => row.id),
+  );
 
   const areas = areaRows.map(toLifeArea);
   const format = (date: string | null) =>
@@ -78,6 +89,7 @@ export async function getGoalsView(
       ...goal,
       startDateLabel: format(goal.startDate),
       targetDateLabel: format(goal.targetDate),
+      progress: progress.get(goal.id) ?? null,
     };
   });
 
@@ -105,13 +117,17 @@ export async function getGoalsView(
 }
 
 export type GoalDetail = {
-  goal: GoalListItem & { completedAtLabel: string | null };
+  goal: Omit<GoalListItem, "progress"> & { completedAtLabel: string | null };
   /** The goal's area, or null when it has none. */
   area: LifeArea | null;
   /** Every area, active first, for the edit form (as in `GoalsView`). */
   areas: LifeArea[];
   /** Newest first. Structured changes only, never content. */
   history: GoalHistoryEntry[];
+  /** The goal's milestones in list order, every status. */
+  milestones: Milestone[];
+  /** Null with no milestones; `countable: 0` when all are dropped (ADR 0010). */
+  progress: MilestoneProgress | null;
 };
 
 /**
@@ -122,34 +138,37 @@ export async function getGoalDetail(
   userId: string,
   goalId: string,
 ): Promise<GoalDetail | null> {
-  const [goalRows, areaRows, eventRows, preferences] = await Promise.all([
-    db
-      .select()
-      .from(goals)
-      .where(and(eq(goals.id, goalId), eq(goals.userId, userId))),
-    db
-      .select()
-      .from(lifeAreas)
-      .where(eq(lifeAreas.userId, userId))
-      .orderBy(asc(lifeAreas.sortOrder), asc(lifeAreas.createdAt)),
-    db
-      .select({
-        id: auditEvents.id,
-        eventType: auditEvents.eventType,
-        occurredAt: auditEvents.occurredAt,
-        changes: auditEvents.changes,
-      })
-      .from(auditEvents)
-      .where(
-        and(
-          eq(auditEvents.userId, userId),
-          eq(auditEvents.entityType, "goal"),
-          eq(auditEvents.entityId, goalId),
-        ),
-      )
-      .orderBy(desc(auditEvents.occurredAt)),
-    getUserPreferences(userId),
-  ]);
+  const [goalRows, areaRows, eventRows, preferences, milestoneRows, progress] =
+    await Promise.all([
+      db
+        .select()
+        .from(goals)
+        .where(and(eq(goals.id, goalId), eq(goals.userId, userId))),
+      db
+        .select()
+        .from(lifeAreas)
+        .where(eq(lifeAreas.userId, userId))
+        .orderBy(asc(lifeAreas.sortOrder), asc(lifeAreas.createdAt)),
+      db
+        .select({
+          id: auditEvents.id,
+          eventType: auditEvents.eventType,
+          occurredAt: auditEvents.occurredAt,
+          changes: auditEvents.changes,
+        })
+        .from(auditEvents)
+        .where(
+          and(
+            eq(auditEvents.userId, userId),
+            eq(auditEvents.entityType, "goal"),
+            eq(auditEvents.entityId, goalId),
+          ),
+        )
+        .orderBy(desc(auditEvents.occurredAt)),
+      getUserPreferences(userId),
+      listMilestones(userId, goalId),
+      getMilestoneProgress(userId, [goalId]),
+    ]);
   const [row] = goalRows;
   if (!row) return null;
 
@@ -182,5 +201,7 @@ export async function getGoalDetail(
       timeZone,
       areaNames: new Map(areas.map((area) => [area.id, area.name])),
     }),
+    milestones: milestoneRows,
+    progress: progress.get(goalId) ?? null,
   };
 }

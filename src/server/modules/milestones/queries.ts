@@ -1,10 +1,25 @@
 import "server-only";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
-import type { MilestoneProgress } from "@/lib/milestones";
+import type { Milestone, MilestoneProgress } from "@/lib/milestones";
 import { db } from "@/server/db/client";
 import { milestones } from "@/server/db/schema";
+
+import { toMilestone } from "./service";
+
+/** Every milestone of one of the user's goals, in list order (any status). */
+export async function listMilestones(
+  userId: string,
+  goalId: string,
+): Promise<Milestone[]> {
+  const rows = await db
+    .select()
+    .from(milestones)
+    .where(and(eq(milestones.goalId, goalId), eq(milestones.userId, userId)))
+    .orderBy(asc(milestones.sortOrder));
+  return rows.map(toMilestone);
+}
 
 /**
  * Progress for each of the user's goals in `goalIds` (ADR 0010): completed

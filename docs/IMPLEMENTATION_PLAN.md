@@ -109,7 +109,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 1.2 | Goals: list and create/edit UI | done | chunk/1.2-goals-list-ui | 2026-10-21 | `/goals` grouped by life area with Active/Paused/Completed/Dropped filter (URL `?status=`), create/edit dialog (title only required, prominent "Why does this matter?"), kind status-action copy |
 | 1.3 | Goal detail page | done | chunk/1.3-goal-detail | 2026-10-21 | `/goals/[goalId]`: header, reason, milestone/task placeholders, history timeline from audit events (structured changes only), status actions incl. Restore, in-shell not-found |
 | 1.4 | Milestones: schema and service | done | chunk/1.4-milestones-schema-service | 2026-10-21 | `milestones` (composite goal FK, cascade; status/completed_at CHECKs), service with dense per-goal order and audit, progress query; goal delete removes milestone events |
-| 1.5 | Milestones UI and progress | todo | | | |
+| 1.5 | Milestones UI and progress | done | chunk/1.5-milestones-ui | 2026-10-22 | Milestone list on goal detail (inline add, move buttons, complete, drop, offer to complete), ADR 0010 progress with help text on detail and goals list |
 | 1.6 | Goal archive and delete flows | todo | | | |
 | 1.✓ | Phase 1 checkpoint (user) | todo | | | |
 | 2.0 | Decision gate: tasks | todo | | | |
@@ -1325,3 +1325,30 @@ Template:
   - 1.6's delete confirmation can count milestones with a plain `count(*)` on `milestones` by goal and user.
 - **Unverified:** none. `pnpm verify` passes (format, lint, typecheck, 237 unit, 168 integration). `pnpm db:generate` shows no drift. Dev DB migrated. `pnpm build` and `pnpm test:e2e` not run (no route or UI changes).
 - **Follow-ups:** none new; the 1.1 life-area-delete event gap is still open.
+
+### 1.5: Milestones UI and progress (2026-10-22)
+- **Built:**
+  - `src/components/goals/milestone-list.tsx` (client): replaces the goal page's Milestones placeholder. Inline add (Enter submits), a checkbox to complete or reopen, Drop and Restore, move up/down buttons, the progress line with the ADR 0010 definition as visible help text, and the "Mark goal complete?" offer when every countable milestone is done (active or paused goals only).
+  - `src/server/modules/milestones/actions.ts`: authed `createMilestone`, `reorderMilestones`, `changeMilestoneStatus`. `queries.ts` gained `listMilestones(userId, goalId)`.
+  - `getGoalDetail` returns `milestones` and `progress`. `getGoalsView` attaches `progress` to each goal, and the goal row shows "2 of 5 milestones".
+  - `src/lib/milestones.ts`: `MILESTONE_PROGRESS_HELP`, `milestoneProgressLabel` (null when nothing is countable), `allCountableMilestonesDone`.
+  - Tests: unit `src/lib/milestones.test.ts`; integration `milestone-ui.integration.test.ts` (progress on detail and list for none, all dropped, mixed, all completed; cross-user list); e2e `tests/e2e/milestones.spec.ts` (zero-milestone state, add, keyboard reorder with focus and reload, complete, drop, offer, all-dropped state, list count, axe).
+- **Deviations:**
+  1. **No pointer drag.** Reorder is by the move up/down buttons, which are keyboard-operable and match the life areas list. Drag and drop was not built. The chunk says "drag or keyboard", and keyboard is done.
+  2. **Milestone edit and delete have no UI.** `updateMilestone` and `deleteMilestone` exist in the service, but the chunk doesn't list them and there is no action for them yet.
+  3. **Status changes are optimistic** (the checkbox and Drop/Restore update before the server answers). Needed so the checkbox doesn't snap back while the save is in flight.
+- **Decisions:**
+  1. Progress for a goal whose milestones are all dropped is `{ completed: 0, countable: 0 }` from the query, as ADR 0010 and the 1.4 note describe. The UI shows nothing for it, and `milestoneProgressLabel` returns null.
+  2. Keyboard focus after a move stays on the pressed button, or on its partner at either end, as in the life areas list.
+  3. The offer to complete only appears for active or paused goals. It never changes the goal by itself.
+- **Next chunk should know:**
+  - The milestone list's props come from `getGoalDetail`; the goal page refreshes after each action, so the server's order is the truth. The optimistic order reverts when the refreshed props arrive.
+  - In e2e, wait for the POST response before `page.reload()`. Focus can stay on a disabled button while the save is still in flight, so `toBeFocused` alone doesn't mean the save finished.
+  - Checkboxes are controlled. Use `.click()` and then check the state in e2e, not `.check()`. Playwright's `check()` verifies the state right after the click, before the optimistic update renders.
+  - 1.6 can count milestones per goal for the delete confirmation with `listMilestones` or a plain count.
+- **Unverified:** none for the automated checks. A manual pass on a phone-width layout and with a screen reader is not done.
+- **Follow-ups:**
+  - Pointer drag to reorder, if dogfooding wants it.
+  - Edit a milestone's title, description and due date (`updateMilestone` needs an action and a dialog or inline editor).
+  - Milestone events don't appear in the goal's history timeline yet (the 1.4 note still applies).
+  - The `Route "/home": Could not validate that a segment in your UI has instant navigation` message appears in dev-server logs during e2e. It isn't from this chunk.
