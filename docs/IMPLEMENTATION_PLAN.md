@@ -112,7 +112,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 1.5 | Milestones UI and progress | done | chunk/1.5-milestones-ui | 2026-10-22 | Milestone list on goal detail (inline add, move buttons, complete, drop, offer to complete), ADR 0010 progress with help text on detail and goals list |
 | 1.6 | Goal archive and delete flows | done | chunk/1.6-goal-archive-delete | 2026-10-22 | `/goals/archived` with confirmed Restore to Active and "completed on …", delete confirmation naming the milestone count (detail page and archive), `deleteGoal` action |
 | 1.✓ | Phase 1 checkpoint (user) | done | | 2026-10-22 | User checked the Phase 1 features in one sitting rather than a few days of real use |
-| 2.0 | Decision gate: tasks | todo | | | |
+| 2.0 | Decision gate: tasks | done | chunk/2.0-tasks-decisions | 2026-10-22 | ADR 0011: open/completed/cancelled, inbox = no parent + no plan, "Earlier, not done" never auto-moved, goal priority scale, estimates 1–1440 min, no `task.deleted`; 2.1–2.8 and DATA_MODEL synced |
 | 2.1 | Tasks: schema | todo | | | |
 | 2.2 | Tasks: service | todo | | | |
 | 2.3 | Quick add and Inbox | todo | | | |
@@ -462,65 +462,76 @@ Decided 2026-10-20 in [ADR 0010](decisions/0010-goal-status-priority-progress.md
 **Goal:** Make goals actionable and plan the day (Journeys A and B).
 
 ### 2.0 Decision gate
-- **Task statuses.** Recommended: `open | completed | cancelled`. "Inbox" is derived (no parent and no planned date), not a status. `in_progress` is deferred.
-- **Overdue planned tasks.** When a planned date passes, the task appears under "Earlier, not done" on Today. Offer one-tap actions: today, pick a date, unplan. Never move it automatically.
-- **Priority.** Recommended: the same scale as goals.
-- **Estimates.** Recommended: an optional `estimated_minutes`, captured now so planned-versus-completed works later.
+Decided 2026-10-22 in [ADR 0011](decisions/0011-task-status-planning-priority-estimates.md); every recommendation was accepted.
+- **Task statuses:** `open | completed | cancelled`, any to any; same status again is a no-op. `completed_at` is set exactly while completed, `cancelled_at` exactly while cancelled. `in_progress` is deferred.
+- **Inbox:** derived, not a status: open tasks with no parent and no `planned_date` (refines ADR 0004). A due date alone doesn't take a task out of the inbox.
+- **Overdue planned tasks:** an open task whose planned date is before local today appears under "Earlier, not done" on Today, with one-tap today / pick a date / unplan. Nothing ever moves it automatically.
+- **Priority:** optional `low | medium | high`, the same scale and labels as goals.
+- **Estimates:** optional `estimated_minutes`, 1–1440, set in the edit form (not in quick add's single field). Actual time is not tracked.
+- **Deletion:** a confirmed hard delete that removes the task's audit events (ADR 0005). No `task.deleted` event, as for goals and life areas.
 
 ### 2.1 Tasks: schema
 - Table `tasks`:
   - `goal_id?`, `milestone_id?` (composite FKs, `SET NULL` per column)
   - `CHECK (num_nonnulls(goal_id, milestone_id) <= 1)`
-  - `title`, `notes?`, `status`, `priority?`
+  - `title`, `notes?`, `status` (default `open`), `priority?`
   - `due_date?`, `due_at?`, `due_tz?`, with `CHECK` that `due_date` excludes `due_at`, and that `due_at` and `due_tz` are both set or both null
-  - `planned_date?`, `estimated_minutes?` (CHECK > 0)
+  - `planned_date?`, `estimated_minutes?`
   - `completed_at?`, `cancelled_at?`, `sort_order`, timestamps
+  - `unique (id, user_id)` for later references (reminders, notes)
+- CHECKs (ADR 0011): `status in (open, completed, cancelled)`; `priority in (low, medium, high)` or null; `estimated_minutes between 1 and 1440` or null; `completed_at` set exactly when `status = completed`; `cancelled_at` set exactly when `status = cancelled`; title/notes length.
+- Reuse the goals' priority values and labels (move them to a shared module rather than copying them).
 - Indexes, adjusted later from real query plans:
   - `(user_id, status, planned_date)`
   - `(user_id, status, due_date)`
   - `(user_id, status, due_at)`
   - `(user_id, milestone_id)`
   - `(user_id, goal_id)`
-- **Tests:** each CHECK rejects bad rows. Deleting a milestone sets the task's `milestone_id` to null and keeps `user_id`.
+- **Tests:** each CHECK rejects bad rows. Deleting a milestone sets the task's `milestone_id` to null and keeps `user_id`; the same for deleting a goal and `goal_id`.
 
 ### 2.2 Tasks: service
-- Operations: create, edit, complete, reopen, cancel, `plan(date | null)`, `reschedule due`, `move(parent)`, delete.
-- Derived queries: `goalOf(task)` (direct goal, or the milestone's goal), the inbox query.
-- Audit events: `task.created`, `task.completed`, `task.reopened`, `task.cancelled`, `task.planned` (old and new dates), `task.due_changed` (old and new), `task.moved`, `task.deleted`. These events are what reschedule history and planned-versus-completed rely on.
-- **Tests:** the timed-deadline round trip across time zones, reopening clears `completed_at`, planning in the past is allowed (backfill), moving to another user's goal is rejected.
+- Operations: create, edit, `changeStatus` (complete, reopen and cancel; any to any per ADR 0011), `plan(date | null)`, `reschedule due`, `move(parent)`, delete.
+- Status changes set and clear `completed_at`/`cancelled_at` per ADR 0011. The same status again returns the task unchanged with no event. Completing a task never changes its milestone or goal.
+- Derived queries: `goalOf(task)` (direct goal, or the milestone's goal), the inbox query (open, no parent, no planned date).
+- Audit events: `task.created`, `task.updated` (changed field names, plus old and new priority and estimate; never title or notes text, like `goal.updated`), `task.completed`, `task.reopened`, `task.cancelled` (each with the status change), `task.planned` (old and new dates), `task.due_changed` (old and new), `task.moved`. These events are what reschedule history and planned-versus-completed rely on.
+- Delete removes the task's events in the same transaction (ADR 0005); there is no `task.deleted` event.
+- **Tests:** every status pair, including the no-op, with `completed_at`/`cancelled_at`; the timed-deadline round trip across time zones; planning in the past is allowed (backfill); moving to another user's goal is rejected; the inbox query includes a task with only a due date and excludes a planned one; delete removes the task's events.
 
 ### 2.3 Quick add and Inbox
-- Global quick add (keyboard shortcut plus a button): title first, with optional goal/milestone, planned date and due date fields.
-- An Inbox view for unplanned tasks with no parent, with bulk actions: plan today, assign to a goal.
+- Global quick add (keyboard shortcut plus a button): title first, with optional goal/milestone, planned date and due date fields. No priority or estimate field; those are set when editing.
+- An Inbox view for open tasks with no parent and no planned date (ADR 0011), with bulk actions: plan today, assign to a goal. Planning or assigning a task removes it from the inbox.
 - **Done when:** capturing a task takes a single field and Enter.
 
 ### 2.4 Plan page: task list and filters
-- All open tasks, filterable by goal, life area, priority, planned or due window, and status. Sort by due, planned or priority.
-- Inline edit of dates and parent. Completed and cancelled tasks appear behind a toggle.
+- All open tasks, filterable by goal, life area, priority, planned or due window, and status. Sort by due, planned or priority (high → low, no priority last).
+- Inline edit of dates and parent. A task edit form for title, notes, priority (none/low/medium/high) and estimate in minutes. Completed and cancelled tasks appear behind a toggle.
+- Priority shows as the same small label as goals, never as a score. Estimates show as "45 min" or "1 h 30 min".
 - **Done when:** filters are reflected in the URL, so a view can be bookmarked and survives refresh.
 
 ### 2.5 Today view
-- Sections:
-  - **Planned for today**
-  - **Due today**
-  - **Overdue**, shown as "Needs a decision", not in red
-  - **Earlier, not done**
+- Sections, open tasks only:
+  - **Planned for today**: `planned_date` is today.
+  - **Due today**: `due_date` is today, or `due_at` falls within today's local range.
+  - **Needs a decision**: `due_date` before today, or `due_at` before now. Never red, no judgement words.
+  - **Earlier, not done**: `planned_date` before today (ADR 0011). One-tap actions: plan for today, pick a date, unplan. Nothing moves automatically, at midnight or otherwise.
+- Each task appears in one section only. Choose the precedence in this chunk and record it in the handoff note.
 - An "Add to today" picker that suggests next actions from active goals and due-soon tasks.
 - Complete, unplan and reschedule in one tap. A gentle "nothing planned" empty state.
 - "Today" is always computed in the user's time zone.
-- **Done when:** integration tests cover the boundaries at 23:59 and 00:01 in a non-UTC zone.
+- **Done when:** integration tests cover the boundaries at 23:59 and 00:01 in a non-UTC zone, and a task planned yesterday shows under "Earlier, not done" with its planned date unchanged.
 
 ### 2.6 Upcoming view
-- The next 14 days, grouped by local date, merging planned and due items, with a toggle to show the next 30 days.
+- The next 14 days, grouped by local date, merging planned and due items (open tasks only), with a toggle to show the next 30 days.
 - **Done when:** a timed deadline appears on the correct local day for the user's zone.
 
 ### 2.7 Tasks in goals and milestones
 - Task lists on goal detail (direct tasks and those under each milestone). Add a task to a milestone in context.
 - "Next action" for each goal: the earliest planned or due open task, or a prompt to add one.
-- Goal delete confirmation now reports the real task count, and the inbox move is tested.
+- Task status never changes milestone or goal status, and goal progress stays milestone-based (ADR 0010).
+- Goal delete confirmation now reports the real task count (extend `goalDeleteConsequences`, see the 1.6 note), and the inbox move is tested.
 
 ### 2.8 End-to-end journey test
-- Playwright: create area → goal with reason → milestone → two tasks → plan one today → complete it → check Today and goal progress.
+- Playwright: create area → goal with reason → milestone → two tasks → plan one today → complete it → check Today and goal progress (unchanged by the task).
 
 **Phase 2 checkpoint:** use Today as your daily driver for at least a week.
 
@@ -1374,3 +1385,16 @@ Template:
 - **Follow-ups:**
   - `tests/e2e/preferences.spec.ts` "first sign-in proposes the device's time zone…" is flaky on `main` too (failed 1 of 5 there with `--repeat-each=5`, and once in the first full run here): after "Confirm and continue" and the Settings heading, a reload sometimes still shows the proposed zone. Not from this chunk; likely the reload races the save, as in the 1.5 note about waiting for the POST.
   - Earlier follow-ups still open: life-area delete writes no `goal.updated` event; milestone events aren't in the goal timeline; milestone edit/delete UI.
+
+### 2.0: Decision gate: tasks (2026-10-22)
+- **Built:** ADR 0011 (task status, overdue plans, priority and estimates) and its index row; ADR 0004's status line notes the refined inbox definition. Chunks 2.0–2.8 rewritten to match; `DATA_MODEL.md` Task section and §7. No code.
+- **Deviations:**
+  1. **`task.deleted` removed from 2.2** (user decision this session): it conflicted with ADR 0005, which deletes an entity's events with it, as 1.1 and 0.11 did.
+  2. **`task.updated` added to 2.2**: the event list had nothing for edits to title, notes, priority or estimate, which ADR 0005 requires. It follows `goal.updated` (field names; old/new for structured fields only).
+  3. **`unique (id, user_id)` added to 2.1**, per the ownership convention, since reminders and note links will reference tasks.
+- **Decisions:** the user accepted every recommendation. Details derived from those answers and recorded in ADR 0011 (not asked separately): status transitions any to any with a no-op for the same status; `completed_at`/`cancelled_at` each set exactly while in that status, enforced by CHECKs; completing a task never changes its milestone or goal; the inbox is open tasks with no parent and no planned date, and a due date alone keeps a task in it; past deadlines show as "Needs a decision"; estimates are capped at 1440 minutes and are not in quick add; priority sorts high → low with none last on the Plan page.
+- **Next chunk should know:** 2.1 needs CHECKs for status, priority, estimate range, and both timestamp rules, plus ADR 0004's parent and deadline CHECKs; the two parent FKs need hand-edited `SET NULL (goal_id)` / `SET NULL (milestone_id)` like `goals.life_area_id` (see the 1.1 note). Share the goal priority constants instead of copying them. 2.5 must choose and record the section precedence when a task matches more than one Today section.
+- **Unverified:** none (docs only). `pnpm format:check` run on the changed docs.
+- **Follow-ups:**
+  - Goal and milestone deletes clear tasks' parents in the database with no `task.moved` event (the same gap as life-area delete → goals). Consider recording it in 2.7.
+  - If dogfooding shows "Earlier, not done" piling up, revisit with a bulk action rather than automatic moves (ADR 0011).

@@ -129,22 +129,28 @@ Suggested fields:
 ### Task
 An actionable unit of work.
 
-Fields ([ADR 0004](decisions/0004-task-hierarchy-and-dates.md)):
+Fields ([ADR 0004](decisions/0004-task-hierarchy-and-dates.md), [ADR 0011](decisions/0011-task-status-planning-priority-estimates.md)):
 - `id`
 - `user_id`
 - `title`
 - `notes` (optional)
-- `status` (proposed: `open | completed | cancelled`, settled at the Phase 2 decision gate). "Inbox" is derived, not a status.
-- `priority` (optional)
-- **Parent, at most one:** `goal_id` (optional) or `milestone_id` (optional), enforced by `CHECK (num_nonnulls(goal_id, milestone_id) <= 1)`. Neither set means the task is in the inbox. A task under a milestone reaches its goal through the milestone.
+- `status`: `open | completed | cancelled` (CHECK, default `open`). Any to any; setting the same status again is a no-op. `in_progress` is deferred.
+- `priority` (optional): `low | medium | high`, the same scale as goals (CHECK). Not numeric.
+- **Parent, at most one:** `goal_id` (optional) or `milestone_id` (optional), enforced by `CHECK (num_nonnulls(goal_id, milestone_id) <= 1)`. A task under a milestone reaches its goal through the milestone.
 - **Deadline, one shape or none:** `due_date` (local date) **or** `due_at` (UTC instant) + `due_tz` (IANA zone). CHECKs enforce that `due_date` excludes `due_at`, and that `due_at` and `due_tz` are both set or both null.
-- `planned_date` (optional local date): when the user intends to do it, separate from the deadline.
-- `estimated_minutes` (optional, > 0)
-- `completed_at` (optional)
-- `cancelled_at` (optional)
+- `planned_date` (optional local date): when the user intends to do it, separate from the deadline. Never changed automatically; a past planned date on an open task shows under "Earlier, not done" on Today until the user replans or unplans it.
+- `estimated_minutes` (optional): whole minutes, `CHECK (estimated_minutes between 1 and 1440)`. Actual time is not tracked.
+- `completed_at` (optional): set exactly while `status = completed` (CHECK).
+- `cancelled_at` (optional): set exactly while `status = cancelled` (CHECK).
 - `sort_order`
 - `created_at`
 - `updated_at`
+
+Rules:
+- **Inbox** is derived, not a status: open tasks with no parent and no `planned_date`. A due date alone doesn't take a task out of the inbox.
+- Completing or cancelling a task never changes its milestone or goal; goal progress stays milestone-based ([ADR 0010](decisions/0010-goal-status-priority-progress.md)).
+- `unique (id, user_id)`, so later tables (reminders, note links) can reference tasks with composite keys.
+- Deleting a task is a confirmed hard delete that removes its audit events in the same transaction; there is no `task.deleted` event ([ADR 0005](decisions/0005-history-and-audit-log.md)).
 
 No `project_id` in v1. Avoid duplicating goal metadata onto each task.
 
@@ -412,6 +418,7 @@ Settled:
 5. Account deletion: cascading hard delete ([ADR 0006](decisions/0006-deletion.md)).
 6. ORM and migrations: Drizzle and drizzle-kit ([ADR 0001](decisions/0001-stack.md)).
 7. Goal statuses, priority, progress and dates; numeric targets deferred ([ADR 0010](decisions/0010-goal-status-priority-progress.md)).
+8. Task statuses, derived inbox, overdue planned tasks, priority and estimates ([ADR 0011](decisions/0011-task-status-planning-priority-estimates.md)).
 
 Still open (decided at phase gates in the implementation plan):
 1. Time blocks and recurring events (Phase 4).

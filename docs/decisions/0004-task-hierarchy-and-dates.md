@@ -1,7 +1,7 @@
 # 0004: Task hierarchy and dates
 
 **Date:** 2026-10-20
-**Status:** Accepted
+**Status:** Accepted. The inbox definition is refined by [ADR 0011](0011-task-status-planning-priority-estimates.md) (no parent **and** no planned date).
 
 ## Context
 The first loop is Goals → Today. The original spec allowed a task to link to a project, a goal and a milestone independently, which creates ambiguous ownership and conflicting parents. Task deadlines can be a whole day ("by Friday") or a precise instant ("before the 15:00 call"), and the user's plan for a task ("I'll do it Tuesday") is different from its deadline.
