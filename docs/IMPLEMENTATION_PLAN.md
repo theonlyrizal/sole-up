@@ -118,7 +118,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 2.3 | Quick add and Inbox | done | chunk/2.3-quick-add-inbox | 2026-10-23 | Global quick add (Add task button + Q key; title, Enter), `/plan/inbox` with bulk plan today and assign to goal, Inbox under Plan in the sidebar and a Plan sub-nav |
 | 2.4 | Plan page: task list and filters | done | chunk/2.4-plan-task-list | 2026-10-23 | `/plan` task list: goal/area/priority/planned/due filters and due/planned/priority sort in the URL, inline dates + parent, edit dialog (priority, estimate), closed tasks behind a toggle |
 | 2.5 | Today view | done | chunk/2.5-today-view | 2026-10-23 | `/plan/today`: four sections (precedence planned → decide → due → earlier), "Add to today" picker (due soon + active goals' next actions), one-tap complete/plan/tomorrow/pick a date/unplan/new due date, calm empty state |
-| 2.6 | Upcoming view | done | chunk/2.6-upcoming-view | 2026-10-23 | `/plan/upcoming`: tomorrow through day 14 (or 30 via `?days=30`) by local date, plans and deadlines merged (both days shown, same day once), timed deadlines on their local day in the user's zone |
+| 2.6 | Upcoming view | done | chunk/2.6-upcoming-view | 2026-10-23 | `/plan/upcoming`: tomorrow through day 7 by default ("Within a Week"; 14 or 30 via `?days=`) by local date, plans and deadlines merged (both days shown, same day once), timed deadlines on their local day in the user's zone |
 | 2.7 | Tasks in goals and milestones | done | chunk/2.7-goal-tasks | 2026-10-23 | Goal detail Tasks section (next action, direct + per-milestone groups with add in context), delete confirmation with real task counts, goal/milestone delete detaches tasks with `task.moved` events |
 | 2.8 | End-to-end journey test | done | chunk/2.8-e2e-journey | 2026-10-23 | `tests/e2e/journey.spec.ts`: area → goal with reason → milestone → two tasks → plan one via Add to today → complete → Today clear, goal progress unchanged; no app bugs found |
 | 2.✓ | Phase 2 checkpoint (user) | done | | 2026-10-23 | User marked done the day Phase 2 finished, without the planned week of using Today daily |
@@ -521,7 +521,7 @@ Decided 2026-10-22 in [ADR 0011](decisions/0011-task-status-planning-priority-es
 - **Done when:** integration tests cover the boundaries at 23:59 and 00:01 in a non-UTC zone, and a task planned yesterday shows under "Earlier, not done" with its planned date unchanged.
 
 ### 2.6 Upcoming view
-- The next 14 days, grouped by local date, merging planned and due items (open tasks only), with a toggle to show the next 30 days.
+- The upcoming days, grouped by local date, merging planned and due items (open tasks only), with tabs for "Within a Week" (the default, the next 7 days), the next 14 days and the next 30 days. (The week tab was added at the user's request after 2.6 shipped with a 14-day default.)
 - **Done when:** a timed deadline appears on the correct local day for the user's zone.
 
 ### 2.7 Tasks in goals and milestones
@@ -1555,6 +1555,11 @@ Template:
   - One-tap actions on Upcoming (complete, plan for today, pick a date), if dogfooding wants them.
   - The `preferences.spec.ts` first-sign-in flake now fails more often under full-suite load (two of three runs here). Fix it with the retry the 2.4 note describes (re-select until the value sticks, or wait for the save's POST before reloading).
   - Earlier follow-ups still open: goal/milestone deletes move tasks with no `task.moved` event (2.7); the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs.
+- **Addendum, "Within a Week" tab (2026-10-23, user-requested plan change):** the user asked for a third tab, the default, called "Within a Week". The 2.6 chunk text is updated to match.
+  - `UPCOMING_RANGES` is now `[7, 14, 30]` with `DEFAULT_UPCOMING_RANGE = 7`: `/plan/upcoming` shows tomorrow through today + 7, `?days=14` and `?days=30` the longer windows, and anything else falls back to 7. New helpers are `UPCOMING_RANGE_LABELS` ("Within a Week", "Next 14 days", "Next 30 days"), `upcomingEmptyTitle` ("Nothing within a week" / "Nothing in the next N days") and `longerUpcomingRange`. The empty state offers the next longer range (a week → 14, 14 → 30, nothing past 30).
+  - Tests: unit 17 (7-day window, the week stops at day 7 with a timed deadline at day-8 midnight left out, labels, helpers); integration 6 (new: the week in Tokyo at 00:01 keeps day 7 incl. 23:59 and drops day 8 incl. 00:00, which 14 days shows); e2e `upcoming.spec.ts` now checks the three tabs, the week default, the empty state stepping 7 → 14 → 30, and that a deadline on day 10 shows only from the 14-day tab.
+  - The old 14-day default's URL `/plan/upcoming` now shows a week; bookmarks with `?days=30` are unchanged.
+  - Checks: `pnpm verify` (356 unit, 290 integration), `pnpm build` and `pnpm test:e2e` (39) pass. The first full e2e run failed once on the known `preferences.spec.ts` first-sign-in flake, which then passed alone and in the next full run. No schema change.
 
 ### 2.7: Tasks in goals and milestones (2026-10-23)
 - **Built:**

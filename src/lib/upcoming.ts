@@ -18,11 +18,32 @@ import { compareTasksBy, formatEstimate, type SortableTask } from "./task-list";
 import type { Task } from "./tasks";
 
 /** How many days ahead the view can show; the first is the default. */
-export const UPCOMING_RANGES = [14, 30] as const;
+export const UPCOMING_RANGES = [7, 14, 30] as const;
 export type UpcomingRange = (typeof UPCOMING_RANGES)[number];
-export const DEFAULT_UPCOMING_RANGE: UpcomingRange = 14;
+export const DEFAULT_UPCOMING_RANGE: UpcomingRange = 7;
 
-/** The range from the page's `days` search param; anything else is 14. */
+/** Each range's tab label. A week is tomorrow through today + 7. */
+export const UPCOMING_RANGE_LABELS: Record<UpcomingRange, string> = {
+  7: "Within a Week",
+  14: "Next 14 days",
+  30: "Next 30 days",
+};
+
+/** The empty state's heading for a range. */
+export function upcomingEmptyTitle(range: UpcomingRange): string {
+  return range === 7
+    ? "Nothing within a week"
+    : `Nothing in the next ${range} days`;
+}
+
+/** The next longer range to suggest when this one is empty, if any. */
+export function longerUpcomingRange(
+  range: UpcomingRange,
+): UpcomingRange | null {
+  return UPCOMING_RANGES[UPCOMING_RANGES.indexOf(range) + 1] ?? null;
+}
+
+/** The range from the page's `days` search param; anything else is 7. */
 export function parseUpcomingRange(
   value: string | string[] | undefined,
 ): UpcomingRange {
