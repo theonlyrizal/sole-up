@@ -48,8 +48,11 @@ test("sign in through the shortcut, then sign out", async ({ page }) => {
   await expect(
     page.getByRole("heading", { level: 1, name: "Home" }),
   ).toBeVisible();
-  await expect(page.getByText(`You're signed in as ${email}`)).toBeVisible();
   await expect(page.getByText("Ada Lovelace")).toBeVisible();
+  // The session belongs to the user who signed in.
+  const session = await page.request.get("/api/auth/get-session");
+  expect(session.status()).toBe(200);
+  expect((await session.json()).user.email).toBe(email);
 
   // A signed-in user skips the sign-in page.
   await page.goto("/sign-in");

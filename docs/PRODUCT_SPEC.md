@@ -169,6 +169,8 @@ The Home screen should help answer:
 
 Avoid a single opaque “life score.” Use small, explainable measures such as overdue commitments, goal activity, habit consistency, and planned-versus-completed work.
 
+Home v1 (chunk 3.2) has three cards: today's planned, due and needs-a-decision counts; active goals without a next action, each named and linked; and deadlines in the next 7 days. Each card shows its definition, range and the time it was worked out, every number links to the list it counts, and a card with no data says "Nothing yet". There is no overall score.
+
 ## 9. Analytics and insight rules
 
 - Show the time range and definition for every metric.

@@ -25,6 +25,7 @@ import {
   TODAY_SECTION_LABELS,
   TODAY_SECTIONS,
   type TodaySection,
+  todaySectionAnchor,
 } from "@/lib/today";
 import {
   changeTaskStatus,
@@ -116,7 +117,11 @@ function TodaySectionBlock({
       ? plannedSummary(tasks)
       : TODAY_SECTION_HINTS[section];
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3">
+    <section
+      id={todaySectionAnchor(section)}
+      aria-labelledby={headingId}
+      className="flex scroll-mt-4 flex-col gap-3"
+    >
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="flex flex-col gap-1">
           <h2 id={headingId} className="text-lg font-semibold">

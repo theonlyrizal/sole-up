@@ -15,6 +15,7 @@ import { createTestUser } from "../../../../tests/integration/helpers/users";
 import {
   deadlinesNextSevenDays,
   goalsWithoutNextAction,
+  listGoalsWithoutNextAction,
   todayTaskCounts,
 } from "./home";
 
@@ -133,6 +134,7 @@ describe("goalsWithoutNextAction", () => {
     const metric = await goalsWithoutNextAction(user.id, clock, TOKYO);
     expect(metric.value).toBe(0);
     expect(metric.hasData).toBe(false);
+    expect(await listGoalsWithoutNextAction(user.id)).toEqual([]);
   });
 
   it("counts active goals with no dated open task", async () => {
@@ -180,6 +182,13 @@ describe("goalsWithoutNextAction", () => {
     const metric = await goalsWithoutNextAction(user.id, clock, TOKYO);
     expect(metric.value).toBe(3);
     expect(metric.hasData).toBe(true);
+
+    // The list Home names is exactly the counted goals, oldest first.
+    expect(await listGoalsWithoutNextAction(user.id)).toEqual([
+      { id: expect.any(String), title: "Empty" },
+      { id: undated.id, title: "Undated" },
+      { id: closed.id, title: "Closed" },
+    ]);
   });
 
   it("leaves out paused goals, other goals' tasks and other users' goals", async () => {
@@ -197,9 +206,14 @@ describe("goalsWithoutNextAction", () => {
     expect(metric.value).toBe(0);
     expect(metric.hasData).toBe(true);
 
+    expect(await listGoalsWithoutNextAction(user.id)).toEqual([]);
+
     // The other user's goal is theirs alone.
     const theirs = await goalsWithoutNextAction(other.id, clock, TOKYO);
     expect(theirs.value).toBe(1);
+    expect(await listGoalsWithoutNextAction(other.id)).toEqual([
+      { id: expect.any(String), title: "Someone else's" },
+    ]);
   });
 });
 

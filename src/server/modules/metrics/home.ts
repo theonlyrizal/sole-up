@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, isNotNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNotNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { dateWindowBounds, dateWindowInstants } from "@/lib/task-list";
 import type { TodayClock } from "@/lib/today";
@@ -59,18 +59,13 @@ export async function todayTaskCounts(
 }
 
 /**
- * Active goals with no next action: no open task under them (directly or
- * under any of their milestones) with a planned date or a deadline. This is
- * `nextActionOf` (chunk 2.7) as one query: any dated open task, passed
- * dates included, is a next action, whatever the zone. Paused and finished
- * goals are left out. No data: the user has no active goals.
+ * True for a goal row with a next action: an open task under it (directly or
+ * under any of its milestones) with a planned date or a deadline. This is
+ * `nextActionOf` (chunk 2.7) as SQL: any dated open task, passed dates
+ * included, is a next action, whatever the zone.
  */
-export async function goalsWithoutNextAction(
-  userId: string,
-  clock: TodayClock,
-  timeZone: string,
-): Promise<Metric<number>> {
-  const hasNextAction = sql`exists (
+function goalHasNextAction() {
+  return sql`exists (
     select 1 from ${tasks}
     left join ${milestones}
       on ${milestones.id} = ${tasks.milestoneId}
@@ -80,6 +75,18 @@ export async function goalsWithoutNextAction(
       and ${tasks.status} = 'open'
       and (${tasks.plannedDate} is not null or ${tasks.dueDate} is not null or ${tasks.dueAt} is not null)
   )`;
+}
+
+/**
+ * Active goals with no next action (see `goalHasNextAction`). Paused and
+ * finished goals are left out. No data: the user has no active goals.
+ */
+export async function goalsWithoutNextAction(
+  userId: string,
+  clock: TodayClock,
+  timeZone: string,
+): Promise<Metric<number>> {
+  const hasNextAction = goalHasNextAction();
   const [row] = await db
     .select({
       activeGoals: sql<number>`count(*)::int`,
@@ -98,6 +105,29 @@ export async function goalsWithoutNextAction(
     range: { from: null, to: null, timeZone, asOf: clock.now },
     hasData: activeGoals > 0,
   };
+}
+
+/** A goal counted by `goalsWithoutNextAction`, for Home to name. */
+export type GoalWithoutNextAction = { id: string; title: string };
+
+/**
+ * The goals `goalsWithoutNextAction` counts, in the Goals list's order
+ * (oldest first), so Home can name each one and link to it.
+ */
+export async function listGoalsWithoutNextAction(
+  userId: string,
+): Promise<GoalWithoutNextAction[]> {
+  return db
+    .select({ id: goals.id, title: goals.title })
+    .from(goals)
+    .where(
+      and(
+        eq(goals.userId, userId),
+        eq(goals.status, "active"),
+        sql`not ${goalHasNextAction()}`,
+      ),
+    )
+    .orderBy(asc(goals.createdAt), asc(goals.id));
 }
 
 /**
