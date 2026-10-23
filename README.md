@@ -163,6 +163,7 @@ Every service mutation records a content-free audit event in the same transactio
 
 - Use the helpers in `src/lib/dates.ts` ([ADR 0008](docs/decisions/0008-dates-and-time-zones.md)): `todayFor(tz)`, `localDateOf`, `localDateTimeOf`, `instantFromLocal`, `startOfLocalDay`, `localDayRange`, `addDays`, `startOfWeek`. Never use the server clock's date or UTC's date as "today".
 - Local dates are `YYYY-MM-DD` strings (Postgres `date`, string mode); instants are `Date` (`timestamptz`); zones are IANA names. Only `src/lib/dates.ts` imports `temporal-polyfill`.
+- Repeating events and blocks go through `src/lib/recurrence.ts`, the only module that imports `rrule-temporal` ([ADR 0012](docs/decisions/0012-calendar-recurrence-time-blocks-views.md)): `rruleSchema` / `recurrenceSchema`, `fromRrule` / `toRrule`, `expandOccurrences(series, { localStart, localEnd, tz }, exceptions)` (at most 366 days) and `describeRecurrence`.
 - The user's zone, locale and week start come from `getUserPreferences(userId)` (`src/server/modules/preferences/service.ts`). `timezone` is `null` until the user confirms it; the (app) layout shows the confirmation form until then.
 
 ## Testing

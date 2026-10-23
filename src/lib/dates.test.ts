@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDays,
   dayOfWeek,
+  daysBetween,
   formatInstant,
   formatLocalDate,
   formatTimeOfDay,
@@ -188,6 +189,13 @@ describe("calendar arithmetic", () => {
     expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
     expect(addDays("2026-03-28", 2)).toBe("2026-03-30");
     expect(() => addDays("2026-10-20", 1.5)).toThrow(RangeError);
+  });
+
+  it("counts calendar days between dates, ignoring DST", () => {
+    expect(daysBetween("2026-03-07", "2026-03-09")).toBe(2);
+    expect(daysBetween("2026-12-31", "2028-01-01")).toBe(366);
+    expect(daysBetween("2026-10-20", "2026-10-20")).toBe(0);
+    expect(daysBetween("2026-10-20", "2026-10-18")).toBe(-2);
   });
 
   it("numbers days of the week from Sunday = 0", () => {
