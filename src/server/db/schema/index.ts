@@ -3,6 +3,7 @@
 // drizzle-kit sees it and relational queries can use it.
 export * from "./auth";
 export * from "./audit";
+export * from "./calendar-events";
 export * from "./goals";
 export * from "./life-areas";
 export * from "./milestones";

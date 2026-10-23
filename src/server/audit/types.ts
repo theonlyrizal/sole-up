@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import {
+  CALENDAR_EVENT_EDITABLE_FIELDS,
+  CALENDAR_EVENT_SOURCES,
+} from "@/lib/calendar-events";
 import { isLocalDate } from "@/lib/dates";
 import {
   GOAL_EDITABLE_FIELDS,
@@ -336,6 +340,39 @@ export const AUDIT_EVENTS = defineAuditEvents({
     }),
   },
   // No `task.deleted`, for the same reason as life areas (ADR 0005).
+
+  // Calendar events (ADR 0012). Title, description and location are user
+  // content: `calendar_event.updated` records which fields changed, plus
+  // old and new values for the shape, times, dates and links only.
+  "calendar_event.created": {
+    entityType: "calendar_event",
+    changes: z.strictObject({
+      allDay: auditChange(z.boolean()),
+      startAt: auditChange(instant),
+      endAt: auditChange(instant),
+      tz: auditChange(timeZone),
+      startDate: auditChange(localDate),
+      endDate: auditChange(localDate),
+      goalId: auditChange(z.uuid()),
+      lifeAreaId: auditChange(z.uuid()),
+      source: auditChange(z.enum(CALENDAR_EVENT_SOURCES)),
+    }),
+  },
+  "calendar_event.updated": {
+    entityType: "calendar_event",
+    changes: z.strictObject({
+      fields: z.array(z.enum(CALENDAR_EVENT_EDITABLE_FIELDS)).min(1),
+      allDay: auditChange(z.boolean()).optional(),
+      startAt: auditChange(instant).optional(),
+      endAt: auditChange(instant).optional(),
+      tz: auditChange(timeZone).optional(),
+      startDate: auditChange(localDate).optional(),
+      endDate: auditChange(localDate).optional(),
+      goalId: auditChange(z.uuid()).optional(),
+      lifeAreaId: auditChange(z.uuid()).optional(),
+    }),
+  },
+  // No `calendar_event.deleted`, for the same reason as life areas (ADR 0005).
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;
