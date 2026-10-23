@@ -121,7 +121,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 2.6 | Upcoming view | done | chunk/2.6-upcoming-view | 2026-10-23 | `/plan/upcoming`: tomorrow through day 14 (or 30 via `?days=30`) by local date, plans and deadlines merged (both days shown, same day once), timed deadlines on their local day in the user's zone |
 | 2.7 | Tasks in goals and milestones | done | chunk/2.7-goal-tasks | 2026-10-23 | Goal detail Tasks section (next action, direct + per-milestone groups with add in context), delete confirmation with real task counts, goal/milestone delete detaches tasks with `task.moved` events |
 | 2.8 | End-to-end journey test | done | chunk/2.8-e2e-journey | 2026-10-23 | `tests/e2e/journey.spec.ts`: area → goal with reason → milestone → two tasks → plan one via Add to today → complete → Today clear, goal progress unchanged; no app bugs found |
-| 2.✓ | Phase 2 checkpoint (user) | todo | | | |
+| 2.✓ | Phase 2 checkpoint (user) | done | | 2026-10-23 | User marked done the day Phase 2 finished, without the planned week of using Today daily |
 | 3.1 | Metrics module foundation | todo | | | |
 | 3.2 | Home summaries | todo | | | |
 | 4.0 | Decision gate: calendar | todo | | | |
