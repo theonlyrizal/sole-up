@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { CalendarEventOccurrence } from "./calendar-events";
 import {
   calendarDayLabel,
-  groupEventsByDay,
   occurrenceKey,
   originalStartParam,
 } from "./calendar-list";
@@ -55,26 +54,6 @@ function allDay(startDate: string, endDate: string): CalendarEventOccurrence {
     endDate,
   };
 }
-
-describe("groupEventsByDay", () => {
-  it("lists events under their local start day, ongoing ones today", () => {
-    // 15:30 UTC on the 2nd is 00:30 on the 3rd in Tokyo.
-    const afterMidnight = timed("2026-11-02T15:30:00Z", "2026-11-02T16:30:00Z");
-    const morning = timed("2026-11-02T00:00:00Z", "2026-11-02T01:00:00Z");
-    const ongoing = allDay("2026-10-30", "2026-11-04");
-    const days = groupEventsByDay(
-      [morning, afterMidnight, ongoing],
-      TODAY,
-      TOKYO,
-    );
-    expect(
-      days.map(({ date, events }) => [date, events.map(({ id }) => id)]),
-    ).toEqual([
-      ["2026-11-02", [ongoing.id, morning.id]],
-      ["2026-11-03", [afterMidnight.id]],
-    ]);
-  });
-});
 
 describe("occurrence keys", () => {
   it("address a one-off by ID and an occurrence by its original start", () => {

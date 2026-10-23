@@ -1,0 +1,46 @@
+/*
+ * FullCalendar's classic theme, coloured with the app's tokens (globals.css).
+ * This replaces the theme's palette.css: every variable it defines is set
+ * here from a token, so light and dark (OS or data-theme) follow the app
+ * without FullCalendar's own colour-scheme switch.
+ */
+.soleup-calendar {
+  /* buttons */
+  --fc-classic-button: var(--surface);
+  --fc-classic-button-border: var(--border);
+  --fc-classic-button-strong: var(--surface-muted);
+  --fc-classic-button-strong-border: var(--fg-muted);
+  --fc-classic-button-outline: var(--focus);
+  --fc-classic-button-foreground: var(--fg);
+
+  /* primary */
+  --fc-classic-primary: var(--accent);
+  --fc-classic-primary-foreground: var(--accent-fg);
+
+  /* calendar content */
+  --fc-classic-event: var(--accent);
+  --fc-classic-event-contrast: var(--accent-fg);
+  --fc-classic-background-event: var(--success);
+  --fc-classic-background-event-opacity: 15%;
+  --fc-classic-background-event-foreground-opacity: 50%;
+  --fc-classic-highlight: color-mix(in srgb, var(--accent) 15%, transparent);
+  --fc-classic-today: color-mix(in srgb, var(--accent) 8%, transparent);
+  --fc-classic-now: var(--danger);
+  --fc-classic-small-dot-width: 8px;
+  --fc-classic-large-dot-width: 10px;
+
+  /* neutral backgrounds */
+  --fc-classic-background: var(--surface);
+  --fc-classic-faint: color-mix(in srgb, var(--fg) 4%, transparent);
+  --fc-classic-muted: var(--surface-muted);
+  --fc-classic-strong: color-mix(in srgb, var(--fg) 14%, transparent);
+
+  /* neutral foregrounds */
+  --fc-classic-foreground: var(--fg);
+  --fc-classic-faint-foreground: var(--fg-muted);
+  --fc-classic-muted-foreground: var(--fg-muted);
+
+  /* neutral borders */
+  --fc-classic-border: var(--border);
+  --fc-classic-strong-border: var(--fg-muted);
+}

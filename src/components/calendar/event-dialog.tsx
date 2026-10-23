@@ -40,6 +40,7 @@ import {
 } from "@/server/modules/calendar-events/actions";
 import type { EventLinkOptions } from "@/server/modules/calendar-events/queries";
 
+import { DeleteEventDialog } from "./delete-event-dialog";
 import { RepeatBuilder } from "./repeat-builder";
 import { type ScopeOption, ScopeChooser } from "./scope-chooser";
 
@@ -54,11 +55,25 @@ export type EventFormContext = {
 };
 
 type EventFormDialogProps = EventFormContext & {
-  /** The element that opens the dialog, usually a `<Button>`. */
-  trigger: React.ReactElement;
   /** The event or occurrence to edit; omit to create one. */
   event?: CalendarEventOccurrence;
-};
+} & (
+    | {
+        /** The element that opens the dialog, usually a `<Button>`. */
+        trigger: React.ReactElement;
+        open?: undefined;
+        onOpenChange?: undefined;
+        onCloseAutoFocus?: undefined;
+      }
+    | {
+        /** Controlled: the page opens it, e.g. from a clicked Agenda item. */
+        trigger?: undefined;
+        open: boolean;
+        onOpenChange: (open: boolean) => void;
+        /** Where focus goes on close (see `DialogContent`). */
+        onCloseAutoFocus?: (event: Event) => void;
+      }
+  );
 
 /**
  * Creates or edits a calendar event in a dialog (chunk 4.4). Saving one
@@ -68,15 +83,21 @@ type EventFormDialogProps = EventFormContext & {
 export function EventFormDialog({
   trigger,
   event,
+  open: controlledOpen,
+  onOpenChange,
+  onCloseAutoFocus,
   ...context
 }: EventFormDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
         title={event ? "Edit event" : "New event"}
         className="max-w-xl"
+        onCloseAutoFocus={onCloseAutoFocus}
       >
         <EventForm
           event={event}
@@ -582,6 +603,16 @@ function EventForm({
         <Button variant="secondary" disabled={pending} onClick={onCancel}>
           Cancel
         </Button>
+        {event && (
+          <span className="ml-auto">
+            <DeleteEventDialog
+              event={event}
+              locale={locale}
+              timeZone={userTimeZone}
+              onDeleted={onSaved}
+            />
+          </span>
+        )}
       </div>
     </form>
   );

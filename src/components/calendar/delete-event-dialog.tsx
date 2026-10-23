@@ -24,6 +24,8 @@ type DeleteEventDialogProps = {
   event: CalendarEventOccurrence;
   locale: string;
   timeZone: string;
+  /** Called once the event is deleted, e.g. to close the edit dialog. */
+  onDeleted?: () => void;
 };
 
 /**
@@ -36,6 +38,7 @@ export function DeleteEventDialog({
   event,
   locale,
   timeZone,
+  onDeleted,
 }: DeleteEventDialogProps) {
   const trigger = (
     <Button variant="ghost" size="sm" aria-label={`Delete: ${event.title}`}>
@@ -52,7 +55,10 @@ export function DeleteEventDialog({
         confirmLabel="Delete event"
         onConfirm={async () => {
           const result = await deleteCalendarEvent({ id: event.id });
-          if (result.ok) toast({ title: "Event deleted", variant: "success" });
+          if (result.ok) {
+            toast({ title: "Event deleted", variant: "success" });
+            onDeleted?.();
+          }
           return result;
         }}
       />
@@ -65,6 +71,7 @@ export function DeleteEventDialog({
       originalStart={originalStart}
       locale={locale}
       timeZone={timeZone}
+      onDeleted={onDeleted}
     />
   );
 }
@@ -75,12 +82,14 @@ function DeleteOccurrenceDialog({
   originalStart,
   locale,
   timeZone,
+  onDeleted,
 }: {
   trigger: React.ReactElement;
   event: CalendarEventOccurrence;
   originalStart: string;
   locale: string;
   timeZone: string;
+  onDeleted?: () => void;
 }) {
   const id = useId();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -133,6 +142,7 @@ function DeleteOccurrenceDialog({
         variant: "success",
       });
       setOpen(false);
+      onDeleted?.();
     });
   }
 

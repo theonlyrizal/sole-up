@@ -5,8 +5,9 @@ import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 // The event dialog (chunk 4.4): default length, the repeat builder with its
 // field errors, all-day events with an inclusive end, goal → life area, the
 // time-zone note, and the scope prompt for occurrences of a series, driven
-// from the keyboard where it matters. The browser (and so the confirmed
-// time zone) is in Tokyo.
+// from the keyboard where it matters. Events are opened from their Agenda
+// item (4.5), and deleted from their dialog. The browser (and so the
+// confirmed time zone) is in Tokyo.
 
 const TOKYO = "Asia/Tokyo";
 test.use({ timezoneId: TOKYO });
@@ -34,18 +35,23 @@ function longWeekday(days: number): string {
   }).format(at);
 }
 
-/** The section for one local date, found by its heading's `<time>`. */
+/** One day of the Agenda (4.5), found by its heading's `<time>`. */
 function day(page: Page, date: string) {
   return page
-    .getByRole("region")
+    .getByRole("listitem")
     .filter({ has: page.locator(`h2 time[datetime="${date}"]`) });
+}
+
+/** An event's button on a day: it opens the event's dialog. */
+function item(page: Page, date: string, title: string) {
+  return day(page, date).getByRole("button", { name: title, exact: true });
 }
 
 /** The row of an event on a day. */
 function row(page: Page, date: string, title: string) {
   return day(page, date)
     .getByRole("listitem")
-    .filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+    .filter({ has: page.getByRole("button", { name: title, exact: true }) });
 }
 
 async function openCalendar(page: Page) {
@@ -71,10 +77,7 @@ async function newEventDialog(page: Page) {
 
 async function editDialog(page: Page, date: string, title: string) {
   const dialog = page.getByRole("dialog", { name: "Edit event" });
-  await openWith(
-    row(page, date, title).getByRole("button", { name: `Edit: ${title}` }),
-    dialog,
-  );
+  await openWith(item(page, date, title), dialog);
   return dialog;
 }
 
@@ -103,7 +106,9 @@ test("a repeating event from the keyboard, with field errors in the builder", as
       name: "Calendar",
     }),
   ).toHaveAttribute("aria-current", "page");
-  await expect(page.getByText("No events in the next 30 days")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Nothing in these days" }),
+  ).toBeVisible();
 
   // Open with Enter; the title has focus.
   const dialog = page.getByRole("dialog", { name: "New event" });
@@ -181,10 +186,8 @@ test("a repeating event from the keyboard, with field errors in the builder", as
   }
   await expect(row(page, tokyoDate(22), "Physio")).toHaveCount(0);
 
-  // Escape closes the dialog and returns focus to its trigger.
-  const edit = row(page, tokyoDate(1), "Physio").getByRole("button", {
-    name: "Edit: Physio",
-  });
+  // Escape closes the dialog and returns focus to the item.
+  const edit = item(page, tokyoDate(1), "Physio");
   await editDialog(page, tokyoDate(1), "Physio");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -238,10 +241,14 @@ test("all-day with an inclusive end, goal → area, and another time zone", asyn
 
   await page.reload();
   const race = row(page, tokyoDate(3), "Race weekend");
-  await expect(race).toContainText("All day, to");
+  await expect(race).toContainText("All day");
   await expect(race).toContainText("Goal: Run a half marathon");
   await expect(race).toContainText("Area: Health");
-  await expect(day(page, tokyoDate(4))).toHaveCount(0);
+  // The Agenda lists it on each of its days, and not after.
+  await expect(row(page, tokyoDate(4), "Race weekend")).toContainText(
+    "All day",
+  );
+  await expect(day(page, tokyoDate(5))).toHaveCount(0);
 
   // The end date reads inclusive when edited. Make it a timed event in New
   // York: the dialog shows its times in the user's zone too.
@@ -264,7 +271,10 @@ test("all-day with an inclusive end, goal → area, and another time zone", asyn
   await expect(
     page
       .getByRole("listitem")
-      .filter({ hasText: "Race weekend" })
+      .filter({
+        has: page.getByRole("button", { name: "Race weekend", exact: true }),
+      })
+      .filter({ hasNot: page.locator("h2") })
       .filter({ hasText: "America/New_York" }),
   ).toBeVisible();
 });
@@ -321,12 +331,11 @@ test("occurrences ask which events to change or delete, naming what's dropped", 
   await expect(row(page, tokyoDate(15), "Standup")).toBeVisible();
   await expect(row(page, tokyoDate(29), "Standup")).toBeVisible();
 
-  // Delete from the 15th on.
+  // Delete from the 15th on, from the event's dialog.
+  dialog = await editDialog(page, tokyoDate(15), "Standup");
   const remove = page.getByRole("alertdialog", { name: "Delete “Standup”?" });
   await openWith(
-    row(page, tokyoDate(15), "Standup").getByRole("button", {
-      name: "Delete: Standup",
-    }),
+    dialog.getByRole("button", { name: "Delete: Standup" }),
     remove,
   );
   await expect(
@@ -339,6 +348,7 @@ test("occurrences ask which events to change or delete, naming what's dropped", 
   await expectNoSeriousViolations(page);
   await remove.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(remove).toHaveCount(0);
+  await expect(dialog).toHaveCount(0);
   await expect(toast(page, "Events deleted")).toBeVisible();
   await expect(row(page, tokyoDate(15), "Standup")).toHaveCount(0);
   await expect(row(page, tokyoDate(29), "Standup")).toHaveCount(0);
