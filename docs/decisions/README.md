@@ -17,3 +17,4 @@ To change a decision, add a new ADR that supersedes the old one and update the o
 | [0009](0009-production-hosting.md) | Production hosting providers | Accepted |
 | [0010](0010-goal-status-priority-progress.md) | Goal status, priority, progress and dates | Accepted |
 | [0011](0011-task-status-planning-priority-estimates.md) | Task status, overdue plans, priority and estimates | Accepted |
+| [0012](0012-calendar-recurrence-time-blocks-views.md) | Calendar: event shapes, recurrence, time blocks and views | Accepted |

@@ -64,7 +64,9 @@ Build a useful personal management product first. Add AI when the product has re
 
 ### 1F. Calendar and reminders
 - In the MVP, sequenced after the core loop (Goals → Today) ([ADR 0007](decisions/0007-platform-and-push.md)).
-- Internal events, no external sync. Recurring events, time blocks and which views ship are decided at the Phase 4 decision gate (recommended: no recurring events or time blocks in v1; week and agenda views).
+- Internal events, no external sync.
+- Repeating events, and time blocks for tasks ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)).
+- Week, Day and Agenda views. Resource views by life area follow the Phase 4 checkpoint.
 - Time-zone-correct event display.
 - Reliable reminder delivery via Web Push from a pg-boss worker ([ADR 0003](decisions/0003-hosting-and-jobs.md)).
 - Notification preferences and error handling.

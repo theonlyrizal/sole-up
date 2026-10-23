@@ -205,35 +205,77 @@ Suggested fields:
 Use a uniqueness constraint appropriate to the habit's cadence and logging model. Do not automatically treat an unlogged day as a failure without defining that behavior.
 
 ### CalendarEvent
-A time commitment or event managed by SoleUp.
+A time commitment or event managed by SoleUp. Rules: [ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md).
 
-Suggested fields:
+Fields:
 - `id`
 - `user_id`
 - `title`
 - `description` (optional)
-- `start_at`
-- `end_at`
-- `timezone` or enough information to render in the user's selected zone
+- `location` (optional)
 - `all_day`
-- `source` (internal or integration identifier)
-- `external_id` (optional)
+- **Timed shape:** `start_at`, `end_at` (UTC instants) and `tz` (the IANA zone it was created in). May span midnight or several days.
+- **All-day shape:** `start_date`, `end_date` (`date`, end **exclusive**). No instants and no zone, so a time-zone change never moves them. The UI shows an inclusive end.
+- `rrule` (optional): the `RRULE` value of a repeating series, limited to the repeat builder's subset (ADR 0012). A series row's times are its first occurrence's.
+- `goal_id` (optional)
+- `life_area_id` (optional; its resource lane. Choosing a goal pre-fills the goal's area.)
+- `source` (`internal` by default; reserved for future integrations)
+- `external_id` (optional, null in v1)
 - `created_at`
 - `updated_at`
 
+Constraints: CHECKs enforce exactly one shape and that the end comes after the start. `goal_id` and `life_area_id` are composite FKs with `ON DELETE SET NULL (column)`. `unique (id, user_id)`.
+
+Occurrences of a series are expanded at query time (`src/lib/recurrence.ts`, `rrule-temporal`), never stored. Timed occurrences keep the series' local wall-clock time in `tz` across DST and last the series' elapsed duration.
+
 External calendar synchronization is out of MVP unless explicitly prioritized. If added, model sync status and conflict handling.
 
-### TimeBlock (decided at the Phase 4 gate)
-A planned allocation of time to a task or focus area. Whether it is in v1 is decided at the Phase 4 decision gate (recommended: deferred). It never links to a project in v1.
+### CalendarEventException
+One occurrence of a repeating event that differs from its rule ("this event" edits and deletes).
 
-Suggested fields:
+Fields:
 - `id`
 - `user_id`
-- `title`
-- `start_at`
-- `end_at`
-- `task_id` (optional)
-- `status`
+- `event_id` (composite FK, cascade)
+- `original_start_at` or `original_start_date`: the occurrence's start as the rule generated it, matching the series' shape. Unique per event.
+- `kind` (`cancelled | modified`)
+- Override fields, for `modified` (optional): start/end, `title`, `description`, `location`, `goal_id`, `life_area_id`
+- `created_at`
+- `updated_at`
+
+A "this and following" change ends the series with `UNTIL` and starts a new series in one transaction. Later exceptions move to the new series when the new rule still generates them, and are dropped otherwise.
+
+### TimeBlock
+A planned slot of time for one task. Rules: ADR 0012. It never links to a project in v1.
+
+Fields:
+- `id`
+- `user_id`
+- `task_id` (required, composite FK, `ON DELETE CASCADE`). A block shows its task's title and has none of its own.
+- `start_at`, `end_at` (UTC) and `tz`. Timed only, at most 24 hours.
+- `rrule` (optional): blocks repeat with the same builder and scopes as events.
+- `status` (`scheduled | done | skipped`, default `scheduled`): the status of a one-off block. Each occurrence of a repeating block has its status in an exception.
+- `created_at`
+- `updated_at`
+
+Rules:
+- Only the user sets the status, except for one rule: completing the task marks `done` its started one-off blocks that are still `scheduled`, and only today's started, still-`scheduled` occurrences of a repeating block.
+  - Skipped and future blocks are never changed, and reopening or cancelling the task changes nothing.
+  - Marking a block `done` never completes the task.
+  - A past `scheduled` block reads "Not marked".
+- The resource lane is derived: the task's goal's life area (direct goal, or the milestone's goal), otherwise "No area".
+
+### TimeBlockException
+One occurrence of a repeating block that differs from its rule.
+
+Fields:
+- `id`
+- `user_id`
+- `block_id` (composite FK, cascade)
+- `original_start_at` (unique per block)
+- `kind` (`cancelled | modified`)
+- Override start/end (optional)
+- `status` (optional; `scheduled | done | skipped`)
 - `created_at`
 - `updated_at`
 
@@ -363,16 +405,16 @@ User
  ├── Goals ── Milestones ── Tasks
  │    ├── Tasks
  │    └── Habits
- ├── Tasks (inbox: no parent)
+ ├── Tasks (inbox: no parent) ── TimeBlocks ── TimeBlockExceptions
  ├── Habits ── HabitLogs
- ├── CalendarEvents
+ ├── CalendarEvents ── CalendarEventExceptions
  ├── Notes ── NoteLinks
  ├── AuditEvents
  ├── WeeklyReviews
  └── PersonalMemories (later)
 ```
 
-The diagram is conceptual. A task has at most one parent: a milestone, a goal, or none (inbox). Projects (later) and TimeBlocks (Phase 4 gate) are not shown.
+The diagram is conceptual. A task has at most one parent: a milestone, a goal, or none (inbox). Every task, whatever its parent, can have time blocks. Calendar events optionally link to a goal and a life area. Projects (later) are not shown.
 
 ## 5. Data integrity and indexes
 
@@ -381,7 +423,7 @@ Likely constraints and indexes:
 - Index user-owned records by `user_id` and common sort/filter fields.
 - Index tasks by `(user_id, status, planned_date)`, `(user_id, status, due_date)` and `(user_id, status, due_at)` where query patterns justify it.
 - Index habit logs by `(user_id, habit_id, local_date)`.
-- Index events by `(user_id, start_at)`.
+- Index events by `(user_id, start_at)` and `(user_id, start_date)`, and time blocks by `(user_id, start_at)`. Repeating series are expanded in application code, so a series' end may need its own index once query plans show it.
 - Add unique constraints for external IDs within the correct integration/account scope.
 - Ensure a goal's milestone belongs to the same user as the goal.
 - Ensure linked records cannot cross user ownership boundaries: child foreign keys are composite, e.g. `(goal_id, user_id) references goals(id, user_id)`.
@@ -397,6 +439,7 @@ Exact indexes should follow real query patterns and query plans, not be added in
 - **Delete** is a hard delete behind a clear confirmation. No soft deletion.
 - **Deleting a goal** deletes its milestones and takes all its tasks (direct and via milestones) off it, recording a `task.moved` event for each (chunk 2.7). Open tasks with no planned date land in the inbox; planned ones keep their date and closed ones their status, all without a parent. The confirmation states each count. Tasks are never deleted implicitly.
 - **Deleting a milestone** takes its tasks off it the same way, with a `task.moved` event each (to no parent, not to the goal).
+- **Deleting a task** deletes its time blocks and their exceptions ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)). Deleting a goal or life area clears the link on calendar events and keeps the events.
 - **Deleting the account** cascades every user-owned row from `users` in one transaction, and revokes sessions and push subscriptions.
 - Every hard delete also removes the entity's audit events in the same transaction.
 
@@ -422,9 +465,9 @@ Settled:
 6. ORM and migrations: Drizzle and drizzle-kit ([ADR 0001](decisions/0001-stack.md)).
 7. Goal statuses, priority, progress and dates; numeric targets deferred ([ADR 0010](decisions/0010-goal-status-priority-progress.md)).
 8. Task statuses, derived inbox, overdue planned tasks, priority and estimates ([ADR 0011](decisions/0011-task-status-planning-priority-estimates.md)).
+9. Calendar event shapes, recurrence with exceptions, and time blocks ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)).
 
 Still open (decided at phase gates in the implementation plan):
-1. Time blocks and recurring events (Phase 4).
-2. Habit cadence and logging semantics (Phase 6).
-3. Supported note links (Phase 8).
-4. Backup and log retention (Phase 10 privacy notes).
+1. Habit cadence and logging semantics (Phase 6).
+2. Supported note links (Phase 8).
+3. Backup and log retention (Phase 10 privacy notes).
