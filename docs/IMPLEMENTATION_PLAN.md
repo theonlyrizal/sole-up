@@ -170,7 +170,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 2.7 | Tasks in goals and milestones | done | chunk/2.7-goal-tasks | 2026-10-23 | Goal detail Tasks section (next action, direct + per-milestone groups with add in context), delete confirmation with real task counts, goal/milestone delete detaches tasks with `task.moved` events |
 | 2.8 | End-to-end journey test | done | chunk/2.8-e2e-journey | 2026-10-23 | `tests/e2e/journey.spec.ts`: area → goal with reason → milestone → two tasks → plan one via Add to today → complete → Today clear, goal progress unchanged; no app bugs found |
 | 2.✓ | Phase 2 checkpoint (user) | done | | 2026-10-23 | User marked done the day Phase 2 finished, without the planned week of using Today daily |
-| 3.1 | Metrics module foundation | todo | | | |
+| 3.1 | Metrics module foundation | done | chunk/3.1-metrics | 2026-10-23 | `src/server/modules/metrics/`: `Metric<V>` contract (`value`, `definition`, `range` with `asOf`, `hasData`), `todayTaskCounts`, `goalsWithoutNextAction`, `deadlinesNextSevenDays`; no UI |
 | 3.2 | Home summaries | todo | | | |
 | 4.0 | Decision gate: calendar | todo | | | |
 | 4.1 | Calendar events: schema and service | todo | | | |
@@ -1647,3 +1647,25 @@ Template:
 - **Next chunk should know:** the spec reuses the locators listed in the 2.5 and 2.7 notes and the picker's hydration retry from `today.spec.ts`; the browser's own time zone is used (no `timezoneId`), since "today" is computed on the server from the confirmed zone either way.
 - **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 354 unit, 289 integration) passes; `pnpm test:e2e` (40 tests) passed three consecutive full runs; `journey.spec.ts` passed 4 of 4 with `--repeat-each=4`. `pnpm build` not run (no app code changed). No schema change, so no migration.
 - **Follow-ups:** none new. Still open from earlier notes: life-area delete writes no `goal.updated` event; milestone events aren't in the goal timeline; milestone edit and delete UI; next action on the Goals list; the `preferences.spec.ts` first-sign-in flake (did not fail in this chunk's runs); the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs.
+
+### 3.1: Metrics module foundation (2026-10-23)
+- **Built:**
+  - `src/server/modules/metrics/metric.ts`: the contract `Metric<Value> = { value, definition, range, hasData }`, with `MetricRange = { from, to, timeZone, asOf }` (inclusive local dates in the user's zone; `null` bounds are open; `asOf` is the instant it was computed at).
+  - `src/server/modules/metrics/home.ts` (server-only), each `(userId, clock, timeZone)` with `clock` from `todayClock`:
+    - `todayTaskCounts` → `{ planned, due, decide }`: reuses `listTodayTasks`, so each task counts once in its Today section, with the same precedence as `/plan/today`. Range: today.
+    - `goalsWithoutNextAction` → number: active goals with no open task (direct or under any milestone, closed milestones included) that has a planned date or a deadline. One SQL query (`count(*) filter (where not exists …)`), equivalent to `nextActionOf` from 2.7. Range: open (`null`/`null`), as of now.
+    - `deadlinesNextSevenDays` → number: open tasks with a deadline from tomorrow through today + 7 (`dateWindowBounds("next7")`, so it is the same as `/plan?due=next7` and Upcoming's "Within a Week"). Timed deadlines count on their local day, using an instant range.
+  - Tests: `home.integration.test.ts` (9, Tokyo at 00:01 on the 24th, while UTC is still on the 23rd). For each metric: empty data (`hasData: false`, with the exact `range`), data in range, and data out of range (`hasData: true`, value 0). Cases include planned-today winning over a passed deadline, midnight today counting as passed, New York deadlines that fall on a different Tokyo day at both window edges, paused/dropped goals, a dated inbox task, closed tasks, and cross-user isolation.
+  - `ARCHITECTURE.md` §9 names the module and its contract.
+- **Deviations:** none. There is no unit test file: the metrics are queries, and the pure rules they reuse (`todaySection`, `dateWindowBounds`, `nextActionOf`) already have unit tests.
+- **Decisions:**
+  1. **`hasData` means "there is anything for the metric to look at"**, not `value > 0`: today counts → the user has any open task; goals without a next action → any active goal; deadlines → any open task with a deadline. A zero with `hasData: true` is a real result (for example, deadlines exist but none fall in the next 7 days). It is documented on the type.
+  2. **`range` carries `asOf`**, so a snapshot metric with no date bounds (goals without a next action) still says when it was true.
+  3. **Values are counts, not lists.** 3.2 links each number to the list it counts: `/plan/today`, `/plan?due=next7` (or `/plan/upcoming`), and the goals list.
+  4. Definitions are plain-language strings returned in each metric, ready for the card text 3.2 needs.
+- **Next chunk should know:**
+  - 3.2: call the three metrics with `todayClock(zone)` and the user's saved zone (from preferences). When `hasData` is false, show "nothing yet". `range.from`/`to` are local dates to format, and `null` means open.
+  - Paused goals are deliberately left out of "goals without a next action". If Home should name the goals, add a list variant rather than widening `value`.
+  - 7.1/9.1 should add metrics as new named functions returning `Metric<…>` in this module (one file per surface, as `home.ts` is).
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 356 unit, 299 integration) passes. No UI, so `pnpm build` and `pnpm test:e2e` were not run. No schema change, so no migration.
+- **Follow-ups:** none new. Still open from earlier notes: life-area delete writes no `goal.updated` event; milestone events aren't in the goal timeline; milestone edit and delete UI; next action on the Goals list; the `preferences.spec.ts` first-sign-in flake; the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs.
