@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { instantFromLocal, type LocalDate } from "@/lib/dates";
 import {
@@ -12,7 +12,7 @@ import {
 import { deleteAuditEventsForEntity, recordAudit } from "@/server/audit/record";
 import { db, type DbTransaction } from "@/server/db/client";
 import { isForeignKeyViolation } from "@/server/db/errors";
-import { tasks } from "@/server/db/schema";
+import { milestones, tasks } from "@/server/db/schema";
 import { NotFoundError, ValidationError } from "@/server/errors";
 
 import type {
@@ -443,6 +443,74 @@ export async function scheduleTask(
     }),
   );
   return toTask(row);
+}
+
+/**
+ * Takes every task off a goal (directly or under any of its milestones) or
+ * off one milestone, before that parent is hard-deleted in the same
+ * transaction. The foreign keys would clear the parent anyway; doing it
+ * here records a `task.moved` event per task, so its history shows the move
+ * to no parent (the inbox, for an open task without a plan; ADR 0006).
+ */
+export async function detachTasksInTx(
+  tx: DbTransaction,
+  userId: string,
+  parent: { goalId: string } | { milestoneId: string },
+): Promise<void> {
+  const underParent =
+    "goalId" in parent
+      ? or(
+          eq(tasks.goalId, parent.goalId),
+          inArray(
+            tasks.milestoneId,
+            tx
+              .select({ id: milestones.id })
+              .from(milestones)
+              .where(
+                and(
+                  eq(milestones.goalId, parent.goalId),
+                  eq(milestones.userId, userId),
+                ),
+              ),
+          ),
+        )
+      : eq(tasks.milestoneId, parent.milestoneId);
+
+  const rows = await tx
+    .select({
+      id: tasks.id,
+      goalId: tasks.goalId,
+      milestoneId: tasks.milestoneId,
+    })
+    .from(tasks)
+    .where(and(eq(tasks.userId, userId), underParent))
+    .orderBy(asc(tasks.sortOrder), asc(tasks.id))
+    .for("update");
+  if (rows.length === 0) return;
+
+  await tx
+    .update(tasks)
+    .set({ goalId: null, milestoneId: null })
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        inArray(
+          tasks.id,
+          rows.map((row) => row.id),
+        ),
+      ),
+    );
+  for (const row of rows) {
+    await recordAudit(tx, {
+      type: "task.moved",
+      userId,
+      entityId: row.id,
+      changes: {
+        goalId: { from: row.goalId, to: null },
+        milestoneId: { from: row.milestoneId, to: null },
+      },
+    });
+  }
 }
 
 /** Hard delete (ADR 0006). Removes the task's audit events with it. */

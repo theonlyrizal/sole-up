@@ -150,6 +150,7 @@ Rules:
 - **Inbox** is derived, not a status: open tasks with no parent and no `planned_date`. A due date alone doesn't take a task out of the inbox.
 - **Today's sections** are derived on read from the user's local today and the current instant, never stored. Each open task shows in one section, the first that applies: Planned for today (`planned_date` is today), Needs a decision (`due_date` before today or `due_at` before now), Due today (`due_date` today or `due_at` later today), Earlier, not done (`planned_date` before today). See `todaySection` in `src/lib/today.ts`.
 - **Upcoming** is derived on read too: open tasks planned for, or due on, tomorrow through today + 14 days (or + 30), grouped by the user's local date. A timed deadline falls on the local day of `due_at` in the user's zone, whatever its `due_tz`. A task planned for one day and due on another shows on both; on the same day it shows once. See `groupUpcomingTasks` in `src/lib/upcoming.ts`.
+- **A goal's next action** is derived on read: its open task (direct or under any milestone) with the earliest planned date or deadline day in the user's zone, passed ones included; ties by deadline, then position. With no dated open task the goal has none, and its page prompts for one. Task status never changes a milestone, the goal or its progress (ADR 0010). See `nextActionOf` in `src/lib/goal-tasks.ts`.
 - Completing or cancelling a task never changes its milestone or goal; goal progress stays milestone-based ([ADR 0010](decisions/0010-goal-status-priority-progress.md)).
 - `unique (id, user_id)`, so later tables (reminders, note links) can reference tasks with composite keys.
 - Deleting a task is a confirmed hard delete that removes its audit events in the same transaction; there is no `task.deleted` event ([ADR 0005](decisions/0005-history-and-audit-log.md)).
@@ -394,8 +395,8 @@ Exact indexes should follow real query patterns and query plans, not be added in
 ### Deletion rules ([ADR 0006](decisions/0006-deletion.md))
 - **Archive** is a reversible status. Archived records are hidden by default and can be restored.
 - **Delete** is a hard delete behind a clear confirmation. No soft deletion.
-- **Deleting a goal** deletes its milestones and moves all its tasks (direct and via milestones) to the inbox. Tasks are never deleted implicitly.
-- **Deleting a milestone** moves its tasks to the inbox.
+- **Deleting a goal** deletes its milestones and takes all its tasks (direct and via milestones) off it, recording a `task.moved` event for each (chunk 2.7). Open tasks with no planned date land in the inbox; planned ones keep their date and closed ones their status, all without a parent. The confirmation states each count. Tasks are never deleted implicitly.
+- **Deleting a milestone** takes its tasks off it the same way, with a `task.moved` event each (to no parent, not to the goal).
 - **Deleting the account** cascades every user-owned row from `users` in one transaction, and revokes sessions and push subscriptions.
 - Every hard delete also removes the entity's audit events in the same transaction.
 
