@@ -123,7 +123,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 2.8 | End-to-end journey test | done | chunk/2.8-e2e-journey | 2026-10-23 | `tests/e2e/journey.spec.ts`: area → goal with reason → milestone → two tasks → plan one via Add to today → complete → Today clear, goal progress unchanged; no app bugs found |
 | 2.✓ | Phase 2 checkpoint (user) | done | | 2026-10-23 | User marked done the day Phase 2 finished, without the planned week of using Today daily |
 | 3.1 | Metrics module foundation | done | chunk/3.1-metrics | 2026-10-23 | `src/server/modules/metrics/`: `Metric<V>` contract (`value`, `definition`, `range` with `asOf`, `hasData`), `todayTaskCounts`, `goalsWithoutNextAction`, `deadlinesNextSevenDays`; no UI |
-| 3.2 | Home summaries | todo | | | |
+| 3.2 | Home summaries | done | chunk/3.2-home-summaries | 2026-10-23 | `/home`: Today, Goals without a next action (named, from a new list variant) and Deadlines in the next 7 days cards, each with definition, range and "as of"; numbers link to their lists; "Nothing yet" with no data; no score |
 | 4.0 | Decision gate: calendar | todo | | | |
 | 4.1 | Calendar events: schema and service | todo | | | |
 | 4.2 | Event create/edit UI | todo | | | |
@@ -1621,3 +1621,28 @@ Template:
   - 7.1/9.1 should add metrics as new named functions returning `Metric<…>` in this module (one file per surface, as `home.ts` is).
 - **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 356 unit, 299 integration) passes. No UI, so `pnpm build` and `pnpm test:e2e` were not run. No schema change, so no migration.
 - **Follow-ups:** none new. Still open from earlier notes: life-area delete writes no `goal.updated` event; milestone events aren't in the goal timeline; milestone edit and delete UI; next action on the Goals list; the `preferences.spec.ts` first-sign-in flake; the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs.
+
+### 3.2: Home summaries (2026-10-23)
+- **Built:**
+  - `src/app/(app)/home/page.tsx` (replaces the placeholder greeting) and `error.tsx`. It reads the user's saved zone, makes one `todayClock`, and calls the three 3.1 metrics plus the new list variant in parallel.
+  - `src/components/home/home-view.tsx`: one card (a region named by its heading) per metric. Cards: "Today", "Goals without a next action" and "Deadlines in the next 7 days". Each shows the metric's `definition`, its range ("Range: Today, 23 Oct 2026" / "Range: 24 Oct 2026 to 31 Oct 2026" / "Range: Any date") and the time it was worked out ("As of: 14:05", a `<time>`). With `hasData: false` a card says "Nothing yet" with one calm line (the goals card adds an "Add a goal" link). `metric-range.ts` (pure, unit-tested) words the range and time. `refresh-on-new-day.tsx` reuses `useRefreshOnNewDay`, so Home left open overnight shows the new day.
+  - Links: Today's counts go to `/plan/today#today-planned`, `#today-due` and `#today-decide`. Today's sections now have those ids (`todaySectionAnchor` in `src/lib/today.ts`). Deadlines go to `/plan?due=next7`. The goals count goes to the list of goal names on the card (`#goals-without-next-action`), and each name goes to its goal page.
+  - `listGoalsWithoutNextAction(userId)` in `metrics/home.ts`: `{ id, title }[]`, oldest first (the Goals list's order). It shares the `goalHasNextAction()` SQL with `goalsWithoutNextAction`, now pulled out of that function.
+  - Tests: unit `src/components/home/metric-range.test.ts` (6). Integration: `home.integration.test.ts` checks that the list matches the count in all three goals cases (empty and paused/dropped, the counted three in order, cross-user). E2E: `tests/e2e/home.spec.ts` (2, browser in Tokyo). The first test covers a new user: three cards with "Nothing yet", definitions, ranges, no `%`, "score" or bare 0, axe, and the Add a goal link. The second covers data: each number's link `href`, clicking through to Today's section, the Plan due filter (showing day 3 but not today or day 10) and a goal page, and a dated task taking the goal off the card ("0 goals", "Every active goal has a next action.").
+  - `auth.spec.ts` checked the placeholder "You're signed in as <email>" line, which is gone. It now checks the email through `GET /api/auth/get-session` instead, which is a stronger check of the same thing.
+  - Docs: `ARCHITECTURE.md` §9 (list variants), `PRODUCT_SPEC.md` §8 (Home v1 cards).
+- **Deviations:**
+  1. **Goals without a next action are named on the card.** No existing list matches what this number counts (the Goals page filters only by status), and the user chose this over a new Goals-page filter or linking to all active goals. The number links to that in-card list.
+  2. **Extras:** "As of" time on every card, and the midnight refresh, as on Today.
+- **Decisions:**
+  1. **Count labels sit under the number** and form the link's name ("1 Planned for today", "2 deadlines", "1 goal"). Today's labels reuse `TODAY_SECTION_LABELS`, so Home and Today use the same words.
+  2. **Empty-state links don't reuse nav words** ("Today", "Plan", "Goals"). Playwright's non-exact `getByRole("link", { name: "Goals" })` in `journey.spec.ts` also matched "Go to Goals". Only the goals card has a link ("Add a goal"). The other two point to Add task in their text.
+  3. **Zero with data is shown as a linked 0**, because it's a real result (3.1 decision 1). Only `hasData: false` shows "Nothing yet".
+- **Next chunk should know:**
+  - Home locators: cards are `getByRole("region", { name, exact: true })`. Count links are named "<n> <label>". The goal names are in the list "Goals without a next action".
+  - 4.5 and 6.6 add Home cards. Add a metric in `metrics/home.ts`, then one `<MetricCard>` in `home-view.tsx`, and keep each number a `CountLink` to the list it counts.
+  - The `home.spec.ts` link test is marked `test.slow()` (about 15 s alone).
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 362 unit, 299 integration), `pnpm build` and `pnpm test:e2e` (42 tests, first full run clean) pass. `home.spec.ts`, `journey.spec.ts` and `auth.spec.ts` passed 2 of 2 with `--repeat-each=2`. No schema change, so no migration. No one has looked at the cards in a browser by hand (the axe checks pass), and there's been no screen reader or phone pass.
+- **Follow-ups:**
+  - A Goals-page "without a next action" filter, if the in-card list gets long while dogfooding.
+  - Earlier follow-ups still open: life-area delete writes no `goal.updated` event; milestone events aren't in the goal timeline; milestone edit and delete UI; next action on the Goals list; the `preferences.spec.ts` first-sign-in flake (did not fail in this chunk's runs); the `/home` instant-navigation dev warning (still printed for `/home`); noisy `Provider not found` auth logs.

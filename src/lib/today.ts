@@ -35,6 +35,11 @@ export const TODAY_SECTION_HINTS: Record<TodaySection, string> = {
     "Planned for an earlier day and still open. They stay put until you choose: today, another day, or no plan.",
 };
 
+/** The element id of a section on `/plan/today`, so Home can link to it. */
+export function todaySectionAnchor(section: TodaySection): string {
+  return `today-${section}`;
+}
+
 /** The user's today, and where it starts and ends, at one instant. */
 export type TodayClock = {
   today: LocalDate;
