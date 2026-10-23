@@ -30,6 +30,12 @@ type DialogContentProps = {
   description?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
+  /**
+   * Where focus goes on close. Call `preventDefault()` and move focus
+   * yourself when the opening element may have been re-rendered (a dialog
+   * opened from a calendar item); otherwise focus returns to the trigger.
+   */
+  onCloseAutoFocus?: (event: Event) => void;
 };
 
 export function DialogContent({
@@ -37,12 +43,14 @@ export function DialogContent({
   description,
   children,
   className,
+  onCloseAutoFocus,
 }: DialogContentProps) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className={overlayClass} />
       <DialogPrimitive.Content
         className={cx(contentClass, className)}
+        onCloseAutoFocus={onCloseAutoFocus}
         // Without a description Radix warns unless this is explicitly unset.
         {...(description ? {} : { "aria-describedby": undefined })}
       >

@@ -393,6 +393,31 @@ export async function listUpcomingTasks(
   return groupUpcomingTasks(items, window, timeZone);
 }
 
+/**
+ * The Agenda (chunk 4.5): open tasks planned for a day in `[from, to)`, or
+ * with a timed deadline on one of those local days in `timeZone` (the
+ * user's). All-day deadlines are left out (ADR 0012). `agendaEntries` turns
+ * them into rows.
+ */
+export async function listAgendaTasks(
+  userId: string,
+  { from, to, timeZone }: { from: LocalDate; to: LocalDate; timeZone: string },
+): Promise<PlanTaskItem[]> {
+  return selectPlanTaskItems(
+    and(
+      eq(tasks.userId, userId),
+      eq(tasks.status, "open"),
+      or(
+        and(gte(tasks.plannedDate, from), lt(tasks.plannedDate, to)),
+        and(
+          gte(tasks.dueAt, startOfLocalDay(from, timeZone)),
+          lt(tasks.dueAt, startOfLocalDay(to, timeZone)),
+        ),
+      ),
+    ),
+  );
+}
+
 /** Most suggestions per group in the "Add to today" picker. */
 export const TODAY_SUGGESTIONS_DUE_SOON_MAX = 10;
 export const TODAY_SUGGESTIONS_PER_GOAL_MAX = 3;

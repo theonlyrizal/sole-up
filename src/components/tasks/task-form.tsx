@@ -27,23 +27,47 @@ const PRIORITY_OPTION_LABELS: Record<Priority, string> = {
   high: "High",
 };
 
-type TaskFormDialogProps = {
-  /** The element that opens the dialog, usually a `<Button>`. */
-  trigger: React.ReactElement;
-  task: Task;
-};
+type TaskFormDialogProps = { task: Task } & (
+  | {
+      /** The element that opens the dialog, usually a `<Button>`. */
+      trigger: React.ReactElement;
+      open?: undefined;
+      onOpenChange?: undefined;
+      onCloseAutoFocus?: undefined;
+    }
+  | {
+      /** Controlled: the page opens it, e.g. from a clicked Agenda item. */
+      trigger?: undefined;
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      /** Where focus goes on close (see `DialogContent`). */
+      onCloseAutoFocus?: (event: Event) => void;
+    }
+);
 
 /**
  * Edits a task's title, notes, priority and estimate in a dialog. Dates and
  * parent are edited inline on the list; the dialog can also cancel or
  * reopen the task.
  */
-export function TaskFormDialog({ trigger, task }: TaskFormDialogProps) {
-  const [open, setOpen] = useState(false);
+export function TaskFormDialog({
+  trigger,
+  task,
+  open: controlledOpen,
+  onOpenChange,
+  onCloseAutoFocus,
+}: TaskFormDialogProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent title="Edit task" className="max-w-lg">
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
+      <DialogContent
+        title="Edit task"
+        className="max-w-lg"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <TaskForm task={task} onDone={() => setOpen(false)} />
       </DialogContent>
     </Dialog>

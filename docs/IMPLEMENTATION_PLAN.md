@@ -177,7 +177,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 4.2 | Recurrence engine | done | chunk/4.2-recurrence-engine | 2026-10-23 | `src/lib/recurrence.ts` on `rrule-temporal` 2.2.8 (no global Temporal): builder-subset Zod schemas, rule ↔ builder, pure floating-time `expandOccurrences` with exceptions and the 366-day cap, `describeRecurrence`; no schema, no UI |
 | 4.3 | Recurring events: series, exceptions and scopes | done | chunk/4.3-recurring-events | 2026-10-23 | `rrule` + `calendar_event_exceptions` (snapshot exceptions, migration 0009), `eventsBetween` expands series, this/following/all edit and delete with exception carry-over, dropped reported back, exception audit events; no UI |
 | 4.4 | Event create/edit UI | done | chunk/4.4-event-dialog | 2026-10-23 | `/plan/calendar` (Calendar under Plan) listing 30 days, event dialog (60-min default, inclusive all-day end, goal → area, zone note), repeat builder with field errors, scope prompt naming dropped exceptions via dry-run previews |
-| 4.5 | FullCalendar foundation and Agenda view | todo | | | |
+| 4.5 | FullCalendar foundation and Agenda view | done | chunk/4.5-agenda-view | 2026-10-23 | `@fullcalendar/react` 7.1.1 behind one token-themed, client-only `Calendar` wrapper; `/plan/calendar` is the Agenda (events + occurrences, plans, timed deadlines) for `?start=&days=7\|14\|30` (default 30 from today), items open their dialogs |
 | 4.6 | Week and Day views | todo | | | |
 | 4.7 | Time blocks: schema and service | todo | | | |
 | 4.8 | Time blocks UI | todo | | | |
@@ -2007,3 +2007,35 @@ Template:
 - **Follow-ups:**
   - A field's error stays until the next save, even after it is fixed; clearing it on change would be calmer.
   - Event history (goal/area deletes clearing links without an event, from 4.1/4.3) is still not shown anywhere.
+
+### 4.5: FullCalendar foundation and Agenda view (2026-10-23)
+- **Built:**
+  - Dependency `@fullcalendar/react` 7.1.1 (MIT; peers React ^19 and `temporal-polyfill` ^1.0.1, both met). Only its `/list` and `/themes/classic` subpaths are imported; no v6 packages.
+  - `src/components/calendar/full-calendar.tsx`: `Calendar`, the one wrapper. It takes an expanded feed (`CalendarFeedItem<Data>`: `id`, `title`, `allDay`, `start`/`end` as ISO instants or local dates with an exclusive end, `order`, optional `color`, `data`), the visible local-day range, the user's zone, `renderItem(data, { isStart, isEnd })`, `renderDayHeader(date)` and `empty`. `calendar-theme.css` sets every classic-theme palette variable from the app's tokens (replacing the theme's `palette.css`).
+  - `src/lib/agenda.ts` (pure): `AGENDA_DAY_COUNTS` (7, 14, 30; default 30), `parseAgendaRange`, `agendaHref`, `agendaEnd`, `shiftAgendaRange`, `agendaRangeLabel`, `inAgendaRange`, `agendaEntries(events, tasks, range, zone)` → `AgendaEntry` rows, `agendaEntryKind`.
+  - Queries: `listAgendaTasks(userId, { from, to, timeZone })` in `tasks/queries.ts` (open tasks planned in the range or with a timed deadline on its local days); `listAgenda(userId, range, timeZone)` in `calendar-events/queries.ts` (replaces 4.4's `listUpcomingEvents` and `CALENDAR_LIST_DAYS`).
+  - `/plan/calendar` is now the Agenda: `src/components/calendar/agenda-view.tsx` (Previous/From today/Next links, "Days to show" 7/14/30, New event, the list, one controlled dialog for the clicked item). `calendar-view.tsx` (4.4's plain list) is removed, and `groupEventsByDay`/`listDayOf` with it.
+  - `EventFormDialog` and `TaskFormDialog` have a controlled variant (`open`, `onOpenChange`, `onCloseAutoFocus`, no trigger); `DialogContent` passes `onCloseAutoFocus` through. The event dialog has a Delete button (`Delete: <title>`, the 4.4 `DeleteEventDialog`, with a new `onDeleted`).
+  - Tests: unit `src/lib/agenda.test.ts` (10); integration `calendar-events/agenda.integration.test.ts` (5, Tokyo: merging incl. a New York deadline landing on the next Tokyo day, range edges at 00:00/23:59, closed/undated/all-day-deadline tasks left out, goal join, cross-user) and the 4.4 list tests ported to `listAgenda`; e2e `tests/e2e/agenda.spec.ts` (3, browser in Tokyo: empty state, day counts and Previous/Next in the URL through a reload, axe; a plan, a 00:30 deadline (the day before in UTC) and an event on their Tokyo days in time order, Tab/Enter/Escape with focus back on the item for a task and an event, axe with a dialog open; dark theme on the app's tokens with axe, and no sideways scroll at 375 px). `calendar.spec.ts` now opens events from their item and deletes from the dialog.
+  - README "UI shell and components": the calendar wrapper.
+- **Deviations:**
+  1. **Delete moved into the event dialog.** Clicking an item opens its dialog (the chunk text); the 4.4 rows' separate Edit and Delete buttons are gone, so Delete sits in the dialog's button row.
+  2. **Multi-day events show on each of their days** (FullCalendar's list behaviour, "From 22:00" / "Until 01:00" / "All day" on the days in between). 4.4's list showed them once.
+- **Decisions:**
+  1. **Range in the URL:** `?start=YYYY-MM-DD&days=7|14|30`, both optional; the plain path is 30 days from today (what the 4.4 page showed). Malformed values fall back. Previous/Next move by the range's own length.
+  2. **Rows:** a plan is an all-day row on its date; a timed deadline is a row at its time on its local day in the user's zone; planned and due on the same day is one row at the deadline's time ("Planned task, due"). All-day deadlines are not on the Agenda (ADR 0012 and the chunk name timed deadlines only; Upcoming has them). Open tasks only. Events sort before tasks at the same start (`order`).
+  3. **FullCalendar renders, our components own the content:** `eventInteractive` is off (with it, each row becomes `role="button"` inside a `role="list"`), and each row holds our own `<h3><button>` that opens the dialog, so one Tab stop per row and native Enter/Space. Day headings are our `<h2><time>`; FullCalendar's side label (level 1) is suppressed, since `listDayAltFormat: false` falls back to the default.
+  4. **Client-only rendering** (`useSyncExternalStore`, a `LoadingState` on the server): FullCalendar's Intl range label differed between Node and Chromium and caused a hydration mismatch.
+  5. **Focus return:** FullCalendar re-renders rows while a dialog is open, so the controlled dialogs return focus to the opening button by its position among `[data-agenda-item]` buttons (`onCloseAutoFocus`), not to the original node.
+  6. **Version 7.1.1, not 7.1.3** (ADR 0012 named 7.1.3): the newest release at least two weeks old, as for earlier dependencies.
+  7. Times and dates in rows use our own formatting (`formatTimeOfDay`, `timeRangeLabel`, `calendarDayLabel`) in the user's locale; FullCalendar's own strings (the outer list's and each day's `aria-label`) stay in its default English.
+- **Next chunk should know:**
+  - 4.6: add `/timegrid` to the same wrapper (a `view` prop already exists, with "agenda" only), reuse `CalendarFeedItem` and the theme file; the classic theme's grid classes pick up the token palette. The Agenda's toolbar and URL handling are in `agenda-view.tsx`; Week/Day navigation can follow `agendaHref`'s pattern. Check `eventInteractive` and roles again on the grid: rows there are not list items.
+  - Locators: a day is `getByRole("listitem").filter({ has: locator('h2 time[datetime="YYYY-MM-DD"]') })`; an item is the button named by its title (`exact: true`) inside a day; the row is the inner `listitem` holding that button. Nav regions are "Move through the agenda" and "Days to show"; the empty heading is "Nothing in these days".
+  - FullCalendar brings `temporal-polyfill` into the client bundle (its own import); `rrule-temporal` is still absent from `.next/static` (checked).
+  - 4.8 adds time blocks to `agendaEntries` (a new `kind`) and to `listAgenda`.
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 515 unit, 358 integration), `pnpm build` and `pnpm test:e2e` (48 tests, first full run clean) pass; `agenda.spec.ts` and `calendar.spec.ts` passed 18 of 18 with `--repeat-each=3`. No schema change, so no migration. A manual pass with a screen reader is not done.
+- **Follow-ups:**
+  - FullCalendar's English `aria-label`s on the list and days: pass the user's locale (with its locale data) or a `buttonHint`-style option if a non-English locale ever matters.
+  - Completed tasks are not on the Agenda, so a past range shows only events; consider showing closed tasks for past days if reviewing history wants it.
+  - Earlier follow-ups still open: field errors that stay until the next save in the event dialog; event history for link clears.

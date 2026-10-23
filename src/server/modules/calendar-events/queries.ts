@@ -2,34 +2,45 @@ import "server-only";
 
 import { asc, eq, sql } from "drizzle-orm";
 
-import { groupEventsByDay, type EventDay } from "@/lib/calendar-list";
-import { addDays, type LocalDate } from "@/lib/dates";
+import {
+  agendaEnd,
+  agendaEntries,
+  type AgendaEntry,
+  type AgendaRange,
+} from "@/lib/agenda";
 import type { GoalStatus } from "@/lib/goals";
 import type { LifeAreaStatus } from "@/lib/life-areas";
 import { db } from "@/server/db/client";
 import { goals, lifeAreas } from "@/server/db/schema";
+import {
+  listAgendaTasks,
+  type PlanTaskItem,
+} from "@/server/modules/tasks/queries";
 
 import { eventsBetween } from "./service";
 
 // Read models for the calendar page. Every query is scoped to the user.
 
-/** How many days the calendar page lists, today included (until 4.5). */
-export const CALENDAR_LIST_DAYS = 30;
-
 /**
- * The user's events and occurrences from `today` through the next
- * CALENDAR_LIST_DAYS - 1 days, grouped by their local day in `timeZone`.
+ * The Agenda's rows for `range` (chunk 4.5): the user's events and
+ * occurrences overlapping its local days in `timeZone` (the user's), and
+ * their open tasks' plans and timed deadlines on those days.
  */
-export async function listUpcomingEvents(
+export async function listAgenda(
   userId: string,
-  { today, timeZone }: { today: LocalDate; timeZone: string },
-): Promise<EventDay[]> {
-  const events = await eventsBetween(userId, {
-    localStart: today,
-    localEnd: addDays(today, CALENDAR_LIST_DAYS),
-    tz: timeZone,
-  });
-  return groupEventsByDay(events, today, timeZone);
+  range: AgendaRange,
+  timeZone: string,
+): Promise<AgendaEntry<PlanTaskItem>[]> {
+  const to = agendaEnd(range);
+  const [events, tasks] = await Promise.all([
+    eventsBetween(userId, {
+      localStart: range.start,
+      localEnd: to,
+      tz: timeZone,
+    }),
+    listAgendaTasks(userId, { from: range.start, to, timeZone }),
+  ]);
+  return agendaEntries(events, tasks, range, timeZone);
 }
 
 /** What an event can link to: goals (with their area) and life areas. */

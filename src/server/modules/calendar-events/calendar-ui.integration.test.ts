@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { instantFromLocal } from "@/lib/dates";
+import type { AgendaEntry } from "@/lib/agenda";
+import { instantFromLocal, localDateOf } from "@/lib/dates";
 import { db } from "@/server/db/client";
 import {
   auditEvents,
@@ -18,11 +19,11 @@ import {
   createTestUser,
 } from "../../../../tests/integration/helpers/users";
 import * as actions from "./actions";
-import { listEventLinkOptions, listUpcomingEvents } from "./queries";
+import { listAgenda, listEventLinkOptions } from "./queries";
 
 // The event dialog's server side (chunk 4.4): the actions it calls, the
-// scope prompt's previews (which must change nothing), and the calendar
-// page's list.
+// scope prompt's previews (which must change nothing), and the events on
+// the calendar page's Agenda (4.5; its tasks are in agenda.integration).
 
 const requestHeaders = vi.hoisted(() => ({ current: new Headers() }));
 vi.mock("next/headers", () => ({
@@ -61,6 +62,11 @@ const standup = (fields: Record<string, unknown> = {}) => ({
 /** The original start of the standup on a Monday, as the dialog sends it. */
 const monday = (date: string) =>
   instantFromLocal(date, "09:00", NEW_YORK).toISOString();
+
+/** An Agenda row's first local day in Tokyo. */
+function startDay(entry: AgendaEntry): string {
+  return entry.allDay ? entry.start : localDateOf(new Date(entry.start), TOKYO);
+}
 
 async function snapshot() {
   return {
@@ -297,7 +303,7 @@ describe("scope previews", () => {
 });
 
 describe("calendar page queries", () => {
-  it("list the coming days' events by the user's local day", async () => {
+  it("put events on the Agenda by the user's local day", async () => {
     const user = await createTestUser();
     await signInAs(user.id);
     await actions.createCalendarEvent(standup());
@@ -321,23 +327,26 @@ describe("calendar page queries", () => {
     await signInAs(other.id);
     await actions.createCalendarEvent(standup({ title: "Not mine" }));
 
-    const days = await listUpcomingEvents(user.id, {
-      today: "2026-11-02",
-      timeZone: TOKYO,
-    });
-    const summary = days.map(({ date, events }) => [
-      date,
-      events.map(({ title }) => title),
-    ]);
+    const entries = await listAgenda(
+      user.id,
+      { start: "2026-11-02", days: 30 },
+      TOKYO,
+    );
+    const summary = entries
+      .map((entry) => `${startDay(entry)} ${entry.title}`)
+      .sort();
     // 11:00 in New York is 01:00 the next day in Tokyo. The holiday began
-    // before today and is listed today.
-    expect(summary.slice(0, 3)).toEqual([
-      ["2026-11-02", ["Holiday", "Standup"]],
-      ["2026-11-03", ["Late call"]],
-      ["2026-11-09", ["Standup"]],
+    // before the range and is still on it (FullCalendar shows it from the
+    // range's first day). Another user's event is not.
+    expect(summary).toEqual([
+      "2026-10-30 Holiday",
+      "2026-11-02 Standup",
+      "2026-11-03 Late call",
+      "2026-11-09 Standup",
+      "2026-11-16 Standup",
+      "2026-11-23 Standup",
+      "2026-11-30 Standup",
     ]);
-    expect(summary.at(-1)?.[0]).toBe("2026-11-30");
-    expect(summary.flatMap(([, titles]) => titles)).not.toContain("Not mine");
   });
 
   it("offer the user's goals with their areas", async () => {
@@ -364,12 +373,13 @@ describe("calendar page queries", () => {
   it("show a cancelled occurrence as gone", async () => {
     const user = await createTestUser();
     const id = await createStandupWithExceptions(user.id);
-    const days = await listUpcomingEvents(user.id, {
-      today: "2026-11-02",
-      timeZone: NEW_YORK,
-    });
-    const standups = days.flatMap(({ events }) =>
-      events.filter((event) => event.id === id),
+    const entries = await listAgenda(
+      user.id,
+      { start: "2026-11-02", days: 30 },
+      NEW_YORK,
+    );
+    const standups = entries.flatMap((entry) =>
+      entry.kind === "event" && entry.event.id === id ? [entry.event] : [],
     );
     expect(standups.slice(0, 3).map((event) => event.modified)).toEqual([
       false,
