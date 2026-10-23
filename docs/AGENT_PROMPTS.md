@@ -2,7 +2,12 @@
 
 Paste one prompt per session, in order. Each prompt points the agent to its chunk in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). The plan's **Agent session protocol** covers what every session does: reading, preconditions, branching, scope, verification, the Progress log, handoff notes, and committing.
 
-Before starting the next session, merge the previous chunk's branch into `main`.
+You can start the next session as soon as the previous one has opened its PR. Each agent:
+- opens a PR with auto-merge enabled
+- waits for the previous chunk's PR to pass CI and merge, doing uncommitted work on its own chunk in the meantime
+- then branches from the updated `main`
+
+That workflow is described in protocol steps 2, 2a and 7.
 
 Rows marked "(user)" in the Progress log are your own checkpoints. They have no prompt.
 
@@ -110,10 +115,10 @@ Finish line: Stop immediately once pnpm verify and pnpm build pass, a forced err
 
 ### 0.13: Continuous integration
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 0.13 only. Create .github/workflows/ci.yml running, in order: install, lint, typecheck, unit tests, integration tests (Postgres service container, migrate from zero), build, e2e smoke test, plus a drift check that fails when pnpm db:generate produces changes. Cache pnpm. Do not push; I'll push and set branch protection myself.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 0.13 only. Create .github/workflows/ci.yml running, in order: install, lint, typecheck, unit tests, integration tests (Postgres service container, migrate from zero), build, e2e smoke test, plus a drift check that fails when pnpm db:generate produces changes. Cache pnpm. Give me the exact steps to make these checks required on main (branch protection or ruleset), so auto-merge waits for CI on every later PR; I apply that setting myself.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once every CI step passes locally in the same order (including the drift check showing no diff), you've given me the branch-protection steps, and the protocol close-out is complete.
+Finish line: Stop immediately once every CI step passes locally in the same order (including the drift check showing no diff), the workflow runs green on this chunk's own PR, you've given me the required-checks steps, and the protocol close-out is complete.
 ```
 
 ### 0.14: First deploy
