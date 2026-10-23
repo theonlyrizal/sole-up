@@ -120,8 +120,8 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 2.5 | Today view | done | chunk/2.5-today-view | 2026-10-23 | `/plan/today`: four sections (precedence planned → decide → due → earlier), "Add to today" picker (due soon + active goals' next actions), one-tap complete/plan/tomorrow/pick a date/unplan/new due date, calm empty state |
 | 2.6 | Upcoming view | done | chunk/2.6-upcoming-view | 2026-10-23 | `/plan/upcoming`: tomorrow through day 7 by default ("Within a Week"; 14 or 30 via `?days=`) by local date, plans and deadlines merged (both days shown, same day once), timed deadlines on their local day in the user's zone |
 | 2.7 | Tasks in goals and milestones | done | chunk/2.7-goal-tasks | 2026-10-23 | Goal detail Tasks section (next action, direct + per-milestone groups with add in context), delete confirmation with real task counts, goal/milestone delete detaches tasks with `task.moved` events |
-| 2.8 | End-to-end journey test | todo | | | |
-| 2.✓ | Phase 2 checkpoint (user) | todo | | | |
+| 2.8 | End-to-end journey test | done | chunk/2.8-e2e-journey | 2026-10-23 | `tests/e2e/journey.spec.ts`: area → goal with reason → milestone → two tasks → plan one via Add to today → complete → Today clear, goal progress unchanged; no app bugs found |
+| 2.✓ | Phase 2 checkpoint (user) | done | | 2026-10-23 | User marked done the day Phase 2 finished, without the planned week of using Today daily |
 | 3.1 | Metrics module foundation | todo | | | |
 | 3.2 | Home summaries | todo | | | |
 | 4.0 | Decision gate: calendar | todo | | | |
@@ -1588,3 +1588,14 @@ Template:
   - Show each goal's next action on the Goals list (needs a batched next-action query).
   - Milestone delete UI (the service already keeps and detaches its tasks), with a confirmation that states the task count.
   - Earlier follow-ups still open: life-area delete writes no `goal.updated` event; milestone events aren't in the goal timeline; milestone edit UI; the `preferences.spec.ts` first-sign-in flake; the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs.
+
+### 2.8: End-to-end journey test (2026-10-23)
+- **Built:** `tests/e2e/journey.spec.ts`, one Playwright test through the whole Phase 2 loop as a new user: decline the starter areas and create "Health" inline → create a goal in that area with "Why does this matter?" filled (listed under the area; the reason shows under "Why it matters") → add a milestone ("0 of 1 milestone") → add one task under the milestone and one directly under the goal, in context on goal detail → on Today, plan the milestone's task with the "Add to today" picker (both tasks are suggested under the goal) → complete it there in one tap → Today is back to "Nothing planned for today" after a reload, with only its first section and the unplanned task absent → goal detail still shows "0 of 1 milestone", the milestone unchecked and the goal Active, the completed task behind the "Show completed and cancelled (1)" toggle as "Completed", the direct task still open → the Goals list row still says "0 of 1 milestone" under its area.
+- **Deviations:** none. The journey exposed no app bugs, so no app code changed.
+- **Decisions:**
+  1. **One test, not split**, because the chunk describes a single journey. It is marked `test.slow()` (90 s limit): it takes about 14 s alone and about 21 s with four copies in parallel on the dev server, too close to the default 30 s (see the 1.2 note).
+  2. **The milestone's task is the one planned and completed**, so "progress unchanged" checks the case most likely to go wrong: a task under the milestone being completed must not complete the milestone.
+  3. **Today is reached by URL and planned through the picker** (Journey B), not the goal page's "Dates and goal" editor, which 2.4/2.7 specs already cover.
+- **Next chunk should know:** the spec reuses the locators listed in the 2.5 and 2.7 notes and the picker's hydration retry from `today.spec.ts`; the browser's own time zone is used (no `timezoneId`), since "today" is computed on the server from the confirmed zone either way.
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 354 unit, 289 integration) passes; `pnpm test:e2e` (40 tests) passed three consecutive full runs; `journey.spec.ts` passed 4 of 4 with `--repeat-each=4`. `pnpm build` not run (no app code changed). No schema change, so no migration.
+- **Follow-ups:** none new. Still open from earlier notes: life-area delete writes no `goal.updated` event; milestone events aren't in the goal timeline; milestone edit and delete UI; next action on the Goals list; the `preferences.spec.ts` first-sign-in flake (did not fail in this chunk's runs); the `/home` instant-navigation dev warning; noisy `Provider not found` auth logs.
