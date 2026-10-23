@@ -175,7 +175,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 4.0 | Decision gate: calendar | done | chunk/4.0-calendar-decisions | 2026-10-23 | ADR 0012: RRULE recurrence (rrule-temporal, three scopes), task-bound time blocks with status + auto-mark, FullCalendar v7 Week/Day/Agenda, all-day end exclusive; Phase 4 now 4.1–4.11 |
 | 4.1 | Calendar events: schema and service | done | chunk/4.1-calendar-events | 2026-10-23 | `calendar_events` (shape + end CHECKs, column-list `SET NULL` goal/area FKs, 4 indexes), service CRUD with `calendar_event.created`/`.updated`, `eventsBetween` by instant/local-date overlap; no UI |
 | 4.2 | Recurrence engine | done | chunk/4.2-recurrence-engine | 2026-10-23 | `src/lib/recurrence.ts` on `rrule-temporal` 2.2.8 (no global Temporal): builder-subset Zod schemas, rule ↔ builder, pure floating-time `expandOccurrences` with exceptions and the 366-day cap, `describeRecurrence`; no schema, no UI |
-| 4.3 | Recurring events: series, exceptions and scopes | todo | | | |
+| 4.3 | Recurring events: series, exceptions and scopes | done | chunk/4.3-recurring-events | 2026-10-23 | `rrule` + `calendar_event_exceptions` (snapshot exceptions, migration 0009), `eventsBetween` expands series, this/following/all edit and delete with exception carry-over, dropped reported back, exception audit events; no UI |
 | 4.4 | Event create/edit UI | todo | | | |
 | 4.5 | FullCalendar foundation and Agenda view | todo | | | |
 | 4.6 | Week and Day views | todo | | | |
@@ -1925,3 +1925,58 @@ Template:
 - **Follow-ups:**
   - `rrule-temporal` bundles a full Temporal polyfill. When 4.4 imports `describeRecurrence` or the schemas in a client component, check the bundle; if it matters, move the builder, schemas and summary into a module that doesn't import the library.
   - Weekly repeats with `INTERVAL` > 1 count weeks from Monday, not the user's week start. Revisit at the checkpoint if it ever surprises.
+
+### 4.3: Recurring events: series, exceptions and scopes (2026-10-23)
+- **Built:**
+  - Migration 0009: `calendar_events.rrule` (length CHECK) and the table `calendar_event_exceptions`:
+    - `(event_id, user_id)` composite FK with cascade;
+    - goal and life-area composite FKs, hand-edited to `SET NULL (column)` like 0008;
+    - unique `(event_id, original_start_at)` and `(event_id, original_start_date)`;
+    - CHECKs: kind, exactly one original start, override shape, end after start, text lengths;
+    - `(user_id, goal_id)` and `(user_id, life_area_id)` indexes.
+  - `src/lib/recurrence.ts`: `seriesStartDate`, `occurrenceStartOn` (the rule's start on a local date, or null), `countOccurrencesBefore`, `endRuleBefore`, `ruleWithCount`.
+  - `src/lib/calendar-events.ts`: `CALENDAR_EVENT_SCOPES`, `CALENDAR_EVENT_EXCEPTION_KINDS`, `CALENDAR_EVENT_EXCEPTION_FIELDS`, `rrule` on `CalendarEvent` and in the editable fields, and `CalendarEventOccurrence` (`seriesId`, `originalStart`, `modified`).
+  - Validation: `rrule` on create/update (blank means one-off; stored canonical; `UNTIL` on or after the start date), `editCalendarEventOccurrenceSchema` (scope "this" takes no rule) and `deleteCalendarEventOccurrenceSchema`. `originalStart` is an ISO instant for a timed series or a date for an all-day one.
+  - `calendar-events/series.ts` (pure): occurrence keys, displayed values, `seriesAfterEdit` and `reconcileExceptions`.
+  - Service:
+    - `editCalendarEventOccurrence` and `deleteCalendarEventOccurrence` with the three scopes. Edits return `{ event, dropped }`; deletes return `{ dropped }`.
+    - `eventsBetween` expands series.
+    - `updateCalendarEvent` refuses a series (`ConflictError`) but lets a one-off gain a rule.
+    - `deleteCalendarEvent` also removes the exceptions' audit events.
+  - Audit:
+    - `calendar_event.created`/`.updated` gain `rrule`, `scope`, `splitFromId`/`splitIntoId` and `droppedExceptions`.
+    - New `calendar_event_exception.created`/`.updated`, recording structured fields only.
+  - Tests:
+    - integration `recurring-events.integration.test.ts` (24):
+      - schema: a cross-user exception refused by the FK; override CHECKs;
+      - expansion: DST, an occurrence moved before the series and the range, one-offs beside series;
+      - "this": timed edit with audit privacy and a no-op; all-day edit and cancel; modified → cancelled; shape, zone and foreign goal refused;
+      - "all": a timed change carrying moved, linked and cancelled exceptions; an all-day move by a day with a new rule; stopping the repeat; delete;
+      - "following": a timed split; a split on the 1 November fall-back day re-keying exceptions; the remaining COUNT; an all-day split dropping one exception and keeping a moved one; from the first occurrence (edit and delete); delete from a later one;
+      - lookups: an occurrence the rule doesn't generate, a cancelled one, and a one-off;
+      - cross-user: every scope on a plain occurrence and on one with an exception.
+    - unit: recurrence helpers (4) and the new schemas (7).
+  - Docs: DATA_MODEL (snapshot exceptions, scopes, carry-over rules).
+- **Deviations:**
+  1. **Exceptions are full snapshots, not overrides.** A modified exception stores every value its occurrence shows, so a null description or goal means "none" and can't be confused with "as the series". The plan said "override fields".
+  2. **No `actions.ts`** ("no UI"; 4.4 adds them), as in 4.1.
+- **Decisions:**
+  1. **An occurrence is addressed by `(series id, originalStart)`**, checked with `occurrenceStartOn`. One the rule doesn't generate, or one that is cancelled, is `NotFound`. A scoped call on a one-off is a `ConflictError`.
+  2. **"This event"** keeps the series' shape and zone. Switching to all-day or to another zone is a field error that points at the wider scopes. Same values again are a no-op with no event.
+  3. **"All events" applies only the fields that differ from what the occurrence showed**, so editing a renamed occurrence's time doesn't rename the series. Changed times move the series' first occurrence by the same number of days as the edited occurrence moved, at the new time of day, zone and length. The rule is the one sent: the UI must send the series' rule when it isn't changing it, since a missing rule means stop repeating.
+  4. **"This and following"** ends the old rule with `UNTIL` the day before (dropping `COUNT`). It creates the new series as "all" would from a series starting at the split occurrence. If the rule is unchanged and ends after a count, the new series keeps the count left. From the first occurrence it is "all"; a delete from there deletes the series.
+  5. **Carry-over:** exceptions move by the same number of days and are dropped when the new rule generates none that day. A modified exception's fields that equalled the old series take the new values, and generated times follow the new ones. Times it moved are kept, unless the shape changed (then dropped). Stopping the repeat folds the first occurrence's changes into the event and drops the rest. Exceptions the old rule had already stopped generating are removed without being reported.
+  6. **Rewriting carried exceptions deletes and re-inserts them with the same ID** (and `created_at`), so shifting several by a day never collides on the unique original start. Their audit history survives because it is keyed by ID.
+  7. **No `.deleted` exception event**, as for life areas: a dropped exception's events go with it, and the series' `updated` event counts the drops. The split events link the two series by ID.
+  8. `eventsBetween` loads one-offs by overlap and series that start before the range end or have an exception starting before it. Occurrences carry the series ID as `id` too. They sort as before, then by original start.
+- **Next chunk should know:**
+  - 4.4: the scope dialog needs a **preview** of what would be dropped. The services return `dropped` only after writing. `reconcileExceptions` in `series.ts` is pure and does the same computation, so a read-only preview service can call it with the loaded series and exceptions.
+  - 4.4: always send the current `rrule` with "following"/"all" (an absent one stops the repeat). A timed occurrence's `originalStart` is `toISOString()` of what `eventsBetween` returned.
+  - 4.4: `updateCalendarEvent` is for one-offs only.
+  - 4.5: `eventsBetween` returns `CalendarEventOccurrence[]`. Use `seriesId` + `originalStart` to address an occurrence, and `modified` to mark changed ones.
+  - 4.7 (time blocks): `series.ts` and the scope functions are event-specific; reuse the approach, not the module.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint, typecheck, 477 unit tests and 343 integration tests. `pnpm db:generate` reports no schema changes after the hand edit, and the dev DB is migrated. No UI, so `pnpm build` and `pnpm test:e2e` were not run.
+- **Follow-ups:**
+  - Moving an occurrence with "all" doesn't adjust a weekly rule's days. If the moved day isn't in the rule, that occurrence disappears; 4.4's builder should update `BYDAY` when the user moves a weekly series.
+  - Deleting a goal or life area clears exception links through the FK with no exception event (as for events).
+  - Phase 10 export must include `calendar_event_exceptions`.

@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import { instantFromLocal, localDateTimeOf } from "./dates";
 import {
+  countOccurrencesBefore,
   describeRecurrence,
+  endRuleBefore,
   expandOccurrences,
   fromRrule,
+  occurrenceStartOn,
   recurrenceSchema,
+  ruleWithCount,
   rruleSchema,
+  seriesStartDate,
   toRrule,
   type AllDaySeries,
   type Recurrence,
@@ -638,6 +643,63 @@ describe("expandOccurrences: range", () => {
         range("2026-01-01", "2026-02-01"),
       ),
     ).toThrow(RangeError);
+  });
+});
+
+describe("occurrence helpers", () => {
+  it("finds the start the rule generates on a local date", () => {
+    const series = timed("FREQ=WEEKLY;BYDAY=MO,TH", "2026-10-26", "09:00");
+    expect(seriesStartDate(series)).toBe("2026-10-26");
+    // After New York falls back on 1 November, 09:00 is 14:00 UTC.
+    expect(occurrenceStartOn(series, "2026-11-02")).toEqual(
+      new Date("2026-11-02T14:00:00Z"),
+    );
+    expect(occurrenceStartOn(series, "2026-11-03")).toBeNull();
+    expect(occurrenceStartOn(series, "2026-10-19")).toBeNull();
+
+    const days = allDay(
+      "FREQ=MONTHLY;BYMONTHDAY=31",
+      "2026-01-31",
+      "2026-02-01",
+    );
+    expect(occurrenceStartOn(days, "2026-03-31")).toBe("2026-03-31");
+    expect(occurrenceStartOn(days, "2026-04-30")).toBeNull();
+  });
+
+  it("keeps the stored instant on the series' own first date", () => {
+    // 01:30 happens twice on 1 November; the later one is the start here.
+    const startAt = new Date("2026-11-01T06:30:00Z");
+    const series: TimedSeries = {
+      allDay: false,
+      rrule: "FREQ=DAILY",
+      startAt,
+      endAt: new Date("2026-11-01T07:00:00Z"),
+      tz: NEW_YORK,
+    };
+    expect(occurrenceStartOn(series, "2026-11-01")).toEqual(startAt);
+  });
+
+  it("counts the occurrences before a date, the start included", () => {
+    const series = allDay(
+      "FREQ=WEEKLY;BYDAY=MO,WE;COUNT=10",
+      "2026-10-05",
+      "2026-10-06",
+    );
+    expect(countOccurrencesBefore(series, "2026-10-05")).toBe(0);
+    expect(countOccurrencesBefore(series, "2026-10-12")).toBe(2);
+    expect(countOccurrencesBefore(series, "2027-01-01")).toBe(10);
+  });
+
+  it("ends a rule before a date, or after a count, keeping its other parts", () => {
+    expect(endRuleBefore("FREQ=WEEKLY;BYDAY=MO;COUNT=5", "2026-11-01")).toBe(
+      "FREQ=WEEKLY;BYDAY=MO;UNTIL=20261031",
+    );
+    expect(endRuleBefore("FREQ=DAILY;INTERVAL=2", "2026-01-01")).toBe(
+      "FREQ=DAILY;INTERVAL=2;UNTIL=20251231",
+    );
+    expect(ruleWithCount("FREQ=MONTHLY;BYDAY=-1FR;UNTIL=20261231", 3)).toBe(
+      "FREQ=MONTHLY;BYDAY=-1FR;COUNT=3",
+    );
   });
 });
 

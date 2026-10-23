@@ -15,6 +15,46 @@ export type CalendarEventSource = (typeof CALENDAR_EVENT_SOURCES)[number];
 /** The longest range one `eventsBetween` query may ask for (ADR 0012). */
 export const CALENDAR_RANGE_MAX_DAYS = 366;
 
+/** The longest stored RRULE value (the builder's rules are far shorter). */
+export const CALENDAR_EVENT_RRULE_MAX = 200;
+
+/**
+ * Which occurrences of a repeating event an edit or delete applies to
+ * (ADR 0012): this one, this one and every later one, or the whole series.
+ */
+export const CALENDAR_EVENT_SCOPES = ["this", "following", "all"] as const;
+export type CalendarEventScope = (typeof CALENDAR_EVENT_SCOPES)[number];
+
+/** An exception either removes one occurrence or overrides its fields. */
+export const CALENDAR_EVENT_EXCEPTION_KINDS = [
+  "cancelled",
+  "modified",
+] as const;
+export type CalendarEventExceptionKind =
+  (typeof CALENDAR_EVENT_EXCEPTION_KINDS)[number];
+
+/**
+ * Columns of an exception that `calendar_event_exception.updated` can name.
+ * Title, description and location are user content: named, never stored.
+ */
+export const CALENDAR_EVENT_EXCEPTION_FIELDS = [
+  "eventId",
+  "originalStartAt",
+  "originalStartDate",
+  "kind",
+  "title",
+  "description",
+  "location",
+  "startAt",
+  "endAt",
+  "startDate",
+  "endDate",
+  "goalId",
+  "lifeAreaId",
+] as const;
+export type CalendarEventExceptionField =
+  (typeof CALENDAR_EVENT_EXCEPTION_FIELDS)[number];
+
 /**
  * Fields an edit can change, in the order `calendar_event.updated` lists
  * them. Title, description and location are user content: the event names
@@ -30,6 +70,7 @@ export const CALENDAR_EVENT_EDITABLE_FIELDS = [
   "tz",
   "startDate",
   "endDate",
+  "rrule",
   "goalId",
   "lifeAreaId",
 ] as const;
@@ -41,6 +82,8 @@ type CalendarEventBase = {
   title: string;
   description: string | null;
   location: string | null;
+  /** The RRULE value of a repeating series (ADR 0012); null for a one-off. */
+  rrule: string | null;
   goalId: string | null;
   lifeAreaId: string | null;
   source: CalendarEventSource;
@@ -69,6 +112,27 @@ export type AllDayCalendarEvent = CalendarEventBase & {
 };
 
 export type CalendarEvent = TimedCalendarEvent | AllDayCalendarEvent;
+
+type OccurrenceKeyFields<Key> = {
+  /** The series row's ID for an occurrence of a repeating event; null for a one-off. */
+  seriesId: string | null;
+  /**
+   * The occurrence's start as the rule generated it, before any exception
+   * moved it: what scoped edits and deletes address it by. Null for a one-off.
+   */
+  originalStart: Key | null;
+  /** True when an exception changed this occurrence. */
+  modified: boolean;
+};
+
+/**
+ * One event or occurrence as `eventsBetween` returns it. An occurrence
+ * carries its series' ID (as `id` too) and rule, with the times, text and
+ * links it actually has.
+ */
+export type CalendarEventOccurrence =
+  | (TimedCalendarEvent & OccurrenceKeyFields<Date>)
+  | (AllDayCalendarEvent & OccurrenceKeyFields<LocalDate>);
 
 /** The stored timing columns of either shape (`calendar_events`). */
 export type CalendarEventTiming =

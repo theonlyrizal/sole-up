@@ -64,6 +64,13 @@
       "when": 1792752892638,
       "tag": "0008_calendar_events",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792764572939,
+      "tag": "0009_calendar_event_exceptions",
+      "breakpoints": true
     }
   ]
 }
