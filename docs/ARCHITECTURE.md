@@ -144,6 +144,8 @@ Use deterministic application/database logic for metrics such as:
 
 Keep metric definitions centralized and tested. Do not ask an LLM to calculate authoritative counts when code can calculate them.
 
+Metrics live in `src/server/modules/metrics/`. Each one is a named function returning `{ value, definition, range, hasData }`, so a number always comes with its plain-language definition, the local days it covers (in the user's zone, with the instant it was computed at), and whether there was any data at all. When there is no data, the UI says "nothing yet" instead of showing a zero.
+
 ## 10. Intelligence service boundary
 
 The future intelligence module should accept a bounded, typed request and return a validated response.
