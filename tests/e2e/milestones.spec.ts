@@ -135,5 +135,9 @@ test("a goal with no milestones shows no progress, and the list adds and reorder
   // The goals list shows the same count for a goal that has one.
   await page.getByRole("button", { name: "Restore Record the demo" }).click();
   await page.getByRole("link", { name: "← Goals" }).click();
-  await expect(page.getByText("0 of 1 milestone")).toBeVisible();
+  // Next keeps the detail page mounted but hidden after navigating, with
+  // its own "0 of 1 milestone", so look inside the list's group only.
+  await expect(
+    page.getByRole("region", { name: "No area" }).getByText("0 of 1 milestone"),
+  ).toBeVisible();
 });

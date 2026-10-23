@@ -2053,6 +2053,7 @@ Template:
 - **Deviations:**
   1. **Day headings in Week use FullCalendar's nav links** (`navLinks` + `navLinkDayClick` → `router.push`), not our own `<Link>`: FullCalendar wraps a time grid's heading content in `aria-hidden` unless it is its nav link, and a link of ours inside failed axe (`aria-hidden-focus`). They are `role="link"` elements named by the full date ("Today · Saturday, October 24, 2026"), not `<a href>`.
   2. **The Agenda's toolbar changed:** the view switch is its first row (with New event), then its range moves and day counts as before.
+  3. **Fixed an ambiguous locator in `milestones.spec.ts`** (not this chunk's area) after it failed CI three times in a row: after "← Goals", Next keeps the goal page mounted but hidden, so `getByText("0 of 1 milestone")` matched it as well as the Goals list. It now looks inside the list's "No area" region. Passed 3 of 3 locally with `CI=true`.
 - **Decisions:**
   1. **URL:** `?view=week|day&date=YYYY-MM-DD`; `date` is the anchor (any day of the week), left out when it is today. Previous/Next move it by 7 or 1. Switching views carries the day: the Agenda starts on the grid's first day, Week holds it, Day shows it.
   2. **Range from `visibleRange`**, not `timeGridWeek` + `firstDay`, so the grid shows exactly the days the server loaded.
