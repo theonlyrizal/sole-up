@@ -9,12 +9,15 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { LocalDate } from "@/lib/dates";
 import { PRIORITY_LABELS } from "@/lib/priorities";
 import {
+  longerUpcomingRange,
   type UpcomingDay,
   type UpcomingEntry,
   upcomingDayLabel,
+  upcomingEmptyTitle,
   upcomingEntryDetails,
   upcomingHref,
   type UpcomingRange,
+  UPCOMING_RANGE_LABELS,
   UPCOMING_RANGES,
 } from "@/lib/upcoming";
 import type { PlanTaskItem } from "@/server/modules/tasks/queries";
@@ -32,7 +35,7 @@ type UpcomingViewProps = {
 };
 
 /**
- * Upcoming (chunk 2.6): the next 14 or 30 days, one section per day that
+ * Upcoming (chunk 2.6): the next 7, 14 or 30 days, one section per day that
  * has something planned or due on it. A task planned for one day and due on
  * another shows on both.
  */
@@ -45,6 +48,7 @@ export function UpcomingView({
   timeZone,
 }: UpcomingViewProps) {
   useRefreshOnNewDay(nextDayStartsAt);
+  const longer = longerUpcomingRange(range);
   return (
     <div className="flex flex-col gap-8">
       <nav aria-label="Days to show">
@@ -64,7 +68,7 @@ export function UpcomingView({
                     focusRing,
                   )}
                 >
-                  Next {option} days
+                  {UPCOMING_RANGE_LABELS[option]}
                 </Link>
               </li>
             );
@@ -73,15 +77,15 @@ export function UpcomingView({
       </nav>
       {days.length === 0 ? (
         <EmptyState
-          title={`Nothing in the next ${range} days`}
+          title={upcomingEmptyTitle(range)}
           description="Tasks you plan for a day, or give a deadline, show here by day. Today's are on Today."
           action={
-            range === 14 ? (
+            longer ? (
               <Link
-                href={upcomingHref(30)}
+                href={upcomingHref(longer)}
                 className={buttonClass({ variant: "secondary" })}
               >
-                Show the next 30 days
+                Show the next {longer} days
               </Link>
             ) : null
           }

@@ -12,7 +12,7 @@ import { listUpcomingTasks } from "./queries";
 import { changeTaskStatus, createTask } from "./service";
 import { createTaskSchema } from "./validation";
 
-// The Upcoming view (chunk 2.6): the next 14 or 30 local days in a non-UTC
+// The Upcoming view (chunk 2.6): the next 7, 14 or 30 local days in a non-UTC
 // zone, plans and deadlines merged by day, timed deadlines on their local
 // day in the user's zone.
 
@@ -73,6 +73,33 @@ describe("listUpcomingTasks in Tokyo", () => {
       "2026-11-06": ["Due 6 Nov [due]"],
       "2026-11-07": ["Due 7 Nov [due]"],
     });
+  });
+
+  it("within a week stops at day 7, a timed deadline at local midnight included", async () => {
+    const user = await createTestUser();
+    // At 00:01 on the 24th, day 7 is the 31st.
+    await newTask(user.id, { title: "Day 7", dueDate: "2026-10-31" });
+    await newTask(user.id, {
+      title: "Day 7, 23:59",
+      dueDate: "2026-10-31",
+      dueTime: "23:59",
+      dueTz: TOKYO,
+    });
+    await newTask(user.id, {
+      title: "Day 8, 00:00",
+      dueDate: "2026-11-01",
+      dueTime: "00:00",
+      dueTz: TOKYO,
+    });
+    await newTask(user.id, { title: "Day 8", plannedDate: "2026-11-01" });
+
+    expect(await titlesByDay(user.id, AT_0001, 7)).toEqual({
+      "2026-10-31": ["Day 7 [due]", "Day 7, 23:59 [due]"],
+    });
+    expect(Object.keys(await titlesByDay(user.id, AT_0001, 14))).toEqual([
+      "2026-10-31",
+      "2026-11-01",
+    ]);
   });
 
   it("shows the next 30 days when asked", async () => {

@@ -2,9 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 
-// The Upcoming view (chunk 2.6): the next 14 days by local date, plans and
-// deadlines merged, a 30-day toggle in the URL. The browser (and so the
-// confirmed time zone) is in Tokyo, far from UTC.
+// The Upcoming view (chunk 2.6): the next week by local date (14 or 30 days
+// on their tabs), plans and deadlines merged, the range in the URL. The
+// browser (and so the confirmed time zone) is in Tokyo, far from UTC.
 
 const TOKYO = "Asia/Tokyo";
 test.use({ timezoneId: TOKYO });
@@ -82,22 +82,37 @@ async function setTimedDeadline(
   await expect(page.getByText("Task updated", { exact: true })).toBeVisible();
 }
 
-test("an empty window is calm, and the 30-day toggle lives in the URL", async ({
+test("an empty window is calm, and the range tabs live in the URL", async ({
   page,
 }) => {
   await signInAndConfirm(page);
   await openUpcoming(page);
+  // Within a Week is the default.
+  const ranges = page.getByRole("navigation", { name: "Days to show" });
+  await expect(ranges.getByRole("link")).toHaveText([
+    "Within a Week",
+    "Next 14 days",
+    "Next 30 days",
+  ]);
+  await expect(
+    ranges.getByRole("link", { name: "Within a Week" }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Nothing within a week" }),
+  ).toBeVisible();
+  await expectNoSeriousViolations(page);
+
+  await page.getByRole("link", { name: "Show the next 14 days" }).click();
+  await expect(page).toHaveURL(/\/plan\/upcoming\?days=14$/);
   await expect(
     page.getByRole("heading", {
       level: 2,
       name: "Nothing in the next 14 days",
     }),
   ).toBeVisible();
-  const ranges = page.getByRole("navigation", { name: "Days to show" });
   await expect(
     ranges.getByRole("link", { name: "Next 14 days" }),
   ).toHaveAttribute("aria-current", "page");
-  await expectNoSeriousViolations(page);
 
   await page.getByRole("link", { name: "Show the next 30 days" }).click();
   await expect(page).toHaveURL(/\/plan\/upcoming\?days=30$/);
@@ -130,6 +145,7 @@ test("plans and deadlines land on their local days, a timed one included", async
     dueDate: tokyoDate(4),
   });
   await addTask(page, "Water the plants", { plannedDate: tokyoDate(0) });
+  await addTask(page, "Send the forms", { dueDate: tokyoDate(10) });
   await addTask(page, "Book flights", { dueDate: tokyoDate(20) });
   await addTask(page, "Call the dentist");
   // 00:30 in Tokyo is 15:30 UTC the day before, so a UTC-date bug would
@@ -162,16 +178,22 @@ test("plans and deadlines land on their local days, a timed one included", async
     day(page, tokyoDate(4)).getByText("Planned, due", { exact: true }),
   ).toBeVisible();
 
-  // Today's plan is on Today, and day 20 is outside the first 14 days.
+  // Today's plan is on Today; day 10 is past the week, day 20 past 14 days.
   await expect(page.getByText("Water the plants")).toHaveCount(0);
+  await expect(page.getByText("Send the forms")).toHaveCount(0);
   await expect(page.getByText("Book flights")).toHaveCount(0);
   await expectNoSeriousViolations(page);
 
+  const ranges = page.getByRole("navigation", { name: "Days to show" });
+  await ranges.getByRole("link", { name: "Next 14 days" }).click();
+  await expect(page).toHaveURL(/\?days=14$/);
+  await expect(
+    day(page, tokyoDate(10)).getByText("Send the forms"),
+  ).toBeVisible();
+  await expect(page.getByText("Book flights")).toHaveCount(0);
+
   // The next 30 days include it, and the choice survives a reload.
-  await page
-    .getByRole("navigation", { name: "Days to show" })
-    .getByRole("link", { name: "Next 30 days" })
-    .click();
+  await ranges.getByRole("link", { name: "Next 30 days" }).click();
   await expect(page).toHaveURL(/\?days=30$/);
   await expect(
     day(page, tokyoDate(20)).getByText("Book flights"),

@@ -5,10 +5,14 @@ import type { Task } from "./tasks";
 import {
   dueDayOf,
   groupUpcomingTasks,
+  longerUpcomingRange,
   parseUpcomingRange,
   upcomingDayLabel,
+  upcomingEmptyTitle,
   upcomingEntryDetails,
   upcomingHref,
+  type UpcomingRange,
+  UPCOMING_RANGE_LABELS,
   upcomingWindow,
 } from "./upcoming";
 
@@ -43,7 +47,7 @@ function task(fields: Partial<Task> = {}): Task {
 
 const timed = (iso: string, dueTz = TOKYO) => ({ dueAt: new Date(iso), dueTz });
 
-function titlesByDay(tasks: Task[], days: 14 | 30 = 14) {
+function titlesByDay(tasks: Task[], days: UpcomingRange = 14) {
   const window = upcomingWindow(TODAY, days, TOKYO);
   return Object.fromEntries(
     groupUpcomingTasks(tasks, window, TOKYO).map((day) => [
@@ -56,27 +60,50 @@ function titlesByDay(tasks: Task[], days: 14 | 30 = 14) {
   );
 }
 
-describe("parseUpcomingRange and upcomingHref", () => {
-  it("accepts 14 or 30 days and falls back to 14", () => {
-    expect(parseUpcomingRange(undefined)).toBe(14);
+describe("ranges", () => {
+  it("accepts 7, 14 or 30 days and falls back to a week", () => {
+    expect(parseUpcomingRange(undefined)).toBe(7);
+    expect(parseUpcomingRange("7")).toBe(7);
     expect(parseUpcomingRange("14")).toBe(14);
     expect(parseUpcomingRange("30")).toBe(30);
     expect(parseUpcomingRange(["30", "14"])).toBe(30);
-    for (const value of ["7", "31", "abc", "", "30.0x", "-30"]) {
-      expect(parseUpcomingRange(value)).toBe(14);
+    for (const value of ["8", "31", "abc", "", "30.0x", "-30"]) {
+      expect(parseUpcomingRange(value)).toBe(7);
     }
   });
 
-  it("keeps the default range as the plain path, and round-trips", () => {
-    expect(upcomingHref(14)).toBe("/plan/upcoming");
+  it("keeps the default week as the plain path, and round-trips", () => {
+    expect(upcomingHref(7)).toBe("/plan/upcoming");
+    expect(upcomingHref(14)).toBe("/plan/upcoming?days=14");
     expect(upcomingHref(30)).toBe("/plan/upcoming?days=30");
-    const search = new URL(upcomingHref(30), "http://x").searchParams;
-    expect(parseUpcomingRange(search.get("days") ?? undefined)).toBe(30);
+    for (const range of [14, 30] as const) {
+      const search = new URL(upcomingHref(range), "http://x").searchParams;
+      expect(parseUpcomingRange(search.get("days") ?? undefined)).toBe(range);
+    }
+  });
+
+  it("labels each tab, and suggests the next longer range when empty", () => {
+    expect(UPCOMING_RANGE_LABELS).toEqual({
+      7: "Within a Week",
+      14: "Next 14 days",
+      30: "Next 30 days",
+    });
+    expect(upcomingEmptyTitle(7)).toBe("Nothing within a week");
+    expect(upcomingEmptyTitle(14)).toBe("Nothing in the next 14 days");
+    expect(longerUpcomingRange(7)).toBe(14);
+    expect(longerUpcomingRange(14)).toBe(30);
+    expect(longerUpcomingRange(30)).toBeNull();
   });
 });
 
 describe("upcomingWindow", () => {
-  it("runs from tomorrow through today + 14 or + 30, in the user's zone", () => {
+  it("runs from tomorrow through today + 7, 14 or 30, in the user's zone", () => {
+    expect(upcomingWindow(TODAY, 7, TOKYO)).toEqual({
+      from: "2026-10-24",
+      to: "2026-10-30",
+      start: new Date("2026-10-23T15:00:00Z"),
+      end: new Date("2026-10-30T15:00:00Z"),
+    });
     expect(upcomingWindow(TODAY, 14, TOKYO)).toEqual({
       from: "2026-10-24",
       to: "2026-11-06",
@@ -121,6 +148,24 @@ describe("groupUpcomingTasks", () => {
     ).toEqual({
       "2026-10-24": ["Tomorrow [planned]"],
       "2026-11-06": ["Day 14 [due]"],
+    });
+  });
+
+  it("within a week covers tomorrow through day 7", () => {
+    expect(
+      titlesByDay(
+        [
+          task({ title: "Tomorrow", plannedDate: "2026-10-24" }),
+          task({ title: "Day 7", dueDate: "2026-10-30" }),
+          task({ title: "Day 8", dueDate: "2026-10-31" }),
+          // 00:00 on day 8 in Tokyo is outside the week.
+          task({ title: "Day 8 midnight", ...timed("2026-10-30T15:00:00Z") }),
+        ],
+        7,
+      ),
+    ).toEqual({
+      "2026-10-24": ["Tomorrow [planned]"],
+      "2026-10-30": ["Day 7 [due]"],
     });
   });
 
