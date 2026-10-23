@@ -8,6 +8,7 @@ import {
   type AgendaEntry,
   type AgendaRange,
 } from "@/lib/agenda";
+import { gridEntries, type GridRange } from "@/lib/calendar-views";
 import type { GoalStatus } from "@/lib/goals";
 import type { LifeAreaStatus } from "@/lib/life-areas";
 import { db } from "@/server/db/client";
@@ -41,6 +42,27 @@ export async function listAgenda(
     listAgendaTasks(userId, { from: range.start, to, timeZone }),
   ]);
   return agendaEntries(events, tasks, range, timeZone);
+}
+
+/**
+ * The Week or Day grid's items for `range` (chunk 4.6): the user's events
+ * and occurrences overlapping its local days in `timeZone` (the user's),
+ * and their open tasks' timed deadlines on those days.
+ */
+export async function listCalendarGrid(
+  userId: string,
+  range: GridRange,
+  timeZone: string,
+): Promise<AgendaEntry<PlanTaskItem>[]> {
+  const [events, tasks] = await Promise.all([
+    eventsBetween(userId, {
+      localStart: range.start,
+      localEnd: range.end,
+      tz: timeZone,
+    }),
+    listAgendaTasks(userId, { from: range.start, to: range.end, timeZone }),
+  ]);
+  return gridEntries(events, tasks, range, timeZone);
 }
 
 /** What an event can link to: goals (with their area) and life areas. */

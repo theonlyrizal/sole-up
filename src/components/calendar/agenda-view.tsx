@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 
 import { useRefreshOnNewDay } from "@/components/tasks/use-refresh-on-new-day";
-import { TaskFormDialog } from "@/components/tasks/task-form";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -12,7 +11,6 @@ import {
   AGENDA_DAY_COUNT_LABELS,
   AGENDA_DAY_COUNTS,
   agendaEnd,
-  type AgendaEntry,
   agendaEntryKind,
   agendaHref,
   type AgendaRange,
@@ -33,8 +31,10 @@ import {
   type CalendarFeedItem,
   type CalendarItemSegment,
 } from "./full-calendar";
+import { type CalendarEntry, ItemDialog, useItemDialog } from "./item-dialog";
+import { pillClass, ViewNav } from "./view-nav";
 
-type Entry = AgendaEntry<PlanTaskItem>;
+type Entry = CalendarEntry;
 
 type AgendaViewProps = EventFormContext & {
   entries: Entry[];
@@ -57,14 +57,8 @@ export function AgendaView({
   ...context
 }: AgendaViewProps) {
   useRefreshOnNewDay(nextDayStartsAt);
-  // The clicked item stays selected while its dialog closes, so the dialog
-  // can finish closing and return focus to the item's button.
-  const [selected, setSelected] = useState<Entry | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const listRef = useRef<HTMLDivElement>(null);
-  // Which item button opened the dialog, by position: FullCalendar may
-  // re-render the rows while it is open, replacing the button itself.
-  const openerIndex = useRef(-1);
+  const { containerRef, openItem, dialog } =
+    useItemDialog("[data-agenda-item]");
   const items = useMemo(
     () =>
       entries.map((entry): CalendarFeedItem<Entry> => ({
@@ -81,35 +75,20 @@ export function AgendaView({
     [entries],
   );
   const rangeLabel = agendaRangeLabel(range, context.locale);
-  const itemButtons = () =>
-    Array.from(
-      listRef.current?.querySelectorAll<HTMLElement>("[data-agenda-item]") ??
-        [],
-    );
-  const open = (entry: Entry, opener: HTMLElement) => {
-    openerIndex.current = itemButtons().indexOf(opener);
-    setSelected(entry);
-    setDialogOpen(true);
-  };
-  const returnFocus = (event: Event) => {
-    const opener = itemButtons()[openerIndex.current];
-    if (!opener) return;
-    event.preventDefault();
-    opener.focus();
-  };
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <RangeNav range={range} today={today} />
+        <ViewNav current="agenda" date={range.start} today={today} />
         <EventFormDialog {...context} trigger={<Button>New event</Button>} />
       </div>
+      <RangeNav range={range} today={today} />
       <DayCountNav range={range} today={today} />
       <p className="text-muted">
         <span className="sr-only">Showing </span>
         {rangeLabel}
       </p>
-      <div ref={listRef}>
+      <div ref={containerRef}>
         <Calendar
           view="agenda"
           range={{ start: range.start, end: agendaEnd(range) }}
@@ -128,7 +107,7 @@ export function AgendaView({
               entry={entry}
               segment={segment}
               context={context}
-              onOpen={(opener) => open(entry, opener)}
+              onOpen={(opener) => openItem(entry, opener)}
             />
           )}
           empty={
@@ -139,37 +118,10 @@ export function AgendaView({
           }
         />
       </div>
-      {selected?.kind === "event" && (
-        <EventFormDialog
-          key={selected.id}
-          {...context}
-          event={selected.event}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          onCloseAutoFocus={returnFocus}
-        />
-      )}
-      {selected?.kind === "task" && (
-        <TaskFormDialog
-          key={selected.id}
-          task={selected.task}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          onCloseAutoFocus={returnFocus}
-        />
-      )}
+      <ItemDialog {...dialog} context={context} />
     </div>
   );
 }
-
-const pillClass = (current: boolean) =>
-  cx(
-    "inline-flex rounded-md border px-3 py-1.5 text-sm",
-    current
-      ? "border-accent font-medium text-fg"
-      : "border-border text-muted hover:text-fg",
-    focusRing,
-  );
 
 function RangeNav({ range, today }: { range: AgendaRange; today: LocalDate }) {
   const isToday = range.start === today;

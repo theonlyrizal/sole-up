@@ -178,7 +178,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 4.3 | Recurring events: series, exceptions and scopes | done | chunk/4.3-recurring-events | 2026-10-23 | `rrule` + `calendar_event_exceptions` (snapshot exceptions, migration 0009), `eventsBetween` expands series, this/following/all edit and delete with exception carry-over, dropped reported back, exception audit events; no UI |
 | 4.4 | Event create/edit UI | done | chunk/4.4-event-dialog | 2026-10-23 | `/plan/calendar` (Calendar under Plan) listing 30 days, event dialog (60-min default, inclusive all-day end, goal → area, zone note), repeat builder with field errors, scope prompt naming dropped exceptions via dry-run previews |
 | 4.5 | FullCalendar foundation and Agenda view | done | chunk/4.5-agenda-view | 2026-10-23 | `@fullcalendar/react` 7.1.1 behind one token-themed, client-only `Calendar` wrapper; `/plan/calendar` is the Agenda (events + occurrences, plans, timed deadlines) for `?start=&days=7\|14\|30` (default 30 from today), items open their dialogs |
-| 4.6 | Week and Day views | todo | | | |
+| 4.6 | Week and Day views | done | chunk/4.6-week-day-views | 2026-10-24 | `/plan/calendar?view=week\|day&date=`: FullCalendar time grids from the user's week start, all-day row, timed deadlines as dashed markers, overlaps side by side, arrow-key moves between items, Week → Day below `md` |
 | 4.7 | Time blocks: schema and service | todo | | | |
 | 4.8 | Time blocks UI | todo | | | |
 | 4.9 | Integrations with Today and Home | todo | | | |
@@ -2039,3 +2039,33 @@ Template:
   - FullCalendar's English `aria-label`s on the list and days: pass the user's locale (with its locale data) or a `buttonHint`-style option if a non-English locale ever matters.
   - Completed tasks are not on the Agenda, so a past range shows only events; consider showing closed tasks for past days if reviewing history wants it.
   - Earlier follow-ups still open: field errors that stay until the next save in the event dialog; event history for link clears.
+
+### 4.6: Week and Day views (2026-10-24)
+- **Built:**
+  - `src/lib/calendar-views.ts` (pure): `CALENDAR_VIEWS` and labels, `parseCalendarView`, `GridRange` (`view`, anchor `date`, `start`/`end`), `gridRange` (week from the user's week start, or one day), `parseGridRange`, `gridHref`, `shiftGridDate`, `inGridRange`, `gridDays`, `gridRangeLabel`, `gridDayShortLabel`, `gridEntries` (events plus timed deadlines as `DEADLINE_MARKER_MINUTES` = 15-minute markers; no plans, no all-day deadlines), and the arrow-key rule `gridItemTarget` / `isGridKey`. `eventEntry` in `agenda.ts` is now exported for it.
+  - `listCalendarGrid(userId, range, timeZone)` in `calendar-events/queries.ts` (`eventsBetween` + `listAgendaTasks`, filtered by `gridEntries`).
+  - The `Calendar` wrapper takes `view: "agenda" | "week" | "day"` (`/timegrid` added; time grids get exactly the range's days via `visibleRange`), per-item `contrastColor` and `className`, `slotEventOverlap={false}`, a now indicator, "All day" row text, and a `dayLink` prop (FullCalendar's own nav links on Week's day headings).
+  - `src/components/calendar/time-grid-view.tsx` (`TimeGridView`): Agenda | Week | Day switch, Previous/Today/Next in the URL, New event, the range label, a calm "Nothing this week/day" line or the keyboard hint, the grid, and one dialog per clicked item. Items are our own buttons (`data-calendar-item`, name = title) with a description (kind, day, time); arrow keys move between them. Below `md` Week `router.replace`s to Day for the same date.
+  - Shared: `item-dialog.tsx` (`useItemDialog`, `ItemDialog`: the 4.5 focus-return-by-position logic) and `view-nav.tsx` (`ViewNav`, `pillClass`), now used by the Agenda too. `calendar-theme.css`: the dashed deadline marker and a focus ring for FullCalendar's nav links.
+  - `/plan/calendar` page: `?view=week|day&date=`; the Agenda stays the plain path. The page is `max-w-5xl` for Week and Day.
+  - Tests: unit `calendar-views.test.ts` (17: views, week starts 0/1/6, day, URLs round trip, moves across a month end, labels, Tokyo markers, plans/all-day/out-of-range deadlines left out, arrow-key targets incl. skipping an empty day and nearest-in-time); integration `calendar-grid.integration.test.ts` (4, Tokyo: a week's series occurrences, all-day event and deadlines incl. a New York deadline landing on the next Tokyo day, no plans; range edges at 00:00/23:59 and an event crossing in from the night before; Day holds one day; closed tasks; cross-user); e2e `tests/e2e/week-day.spec.ts` (3, browser in Tokyo: Monday default then Sunday after Settings, Previous/Next/Today in the URL through a reload, a day heading opens Day, axe on Week and Day; a 00:30 deadline marker, an all-day event in the all-day row, Dentist 09:00 and Standup 09:30 side by side in Week and Day, ArrowUp/Down/Left/Right, Enter/Escape with focus back for a task and an event, Tab order, axe with a dialog open; a phone gets Day (Week link hidden) in the dark theme with no sideways scroll and axe).
+  - README "UI shell and components": the views, `dayLink` and the URLs.
+- **Deviations:**
+  1. **Day headings in Week use FullCalendar's nav links** (`navLinks` + `navLinkDayClick` → `router.push`), not our own `<Link>`: FullCalendar wraps a time grid's heading content in `aria-hidden` unless it is its nav link, and a link of ours inside failed axe (`aria-hidden-focus`). They are `role="link"` elements named by the full date ("Today · Saturday, October 24, 2026"), not `<a href>`.
+  2. **The Agenda's toolbar changed:** the view switch is its first row (with New event), then its range moves and day counts as before.
+- **Decisions:**
+  1. **URL:** `?view=week|day&date=YYYY-MM-DD`; `date` is the anchor (any day of the week), left out when it is today. Previous/Next move it by 7 or 1. Switching views carries the day: the Agenda starts on the grid's first day, Week holds it, Day shows it.
+  2. **Range from `visibleRange`**, not `timeGridWeek` + `firstDay`, so the grid shows exactly the days the server loaded.
+  3. **Deadline markers last 15 minutes** on the grid so they take part in the overlap layout; their label is "Due <time>". Planned tasks and all-day deadlines are not on the grids (chunk text).
+  4. **Keyboard:** every item is a Tab stop (DOM order: day headings, the all-day row, then each day's timed items); Up/Down move through a day (all-day first, then by time), Left/Right go to the nearest-in-time item of the previous/next day that has items, Home/End to the first/last item.
+  5. **Full 24-hour grid with `height="auto"`**, no inner scroller: no scroll trap, and no empty scrollable region for axe's `scrollable-region-focusable`. The page is long; the morning is below the fold.
+  6. **Phone fallback by redirect**, so the URL always says what is shown; the Week link is hidden below `md`.
+- **Next chunk should know:**
+  - 4.7/4.8: blocks join `gridEntries` (a new `kind`) and `listCalendarGrid`; slot selection needs `/interaction` and `selectable` on the wrapper. Our item buttons sit inside FullCalendar's event elements, which are absolutely positioned.
+  - Locators: a column date is `.soleup-calendar [role="columnheader"] time[datetime]`; an item is the button named by its title inside `[role="gridcell"][data-date="YYYY-MM-DD"]`; its wrapper (`xpath=..`) holds the time line. Nav regions: "Calendar view", "Move through the calendar". Day links are `getByRole("link", { name: /^Today · / })` etc.
+  - FullCalendar's own strings (column `aria-label`s, slot hours) stay in its default English, as in 4.5.
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 532 unit, 362 integration), `pnpm build` and `pnpm test:e2e` (51 tests, first full run clean) pass; `week-day.spec.ts` passed 9 of 9 with `--repeat-each=3`. No schema change, so no migration. A manual pass with a screen reader is not done.
+- **Follow-ups:**
+  - Scroll the grid to the morning (or the first item) on load, if the long 24-hour page bothers while dogfooding.
+  - The FullCalendar grid has `role="grid"` but its cells aren't arrow-navigable themselves (our handler moves between items only); revisit in 10.5's accessibility pass.
+  - Earlier follow-ups still open: FullCalendar's English labels; closed tasks on past Agenda days; event dialog field errors that stay until the next save; event history for link clears.

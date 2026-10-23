@@ -125,7 +125,8 @@ export type AgendaEntry<T extends AgendaTaskFields = AgendaTaskFields> = {
   | { kind: "task"; task: T; role: AgendaTaskRole }
 );
 
-function eventEntry(event: CalendarEventOccurrence): AgendaEntry<never> {
+/** An event occurrence's row (the Week and Day grids use it too). */
+export function eventEntry(event: CalendarEventOccurrence): AgendaEntry<never> {
   const base = {
     id: `event:${occurrenceKey(event)}`,
     title: event.title,
