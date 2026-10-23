@@ -57,6 +57,13 @@
       "when": 1792689091413,
       "tag": "0007_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792752892638,
+      "tag": "0008_calendar_events",
+      "breakpoints": true
     }
   ]
 }

@@ -173,7 +173,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 3.1 | Metrics module foundation | done | chunk/3.1-metrics | 2026-10-23 | `src/server/modules/metrics/`: `Metric<V>` contract (`value`, `definition`, `range` with `asOf`, `hasData`), `todayTaskCounts`, `goalsWithoutNextAction`, `deadlinesNextSevenDays`; no UI |
 | 3.2 | Home summaries | done | chunk/3.2-home-summaries | 2026-10-23 | `/home`: Today, Goals without a next action (named, from a new list variant) and Deadlines in the next 7 days cards, each with definition, range and "as of"; numbers link to their lists; "Nothing yet" with no data; no score |
 | 4.0 | Decision gate: calendar | done | chunk/4.0-calendar-decisions | 2026-10-23 | ADR 0012: RRULE recurrence (rrule-temporal, three scopes), task-bound time blocks with status + auto-mark, FullCalendar v7 Week/Day/Agenda, all-day end exclusive; Phase 4 now 4.1–4.11 |
-| 4.1 | Calendar events: schema and service | todo | | | |
+| 4.1 | Calendar events: schema and service | done | chunk/4.1-calendar-events | 2026-10-23 | `calendar_events` (shape + end CHECKs, column-list `SET NULL` goal/area FKs, 4 indexes), service CRUD with `calendar_event.created`/`.updated`, `eventsBetween` by instant/local-date overlap; no UI |
 | 4.2 | Recurrence engine | todo | | | |
 | 4.3 | Recurring events: series, exceptions and scopes | todo | | | |
 | 4.4 | Event create/edit UI | todo | | | |
@@ -1868,3 +1868,29 @@ Template:
   - The 5.0 gate should ask whether event and block occurrences can remind. Occurrences are expanded, not stored (ADR 0012 consequences).
   - Phase 10 export (10.1) must include events, blocks and both exceptions tables.
   - Events aren't draggable on the grid (only blocks are). This is listed for the checkpoint.
+
+### 4.1: Calendar events: schema and service (2026-10-23)
+- **Built:**
+  - `src/lib/calendar-events.ts` (pure): length limits, `CALENDAR_EVENT_SOURCES`, `CALENDAR_RANGE_MAX_DAYS` (366), `CALENDAR_EVENT_EDITABLE_FIELDS`, the `CalendarEvent` type (a union discriminated by `allDay`, with the other shape's columns `null`), `calendarEventTiming(when)` (form times → stored columns).
+  - Schema `src/server/db/schema/calendar-events.ts` + migration `0008_calendar_events.sql`: columns per the chunk, `unique (id, user_id)`, composite FKs `(goal_id, user_id)` and `(life_area_id, user_id)` hand-edited to `ON DELETE SET NULL ("goal_id")` / `("life_area_id")`, indexes `(user_id, start_at)`, `(user_id, start_date)`, `(user_id, goal_id)`, `(user_id, life_area_id)`, and CHECKs `calendar_events_shape_check`, `_end_check`, `_source_check`, `_title_length_check`, `_description_length_check`, `_location_length_check`.
+  - `src/server/modules/calendar-events/`: `validation.ts` (`createCalendarEventSchema`, `updateCalendarEventSchema`, `calendarEventIdSchema`, `eventsBetweenSchema`), `service.ts` (`createCalendarEvent`, `getCalendarEvent`, `updateCalendarEvent`, `deleteCalendarEvent`, `eventsBetween`).
+  - Audit events `calendar_event.created|updated` in `AUDIT_EVENTS`.
+  - Tests: unit `src/lib/calendar-events.test.ts` (inclusive → exclusive all-day end, midnight crossing, New York DST gap/overlap) and `calendar-events/validation.test.ts` (19); integration `calendar-events.integration.test.ts` (20: each CHECK, goal and life-area deletes keep the event and `user_id`, user cascade, audit privacy, no-op edit, timed ↔ all-day switch in one event, delete removes only that event's audit rows, cross-user `NotFound` on get/update/delete/range, foreign goal/area field errors, range edges, midnight crossing seen from New York and Tokyo, the 23- and 25-hour New York days, all-day exclusivity in four zones, ordering).
+- **Deviations:**
+  1. **Two extra indexes**, `(user_id, goal_id)` and `(user_id, life_area_id)`, so the `SET NULL` on a goal or area delete doesn't scan the table (tasks has the same).
+  2. **No `actions.ts`** ("no UI"; 4.4 adds them), as in 1.1 and 2.2.
+- **Decisions:**
+  1. **Form input is flat fields** (`allDay`, `startDate`, `startTime`, `endDate`, `endTime`, `tz`), like the task deadline. All-day `endDate` is **inclusive** in the input and stored + 1 day (ADR 0012); times and zone are ignored on all-day events. The parsed output groups them as `when`, which `calendarEventTiming` turns into columns. Timed times use `instantFromLocal` ("compatible"), and the end-after-start check compares instants, so a spring-gap start that lands on the end is refused (`endTime` error).
+  2. **`eventsBetween(userId, { localStart, localEnd, tz })` takes whole local days with an exclusive `localEnd`** (what FullCalendar sends), at most 366 days. Timed: `start_at < end-of-range and end_at > start-of-range`, with both bounds from `startOfLocalDay` (so 23/25-hour days are right). All-day: `start_date < localEnd and end_date > localStart`. Touching an edge is not overlap. Sorted by start (an all-day event at its first day's local midnight in `tz`), all-day first on a tie, then ID.
+  3. **`calendar_event.updated` lists changed field names** (title/description/location by name only) plus from/to for the shape, times, dates, zone and links that changed. A timed ↔ all-day switch therefore records all six timing columns in one event. `created` records every structured field, including `source`.
+  4. A foreign or missing goal/area is caught from the composite FK and returned as a `goalId` / `lifeAreaId` field error, as in goals and tasks.
+  5. `allDay` must be a real boolean; 4.4 converts its checkbox.
+- **Next chunk should know:**
+  - 4.2/4.3: recurrence adds `rrule` to this table; keep the hand-edited `SET NULL (column)` FKs if drizzle-kit regenerates them (comment in the schema and the SQL). `CalendarEvent` and `toCalendarEvent` will need the series fields.
+  - 4.4: the inverse of `calendarEventTiming` (stored exclusive end → the form's inclusive end, instants → local date/time in the event's `tz`) is not written yet; `localDateTimeOf` and `addDays(endDate, -1)` cover it.
+  - 4.5: `eventsBetween` is the range query; pass FullCalendar's visible range as local dates in the user's zone.
+  - Deleting a goal or life area clears the event's link through the FK with no `calendar_event.updated` event (same as goals' area).
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 386 unit, 319 integration) passes. `pnpm db:generate` reports no schema changes after the hand edit. Dev DB migrated. No UI, so `pnpm build` and `pnpm test:e2e` were not run.
+- **Follow-ups:**
+  - Goal and life-area deletes write no event history for the events whose link they clear (consider when 4.4 shows event history, if it does).
+  - Phase 10 export must include `calendar_events` (already noted in 4.0).
