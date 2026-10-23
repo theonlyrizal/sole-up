@@ -174,7 +174,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 3.2 | Home summaries | done | chunk/3.2-home-summaries | 2026-10-23 | `/home`: Today, Goals without a next action (named, from a new list variant) and Deadlines in the next 7 days cards, each with definition, range and "as of"; numbers link to their lists; "Nothing yet" with no data; no score |
 | 4.0 | Decision gate: calendar | done | chunk/4.0-calendar-decisions | 2026-10-23 | ADR 0012: RRULE recurrence (rrule-temporal, three scopes), task-bound time blocks with status + auto-mark, FullCalendar v7 Week/Day/Agenda, all-day end exclusive; Phase 4 now 4.1–4.11 |
 | 4.1 | Calendar events: schema and service | done | chunk/4.1-calendar-events | 2026-10-23 | `calendar_events` (shape + end CHECKs, column-list `SET NULL` goal/area FKs, 4 indexes), service CRUD with `calendar_event.created`/`.updated`, `eventsBetween` by instant/local-date overlap; no UI |
-| 4.2 | Recurrence engine | todo | | | |
+| 4.2 | Recurrence engine | done | chunk/4.2-recurrence-engine | 2026-10-23 | `src/lib/recurrence.ts` on `rrule-temporal` 2.2.8 (no global Temporal): builder-subset Zod schemas, rule ↔ builder, pure floating-time `expandOccurrences` with exceptions and the 366-day cap, `describeRecurrence`; no schema, no UI |
 | 4.3 | Recurring events: series, exceptions and scopes | todo | | | |
 | 4.4 | Event create/edit UI | todo | | | |
 | 4.5 | FullCalendar foundation and Agenda view | todo | | | |
@@ -1894,3 +1894,34 @@ Template:
 - **Follow-ups:**
   - Goal and life-area deletes write no event history for the events whose link they clear (consider when 4.4 shows event history, if it does).
   - Phase 10 export must include `calendar_events` (already noted in 4.0).
+
+### 4.2: Recurrence engine (2026-10-23)
+- **Built:**
+  - Dependency `rrule-temporal` 2.2.8 (MIT, published 2026-10-01), imported only in `src/lib/recurrence.ts`.
+  - `src/lib/recurrence.ts` (pure, client-safe):
+    - Builder types and constants: `Recurrence` (a union by `frequency`), `MonthlyOn`, `RecurrenceEnd`, `RECURRENCE_FREQUENCIES`/`_WEEKDAYS`/`_ORDINALS`, `RECURRENCE_INTERVAL_MAX` (99), `RECURRENCE_COUNT_MAX` (999).
+    - `recurrenceSchema` (builder values as the form sends them; strict objects, weekdays sorted Monday first) and `rruleSchema` (a stored rule string → builder values, with a specific message for each rejection).
+    - `fromRrule(rule)` (throws `RangeError`) and `toRrule(values)` (canonical: FREQ, INTERVAL if not 1, BYDAY/BYMONTHDAY, COUNT/UNTIL).
+    - `expandOccurrences(series, { localStart, localEnd, tz }, exceptions)`, overloaded for `TimedSeries` and `AllDaySeries`, with typed `TimedException<P>`/`AllDayException<P>` (`cancelled`, or `modified` with optional new times and a caller-defined `patch`).
+    - `describeRecurrence(ruleOrValues, { start, locale })`.
+  - `daysBetween(start, end)` in `src/lib/dates.ts`.
+  - Tests: `src/lib/recurrence.test.ts` (79): weekly 09:00 across both New York DST changes, a spring-gap time, duration across DST, monthly on the 31st and the last Friday, yearly 29 Feb (leap years only, COUNT counts only those), COUNT and UNTIL boundaries (UNTIL's local date when it is already the next day in UTC), cancel/move/patch exceptions (moved in from outside the range, moved out, stale keys ignored), exact range edges for timed and all-day, a range in another zone, the 366-day cap, round trips both ways, 34 rejected rules, and the summaries. `dates.test.ts` covers `daysBetween`.
+  - Docs: DATA_MODEL (`UNTIL` form, gap and COUNT rules), README "Dates and time zones".
+- **Deviations:**
+  1. **The range is one object, `{ localStart, localEnd, tz }`** (whole local days, end exclusive), rather than separate `rangeStart`/`rangeEnd`, so it means exactly what `eventsBetween` takes and the 366-day cap counts days. A timed range in instants would need slack for 23- and 25-hour days.
+- **Decisions:**
+  1. **No global Temporal needed.** The library bundles its own polyfill and reads `globalThis.Temporal ?? bundled`; it never writes the global (checked in its dist and at runtime). `recurrence.ts` passes it plain `{ timeZoneId, toString }` inputs and reads results with `toPlainDateTime()`, so it never imports `temporal-polyfill` itself.
+  2. **Expansion is in floating time.** The library generates local dates and times as if in UTC, and each becomes an instant in the series' zone through `instantFromLocal`. A time skipped by spring-forward moves forward ("compatible", ADR 0008). The library's own zone mode follows RFC 5545 and would drop that occurrence.
+  3. **`UNTIL` is stored as a local date** (`UNTIL=20261220`): the last day, inclusive, an occurrence may start on, in the series' zone. Every builder frequency has at most one occurrence a day, so this is exact. `UNTIL` with a time (`…T000000Z`) is rejected. This is RFC 5545-valid for floating rules only; an iCalendar export (10.1) must convert it.
+  4. **The series start is always the first occurrence** (`includeDtstart`), and it counts toward `COUNT`, even when it doesn't match the rule's days. The first occurrence keeps the stored `startAt`, so a start in the second 01:30 of a fall-back night still matches its exception key.
+  5. **Builder subset:** monthly needs exactly one of `BYMONTHDAY=1..31` or `BYDAY` with an ordinal of 1–4 or -1; weekly needs plain `BYDAY`; daily and yearly take no day parts; no `WKST`, so weeks start on Monday for `INTERVAL` > 1. Month days 29–31 skip shorter months and yearly 29 Feb repeats in leap years only (RFC behaviour); the summary says so.
+  6. **Exceptions:** a modified exception without an end keeps the series' duration from its new start. Exceptions whose original start the rule doesn't generate are ignored, including ones moved into the range.
+  7. Summaries are English, with dates in the user's locale ("Every 2 weeks on Mon and Thu, until 20 Dec 2026").
+- **Next chunk should know:**
+  - 4.3: pass the series row and its exception rows to `expandOccurrences`; put title/description/location/links in `patch`. For "this and following", `UNTIL` is the local date before the split occurrence. To check that an exception still matches a new rule, expand a one-day range around its original start. Validate a submitted rule with `rruleSchema` (or the builder values with `recurrenceSchema` and store `toRrule(...)`).
+  - Expansion throws `RangeError` for a stored rule outside the subset, an empty or reversed range, more than 366 days, or a series whose end isn't after its start.
+  - A timed series start is assumed to be minute precision (the form's `HH:MM`); later occurrences take the start's wall-clock minutes.
+- **Unverified:** none. `pnpm verify` (format, lint, typecheck, 466 unit, 319 integration) passes. No UI, so `pnpm build` and `pnpm test:e2e` were not run.
+- **Follow-ups:**
+  - `rrule-temporal` bundles a full Temporal polyfill. When 4.4 imports `describeRecurrence` or the schemas in a client component, check the bundle; if it matters, move the builder, schemas and summary into a module that doesn't import the library.
+  - Weekly repeats with `INTERVAL` > 1 count weeks from Monday, not the user's week start. Revisit at the checkpoint if it ever surprises.

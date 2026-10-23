@@ -216,7 +216,7 @@ Fields:
 - `all_day`
 - **Timed shape:** `start_at`, `end_at` (UTC instants) and `tz` (the IANA zone it was created in). May span midnight or several days.
 - **All-day shape:** `start_date`, `end_date` (`date`, end **exclusive**). No instants and no zone, so a time-zone change never moves them. The UI shows an inclusive end.
-- `rrule` (optional): the `RRULE` value of a repeating series, limited to the repeat builder's subset (ADR 0012). A series row's times are its first occurrence's.
+- `rrule` (optional): the `RRULE` value of a repeating series, limited to the repeat builder's subset (ADR 0012). A series row's times are its first occurrence's. `UNTIL` is a local date (`UNTIL=20261220`): the last day, inclusive, on which an occurrence may start, in the series' zone.
 - `goal_id` (optional)
 - `life_area_id` (optional; its resource lane. Choosing a goal pre-fills the goal's area.)
 - `source` (`internal` by default; reserved for future integrations)
@@ -226,7 +226,7 @@ Fields:
 
 Constraints: CHECKs enforce exactly one shape and that the end comes after the start. `goal_id` and `life_area_id` are composite FKs with `ON DELETE SET NULL (column)`. `unique (id, user_id)`.
 
-Occurrences of a series are expanded at query time (`src/lib/recurrence.ts`, `rrule-temporal`), never stored. Timed occurrences keep the series' local wall-clock time in `tz` across DST and last the series' elapsed duration.
+Occurrences of a series are expanded at query time (`src/lib/recurrence.ts`, `rrule-temporal`), never stored. Timed occurrences keep the series' local wall-clock time in `tz` across DST and last the series' elapsed duration. A wall-clock time skipped by a spring-forward gap moves forward by the gap ("compatible", ADR 0008) rather than being dropped. The series start is always the first occurrence and counts toward `COUNT`.
 
 External calendar synchronization is out of MVP unless explicitly prioritized. If added, model sync status and conflict handling.
 

@@ -124,6 +124,13 @@ export function addDays(date: LocalDate, days: number): LocalDate {
   return parseLocalDate(date).add({ days }).toString();
 }
 
+/** Calendar days from `start` to `end` (negative when `end` is earlier). */
+export function daysBetween(start: LocalDate, end: LocalDate): number {
+  return parseLocalDate(start).until(parseLocalDate(end), {
+    largestUnit: "days",
+  }).days;
+}
+
 /** Day of the week of a local date: 0 = Sunday … 6 = Saturday. */
 export function dayOfWeek(date: LocalDate): WeekStart {
   // Temporal numbers Monday 1 … Sunday 7.

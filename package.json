@@ -34,6 +34,7 @@
     "radix-ui": "1.7.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "rrule-temporal": "2.2.8",
     "server-only": "0.0.1",
     "temporal-polyfill": "1.0.5",
     "zod": "4.6.7"
