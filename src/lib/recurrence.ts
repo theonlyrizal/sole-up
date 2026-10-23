@@ -524,6 +524,88 @@ export function expandOccurrences<P>(
     : expandTimed(series, range, exceptions as readonly TimedException<P>[]);
 }
 
+/** A timed series' generator and the instant of each local start it yields. */
+function timedGenerator(series: TimedSeries) {
+  const anchor = localDateTimeOf(series.startAt, series.tz);
+  const generate = createGenerator(fromRrule(series.rrule), anchor);
+  // The anchor's own date keeps the stored instant, so a start in the later
+  // half of a fall-back overlap is still the first occurrence.
+  const toInstant = (start: LocalStart) =>
+    start.date === anchor.date
+      ? series.startAt
+      : instantFromLocal(start.date, start.time, series.tz);
+  return { anchor, generate, toInstant };
+}
+
+function allDayGenerator(series: AllDaySeries) {
+  return createGenerator(fromRrule(series.rrule), {
+    date: series.startDate,
+    time: "00:00",
+  });
+}
+
+/** The local date of a series' first occurrence (in its zone, if timed). */
+export function seriesStartDate(series: TimedSeries | AllDaySeries): LocalDate {
+  return series.allDay
+    ? series.startDate
+    : localDateOf(series.startAt, series.tz);
+}
+
+/**
+ * The start of the occurrence the rule generates on local date `date` (in
+ * the series' zone), or null when it generates none that day. Every builder
+ * frequency has at most one occurrence a day, so a date names one
+ * occurrence. Exceptions are not applied.
+ */
+export function occurrenceStartOn(
+  series: TimedSeries,
+  date: LocalDate,
+): Date | null;
+export function occurrenceStartOn(
+  series: AllDaySeries,
+  date: LocalDate,
+): LocalDate | null;
+export function occurrenceStartOn(
+  series: TimedSeries | AllDaySeries,
+  date: LocalDate,
+): Date | LocalDate | null {
+  if (series.allDay)
+    return allDayGenerator(series)(date, date).length > 0 ? date : null;
+  const { generate, toInstant } = timedGenerator(series);
+  const [start] = generate(date, date);
+  return start ? toInstant(start) : null;
+}
+
+/**
+ * How many occurrences the rule generates before local date `date`. It
+ * walks every occurrence from the series start, so use it for rules that
+ * end after a count (at most RECURRENCE_COUNT_MAX occurrences).
+ */
+export function countOccurrencesBefore(
+  series: TimedSeries | AllDaySeries,
+  date: LocalDate,
+): number {
+  const first = seriesStartDate(series);
+  if (date <= first) return 0;
+  const generate = series.allDay
+    ? allDayGenerator(series)
+    : timedGenerator(series).generate;
+  return generate(first, addDays(date, -1)).length;
+}
+
+/** The rule ended so that no occurrence starts on or after `date`. */
+export function endRuleBefore(rule: string, date: LocalDate): string {
+  return toRrule({
+    ...fromRrule(rule),
+    end: { type: "until", until: addDays(date, -1) },
+  });
+}
+
+/** The rule ending after `count` occurrences. */
+export function ruleWithCount(rule: string, count: number): string {
+  return toRrule({ ...fromRrule(rule), end: { type: "count", count } });
+}
+
 function expandTimed<P>(
   series: TimedSeries,
   range: RecurrenceRange,
@@ -532,15 +614,7 @@ function expandTimed<P>(
   const duration = series.endAt.getTime() - series.startAt.getTime();
   if (!(duration > 0))
     throw new RangeError("A series must end after it starts");
-  const anchor = localDateTimeOf(series.startAt, series.tz);
-  const generate = createGenerator(fromRrule(series.rrule), anchor);
-
-  // The anchor's own date keeps the stored instant, so a start in the later
-  // half of a fall-back overlap is still the first occurrence.
-  const toInstant = (start: LocalStart) =>
-    start.date === anchor.date
-      ? series.startAt
-      : instantFromLocal(start.date, start.time, series.tz);
+  const { generate, toInstant } = timedGenerator(series);
 
   const rangeStart = startOfLocalDay(range.localStart, range.tz).getTime();
   const rangeEnd = startOfLocalDay(range.localEnd, range.tz).getTime();
@@ -614,10 +688,7 @@ function expandAllDay<P>(
 ): AllDayOccurrence<P>[] {
   const days = daysBetween(series.startDate, series.endDate);
   if (!(days > 0)) throw new RangeError("A series must end after it starts");
-  const generate = createGenerator(fromRrule(series.rrule), {
-    date: series.startDate,
-    time: "00:00",
-  });
+  const generate = allDayGenerator(series);
   const overlaps = (occurrence: AllDayOccurrence<P>) =>
     occurrence.startDate < range.localEnd &&
     occurrence.endDate > range.localStart;

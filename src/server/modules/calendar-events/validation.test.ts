@@ -4,6 +4,8 @@ import { z } from "zod";
 import {
   calendarEventIdSchema,
   createCalendarEventSchema,
+  deleteCalendarEventOccurrenceSchema,
+  editCalendarEventOccurrenceSchema,
   eventsBetweenSchema,
   updateCalendarEventSchema,
 } from "./validation";
@@ -47,6 +49,7 @@ describe("createCalendarEventSchema", () => {
       location: "Main St",
       goalId: null,
       lifeAreaId: null,
+      rrule: null,
       when: {
         allDay: false,
         startDate: "2026-10-24",
@@ -206,6 +209,160 @@ describe("updateCalendarEventSchema", () => {
     expect(fieldErrors(updateCalendarEventSchema.safeParse(allDay))).toEqual({
       id: ["Choose an event."],
     });
+  });
+});
+
+describe("repeat rule", () => {
+  it("stores a rule in canonical form, and blank as a one-off", () => {
+    expect(
+      createCalendarEventSchema.parse({
+        ...timed,
+        rrule: " FREQ=WEEKLY;BYDAY=FR,MO;INTERVAL=1 ",
+      }).rrule,
+    ).toBe("FREQ=WEEKLY;BYDAY=MO,FR");
+    expect(createCalendarEventSchema.parse({ ...timed, rrule: "" }).rrule).toBe(
+      null,
+    );
+    expect(
+      updateCalendarEventSchema.parse({ id: ID, ...allDay, rrule: null }).rrule,
+    ).toBe(null);
+  });
+
+  it("rejects parts outside the repeat builder", () => {
+    expect(
+      fieldErrors(
+        createCalendarEventSchema.safeParse({
+          ...timed,
+          rrule: "FREQ=HOURLY",
+        }),
+      ),
+    ).toEqual({ rrule: ["Repeat daily, weekly, monthly or yearly."] });
+    expect(
+      fieldErrors(
+        createCalendarEventSchema.safeParse({
+          ...timed,
+          rrule: "FREQ=DAILY;BYHOUR=9",
+        }),
+      ),
+    ).toEqual({ rrule: ["Repeat rules can't use BYHOUR."] });
+  });
+
+  it("needs a repeat that ends on a date to end on or after the start", () => {
+    expect(
+      fieldErrors(
+        createCalendarEventSchema.safeParse({
+          ...timed,
+          rrule: "FREQ=DAILY;UNTIL=20261023",
+        }),
+      ),
+    ).toEqual({ rrule: ["End the repeat on or after the start date."] });
+    expect(
+      createCalendarEventSchema.safeParse({
+        ...timed,
+        rrule: "FREQ=DAILY;UNTIL=20261024",
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe("editCalendarEventOccurrenceSchema", () => {
+  it("takes an instant or a date as the occurrence, and the scope", () => {
+    expect(
+      editCalendarEventOccurrenceSchema.parse({
+        id: ID,
+        originalStart: "2026-10-24T13:00:00Z",
+        scope: "all",
+        ...timed,
+        rrule: "FREQ=DAILY",
+      }),
+    ).toMatchObject({
+      id: ID,
+      originalStart: new Date("2026-10-24T13:00:00Z"),
+      scope: "all",
+      rrule: "FREQ=DAILY",
+      title: "Dentist",
+      when: { allDay: false, startTime: "09:00" },
+    });
+    expect(
+      editCalendarEventOccurrenceSchema.parse({
+        id: ID,
+        originalStart: "2026-10-24",
+        scope: "following",
+        ...allDay,
+      }),
+    ).toMatchObject({ originalStart: "2026-10-24", rrule: null });
+  });
+
+  it("can't change the rule of one occurrence", () => {
+    const input = {
+      id: ID,
+      originalStart: "2026-10-24",
+      scope: "this",
+      ...allDay,
+    };
+    expect(editCalendarEventOccurrenceSchema.parse(input).rrule).toBe(null);
+    expect(
+      editCalendarEventOccurrenceSchema.safeParse({
+        ...input,
+        rrule: "FREQ=DAILY",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a bad occurrence or scope, and checks the times", () => {
+    const input = {
+      id: ID,
+      originalStart: "2026-10-24",
+      scope: "this",
+      ...timed,
+    };
+    expect(
+      fieldErrors(
+        editCalendarEventOccurrenceSchema.safeParse({
+          ...input,
+          originalStart: "next Tuesday",
+        }),
+      ),
+    ).toEqual({ originalStart: ["Choose an occurrence."] });
+    expect(
+      editCalendarEventOccurrenceSchema.safeParse({ ...input, scope: "some" })
+        .success,
+    ).toBe(false);
+    expect(
+      fieldErrors(
+        editCalendarEventOccurrenceSchema.safeParse({
+          ...input,
+          endTime: "08:00",
+        }),
+      ),
+    ).toEqual({ endTime: ["End after the start."] });
+  });
+});
+
+describe("deleteCalendarEventOccurrenceSchema", () => {
+  it("needs the series, the occurrence and a scope", () => {
+    expect(
+      deleteCalendarEventOccurrenceSchema.parse({
+        id: ID,
+        originalStart: "2026-10-24T13:00:00.000Z",
+        scope: "following",
+      }),
+    ).toEqual({
+      id: ID,
+      originalStart: new Date("2026-10-24T13:00:00Z"),
+      scope: "following",
+    });
+    expect(
+      Object.keys(
+        fieldErrors(
+          deleteCalendarEventOccurrenceSchema.safeParse({
+            id: ID,
+            originalStart: "2026-10-24",
+            scope: "everything",
+          }),
+        ),
+      ),
+    ).toEqual(["scope"]);
   });
 });
 

@@ -226,7 +226,9 @@ Fields:
 
 Constraints: CHECKs enforce exactly one shape and that the end comes after the start. `goal_id` and `life_area_id` are composite FKs with `ON DELETE SET NULL (column)`. `unique (id, user_id)`.
 
-Occurrences of a series are expanded at query time (`src/lib/recurrence.ts`, `rrule-temporal`), never stored. Timed occurrences keep the series' local wall-clock time in `tz` across DST and last the series' elapsed duration. A wall-clock time skipped by a spring-forward gap moves forward by the gap ("compatible", ADR 0008) rather than being dropped. The series start is always the first occurrence and counts toward `COUNT`.
+Occurrences of a series are expanded at query time (`src/lib/recurrence.ts`, `rrule-temporal`), never stored. Timed occurrences keep the series' local wall-clock time in `tz` across DST and last the series' elapsed duration. A wall-clock time skipped by a spring-forward gap moves forward by the gap ("compatible", ADR 0008) rather than being dropped. The series start is always the first occurrence and counts toward `COUNT`. `eventsBetween` returns each occurrence with its series' ID, its original start (the key scoped edits and deletes use) and whether an exception changed it.
+
+A series row is changed only through a scope (`editCalendarEventOccurrence`, `deleteCalendarEventOccurrence`); a plain update refuses it. A one-off becomes a series by setting `rrule`.
 
 External calendar synchronization is out of MVP unless explicitly prioritized. If added, model sync status and conflict handling.
 
@@ -239,11 +241,18 @@ Fields:
 - `event_id` (composite FK, cascade)
 - `original_start_at` or `original_start_date`: the occurrence's start as the rule generated it, matching the series' shape. Unique per event.
 - `kind` (`cancelled | modified`)
-- Override fields, for `modified` (optional): start/end, `title`, `description`, `location`, `goal_id`, `life_area_id`
+- Snapshot fields, for `modified`: start/end in the series' shape, `title`, `description`, `location`, `goal_id` (composite FK, `SET NULL (goal_id)`), `life_area_id` (composite FK, `SET NULL (life_area_id)`). A `cancelled` exception sets none of them.
 - `created_at`
 - `updated_at`
 
-A "this and following" change ends the series with `UNTIL` and starts a new series in one transaction. Later exceptions move to the new series when the new rule still generates them, and are dropped otherwise.
+A modified exception is a **full snapshot** of its occurrence, not a set of overrides: a null description or goal means "none", never "as the series". CHECKs keep a cancelled exception empty and a modified one's times in the original start's shape.
+
+Scopes (in one transaction each):
+- **This event:** upserts a modified exception (same shape and zone as the series), or a cancelled one for a delete.
+- **All events:** applies only the fields the user changed from what the occurrence showed. Changed times move the whole series by the same number of days, at the new time of day, zone and length. Deleting removes the series, its exceptions and their audit events.
+- **This and following:** ends the old series with `UNTIL` the day before and inserts a new series from the occurrence, computed as for "all events". Keeping a rule that ends after a count keeps the count left. From the first occurrence it is "all events". Deleting ends the series and removes the later exceptions.
+
+Exceptions follow the series change: each moves to the occurrence the same number of days later, and is dropped (and reported back to the caller) when the new rule generates none that day. A modified exception's field that equalled the old series takes the new series' value, and times equal to the old generated ones follow the new ones; times it moved are kept, unless the series switched between timed and all-day. When the repeat stops (`rrule` null), the first occurrence's changes fold into the event and every other exception is dropped. Exceptions the old rule no longer generated are removed silently.
 
 ### TimeBlock
 A planned slot of time for one task. Rules: ADR 0012. It never links to a project in v1.

@@ -3,12 +3,14 @@ import { z } from "zod";
 import {
   CALENDAR_EVENT_DESCRIPTION_MAX,
   CALENDAR_EVENT_LOCATION_MAX,
+  CALENDAR_EVENT_SCOPES,
   CALENDAR_EVENT_TITLE_MAX,
   CALENDAR_RANGE_MAX_DAYS,
   calendarEventTiming,
 } from "@/lib/calendar-events";
 import { addDays, isLocalDate, type LocalDate } from "@/lib/dates";
 import { canonicalTimeZone } from "@/lib/preferences";
+import { fromRrule, rruleSchema, toRrule } from "@/lib/recurrence";
 
 const idSchema = z.uuid("Choose an event.");
 
@@ -90,7 +92,29 @@ const eventFields = {
   lifeAreaId: linkIdSchema("Choose one of your areas."),
 };
 
-type EventFields = z.output<z.ZodObject<typeof eventFields>>;
+/**
+ * A repeat rule (ADR 0012), limited to the repeat builder's parts and
+ * stored in canonical form. Blank or absent means a one-off event.
+ */
+const rruleFieldSchema = z
+  .string("Choose how often it repeats.")
+  .trim()
+  .nullish()
+  .transform((value, context) => {
+    if (!value) return null;
+    const parsed = rruleSchema.safeParse(value);
+    if (!parsed.success) {
+      for (const { message } of parsed.error.issues) {
+        context.addIssue({ code: "custom", message });
+      }
+      return z.NEVER;
+    }
+    return toRrule(parsed.data);
+  });
+
+type EventFields = z.output<z.ZodObject<typeof eventFields>> & {
+  rrule?: string | null;
+};
 
 /** The times in the shape `calendarEventTiming` takes, or null if incomplete. */
 function whenOf(event: EventFields) {
@@ -112,8 +136,17 @@ function issue(context: z.core.$RefinementCtx, path: string, message: string) {
   context.addIssue({ code: "custom", path: [path], message });
 }
 
-/** Each shape's required fields, then the end after the start. */
+/**
+ * Each shape's required fields, then the end after the start, and a repeat
+ * that ends on a date ends on or after the start date.
+ */
 function checkEventTimes(event: EventFields, context: z.core.$RefinementCtx) {
+  if (event.rrule && event.startDate) {
+    const end = fromRrule(event.rrule).end;
+    if (end.type === "until" && end.until < event.startDate) {
+      issue(context, "rrule", "End the repeat on or after the start date.");
+    }
+  }
   if (!event.startDate) issue(context, "startDate", "Pick a start date.");
   if (!event.endDate) issue(context, "endDate", "Pick an end date.");
   if (!event.allDay) {
@@ -149,25 +182,99 @@ function toEventInput(event: EventFields) {
   };
 }
 
+/** A one-off event, or a repeating series when `rrule` is set. */
 export const createCalendarEventSchema = z
-  .strictObject(eventFields)
+  .strictObject({ ...eventFields, rrule: rruleFieldSchema })
   .superRefine(checkEventTimes)
-  .transform(toEventInput);
+  .transform(({ rrule, ...event }) => ({ ...toEventInput(event), rrule }));
 export type CreateCalendarEventInput = z.output<
   typeof createCalendarEventSchema
 >;
 
-/** Replaces every editable field, like the create form. */
+/**
+ * Replaces every editable field of a one-off event, like the create form;
+ * setting `rrule` makes it a series. A series is changed through
+ * `editCalendarEventOccurrenceSchema` instead.
+ */
 export const updateCalendarEventSchema = z
-  .strictObject({ id: idSchema, ...eventFields })
+  .strictObject({ id: idSchema, ...eventFields, rrule: rruleFieldSchema })
   .superRefine(checkEventTimes)
-  .transform(({ id, ...event }) => ({ id, ...toEventInput(event) }));
+  .transform(({ id, rrule, ...event }) => ({
+    id,
+    ...toEventInput(event),
+    rrule,
+  }));
 export type UpdateCalendarEventInput = z.output<
   typeof updateCalendarEventSchema
 >;
 
 export const calendarEventIdSchema = z.strictObject({ id: idSchema });
 export type CalendarEventIdInput = z.output<typeof calendarEventIdSchema>;
+
+/**
+ * An occurrence's key, as `eventsBetween` returns it: its original start,
+ * an ISO 8601 instant for a timed series or a local date for an all-day one.
+ */
+const originalStartSchema = z
+  .string("Choose an occurrence.")
+  .transform((value, context): Date | LocalDate => {
+    if (isLocalDate(value)) return value;
+    if (z.iso.datetime({ offset: true }).safeParse(value).success) {
+      return new Date(value);
+    }
+    context.addIssue({ code: "custom", message: "Choose an occurrence." });
+    return z.NEVER;
+  });
+
+const occurrenceFields = { id: idSchema, originalStart: originalStartSchema };
+
+/**
+ * A change to one occurrence of a series, with the scope it applies to
+ * (ADR 0012). The fields are the occurrence's new values as the event form
+ * sends them. "this" changes only that occurrence, so it can't change the
+ * rule; "following" and "all" take the series' rule (null stops repeating).
+ */
+export const editCalendarEventOccurrenceSchema = z
+  .discriminatedUnion(
+    "scope",
+    [
+      z.strictObject({
+        ...occurrenceFields,
+        scope: z.literal("this"),
+        ...eventFields,
+      }),
+      z.strictObject({
+        ...occurrenceFields,
+        scope: z.literal("following"),
+        ...eventFields,
+        rrule: rruleFieldSchema,
+      }),
+      z.strictObject({
+        ...occurrenceFields,
+        scope: z.literal("all"),
+        ...eventFields,
+        rrule: rruleFieldSchema,
+      }),
+    ],
+    "Choose which events to change.",
+  )
+  .superRefine(checkEventTimes)
+  .transform(({ id, originalStart, scope, ...fields }) => {
+    const { rrule = null, ...event } = fields as EventFields;
+    return { id, originalStart, scope, rrule, ...toEventInput(event) };
+  });
+export type EditCalendarEventOccurrenceInput = z.output<
+  typeof editCalendarEventOccurrenceSchema
+>;
+
+/** Deletes one occurrence, it and every later one, or the whole series. */
+export const deleteCalendarEventOccurrenceSchema = z.strictObject({
+  ...occurrenceFields,
+  scope: z.enum(CALENDAR_EVENT_SCOPES, "Choose which events to delete."),
+});
+export type DeleteCalendarEventOccurrenceInput = z.output<
+  typeof deleteCalendarEventOccurrenceSchema
+>;
 
 const requiredDateSchema = (message: string) =>
   z

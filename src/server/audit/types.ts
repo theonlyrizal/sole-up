@@ -2,6 +2,9 @@ import { z } from "zod";
 
 import {
   CALENDAR_EVENT_EDITABLE_FIELDS,
+  CALENDAR_EVENT_EXCEPTION_FIELDS,
+  CALENDAR_EVENT_EXCEPTION_KINDS,
+  CALENDAR_EVENT_SCOPES,
   CALENDAR_EVENT_SOURCES,
 } from "@/lib/calendar-events";
 import { isLocalDate } from "@/lib/dates";
@@ -17,6 +20,7 @@ import {
 } from "@/lib/milestones";
 import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
 import { PRIORITIES } from "@/lib/priorities";
+import { rruleSchema } from "@/lib/recurrence";
 import {
   TASK_EDITABLE_FIELDS,
   TASK_ESTIMATE_MAX_MINUTES,
@@ -156,6 +160,9 @@ const estimate = z
   .min(TASK_ESTIMATE_MIN_MINUTES)
   .max(TASK_ESTIMATE_MAX_MINUTES);
 const taskStatus = auditChange(z.enum(TASK_STATUSES));
+/** A stored repeat rule: structured parts only, never free text (ADR 0012). */
+const rrule = z.string().refine((rule) => rruleSchema.safeParse(rule).success);
+const droppedExceptions = z.number().int().min(0);
 
 /**
  * The allowlist. Add each new event here with its entity type and a strict
@@ -343,7 +350,10 @@ export const AUDIT_EVENTS = defineAuditEvents({
 
   // Calendar events (ADR 0012). Title, description and location are user
   // content: `calendar_event.updated` records which fields changed, plus
-  // old and new values for the shape, times, dates and links only.
+  // old and new values for the shape, times, dates, rule and links only.
+  // A change to a series through a scope records the scope; a "this and
+  // following" split links the ended series and the new one by ID and
+  // counts the exceptions it dropped.
   "calendar_event.created": {
     entityType: "calendar_event",
     changes: z.strictObject({
@@ -353,9 +363,12 @@ export const AUDIT_EVENTS = defineAuditEvents({
       tz: auditChange(timeZone),
       startDate: auditChange(localDate),
       endDate: auditChange(localDate),
+      rrule: auditChange(rrule),
       goalId: auditChange(z.uuid()),
       lifeAreaId: auditChange(z.uuid()),
       source: auditChange(z.enum(CALENDAR_EVENT_SOURCES)),
+      scope: z.literal("following").optional(),
+      splitFromId: z.uuid().optional(),
     }),
   },
   "calendar_event.updated": {
@@ -368,11 +381,56 @@ export const AUDIT_EVENTS = defineAuditEvents({
       tz: auditChange(timeZone).optional(),
       startDate: auditChange(localDate).optional(),
       endDate: auditChange(localDate).optional(),
+      rrule: auditChange(rrule).optional(),
+      goalId: auditChange(z.uuid()).optional(),
+      lifeAreaId: auditChange(z.uuid()).optional(),
+      scope: z.enum(["following", "all"]).optional(),
+      splitIntoId: z.uuid().optional(),
+      droppedExceptions: droppedExceptions.optional(),
+    }),
+  },
+  // No `calendar_event.deleted`, for the same reason as life areas (ADR 0005).
+
+  // One occurrence of a series that differs from its rule. Text fields are
+  // named, never stored. `.updated` records the scope it came from: "this"
+  // for an edit or delete of the occurrence itself, "following" or "all"
+  // when a series change carried it over (a new series, a new original
+  // start, or values it shared with the series).
+  "calendar_event_exception.created": {
+    entityType: "calendar_event_exception",
+    changes: z.strictObject({
+      eventId: auditChange(z.uuid()),
+      originalStartAt: auditChange(instant),
+      originalStartDate: auditChange(localDate),
+      kind: auditChange(z.enum(CALENDAR_EVENT_EXCEPTION_KINDS)),
+      startAt: auditChange(instant),
+      endAt: auditChange(instant),
+      startDate: auditChange(localDate),
+      endDate: auditChange(localDate),
+      goalId: auditChange(z.uuid()),
+      lifeAreaId: auditChange(z.uuid()),
+    }),
+  },
+  "calendar_event_exception.updated": {
+    entityType: "calendar_event_exception",
+    changes: z.strictObject({
+      fields: z.array(z.enum(CALENDAR_EVENT_EXCEPTION_FIELDS)).min(1),
+      scope: z.enum(CALENDAR_EVENT_SCOPES),
+      eventId: auditChange(z.uuid()).optional(),
+      originalStartAt: auditChange(instant).optional(),
+      originalStartDate: auditChange(localDate).optional(),
+      kind: auditChange(z.enum(CALENDAR_EVENT_EXCEPTION_KINDS)).optional(),
+      startAt: auditChange(instant).optional(),
+      endAt: auditChange(instant).optional(),
+      startDate: auditChange(localDate).optional(),
+      endDate: auditChange(localDate).optional(),
       goalId: auditChange(z.uuid()).optional(),
       lifeAreaId: auditChange(z.uuid()).optional(),
     }),
   },
-  // No `calendar_event.deleted`, for the same reason as life areas (ADR 0005).
+  // No `calendar_event_exception.deleted`: an exception dropped by a series
+  // change or deleted with its series takes its events with it (ADR 0005);
+  // the series' event counts the dropped ones.
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;
