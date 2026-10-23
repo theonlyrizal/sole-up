@@ -114,7 +114,7 @@ test("archived goals show their completed date and can be deleted from the archi
   const confirm = page.getByRole("alertdialog", {
     name: "Delete “Finish the quilt”?",
   });
-  await expect(confirm).toContainText("It has no milestones.");
+  await expect(confirm).toContainText("It has no milestones or tasks.");
   await expect(confirm).not.toContainText("archive it");
   await confirm.getByRole("button", { name: "Cancel" }).click();
   await expect(confirm).toHaveCount(0);

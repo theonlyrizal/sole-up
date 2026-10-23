@@ -16,7 +16,7 @@ import {
 } from "drizzle-orm";
 
 import { addDays, type LocalDate, startOfLocalDay } from "@/lib/dates";
-import type { GoalStatus } from "@/lib/goals";
+import type { GoalStatus, GoalTaskCounts } from "@/lib/goals";
 import type { LifeAreaStatus } from "@/lib/life-areas";
 import type { MilestoneStatus } from "@/lib/milestones";
 import {
@@ -289,6 +289,54 @@ async function selectPlanTaskItems(
     goal,
     milestone,
   }));
+}
+
+/**
+ * Every task of one goal, any status: directly under it or under one of its
+ * milestones (chunk 2.7). Unsorted; `groupGoalTasks` orders them.
+ */
+export async function listGoalTasks(
+  userId: string,
+  goalId: string,
+): Promise<PlanTaskItem[]> {
+  return selectPlanTaskItems(
+    and(
+      eq(tasks.userId, userId),
+      or(eq(tasks.goalId, goalId), eq(milestones.goalId, goalId)),
+    ),
+  );
+}
+
+/**
+ * For each goal, its tasks (direct or under its milestones) by where a goal
+ * delete would leave them: open and unplanned (the inbox), open and planned,
+ * or closed. Goals with no tasks are absent from the map.
+ */
+export async function countGoalTasks(
+  userId: string,
+  goalIds: string[],
+): Promise<Map<string, GoalTaskCounts>> {
+  if (goalIds.length === 0) return new Map();
+  const goalId = sql<string>`coalesce(${tasks.goalId}, ${milestones.goalId})`;
+  const isOpen = sql`${tasks.status} = 'open'`;
+  const rows = await db
+    .select({
+      goalId,
+      toInbox: sql<number>`count(*) filter (where ${isOpen} and ${tasks.plannedDate} is null)::int`,
+      planned: sql<number>`count(*) filter (where ${isOpen} and ${tasks.plannedDate} is not null)::int`,
+      closed: sql<number>`count(*) filter (where not ${isOpen})::int`,
+    })
+    .from(tasks)
+    .leftJoin(
+      milestones,
+      and(
+        eq(milestones.id, tasks.milestoneId),
+        eq(milestones.userId, tasks.userId),
+      ),
+    )
+    .where(and(eq(tasks.userId, userId), inArray(goalId, goalIds)))
+    .groupBy(goalId);
+  return new Map(rows.map(({ goalId, ...counts }) => [goalId, counts]));
 }
 
 /** Today's sections for the user, worked out at `clock` (chunk 2.5). */

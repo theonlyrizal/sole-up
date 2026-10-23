@@ -24,6 +24,10 @@ type PlanTaskListProps = {
   parentOptions: TaskParentOption[];
   locale: string;
   timeZone: string;
+  /** The list's accessible name. */
+  label?: string;
+  /** False on a goal's own page, where every row's goal is the same. */
+  showGoal?: boolean;
 };
 
 export function PlanTaskList({
@@ -31,10 +35,12 @@ export function PlanTaskList({
   parentOptions,
   locale,
   timeZone,
+  label = "Tasks",
+  showGoal = true,
 }: PlanTaskListProps) {
   return (
     <ul
-      aria-label="Tasks"
+      aria-label={label}
       className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface"
     >
       {tasks.map((task) => (
@@ -44,13 +50,14 @@ export function PlanTaskList({
           parentOptions={parentOptions}
           locale={locale}
           timeZone={timeZone}
+          showGoal={showGoal}
         />
       ))}
     </ul>
   );
 }
 
-type PlanTaskRowProps = Omit<PlanTaskListProps, "tasks"> & {
+type PlanTaskRowProps = Omit<PlanTaskListProps, "tasks" | "label"> & {
   task: PlanTaskItem;
 };
 
@@ -59,6 +66,7 @@ function PlanTaskRow({
   parentOptions,
   locale,
   timeZone,
+  showGoal,
 }: PlanTaskRowProps) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,7 +130,7 @@ function PlanTaskRow({
               </span>
             )}
           </div>
-          {task.goal && (
+          {showGoal && task.goal && (
             <p className="text-sm break-words text-muted">
               <Link
                 href={`/goals/${task.goal.id}`}
@@ -180,7 +188,7 @@ function PlanTaskRow({
 }
 
 /** Planned date, deadline and estimate, for the row's detail line. */
-function taskDetails(
+export function taskDetails(
   task: PlanTaskItem,
   locale: string,
   timeZone: string,

@@ -175,12 +175,63 @@ export function goalStatusActions(status: GoalStatus): GoalStatusAction[] {
 }
 
 /**
- * What deleting a goal removes, for its confirmation. Deleting is a hard
- * delete (ADR 0006): the goal, its milestones and its history go.
- * Phase 2 adds how many tasks move to the inbox.
+ * The tasks a goal delete would take off the goal, directly or under one of
+ * its milestones, by where each one ends up. Every one is kept (ADR 0006).
  */
-export function goalDeleteConsequences(milestoneCount: number): string {
-  if (milestoneCount === 0) return "It has no milestones.";
-  if (milestoneCount === 1) return "1 milestone will be deleted.";
-  return `${milestoneCount} milestones will be deleted.`;
+export type GoalTaskCounts = {
+  /** Open with no planned date: these land in the inbox (ADR 0011). */
+  toInbox: number;
+  /** Open with a planned date: they keep it and stay on Today or Upcoming. */
+  planned: number;
+  /** Completed or cancelled. */
+  closed: number;
+};
+
+export const NO_GOAL_TASKS: GoalTaskCounts = {
+  toInbox: 0,
+  planned: 0,
+  closed: 0,
+};
+
+const plural = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
+/**
+ * What deleting a goal does, for its confirmation. Deleting is a hard
+ * delete (ADR 0006): the goal, its milestones and its history go; its
+ * tasks are kept without a goal, and the open unplanned ones move to the
+ * inbox.
+ */
+export function goalDeleteConsequences(
+  milestoneCount: number,
+  tasks: GoalTaskCounts,
+): string {
+  const taskCount = tasks.toInbox + tasks.planned + tasks.closed;
+  if (milestoneCount === 0 && taskCount === 0) {
+    return "It has no milestones or tasks.";
+  }
+  const sentences = [
+    milestoneCount === 0
+      ? "It has no milestones."
+      : `${plural(milestoneCount, "milestone", "milestones")} will be deleted.`,
+  ];
+  if (taskCount === 0) sentences.push("It has no tasks.");
+  if (tasks.toInbox > 0) {
+    sentences.push(
+      `${plural(tasks.toInbox, "task", "tasks")} will move to your inbox.`,
+    );
+  }
+  if (tasks.planned > 0) {
+    sentences.push(
+      tasks.planned === 1
+        ? "1 planned task will keep its date, without a goal."
+        : `${tasks.planned} planned tasks will keep their dates, without a goal.`,
+    );
+  }
+  if (tasks.closed > 0) {
+    sentences.push(
+      `${plural(tasks.closed, "completed or cancelled task", "completed or cancelled tasks")} will be kept, without a goal.`,
+    );
+  }
+  return sentences.join(" ");
 }

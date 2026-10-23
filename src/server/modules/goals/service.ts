@@ -14,6 +14,7 @@ import { isForeignKeyViolation } from "@/server/db/errors";
 import { goals } from "@/server/db/schema";
 import { ConflictError, NotFoundError, ValidationError } from "@/server/errors";
 import { deleteMilestoneEventsForGoal } from "@/server/modules/milestones/service";
+import { detachTasksInTx } from "@/server/modules/tasks/service";
 
 import type {
   ChangeGoalStatusInput,
@@ -204,14 +205,19 @@ export async function changeGoalStatus(
 }
 
 /**
- * Hard delete (ADR 0006). The database cascades the goal's milestones;
- * the goal's and its milestones' audit events are removed here.
+ * Hard delete (ADR 0006). Its tasks, direct and under its milestones, move
+ * to no parent with a `task.moved` event each and are kept; the database
+ * cascades the goal's milestones; the goal's and its milestones' audit
+ * events are removed here.
  */
 export async function deleteGoal(
   userId: string,
   { id }: GoalIdInput,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    // Goal first, then its tasks: the lock order milestones use too.
+    await findForUpdate(tx, userId, id);
+    await detachTasksInTx(tx, userId, { goalId: id });
     await deleteMilestoneEventsForGoal(tx, userId, id);
     const [deleted] = await tx
       .delete(goals)

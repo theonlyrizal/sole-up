@@ -9,6 +9,7 @@ import {
   goalListStatus,
   goalStatusActions,
   type GoalStatus,
+  NO_GOAL_TASKS,
 } from "./goals";
 
 const LIVE: GoalStatus[] = ["active", "paused", "completed", "dropped"];
@@ -157,9 +158,46 @@ describe("goalStatusActions", () => {
 });
 
 describe("goalDeleteConsequences", () => {
+  const tasks = (toInbox: number, planned = 0, closed = 0) => ({
+    toInbox,
+    planned,
+    closed,
+  });
+
   it("states exactly how many milestones go", () => {
-    expect(goalDeleteConsequences(0)).toBe("It has no milestones.");
-    expect(goalDeleteConsequences(1)).toBe("1 milestone will be deleted.");
-    expect(goalDeleteConsequences(3)).toBe("3 milestones will be deleted.");
+    expect(goalDeleteConsequences(1, tasks(0))).toBe(
+      "1 milestone will be deleted. It has no tasks.",
+    );
+    expect(goalDeleteConsequences(3, tasks(0))).toBe(
+      "3 milestones will be deleted. It has no tasks.",
+    );
+  });
+
+  it("says when there is nothing else to delete or move", () => {
+    expect(goalDeleteConsequences(0, NO_GOAL_TASKS)).toBe(
+      "It has no milestones or tasks.",
+    );
+  });
+
+  it("states how many tasks move to the inbox", () => {
+    expect(goalDeleteConsequences(3, tasks(7))).toBe(
+      "3 milestones will be deleted. 7 tasks will move to your inbox.",
+    );
+    expect(goalDeleteConsequences(0, tasks(1))).toBe(
+      "It has no milestones. 1 task will move to your inbox.",
+    );
+  });
+
+  it("says planned and closed tasks are kept without a goal", () => {
+    expect(goalDeleteConsequences(1, tasks(2, 1, 1))).toBe(
+      "1 milestone will be deleted. 2 tasks will move to your inbox. " +
+        "1 planned task will keep its date, without a goal. " +
+        "1 completed or cancelled task will be kept, without a goal.",
+    );
+    expect(goalDeleteConsequences(0, tasks(0, 2, 3))).toBe(
+      "It has no milestones. " +
+        "2 planned tasks will keep their dates, without a goal. " +
+        "3 completed or cancelled tasks will be kept, without a goal.",
+    );
   });
 });

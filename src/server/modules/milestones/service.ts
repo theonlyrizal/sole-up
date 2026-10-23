@@ -11,6 +11,7 @@ import { deleteAuditEventsForEntity, recordAudit } from "@/server/audit/record";
 import { db, type DbTransaction } from "@/server/db/client";
 import { goals, milestones } from "@/server/db/schema";
 import { ConflictError, NotFoundError } from "@/server/errors";
+import { detachTasksInTx } from "@/server/modules/tasks/service";
 
 import type {
   ChangeMilestoneStatusInput,
@@ -225,7 +226,8 @@ export async function changeMilestoneStatus(
 }
 
 /**
- * Hard delete (ADR 0006). Removes the milestone's audit events with it and
+ * Hard delete (ADR 0006). Its tasks move to no parent with a `task.moved`
+ * event each and are kept. Removes the milestone's audit events with it and
  * closes the gap it leaves, so the goal's order stays dense.
  */
 export async function deleteMilestone(
@@ -239,6 +241,7 @@ export async function deleteMilestone(
       .where(and(eq(milestones.id, id), eq(milestones.userId, userId)));
     if (!target) throw new NotFoundError();
     await lockGoal(tx, userId, target.goalId);
+    await detachTasksInTx(tx, userId, { milestoneId: id });
 
     const [deleted] = await tx
       .delete(milestones)

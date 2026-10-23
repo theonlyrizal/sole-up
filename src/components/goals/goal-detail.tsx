@@ -21,11 +21,25 @@ import type { GoalDetail } from "@/server/modules/goals/queries";
 
 import { DeleteGoalDialog } from "./delete-goal-dialog";
 import { GoalFormDialog } from "./goal-form";
+import { GoalTasks } from "./goal-tasks";
 import { MilestoneList } from "./milestone-list";
 
-/** The goal's own page: header, reason, what's coming, and its history. */
+/** The goal's own page: header, reason, milestones, tasks and history. */
 export function GoalDetailView({ detail }: { detail: GoalDetail }) {
-  const { goal, area, areas, history, milestones, progress } = detail;
+  const {
+    goal,
+    area,
+    areas,
+    history,
+    milestones,
+    progress,
+    tasks,
+    nextAction,
+    taskCounts,
+    taskParentOptions,
+    locale,
+    timeZone,
+  } = detail;
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -128,6 +142,7 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
           <DeleteGoalDialog
             goal={goal}
             milestoneCount={milestones.length}
+            taskCounts={taskCounts}
             // This page is gone; go where the goal was listed.
             onDeleted={() => router.replace(backHref)}
           />
@@ -157,9 +172,15 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
       </Section>
 
       <Section title="Tasks">
-        <p className="text-muted">
-          Tasks that move this goal forward will appear here.
-        </p>
+        <GoalTasks
+          goalId={goal.id}
+          milestones={milestones}
+          tasks={tasks}
+          nextAction={nextAction}
+          parentOptions={taskParentOptions}
+          locale={locale}
+          timeZone={timeZone}
+        />
       </Section>
 
       <Section title="History">

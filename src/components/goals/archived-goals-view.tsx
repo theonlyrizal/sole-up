@@ -42,6 +42,7 @@ export function ArchivedGoalsView({ goals }: { goals: ArchivedGoalItem[] }) {
             <DeleteGoalDialog
               goal={goal}
               milestoneCount={goal.milestoneCount}
+              taskCounts={goal.taskCounts}
               triggerLabel={`Delete: ${goal.title}`}
               onDeleted={() => router.refresh()}
             />

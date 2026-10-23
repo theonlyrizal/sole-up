@@ -3,10 +3,13 @@ import "server-only";
 import { and, asc, count, desc, eq } from "drizzle-orm";
 
 import { formatLocalDate, localDateOf } from "@/lib/dates";
+import { nextActionOf } from "@/lib/goal-tasks";
 import {
   GOAL_LIST_STATUSES,
   type Goal,
   type GoalListStatus,
+  type GoalTaskCounts,
+  NO_GOAL_TASKS,
 } from "@/lib/goals";
 import type { LifeArea } from "@/lib/life-areas";
 import type { Milestone, MilestoneProgress } from "@/lib/milestones";
@@ -19,6 +22,13 @@ import {
   listMilestones,
 } from "@/server/modules/milestones/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
+import {
+  countGoalTasks,
+  listGoalTasks,
+  listTaskParentOptions,
+  type PlanTaskItem,
+  type TaskParentOption,
+} from "@/server/modules/tasks/queries";
 
 import { buildGoalHistory, type GoalHistoryEntry } from "./history";
 import { toGoal } from "./service";
@@ -130,6 +140,8 @@ export type ArchivedGoalItem = Goal & {
   archivedAtLabel: string;
   /** Every milestone, any status: what a delete would remove. */
   milestoneCount: number;
+  /** The goal's tasks by where a delete would leave them. */
+  taskCounts: GoalTaskCounts;
 };
 
 /** The user's archived goals, most recently archived first. */
@@ -145,10 +157,11 @@ export async function getArchivedGoals(
     db.select().from(lifeAreas).where(eq(lifeAreas.userId, userId)),
     getUserPreferences(userId),
   ]);
-  const milestoneCounts = await countMilestones(
-    userId,
-    goalRows.map((row) => row.id),
-  );
+  const goalIds = goalRows.map((row) => row.id);
+  const [milestoneCounts, taskCounts] = await Promise.all([
+    countMilestones(userId, goalIds),
+    countGoalTasks(userId, goalIds),
+  ]);
 
   const { locale } = preferences;
   // As on the detail page: UTC only covers a race with the zone prompt.
@@ -165,6 +178,7 @@ export async function getArchivedGoals(
       completedAtLabel: goal.completedAt ? dayOf(goal.completedAt) : null,
       archivedAtLabel: dayOf(goal.statusChangedAt),
       milestoneCount: milestoneCounts.get(goal.id) ?? 0,
+      taskCounts: taskCounts.get(goal.id) ?? NO_GOAL_TASKS,
     };
   });
 }
@@ -181,6 +195,17 @@ export type GoalDetail = {
   milestones: Milestone[];
   /** Null with no milestones; `countable: 0` when all are dropped (ADR 0010). */
   progress: MilestoneProgress | null;
+  /** Every task of the goal, direct or under a milestone, any status. */
+  tasks: PlanTaskItem[];
+  /** The earliest planned or due open task, or null to prompt for one. */
+  nextAction: PlanTaskItem | null;
+  /** The goal's tasks by where a delete would leave them. */
+  taskCounts: GoalTaskCounts;
+  /** Where the task rows' editor can move a task. */
+  taskParentOptions: TaskParentOption[];
+  locale: string;
+  /** The user's zone, for the tasks' local days and deadline times. */
+  timeZone: string;
 };
 
 /**
@@ -191,37 +216,49 @@ export async function getGoalDetail(
   userId: string,
   goalId: string,
 ): Promise<GoalDetail | null> {
-  const [goalRows, areaRows, eventRows, preferences, milestoneRows, progress] =
-    await Promise.all([
-      db
-        .select()
-        .from(goals)
-        .where(and(eq(goals.id, goalId), eq(goals.userId, userId))),
-      db
-        .select()
-        .from(lifeAreas)
-        .where(eq(lifeAreas.userId, userId))
-        .orderBy(asc(lifeAreas.sortOrder), asc(lifeAreas.createdAt)),
-      db
-        .select({
-          id: auditEvents.id,
-          eventType: auditEvents.eventType,
-          occurredAt: auditEvents.occurredAt,
-          changes: auditEvents.changes,
-        })
-        .from(auditEvents)
-        .where(
-          and(
-            eq(auditEvents.userId, userId),
-            eq(auditEvents.entityType, "goal"),
-            eq(auditEvents.entityId, goalId),
-          ),
-        )
-        .orderBy(desc(auditEvents.occurredAt)),
-      getUserPreferences(userId),
-      listMilestones(userId, goalId),
-      getMilestoneProgress(userId, [goalId]),
-    ]);
+  const [
+    goalRows,
+    areaRows,
+    eventRows,
+    preferences,
+    milestoneRows,
+    progress,
+    taskItems,
+    taskCounts,
+    taskParentOptions,
+  ] = await Promise.all([
+    db
+      .select()
+      .from(goals)
+      .where(and(eq(goals.id, goalId), eq(goals.userId, userId))),
+    db
+      .select()
+      .from(lifeAreas)
+      .where(eq(lifeAreas.userId, userId))
+      .orderBy(asc(lifeAreas.sortOrder), asc(lifeAreas.createdAt)),
+    db
+      .select({
+        id: auditEvents.id,
+        eventType: auditEvents.eventType,
+        occurredAt: auditEvents.occurredAt,
+        changes: auditEvents.changes,
+      })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.userId, userId),
+          eq(auditEvents.entityType, "goal"),
+          eq(auditEvents.entityId, goalId),
+        ),
+      )
+      .orderBy(desc(auditEvents.occurredAt)),
+    getUserPreferences(userId),
+    listMilestones(userId, goalId),
+    getMilestoneProgress(userId, [goalId]),
+    listGoalTasks(userId, goalId),
+    countGoalTasks(userId, [goalId]),
+    listTaskParentOptions(userId),
+  ]);
   const [row] = goalRows;
   if (!row) return null;
 
@@ -256,5 +293,11 @@ export async function getGoalDetail(
     }),
     milestones: milestoneRows,
     progress: progress.get(goalId) ?? null,
+    tasks: taskItems,
+    nextAction: nextActionOf(taskItems, timeZone),
+    taskCounts: taskCounts.get(goalId) ?? NO_GOAL_TASKS,
+    taskParentOptions,
+    locale,
+    timeZone,
   };
 }
