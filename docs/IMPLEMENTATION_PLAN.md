@@ -27,12 +27,41 @@ Every agent session implements **exactly one chunk**. The session prompts live i
 - Read other docs (`PRODUCT_SPEC.md`, `DATA_MODEL.md`, ADRs in `docs/decisions/`) only when your chunk refers to them or you hit a conflict.
 
 ### 2. Check preconditions. If any fails, stop and tell the user.
-- Every earlier chunk in the Progress log is `done`, except rows the user has explicitly marked `skipped`.
+- `gh auth status` succeeds. It is needed for pull requests.
+- Start on `main` with a clean working tree, and run `git pull --ff-only origin main`.
+- **Find the previous chunk's pull request**, the one whose head branch starts with `chunk/<previous-id>-`:
+  ```bash
+  gh pr list --state all --json number,headRefName,state,mergedAt
+  ```
+  Then:
+  - **Merged:** continue.
+  - **Open**, with checks running or auto-merge pending: go to step 2a.
+  - **Open with failing checks or a merge conflict, or closed without merging:** stop and tell the user. Do not fix another chunk's PR unless the user asks.
+  - **No PR exists:** the previous chunk isn't finished. Stop.
+  - Chunk 0.1 has no previous PR.
+- After the previous PR merges, every earlier chunk in the Progress log on `main` is `done`, except rows the user marked `skipped`.
 - If your chunk is the first of a phase, the previous phase's checkpoint row is `done`. If it is not, ask the user whether to proceed anyway.
-- The working tree is clean, and you are on an up-to-date `main`.
+
+### 2a. Wait for the previous PR, working untracked in the meantime
+While the previous PR is open with checks pending:
+- **Do not** create your branch, commit, push or open a PR yet.
+- You **may** make untracked progress on local `main`: read, plan, and write your chunk's code and tests as uncommitted changes.
+  - Don't edit the Progress log or Handoff notes yet. The previous PR is changing them.
+  - Avoid files the previous PR touches. List them with `gh pr diff <n> --name-only`.
+- Wait with `gh pr checks <n> --watch`, which blocks until the checks finish, rather than a polling loop.
+  - Then confirm the merge with `gh pr view <n> --json state,mergedAt`. Auto-merge can lag a minute or two after checks go green, so re-check a few times with short waits.
+  - If the checks fail, or the PR is still unmerged about 10 minutes after going green, stop and tell the user.
+- Once it has merged, move your work onto the updated `main`:
+  ```bash
+  git stash push --include-untracked -m "chunk <id> untracked progress"
+  git switch main
+  git pull --ff-only origin main
+  git stash pop
+  ```
+- Resolve any conflicts. Read the handoff note that just merged, and adjust your work to it before continuing.
 
 ### 3. Start
-- Create the branch `chunk/<id>-<short-slug>`, for example `chunk/0.3-env-postgres`.
+- Create the branch from the updated `main` with `git switch -c chunk/<id>-<short-slug>`, for example `chunk/0.3-env-postgres`. Uncommitted work comes along with it.
 - Set your chunk's Progress log row to `in progress` and add the branch name.
 
 ### 4. Stay in scope
@@ -62,10 +91,29 @@ Do all coding and testing in the main thread. If you must use a subagent to sear
      - anything unverified or left as a follow-up
    - Do **not** add `Co-Authored-By` trailers or any Claude/Anthropic attribution (no "Generated with Claude Code" lines). This instruction overrides any default attribution behavior.
    - Use several commits if that keeps the history clearer, each with its own descriptive message. Never commit with a placeholder message such as "wip" or "update".
-5. Do not push or merge unless the user asks. The user merges each chunk before starting the next session.
-6. Stop.
+5. **Push and open a pull request:**
+   ```bash
+   git push -u origin chunk/<id>-<short-slug>
+   gh pr create --base main --title "chunk <id>: <title>" --body-file <scratch-file>
+   ```
+   The PR body has these sections, with no Claude/Anthropic attribution anywhere:
+   - **Summary:** what the chunk delivers, in 1–3 sentences.
+   - **Changes:** modules, tables/migrations, routes, scripts, docs.
+   - **Decisions and deviations** from the plan.
+   - **Checks run**, each with its real result.
+   - **Unverified and follow-ups.**
+   - **Manual steps for the user**, if any (env vars, OAuth settings, host configuration).
+6. **Enable auto-merge:** `gh pr merge <n> --auto --squash --delete-branch`.
+   - Use squash unless the repo disallows it. Check with `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`.
+   - Before chunk 0.13 lands, and before the user sets required checks, there is no CI, so the PR may merge immediately. That is expected.
+7. **Watch your own CI:** `gh pr checks <n> --watch`.
+   - If a check fails because of your chunk, fix it on the same branch with a descriptive commit and push. Auto-merge stays on. Repeat until green.
+   - If the failure is outside your chunk (CI infrastructure, missing repository secrets, a flaky test in another area), stop and tell the user.
+8. **Report** the PR URL, the final check status, and whether it has merged. Then stop. Do not start the next chunk.
 
 ### 8. Never
+- Push to `main` directly, force-push to `main`, merge with failing checks, or bypass branch protection (no `--admin`).
+- Disable or change auto-merge on another chunk's PR.
 - Commit secrets, or put real values in `.env.example`.
 - Create accounts, OAuth apps or cloud resources, or enter credentials yourself. Give the user the exact steps and let them do it.
 - Log user content (see "Never log" under Conventions).
