@@ -299,42 +299,90 @@ Finish line: Stop immediately once the ADR is written, the plan and DATA_MODEL.m
 
 ### 4.1: Calendar events, schema and service
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.1 only. Implement the calendar_events table (timed vs all-day shapes enforced by CHECKs, end after start, indexes) and a service with CRUD and eventsBetween(localStart, localEnd, tz), with audit events. No UI.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.1 only. Implement the calendar_events table for one-off events (timed vs all-day shapes enforced by CHECKs, end after start, goal and life-area links with column-list SET NULL, indexes) and a service with CRUD and eventsBetween(localStart, localEnd, tz), with audit events. No recurrence, no UI.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify passes, including range edge cases, events crossing midnight, and DST transition days in a zone with DST, and the protocol close-out is complete.
 ```
 
-### 4.2: Event create/edit UI
+### 4.2: Recurrence engine
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.2 only. Build the event form: default duration, all-day toggle, time-zone display when it differs from the user's zone, field-level validation, fully keyboard operable. Add Calendar to the Plan navigation.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.2 only. Add rrule-temporal behind src/lib/recurrence.ts: the Zod schema for the builder subset in ADR 0012, rule ↔ builder conversion, pure occurrence expansion with exceptions and a 366-day range cap, and a plain-language rule summary. No schema, no UI.
+
+Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
+Finish line: Stop immediately once pnpm verify passes, including the DST, month-end, leap-day, COUNT/UNTIL and exception cases listed in 4.2, and the protocol close-out is complete.
+```
+
+### 4.3: Recurring events, series, exceptions and scopes
+```text
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.3 only. Add rrule to calendar_events and the calendar_event_exceptions table, expand series in eventsBetween, and implement the three edit/delete scopes (this event, this and following, all events) in the service, with audit events. No UI.
+
+Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
+Finish line: Stop immediately once pnpm verify passes, including every scope on timed and all-day series, a split on a DST transition day, and cross-user access, and the protocol close-out is complete.
+```
+
+### 4.4: Event create/edit UI
+```text
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.4 only. Build the event dialog: default duration, all-day toggle with an inclusive end date, goal and life area, time-zone display when it differs from the user's zone, the repeat builder, and the scope prompt for occurrences. Field-level validation, fully keyboard operable. Add Calendar to the Plan navigation.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, and the protocol close-out is complete.
 ```
 
-### 4.3: Agenda view
+### 4.5: FullCalendar foundation and Agenda view
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.3 only. Build the Agenda view: a chronological list merging events, timed task deadlines and planned tasks for a chosen range.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.5 only. Add @fullcalendar/react v7 behind one themed client wrapper and build the Agenda view: a chronological list merging events (with occurrences), timed task deadlines and planned tasks for a chosen range.
+
+Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
+Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including axe and keyboard checks on the Agenda, and the protocol close-out is complete.
+```
+
+### 4.6: Week and Day views
+```text
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.6 only. Build the Week view (from the user's week start, timed events by local time, an all-day row, task deadline markers, overlaps side by side, keyboard navigation) and the Day view as the mobile fallback.
+
+Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
+Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including the overlap rendering, keyboard navigation and axe tests, and the protocol close-out is complete.
+```
+
+### 4.7: Time blocks, schema and service
+```text
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.7 only. Implement time_blocks and time_block_exceptions, the block service (scopes, status, blocksBetween) and the auto-mark rules on task completion in ADR 0012, with audit events. No UI.
+
+Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
+Finish line: Stop immediately once pnpm verify passes, including every auto-mark rule in 4.7, task delete cascading blocks and their events, and cross-user access, and the protocol close-out is complete.
+```
+
+### 4.8: Time blocks UI
+```text
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.8 only. Build the "Block time" form, blocks on Week/Day/Agenda, slot select with a task picker, drag to move and resize, the desktop task panel, and block status actions, each drag action with a keyboard path.
+
+Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
+Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including the e2e test in 4.8, and the protocol close-out is complete.
+```
+
+### 4.9: Integrations with Today and Home
+```text
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.9 only. Show today's events and time blocks as a timeline at the top of Today and the next commitment on Home (via the metrics/query layer, not ad-hoc queries in components).
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, and the protocol close-out is complete.
 ```
 
-### 4.4: Week view
+### 4.10: Resource columns by life area
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.4 only. Build the Week view: 7 columns from the user's week start, timed events positioned by local time, an all-day row, task deadline markers, overlaps side by side, keyboard navigation, and a day/agenda fallback on mobile.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.10 only. Build our own resource-columns day view with one column per active life area plus "No area". Do not copy or adapt FullCalendar premium code.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including the overlap rendering and keyboard navigation tests, and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including overlap, keyboard and axe tests, and the protocol close-out is complete.
 ```
 
-### 4.5: Integrations with Today and Home
+### 4.11: Resource timeline by life area
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.5 only. Show today's events at the top of Today and the next commitment on Home (via the metrics/query layer, not ad-hoc queries in components).
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 4.11 only. Build our own resource timeline with one row per active life area plus "No area" across a day or week. Do not copy or adapt FullCalendar premium code.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including lane placement in a non-UTC zone, keyboard and axe tests, and the protocol close-out is complete.
 ```
 
 ---

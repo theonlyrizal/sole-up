@@ -57,7 +57,7 @@ SoleUp organizes a person's work and life through connected concepts:
 - **Projects (later, not in v1):** finite bodies of work that produce an outcome. See [ADR 0004](decisions/0004-task-hierarchy-and-dates.md).
 - **Tasks:** actionable units of work. A task belongs to at most one parent: a milestone, a goal, or none (the inbox).
 - **Habits:** repeated behaviors tracked over time.
-- **Calendar events and time blocks:** commitments or planned use of time. Whether time blocks are in v1 is decided at the Phase 4 decision gate.
+- **Calendar events and time blocks:** commitments, and time reserved for a specific task. Both can repeat. See [ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md).
 - **Notes:** information the user wants to retain.
 - **Audit events:** dated records of structured changes (no user content) that make history and analytics possible. See [ADR 0005](decisions/0005-history-and-audit-log.md).
 - **Reviews:** structured reflection on plans, outcomes, and adjustments.
@@ -80,7 +80,7 @@ Not every object must be linked to every other object. Relationships should be e
 10. Home with a small set of actionable summaries.
 11. Basic analytics based on stored records and the audit log.
 12. Weekly review workflow.
-13. Calendar: internal events, no external sync. Views, recurring events and time blocks are decided at the Phase 4 decision gate.
+13. Calendar: internal events and time blocks for tasks, both repeatable, with no external sync. Week, Day and Agenda views, and resource views by life area after the Phase 4 checkpoint ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)).
 14. Reminders delivered via Web Push to the installed PWA.
 15. Data export and account deletion, implemented before inviting other users.
 16. Responsive, accessible, installable (PWA) interface with loading, empty, and error states.
@@ -220,7 +220,7 @@ Do not optimize for time spent in the app. A good personal management tool may h
 ### Settled (2026-10-20)
 
 - **Primary focus:** goal management connected to daily planning. The first loop is Goals → Today; other modules follow in phases.
-- **Calendar for the first release:** internal events, shown alongside Today and Home, with no external sync. See [ADR 0007](decisions/0007-platform-and-push.md). Recurring events, time blocks and which views ship are decided at the Phase 4 decision gate (recommended: no recurring events or time blocks in v1; week and agenda views).
+- **Calendar for the first release:** internal events, shown alongside Today and Home, with no external sync. See [ADR 0007](decisions/0007-platform-and-push.md). The Phase 4 gate put repeating events and time blocks in v1, with Week, Day and Agenda views and no Month view ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)).
 - **Platform:** responsive web, installable as a PWA. See [ADR 0007](decisions/0007-platform-and-push.md).
 - **First audience:** the developer (dogfooding), with public-grade security. See [ADR 0002](decisions/0002-auth.md).
 - **Goals without numeric targets:** progress is completed milestones out of non-dropped milestones, and a goal can have none. Numeric targets are deferred. See [ADR 0010](decisions/0010-goal-status-priority-progress.md).

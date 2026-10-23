@@ -172,13 +172,19 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 2.✓ | Phase 2 checkpoint (user) | done | | 2026-10-23 | User marked done the day Phase 2 finished, without the planned week of using Today daily |
 | 3.1 | Metrics module foundation | done | chunk/3.1-metrics | 2026-10-23 | `src/server/modules/metrics/`: `Metric<V>` contract (`value`, `definition`, `range` with `asOf`, `hasData`), `todayTaskCounts`, `goalsWithoutNextAction`, `deadlinesNextSevenDays`; no UI |
 | 3.2 | Home summaries | done | chunk/3.2-home-summaries | 2026-10-23 | `/home`: Today, Goals without a next action (named, from a new list variant) and Deadlines in the next 7 days cards, each with definition, range and "as of"; numbers link to their lists; "Nothing yet" with no data; no score |
-| 4.0 | Decision gate: calendar | todo | | | |
+| 4.0 | Decision gate: calendar | done | chunk/4.0-calendar-decisions | 2026-10-23 | ADR 0012: RRULE recurrence (rrule-temporal, three scopes), task-bound time blocks with status + auto-mark, FullCalendar v7 Week/Day/Agenda, all-day end exclusive; Phase 4 now 4.1–4.11 |
 | 4.1 | Calendar events: schema and service | todo | | | |
-| 4.2 | Event create/edit UI | todo | | | |
-| 4.3 | Agenda view | todo | | | |
-| 4.4 | Week view | todo | | | |
-| 4.5 | Integrations with Today and Home | todo | | | |
+| 4.2 | Recurrence engine | todo | | | |
+| 4.3 | Recurring events: series, exceptions and scopes | todo | | | |
+| 4.4 | Event create/edit UI | todo | | | |
+| 4.5 | FullCalendar foundation and Agenda view | todo | | | |
+| 4.6 | Week and Day views | todo | | | |
+| 4.7 | Time blocks: schema and service | todo | | | |
+| 4.8 | Time blocks UI | todo | | | |
+| 4.9 | Integrations with Today and Home | todo | | | |
 | 4.✓ | Phase 4 checkpoint (user) | todo | | | |
+| 4.10 | Resource columns by life area | todo | | | |
+| 4.11 | Resource timeline by life area | todo | | | |
 | 5.0 | Decision gate: reminders | todo | | | |
 | 5.1 | Worker process and pg-boss | todo | | | |
 | 5.2 | Service worker and PWA install | todo | | | |
@@ -614,37 +620,165 @@ Decided 2026-10-22 in [ADR 0011](decisions/0011-task-status-planning-priority-es
 **Goal:** See commitments and dated work in time.
 
 ### 4.0 Decision gate
-- **Recurring events.** Recommended: not in v1. Revisit after a month of use.
-- **Time blocks.** Recommended: deferred. A planned task is not proof of work, and blocks add a second planning model.
-- **Views.** Recommended: Week view plus Agenda. A Month view only if dogfooding shows a need.
-- **All-day events.** Store a local `start_date`/`end_date` (end exclusive), not instants.
+Decided 2026-10-23 in [ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md). The user chose recurrence and time blocks in v1, against the gate's recommendation.
+- **Recurring events:** in v1, for events **and** time blocks.
+  - **Engine:** `rrule-temporal` behind `src/lib/recurrence.ts`. A series row holds the rule, and occurrences are expanded at query time and never stored.
+  - **Exceptions:** per-series exception rows, keyed by the occurrence's original start.
+  - **Patterns:** the form's repeat builder (daily, weekly on weekdays, monthly by day or nth/last weekday, yearly, interval, ends never/after N/on date), and the server accepts only those rule parts.
+  - **Scopes:** edit and delete offer this event / this and following / all events.
+- **Time blocks:** in v1, in their own table.
+  - **Task:** each block is for exactly one task (required, deleted with the task) and shows the task's title. Timed only, at most 24 hours.
+  - **Status:** user-set `scheduled | done | skipped`. A past block that's still `scheduled` reads "Not marked". Marking a block done never completes the task.
+  - **Auto-mark:** completing the task marks its started one-off blocks done, and only today's started occurrences of a repeating block. A repeating series is never ended automatically: its future occurrences show "End series here".
+  - **Creating:** the "Block time" form, selecting a grid slot, dragging a task from a desktop task panel, or dragging a block to move or resize it.
+- **Views:** Week (from the user's week start, all-day row, deadline markers), Day as the mobile fallback, and Agenda. No Month view; decide at the checkpoint.
+  - **Renderer:** FullCalendar v7 (`@fullcalendar/react`, MIT), used for rendering only. The server expands occurrences, and our own dialogs own create and edit.
+- **All-day events:** local `start_date`/`end_date`, end exclusive. The form shows an inclusive end.
+- **Resource views:** lanes are life areas. Built as our own components in 4.10–4.11, after the checkpoint.
 
 ### 4.1 Calendar events: schema and service
-- Table `calendar_events`:
+- Table `calendar_events` (one-off events only; recurrence is 4.3):
   - `title`, `description?`, `location?`, `all_day`
-  - Timed events: `start_at`, `end_at` (UTC) and `tz`. All-day events: `start_date`, `end_date`.
-  - CHECKs enforce exactly one shape and that the end comes after the start.
-  - `goal_id?` (optional context link), `source` (default `internal`), `external_id?`, timestamps.
+  - Timed events: `start_at`, `end_at` (UTC) and `tz`. All-day events: `start_date`, `end_date` (`date`, end exclusive).
+  - CHECKs enforce exactly one shape and that the end comes after the start. Title/description/location length CHECKs.
+  - `goal_id?` and `life_area_id?`: composite FKs with `ON DELETE SET NULL (goal_id)` / `SET NULL (life_area_id)` in a hand-edited migration (see the 1.1 note).
+  - `source` (default `internal`), `external_id?`, timestamps, `unique (id, user_id)` (exceptions, reminders and note links will reference events).
 - Index on `(user_id, start_at)` and on `(user_id, start_date)`.
-- Service: CRUD and range queries (`eventsBetween(localStart, localEnd, tz)`).
-- **Tests:** range query edge cases, events crossing midnight and DST transitions (for example, a zone with DST such as `America/New_York` on a transition day).
+- **Service:**
+  - CRUD. Delete is a confirmed hard delete that removes the event's audit events (ADR 0005).
+  - `eventsBetween(localStart, localEnd, tz)`: timed events by instant overlap, and all-day events by local-date overlap.
+  - Audit events (`calendar_event.created`, `.updated`): structured fields only, never title, description or location.
+- **Tests:** range query edge cases (an event ending exactly at the range start is excluded), events crossing midnight, DST transition days in `America/New_York`, all-day end exclusivity, cross-user access, goal and life-area deletes clearing the link and keeping `user_id`.
 
-### 4.2 Event create/edit UI
-- A form with a sensible default duration, an all-day toggle, and a time-zone display when it differs from the user's zone.
-- **Done when:** validation errors are field-level and the form is fully keyboard operable.
+### 4.2 Recurrence engine
+- Add `rrule-temporal` (check the version and licence first), and import it only in `src/lib/recurrence.ts`. Confirm that it works with the `temporal-polyfill` module import and not a global `Temporal` (ADR 0008). If it needs a global, stop and ask.
+- A Zod schema for the builder subset in ADR 0012:
+  - `FREQ` daily/weekly/monthly/yearly with `INTERVAL`
+  - `BYDAY` (weekly; monthly with an ordinal, including `-1`)
+  - `BYMONTHDAY`
+  - `COUNT` or `UNTIL`, not both
 
-### 4.3 Agenda view
-- A merged chronological list of events, timed task deadlines and planned tasks for a chosen range.
+  Plus functions to turn a stored rule into builder values and back. Anything else is rejected.
+- `expandOccurrences(series, rangeStart, rangeEnd, exceptions)`. It is pure (no DB), and its range is at most 366 days.
+  - **Timed:** local wall-clock time anchored in the series' `tz`, with each occurrence lasting the series' elapsed duration.
+  - **All-day:** dates.
+  - Cancelled exceptions are removed, and overridden ones are moved and patched.
+- A plain-language summary of a rule ("Every 2 weeks on Mon and Thu, until 20 Dec 2026") for the form and dialogs.
+- **Tests (unit):**
+  - weekly across both `America/New_York` DST transitions (stays at 09:00 local)
+  - monthly on the 31st and on the last Friday
+  - yearly on 29 Feb
+  - `COUNT` and `UNTIL` boundaries
+  - exceptions (cancel and move)
+  - a range edge at an occurrence's exact start and end
+  - the 366-day cap
+  - round trip from rule to builder and back
 
-### 4.4 Week view
-- A 7-day grid starting on the user's week start. Timed events are positioned by local time, with an all-day row. Timed task deadlines appear as markers.
-- On mobile, fall back to a day view or the agenda.
-- **Done when:** overlapping events render side by side, and the grid is navigable by keyboard.
+### 4.3 Recurring events: series, exceptions and scopes
+- Add `rrule?` to `calendar_events` (a series row holds its first occurrence's times). Add the table `calendar_event_exceptions`:
+  - `event_id` (composite FK, cascade) and `user_id`
+  - `original_start_at?` / `original_start_date?`, matching the series shape, and unique per event
+  - `kind` (`cancelled | modified`)
+  - override fields: start/end, title, description, location, `goal_id?`, `life_area_id?`
+  - timestamps
+- `eventsBetween` now expands series through `src/lib/recurrence.ts` and returns occurrences with their series id and original start, so the UI can address one occurrence.
+- **Service scopes** (ADR 0012):
+  - **this event:** upsert an exception, or a cancellation for delete
+  - **this and following:** in one transaction, set `UNTIL` on the old series, create the new series, and move or drop later exceptions
+  - **all events:** edit the series and drop exceptions that no longer match
+  - Each operation returns what it dropped, so the UI can confirm.
+- Audit events for series and exception changes (structured fields, the rule and the scope; never text). Deleting a series removes its and its exceptions' events.
+- **Tests:**
+  - each scope for edit and delete, on timed and all-day series
+  - a split on a DST transition day
+  - exceptions carried over or dropped on a split
+  - deleting the first occurrence with "this and following" (deletes the series)
+  - cross-user access to a series and to an exception
 
-### 4.5 Integrations with Today and Home
-- Today shows today's events at the top. Home shows the next commitment.
+### 4.4 Event create/edit UI
+- A Calendar entry under Plan (sidebar, Plan sub-nav and mobile), with an event dialog:
+  - title, an all-day toggle, start and a sensible default duration (60 min), and an inclusive end date for all-day events
+  - location, description, goal (pre-fills its life area) and life area
+  - a time-zone display when the event's zone differs from the user's
+- The repeat builder, with the rule summary from 4.2.
+- On an occurrence of a series, edit and delete ask for the scope. The confirmation names any exceptions that will be dropped.
+- Until 4.5, the calendar page lists upcoming events plainly (the dialog needs a place to live).
+- **Done when:** validation errors are field-level (including the builder's), and the dialog and builder are fully keyboard operable.
 
-**Phase 4 checkpoint:** use the calendar for a week. Decide whether a Month view or recurrence is truly needed.
+### 4.5 FullCalendar foundation and Agenda view
+- Add `@fullcalendar/react` v7 (check the version, licence and React 19 peer first). Use its built-in subpaths (`/list`, `/timegrid`, `/interaction`) and no v6 packages.
+- One client wrapper component in `src/components/calendar/`, themed with the app's Tailwind tokens in light and dark. It renders feeds that the server has already expanded.
+- **Agenda** (`list` view): a chronological list for a chosen range (URL parameter), merging events (with occurrences), timed task deadlines and planned tasks. Clicking an item opens its dialog. Time blocks join in 4.8.
+- **Done when:**
+  - items show on the correct local day in the user's zone
+  - axe passes
+  - the list is keyboard operable
+  - the range survives a refresh
+
+### 4.6 Week and Day views
+- **Week** (`timeGridWeek`): starts on the user's week start. Timed events are positioned by local time, all-day events sit in the all-day row, and timed task deadlines appear as markers. Planned tasks stay on Today, Upcoming and Agenda.
+- **Day** (`timeGridDay`) is the fallback on mobile widths.
+- Navigation (previous, next, today) is reflected in the URL. Clicking an event opens its dialog.
+- **Done when:**
+  - overlapping events render side by side
+  - the grid is navigable by keyboard
+  - axe passes on Week and Day
+
+  If FullCalendar's grid can't meet the keyboard bar, stop and ask (ADR 0012).
+
+### 4.7 Time blocks: schema and service
+- Table `time_blocks`:
+  - `task_id` (required, composite FK, `ON DELETE CASCADE`)
+  - `start_at`, `end_at` (UTC), `tz`, `rrule?`
+  - `status` (`scheduled | done | skipped`, default `scheduled`)
+  - timestamps
+  - CHECKs: end after start, at most 24 hours, status values. For one-off blocks, `status` is the block's status.
+- Table `time_block_exceptions`: `block_id` (composite FK, cascade), `user_id`, `original_start_at` (unique per block), `kind` (`cancelled | modified`), override start/end, `status?`, timestamps.
+- **Service:**
+  - CRUD with the three scopes, reusing 4.3's approach
+  - `setStatus(block or occurrence)`
+  - `blocksBetween(localStart, localEnd, tz)`, with each block's task title, task status and lane (the task's goal's life area via `goalOf`)
+  - audit events, including status changes
+- **Auto-mark:**
+  - **Where:** the task service's `changeStatus` to `completed` calls the block service in the same transaction.
+  - **One-off blocks:** started and still `scheduled` blocks become `done`.
+  - **Repeating blocks:** only occurrences that started on the user's local day of completion and are still `scheduled` become `done`.
+  - **Never:** skipped blocks, future blocks, reopen and cancel change nothing.
+  - **Audit:** one event per block or occurrence, marked as automatic.
+- Task delete deletes its blocks, their exceptions and all their audit events in one transaction.
+- **Tests:**
+  - every auto-mark rule above, including a series started weeks ago (only today's occurrence is marked) and a completion just after midnight in a non-UTC zone
+  - scopes on repeating blocks
+  - the 24-hour CHECK
+  - task delete cascading blocks and their events
+  - cross-user access
+
+### 4.8 Time blocks UI
+- **"Block time" action** on a task (Plan list, Today, task dialog): date, start, duration (defaults to the estimate, else 60 min) and the repeat builder. The task dialog lists its upcoming blocks.
+- **On the grid** (Week and Day):
+  - Blocks are styled differently from events.
+  - Selecting a slot opens a task picker, which creates a block.
+  - Dragging moves a block and resizing changes its length. On a repeating block, both ask for the scope.
+  - **Desktop only:** a task panel beside the Week grid that you drag open tasks out of to create blocks.
+- **On a block:** set its status (done or skipped, or back to scheduled); "Also complete the task?" as a separate action; "Not marked" for past scheduled blocks; "Task completed" plus "End series here" on future occurrences of a series.
+- Agenda includes blocks.
+- **Done when:** every drag action has a keyboard path through the form, and the e2e test creates a block by form and completes its task, which marks the block done.
+
+### 4.9 Integrations with Today and Home
+- Today shows a timeline of today's events and time blocks at the top, with all-day events first.
+- Home shows the next commitment: the next event or block that hasn't ended. It is a metric in `metrics/home.ts` with one card (see the 3.2 note).
+- **Done when:** a timed event and a block on today's local date appear on Today in a non-UTC zone, and Home's card links to the item in the calendar.
+
+**Phase 4 checkpoint:** use the calendar and time blocks for a week. Decide whether a Month view is needed and whether events should be draggable on the grid like blocks. The resource views (4.10–4.11) follow the checkpoint.
+
+### 4.10 Resource columns by life area
+- A day view with one column per active life area, plus "No area". Events go by their `life_area_id`, and blocks by their task's goal's area.
+- Our own component, built from scratch (do not copy or adapt FullCalendar's premium code), reusing the 4.6 positioning and overlap rules where possible.
+- **Done when:** overlaps within a column render side by side, the grid is keyboard navigable, and axe passes.
+
+### 4.11 Resource timeline by life area
+- One row per active life area plus "No area", across a chosen range (a day or a week) on a horizontal time axis. Our own component, built the same way as 4.10.
+- **Done when:** items land in the right lane and position in a non-UTC zone, the timeline is keyboard navigable, and axe passes.
 
 ---
 
@@ -895,7 +1029,7 @@ Decided 2026-10-22 in [ADR 0011](decisions/0011-task-status-planning-priority-es
 | Feature | Prerequisite |
 |---|---|
 | Projects as a task parent | Dogfooding shows non-goal work needs grouping |
-| Time blocks, recurring events, calendar sync | A clear repeated need from real use |
+| Calendar sync, a Month view, dragging events on the grid (time blocks and recurrence are in v1, ADR 0012) | A clear repeated need from real use, judged at the Phase 4 checkpoint |
 | AI-assisted weekly review (roadmap Phase 3) | Phases 7 and 9 stable, a provider ToS review, a provider adapter, cost limits |
 | User-controlled memory (roadmap Phase 4) | The AI review is in use and trusted, and the memory policy is written |
 | Personalized and proactive planning | Memory is in place, plus user controls for frequency and tone |
@@ -1694,3 +1828,43 @@ Template:
 - **Follow-ups:**
   - A Goals-page "without a next action" filter, if the in-card list gets long while dogfooding.
   - Earlier follow-ups still open: life-area delete writes no `goal.updated` event; milestone events aren't in the goal timeline; milestone edit and delete UI; next action on the Goals list; the `preferences.spec.ts` first-sign-in flake (did not fail in this chunk's runs); the `/home` instant-navigation dev warning (still printed for `/home`); noisy `Provider not found` auth logs.
+
+### 4.0: Decision gate: calendar (2026-10-23)
+- **Built:** ADR 0012 (calendar event shapes, recurrence, time blocks and views) and its index row. ADR 0007's status line points to it. Phase 4 is rewritten as 4.1–4.11 (the progress log, chunk text and `AGENT_PROMPTS.md` prompts). The "Later" row is updated. `DATA_MODEL.md` has CalendarEvent, the new CalendarEventException, TimeBlock and the new TimeBlockException, plus §4, §5, §6 and §7. `PRODUCT_SPEC.md` and `ROADMAP.md` are synced. No code.
+- **Deviations:**
+  1. **The user chose recurrence and time blocks in v1**, against the gate's recommendation, so Phase 4 grows from five feature chunks to nine before the checkpoint. The chunks are: engine (4.2), recurring events (4.3), FullCalendar + Agenda (4.5), Week/Day (4.6), and time blocks schema/service (4.7) and UI (4.8). Two more follow the checkpoint: resource columns (4.10) and resource timeline (4.11). The old 4.2–4.5 are now 4.4, 4.5, 4.6 and 4.9.
+  2. **FullCalendar** came from the user's answer (use the free tier if compatible, and build the premium resource views ourselves). It is compatible: v7.1.3 is MIT, and its peers are React ^19 and `temporal-polyfill` ^1.0.1.
+- **Decisions:**
+  - **Asked and answered:**
+    - full RRULE recurrence
+    - all three edit scopes
+    - `rrule-temporal` as the engine
+    - life areas as resources, after the checkpoint
+    - the builder subset only
+    - full time blocks with a required task
+    - user-set status plus auto-mark
+    - repeating blocks
+    - only today's occurrences auto-marked, with "End series here"
+    - action + slot select + task-panel drag
+    - Week + Agenda (+Day), no Month
+    - all-day as local dates, end exclusive
+  - **Derived and recorded in ADR 0012, not asked separately:**
+    - events get their own `life_area_id` (pre-filled from the goal)
+    - occurrences are expanded at query time, never stored, with a 366-day cap per query
+    - timed occurrences keep local wall-clock time and the series' elapsed duration
+    - "this and following" splits the series and carries over exceptions the new rule still generates
+    - blocks last at most 24 hours, are timed only and have no title of their own
+    - reopening or cancelling a task never changes blocks
+    - `@fullcalendar/rrule` is not used
+    - premium FullCalendar code must not be copied
+- **Next chunk should know:**
+  - 4.1 builds one-off events only; `rrule` arrives in 4.3.
+  - The goal and life-area FKs need the hand-edited `SET NULL (column)` (see the 1.1 note).
+  - 4.2 must confirm that `rrule-temporal` works with the `temporal-polyfill` module import (ADR 0008 forbids a global). If not, stop and ask.
+  - FullCalendar v7 ships its plugins as subpaths of `@fullcalendar/react`, so don't install the v6 `@fullcalendar/core`/`timegrid` packages.
+  - 4.7 changes the task service's `changeStatus` and task delete, so re-run the 2.2 tests.
+- **Unverified:** none (docs only). `pnpm format:check` was run on the changed docs.
+- **Follow-ups:**
+  - The 5.0 gate should ask whether event and block occurrences can remind. Occurrences are expanded, not stored (ADR 0012 consequences).
+  - Phase 10 export (10.1) must include events, blocks and both exceptions tables.
+  - Events aren't draggable on the grid (only blocks are). This is listed for the checkpoint.
