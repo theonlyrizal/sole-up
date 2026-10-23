@@ -19,6 +19,7 @@ export const PLAN_SUB_ITEMS = [
   { href: "/plan", label: "All tasks" },
   { href: "/plan/today", label: "Today" },
   { href: "/plan/upcoming", label: "Upcoming" },
+  { href: "/plan/calendar", label: "Calendar" },
   { href: "/plan/inbox", label: "Inbox" },
 ] as const;
 

@@ -126,10 +126,10 @@ test("an empty window is calm, and the range tabs live in the URL", async ({
     ranges.getByRole("link", { name: "Next 30 days" }),
   ).toHaveAttribute("aria-current", "page");
 
-  // Upcoming sits under Plan, between Today and Inbox.
+  // Upcoming sits under Plan, between Today and Calendar.
   await expect(
     page.getByRole("navigation", { name: "Plan" }).getByRole("link"),
-  ).toHaveText(["All tasks", "Today", "Upcoming", "Inbox"]);
+  ).toHaveText(["All tasks", "Today", "Upcoming", "Calendar", "Inbox"]);
 });
 
 test("plans and deadlines land on their local days, a timed one included", async ({

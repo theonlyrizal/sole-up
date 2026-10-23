@@ -698,6 +698,16 @@ type EditInput = Details & { when: When; rrule: string | null };
  */
 export async function editCalendarEventOccurrence(
   userId: string,
+  input: EditCalendarEventOccurrenceInput,
+): Promise<OccurrenceEditResult> {
+  return guardLinks(() =>
+    db.transaction((tx) => editOccurrenceInTx(tx, userId, input)),
+  );
+}
+
+async function editOccurrenceInTx(
+  tx: DbTransaction,
+  userId: string,
   {
     id,
     originalStart,
@@ -707,19 +717,15 @@ export async function editCalendarEventOccurrence(
     ...details
   }: EditCalendarEventOccurrenceInput,
 ): Promise<OccurrenceEditResult> {
-  return guardLinks(() =>
-    db.transaction(async (tx) => {
-      const occurrence = await findOccurrence(tx, userId, id, originalStart);
-      const input = { ...details, when, rrule };
-      if (scope === "this") {
-        return editThisOccurrence(tx, userId, occurrence, originalStart, input);
-      }
-      if (scope === "following" && !occurrence.isFirst) {
-        return splitSeries(tx, userId, occurrence, originalStart, input);
-      }
-      return editAllOccurrences(tx, userId, occurrence, originalStart, input);
-    }),
-  );
+  const occurrence = await findOccurrence(tx, userId, id, originalStart);
+  const input = { ...details, when, rrule };
+  if (scope === "this") {
+    return editThisOccurrence(tx, userId, occurrence, originalStart, input);
+  }
+  if (scope === "following" && !occurrence.isFirst) {
+    return splitSeries(tx, userId, occurrence, originalStart, input);
+  }
+  return editAllOccurrences(tx, userId, occurrence, originalStart, input);
 }
 
 async function editThisOccurrence(
@@ -909,40 +915,102 @@ async function splitSeries(
  */
 export async function deleteCalendarEventOccurrence(
   userId: string,
+  input: DeleteCalendarEventOccurrenceInput,
+): Promise<{ dropped: DroppedException[] }> {
+  return db.transaction((tx) => deleteOccurrenceInTx(tx, userId, input));
+}
+
+async function deleteOccurrenceInTx(
+  tx: DbTransaction,
+  userId: string,
   { id, originalStart, scope }: DeleteCalendarEventOccurrenceInput,
 ): Promise<{ dropped: DroppedException[] }> {
-  return db.transaction(async (tx) => {
-    const { series, exceptions, exception, date, isFirst } =
-      await findOccurrence(tx, userId, id, originalStart);
+  const { series, exceptions, exception, date, isFirst } = await findOccurrence(
+    tx,
+    userId,
+    id,
+    originalStart,
+  );
 
-    if (scope === "this") {
-      const columns = cancelledColumns(originalStart);
-      if (exception) await updateException(tx, userId, exception, columns);
-      else await insertException(tx, userId, series.id, columns);
-      return { dropped: [] };
-    }
+  if (scope === "this") {
+    const columns = cancelledColumns(originalStart);
+    if (exception) await updateException(tx, userId, exception, columns);
+    else await insertException(tx, userId, series.id, columns);
+    return { dropped: [] };
+  }
 
-    if (scope === "all" || isFirst) {
-      await deleteEvent(tx, userId, series.id, exceptions);
-      return { dropped: exceptions.map(toDropped) };
-    }
+  if (scope === "all" || isFirst) {
+    await deleteEvent(tx, userId, series.id, exceptions);
+    return { dropped: exceptions.map(toDropped) };
+  }
 
-    const later = exceptions.filter(
-      (row) => originalDateOf(series, originalStartOf(row)) >= date,
-    );
-    await deleteExceptions(tx, userId, later);
-    const dropped = later
-      .filter((row) => generatesOccurrence(series, originalStartOf(row)))
-      .map(toDropped);
-    await updateEvent(
-      tx,
-      userId,
-      series,
-      { ...seriesColumnsOf(series), rrule: endRuleBefore(series.rrule, date) },
-      { scope: "following", droppedExceptions: dropped.length },
-    );
-    return { dropped };
-  });
+  const later = exceptions.filter(
+    (row) => originalDateOf(series, originalStartOf(row)) >= date,
+  );
+  await deleteExceptions(tx, userId, later);
+  const dropped = later
+    .filter((row) => generatesOccurrence(series, originalStartOf(row)))
+    .map(toDropped);
+  await updateEvent(
+    tx,
+    userId,
+    series,
+    { ...seriesColumnsOf(series), rrule: endRuleBefore(series.rrule, date) },
+    { scope: "following", droppedExceptions: dropped.length },
+  );
+  return { dropped };
+}
+
+// --- Previews ------------------------------------------------------------------
+
+/** Carries a dry run's result out of the transaction it rolls back. */
+class RollbackWith<T> extends Error {
+  constructor(readonly result: T) {
+    super("Dry run rolled back");
+  }
+}
+
+/**
+ * Runs `change` in a transaction and rolls it back, returning what it
+ * would have returned. Domain and validation errors pass through as they
+ * would on the real change.
+ */
+async function dryRun<T>(
+  change: (tx: DbTransaction) => Promise<T>,
+): Promise<T> {
+  try {
+    await db.transaction(async (tx) => {
+      throw new RollbackWith(await change(tx));
+    });
+  } catch (error) {
+    if (error instanceof RollbackWith) return error.result as T;
+    throw error;
+  }
+  throw new Error("Dry run committed");
+}
+
+/**
+ * The exceptions `editCalendarEventOccurrence` would drop for this input,
+ * without changing anything, so the scope prompt can name them before the
+ * user confirms. It runs the same change and rolls it back, so the answer
+ * (and any validation error) is exactly what saving would give.
+ */
+export async function previewCalendarEventOccurrenceEdit(
+  userId: string,
+  input: EditCalendarEventOccurrenceInput,
+): Promise<{ dropped: DroppedException[] }> {
+  const { dropped } = await guardLinks(() =>
+    dryRun((tx) => editOccurrenceInTx(tx, userId, input)),
+  );
+  return { dropped };
+}
+
+/** The exceptions `deleteCalendarEventOccurrence` would drop, changing nothing. */
+export async function previewCalendarEventOccurrenceDelete(
+  userId: string,
+  input: DeleteCalendarEventOccurrenceInput,
+): Promise<{ dropped: DroppedException[] }> {
+  return dryRun((tx) => deleteOccurrenceInTx(tx, userId, input));
 }
 
 // --- Reading a range ---------------------------------------------------------
