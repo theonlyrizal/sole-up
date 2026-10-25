@@ -27,6 +27,13 @@ import {
   TASK_ESTIMATE_MIN_MINUTES,
   TASK_STATUSES,
 } from "@/lib/tasks";
+import {
+  TIME_BLOCK_EDITABLE_FIELDS,
+  TIME_BLOCK_EXCEPTION_FIELDS,
+  TIME_BLOCK_EXCEPTION_KINDS,
+  TIME_BLOCK_SCOPES,
+  TIME_BLOCK_STATUSES,
+} from "@/lib/time-blocks";
 
 // The audit event allowlist (ADR 0005). An event type that is not a key of
 // AUDIT_EVENTS cannot be recorded.
@@ -431,6 +438,78 @@ export const AUDIT_EVENTS = defineAuditEvents({
   // No `calendar_event_exception.deleted`: an exception dropped by a series
   // change or deleted with its series takes its events with it (ADR 0005);
   // the series' event counts the dropped ones.
+
+  // Time blocks (ADR 0012). A block has no text of its own (it shows its
+  // task's title), so every field is structured. Series changes record
+  // their scope as calendar events do. A status change that completing the
+  // task made, rather than the user, carries `automatic: true`.
+  "time_block.created": {
+    entityType: "time_block",
+    changes: z.strictObject({
+      taskId: auditChange(z.uuid()),
+      startAt: auditChange(instant),
+      endAt: auditChange(instant),
+      tz: auditChange(timeZone),
+      rrule: auditChange(rrule),
+      status: auditChange(z.enum(TIME_BLOCK_STATUSES)),
+      scope: z.literal("following").optional(),
+      splitFromId: z.uuid().optional(),
+    }),
+  },
+  "time_block.updated": {
+    entityType: "time_block",
+    changes: z.strictObject({
+      fields: z.array(z.enum(TIME_BLOCK_EDITABLE_FIELDS)).min(1),
+      startAt: auditChange(instant).optional(),
+      endAt: auditChange(instant).optional(),
+      tz: auditChange(timeZone).optional(),
+      rrule: auditChange(rrule).optional(),
+      status: auditChange(z.enum(TIME_BLOCK_STATUSES)).optional(),
+      scope: z.enum(["following", "all"]).optional(),
+      splitIntoId: z.uuid().optional(),
+      droppedExceptions: droppedExceptions.optional(),
+    }),
+  },
+  // A one-off block's status, set by the user or by completing its task.
+  "time_block.status_changed": {
+    entityType: "time_block",
+    changes: z.strictObject({
+      status: auditChange(z.enum(TIME_BLOCK_STATUSES)),
+      automatic: z.literal(true).optional(),
+    }),
+  },
+  // No `time_block.deleted`, for the same reason as life areas (ADR 0005).
+
+  // One occurrence of a repeating block that differs from its rule: moved,
+  // cancelled, or given a status. `.updated` records the scope a series
+  // change carried it over with; a status change has no scope.
+  "time_block_exception.created": {
+    entityType: "time_block_exception",
+    changes: z.strictObject({
+      blockId: auditChange(z.uuid()),
+      originalStartAt: auditChange(instant),
+      kind: auditChange(z.enum(TIME_BLOCK_EXCEPTION_KINDS)),
+      startAt: auditChange(instant),
+      endAt: auditChange(instant),
+      status: auditChange(z.enum(TIME_BLOCK_STATUSES)),
+      automatic: z.literal(true).optional(),
+    }),
+  },
+  "time_block_exception.updated": {
+    entityType: "time_block_exception",
+    changes: z.strictObject({
+      fields: z.array(z.enum(TIME_BLOCK_EXCEPTION_FIELDS)).min(1),
+      scope: z.enum(TIME_BLOCK_SCOPES).optional(),
+      blockId: auditChange(z.uuid()).optional(),
+      originalStartAt: auditChange(instant).optional(),
+      kind: auditChange(z.enum(TIME_BLOCK_EXCEPTION_KINDS)).optional(),
+      startAt: auditChange(instant).optional(),
+      endAt: auditChange(instant).optional(),
+      status: auditChange(z.enum(TIME_BLOCK_STATUSES)).optional(),
+      automatic: z.literal(true).optional(),
+    }),
+  },
+  // No `time_block_exception.deleted`, as for event exceptions.
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;

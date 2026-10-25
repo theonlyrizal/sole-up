@@ -96,7 +96,7 @@ const eventFields = {
  * A repeat rule (ADR 0012), limited to the repeat builder's parts and
  * stored in canonical form. Blank or absent means a one-off event.
  */
-const rruleFieldSchema = z
+export const rruleFieldSchema = z
   .string("Choose how often it repeats.")
   .trim()
   .nullish()

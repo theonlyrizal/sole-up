@@ -14,6 +14,10 @@ import { db, type DbTransaction } from "@/server/db/client";
 import { isForeignKeyViolation } from "@/server/db/errors";
 import { milestones, tasks } from "@/server/db/schema";
 import { NotFoundError, ValidationError } from "@/server/errors";
+import {
+  autoMarkTimeBlocksInTx,
+  deleteTimeBlocksForTaskInTx,
+} from "@/server/modules/time-blocks/service";
 
 import type {
   ChangeTaskStatusInput,
@@ -224,6 +228,8 @@ export async function updateTask(
  * Complete, reopen or cancel: any status to any other (ADR 0011). Sets the
  * timestamp of the status entered and clears the one left. The same status
  * again is a no-op with no event. Never changes the task's goal or milestone.
+ * Completing also auto-marks the task's started time blocks in the same
+ * transaction (ADR 0012); reopening and cancelling leave blocks alone.
  */
 export async function changeTaskStatus(
   userId: string,
@@ -247,6 +253,9 @@ export async function changeTaskStatus(
       entityId: id,
       changes: { status: { from: current.status, to: status } },
     });
+    if (updated.completedAt) {
+      await autoMarkTimeBlocksInTx(tx, userId, id, updated.completedAt);
+    }
     return toTask(updated);
   });
 }
@@ -513,12 +522,16 @@ export async function detachTasksInTx(
   }
 }
 
-/** Hard delete (ADR 0006). Removes the task's audit events with it. */
+/**
+ * Hard delete (ADR 0006). Removes the task's audit events with it, and its
+ * time blocks with their exceptions and audit events (ADR 0012).
+ */
 export async function deleteTask(
   userId: string,
   { id }: TaskIdInput,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    await deleteTimeBlocksForTaskInTx(tx, userId, id);
     const [deleted] = await tx
       .delete(tasks)
       .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
