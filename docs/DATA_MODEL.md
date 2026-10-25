@@ -283,10 +283,14 @@ Fields:
 - `block_id` (composite FK, cascade)
 - `original_start_at` (unique per block)
 - `kind` (`cancelled | modified`)
-- Override start/end (optional)
-- `status` (optional; `scheduled | done | skipped`)
+- `start_at`, `end_at`, `status` (`scheduled | done | skipped`): a `modified` exception holds all three, the occurrence's full values (a snapshot, as for event exceptions); a `cancelled` one holds none.
 - `created_at`
 - `updated_at`
+
+Rules:
+- Marking an occurrence writes a modified exception at its current times. Scoped changes carry exceptions over as for events, and they keep their status.
+- Stopping a repeat folds the first occurrence's times and status into the block; making a one-off repeat moves its status to its first occurrence. A series row's own `status` stays `scheduled` (CHECK).
+- Auto-mark uses the user's confirmed time zone for "the local day of completion", or the series' zone while none is confirmed. Its audit events carry `automatic: true`.
 
 Do not treat a planned block as proof that work actually happened.
 

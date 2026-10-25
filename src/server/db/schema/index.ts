@@ -9,3 +9,4 @@ export * from "./life-areas";
 export * from "./milestones";
 export * from "./preferences";
 export * from "./tasks";
+export * from "./time-blocks";

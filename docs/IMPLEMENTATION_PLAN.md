@@ -179,7 +179,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 4.4 | Event create/edit UI | done | chunk/4.4-event-dialog | 2026-10-23 | `/plan/calendar` (Calendar under Plan) listing 30 days, event dialog (60-min default, inclusive all-day end, goal → area, zone note), repeat builder with field errors, scope prompt naming dropped exceptions via dry-run previews |
 | 4.5 | FullCalendar foundation and Agenda view | done | chunk/4.5-agenda-view | 2026-10-23 | `@fullcalendar/react` 7.1.1 behind one token-themed, client-only `Calendar` wrapper; `/plan/calendar` is the Agenda (events + occurrences, plans, timed deadlines) for `?start=&days=7\|14\|30` (default 30 from today), items open their dialogs |
 | 4.6 | Week and Day views | done | chunk/4.6-week-day-views | 2026-10-24 | `/plan/calendar?view=week\|day&date=`: FullCalendar time grids from the user's week start, all-day row, timed deadlines as dashed markers, overlaps side by side, arrow-key moves between items, Week → Day below `md` |
-| 4.7 | Time blocks: schema and service | todo | | | |
+| 4.7 | Time blocks: schema and service | done | chunk/4.7-time-blocks | 2026-10-26 | `time_blocks` + `time_block_exceptions` (24-hour CHECKs, task cascade, migration 0010), block service with three scopes, `setTimeBlockStatus`, `blocksBetween` with task and lane, auto-mark on completion, task delete removes blocks and their events; no UI |
 | 4.8 | Time blocks UI | todo | | | |
 | 4.9 | Integrations with Today and Home | todo | | | |
 | 4.✓ | Phase 4 checkpoint (user) | todo | | | |
@@ -2070,3 +2070,41 @@ Template:
   - Scroll the grid to the morning (or the first item) on load, if the long 24-hour page bothers while dogfooding.
   - The FullCalendar grid has `role="grid"` but its cells aren't arrow-navigable themselves (our handler moves between items only); revisit in 10.5's accessibility pass.
   - Earlier follow-ups still open: FullCalendar's English labels; closed tasks on past Agenda days; event dialog field errors that stay until the next save; event history for link clears.
+
+### 4.7: Time blocks: schema and service (2026-10-26)
+- **Built:**
+  - `src/lib/time-blocks.ts` (pure): statuses, scopes, exception kinds, 1–1440 minute bounds, editable/exception field lists, the `TimeBlock` and `TimeBlockOccurrence` types, `timeBlockTiming(when)` (local start + duration → instants).
+  - Schema `src/server/db/schema/time-blocks.ts` + migration `0010_time_blocks.sql` (generated, no hand edit: the cascades need no column list):
+    - `time_blocks`: `(task_id, user_id)` composite FK with cascade, `unique (id, user_id)`, indexes `(user_id, start_at)` and `(user_id, task_id)`, CHECKs end, duration ≤ 1440 minutes, status, `series_status` (a series row stays `scheduled`), rrule length;
+    - `time_block_exceptions`: `(block_id, user_id)` composite FK with cascade, unique `(block_id, original_start_at)`, CHECKs kind, override, end, duration, status.
+  - `src/server/modules/time-blocks/`:
+    - `validation.ts`: create, update, id, edit/delete occurrence, set status; `blocksBetweenSchema` is the events' range schema;
+    - `series.ts` (pure): occurrence keys and values, `seriesAfterEdit`, `reconcileExceptions`, `autoMarkTargets`;
+    - `service.ts`: `createTimeBlock`, `getTimeBlock`, `updateTimeBlock`, `deleteTimeBlock`, `editTimeBlockOccurrence`, `deleteTimeBlockOccurrence`, `setTimeBlockStatus`, `blocksBetween`, `autoMarkTimeBlocksInTx`, `deleteTimeBlocksForTaskInTx`.
+  - Task service: `changeTaskStatus` to `completed` calls `autoMarkTimeBlocksInTx` in its transaction with the stored `completed_at`; `deleteTask` calls `deleteTimeBlocksForTaskInTx` first.
+  - Audit events `time_block.created|updated|status_changed` and `time_block_exception.created|updated`. Status changes made by auto-mark carry `automatic: true`.
+  - `rruleFieldSchema` is now exported from `calendar-events/validation.ts` for reuse.
+  - Tests:
+    - unit `time-blocks/validation.test.ts` (7, including a duration across the fall-back);
+    - integration `time-blocks.integration.test.ts` (23): the 24-hour and other CHECKs; cross-user composite FKs; create, edit, status and delete with audit privacy; a one-off turning into a series keeping its status; marking never completes the task; DST; each scope, including carry-over with statuses, a weekly rule dropping an exception, the remaining COUNT, stopping a repeat folding the status, and delete following/all; lanes direct and via a milestone; range edges in Tokyo; an occurrence moved before the series; every operation cross-user;
+    - integration `auto-mark.integration.test.ts` (11): started one-offs marked with an automatic event in the completion's transaction; future, skipped and done blocks untouched; a series begun weeks ago marks only today's occurrence; 00:05 in Tokyo (still the previous UTC day), with an occurrence running past midnight left alone; an exact-start edge; cancelled and moved occurrences; the zone fallback; cancel and reopen change nothing; another user's completion; task delete removing blocks, exceptions and all their events; cross-user delete; account cascade.
+  - DATA_MODEL TimeBlockException: snapshot exceptions and the status rules.
+- **Deviations:**
+  1. **Exceptions are full snapshots** (start, end and status all set on `modified`), as 4.3 did for events, rather than optional overrides. The override CHECK enforces it.
+  2. **`time_blocks_series_status_check`** (not in the chunk text): a series row's status stays `scheduled`, since occurrences keep theirs in exceptions. Making a one-off repeat moves its status to the first occurrence; stopping a repeat folds the first occurrence's status back.
+  3. **The lane comes from one batched join** (`coalesce(task.goal_id, milestone.goal_id)` → `goals.life_area_id`), the same rule as `goalOf`, instead of calling `goalOf` per block.
+  4. **No previews and no `actions.ts`** ("no UI"). Scoped changes return `dropped` after writing, as 4.3 did; 4.8 can add dry-run previews the way 4.4 did for events.
+- **Decisions:**
+  1. **Form input is a start and a length:** `startDate`, `startTime`, `durationMinutes` (1–1440, a real number) and `tz`. The end is that many elapsed minutes later, so the 24-hour CHECK can't surface from valid input. A block's task can't be changed.
+  2. **"The user's local day"** uses `user_preferences.timezone`, or each series' own zone while none is confirmed. An occurrence counts when it started at or after that day's local midnight and at or before `completed_at`, by its actual (possibly moved) start. A one-off counts when it started at any time before.
+  3. **An occurrence's status** lives in a modified exception written at its current times; setting it back to `scheduled` keeps the exception. `setTimeBlockStatus` without `originalStart` on a series, or with it on a one-off, is a `ConflictError`.
+  4. **"End series here"** is `deleteTimeBlockOccurrence` with scope `following` (from the first occurrence it deletes the series).
+  5. **Audit:** blocks have no text, so events record every structured field. Status changes have no scope. Auto-mark writes `time_block.status_changed` or `time_block_exception.created|updated` with `automatic: true`. No `.deleted` events (ADR 0005).
+- **Next chunk should know:**
+  - 4.8: `blocksBetween(userId, { localStart, localEnd, tz })` returns `TimeBlockOccurrence[]`: task title and status, `goalId`, `lifeAreaId`, `status`, and `seriesId` + `originalStart` to address an occurrence. Add a block `kind` to `agendaEntries`/`gridEntries`. For the scope prompt, a `dryRun` like `previewCalendarEventOccurrenceEdit` can wrap `editOccurrenceInTx`/`deleteOccurrenceInTx` (not exported yet).
+  - Always send the current `rrule` with "following"/"all" (an absent one stops the repeat). The "this" payload must omit `rrule` (strict schema).
+  - "Not marked" is UI-only: a past occurrence or one-off whose `status` is `scheduled`.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint, typecheck, 538 unit tests and 396 integration tests. `pnpm db:generate` reports no schema changes, and the dev DB is migrated. Two auto-mark rules were mutation-checked (forcing UTC, and dropping the "started today" bound), and each made a test fail. No UI, so `pnpm build` and `pnpm test:e2e` were not run.
+- **Follow-ups:**
+  - Phase 10 export must include `time_blocks` and `time_block_exceptions` (already noted in 4.0).
+  - A one-off block is auto-marked whenever it started before `completed_at`, so a task completed long after its blocks marks all of them. This matches ADR 0012, but is worth watching at the checkpoint.
