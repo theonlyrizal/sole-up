@@ -173,7 +173,7 @@ Run it with `DATABASE_URL` set in your shell to the production string. The dump 
 
 - **The app sleeps after 15 idle minutes.** The first request after that takes about a minute while Render wakes it. 750 instance hours a month are free; a sleeping service uses none.
 - **Neon Free** suspends its compute after 5 idle minutes (wake-up is well under a second). It allows 0.5 GB of storage per project and a 6-hour restore window.
-- **No background worker.** Render runs workers on paid plans only, and a sleeping web service can't fire reminders on time. Phase 5 (decision gate 5.0) must choose a paid instance, another host for the worker, or another approach before reminders ship.
+- **No background worker.** Render runs workers on paid plans only, and a sleeping web service can't fire reminders on time. Decision gate 5.0 kept the free plans: an external cron (cron-job.org) calls a reminder sweep route every 15 minutes, so reminders may arrive up to 15 minutes early ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)). Chunk 5.1 adds the setup steps here.
 - **Build minutes and bandwidth** have monthly allowances. Without a card, Render suspends the service when they run out instead of billing.
 
 ## Moving to a paid plan later

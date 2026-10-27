@@ -8,7 +8,7 @@ To change a decision, add a new ADR that supersedes the old one and update the o
 |---|---|---|
 | [0001](0001-stack.md) | Stack | Accepted |
 | [0002](0002-auth.md) | Authentication | Accepted |
-| [0003](0003-hosting-and-jobs.md) | Hosting and jobs | Accepted |
+| [0003](0003-hosting-and-jobs.md) | Hosting and jobs | Accepted; worker and pg-boss superseded for v1 by 0013 |
 | [0004](0004-task-hierarchy-and-dates.md) | Task hierarchy and dates | Accepted |
 | [0005](0005-history-and-audit-log.md) | History and audit log | Accepted |
 | [0006](0006-deletion.md) | Deletion | Accepted |
@@ -18,3 +18,4 @@ To change a decision, add a new ADR that supersedes the old one and update the o
 | [0010](0010-goal-status-priority-progress.md) | Goal status, priority, progress and dates | Accepted |
 | [0011](0011-task-status-planning-priority-estimates.md) | Task status, overdue plans, priority and estimates | Accepted |
 | [0012](0012-calendar-recurrence-time-blocks-views.md) | Calendar: event shapes, recurrence, time blocks and views | Accepted |
+| [0013](0013-reminders-sweep-and-delivery.md) | Reminders: free-hosting sweep, what reminds, quiet hours and content | Accepted |

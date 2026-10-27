@@ -68,7 +68,7 @@ Build a useful personal management product first. Add AI when the product has re
 - Repeating events, and time blocks for tasks ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)).
 - Week, Day and Agenda views. Resource views by life area follow the Phase 4 checkpoint.
 - Time-zone-correct event display.
-- Reliable reminder delivery via Web Push from a pg-boss worker ([ADR 0003](decisions/0003-hosting-and-jobs.md)).
+- Reminder delivery via Web Push for timed deadlines, timed events and a daily nudge, from a sweep that runs every 15 minutes on the free hosting, so reminders may arrive up to 15 minutes early ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)).
 - Notification preferences and error handling.
 
 ### 1G. Dashboard and review
