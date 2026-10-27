@@ -33,6 +33,11 @@ export const userPreferences = pgTable(
      * while it hasn't been answered (src/server/modules/life-areas).
      */
     lifeAreaStarters: text().$type<"accepted" | "dismissed">(),
+    /**
+     * The daily planning nudge's local time, "HH:MM" in `timezone`, or null
+     * while it is off (ADR 0013).
+     */
+    dailyNudgeTime: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
       .notNull()
@@ -55,6 +60,10 @@ export const userPreferences = pgTable(
     check(
       "user_preferences_locale_length_check",
       sql`char_length(${table.locale}) between 2 and 35`,
+    ),
+    check(
+      "user_preferences_daily_nudge_time_check",
+      sql`${table.dailyNudgeTime} is null or ${table.dailyNudgeTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`,
     ),
   ],
 );

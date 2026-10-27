@@ -15,6 +15,7 @@ import {
 // Relative, not "@/": drizzle-kit loads this file without the path alias.
 import type { LocalDate } from "../../../lib/dates";
 import { type Priority, PRIORITIES } from "../../../lib/priorities";
+import { REMINDER_OFFSETS, type ReminderOffset } from "../../../lib/reminders";
 import {
   TASK_ESTIMATE_MAX_MINUTES,
   TASK_ESTIMATE_MIN_MINUTES,
@@ -64,6 +65,8 @@ export const tasks = pgTable(
     dueTz: text(),
     plannedDate: date({ mode: "string" }).$type<LocalDate>(),
     estimatedMinutes: integer(),
+    /** Minutes before `due_at` to remind (ADR 0013); null for none. */
+    reminderOffsetMinutes: integer().$type<ReminderOffset>(),
     completedAt: timestamp({ withTimezone: true }),
     cancelledAt: timestamp({ withTimezone: true }),
     sortOrder: integer().notNull().default(0),
@@ -125,6 +128,10 @@ export const tasks = pgTable(
     check(
       "tasks_estimated_minutes_check",
       sql`${table.estimatedMinutes} is null or ${table.estimatedMinutes} between ${sql.raw(String(TASK_ESTIMATE_MIN_MINUTES))} and ${sql.raw(String(TASK_ESTIMATE_MAX_MINUTES))}`,
+    ),
+    check(
+      "tasks_reminder_offset_minutes_check",
+      sql`${table.reminderOffsetMinutes} is null or ${table.reminderOffsetMinutes} in ${sql.raw(`(${REMINDER_OFFSETS.join(", ")})`)}`,
     ),
     check(
       "tasks_completed_at_check",

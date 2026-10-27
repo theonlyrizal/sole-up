@@ -14,6 +14,7 @@ import { db, type DbTransaction } from "@/server/db/client";
 import { isForeignKeyViolation } from "@/server/db/errors";
 import { milestones, tasks } from "@/server/db/schema";
 import { NotFoundError, ValidationError } from "@/server/errors";
+import { syncTaskReminderInTx } from "@/server/modules/reminders/schedule";
 import {
   autoMarkTimeBlocksInTx,
   deleteTimeBlocksForTaskInTx,
@@ -28,6 +29,7 @@ import type {
   PlanTasksInput,
   RescheduleTaskDueInput,
   ScheduleTaskInput,
+  SetTaskReminderInput,
   TaskIdInput,
   UpdateTaskInput,
 } from "./validation";
@@ -35,7 +37,9 @@ import type {
 // Every function takes the user's ID and scopes each query by it. A record
 // that is missing or belongs to someone else is the same NotFoundError.
 // Each mutation writes its audit event in the same transaction, and a change
-// to the current value is a no-op with no event.
+// to the current value is a no-op with no event. A change to the status,
+// the deadline or the reminder offset also writes, moves or removes the
+// task's scheduled reminder in that transaction (ADR 0013).
 // Rules: ADR 0004 (parent and dates) and ADR 0011 (status, inbox, priority,
 // estimates), with the pure parts in src/lib/tasks.ts.
 
@@ -172,8 +176,15 @@ export async function createTask(
           dueDate: { from: null, to: row.dueDate },
           dueAt: { from: null, to: iso(row.dueAt) },
           dueTz: { from: null, to: row.dueTz },
+          ...(row.reminderOffsetMinutes !== null && {
+            reminderOffsetMinutes: {
+              from: null,
+              to: row.reminderOffsetMinutes,
+            },
+          }),
         },
       });
+      await syncTaskReminderInTx(tx, userId, row);
       return row;
     }),
   );
@@ -256,8 +267,45 @@ export async function changeTaskStatus(
     if (updated.completedAt) {
       await autoMarkTimeBlocksInTx(tx, userId, id, updated.completedAt);
     }
+    await syncTaskReminderInTx(tx, userId, updated);
     return toTask(updated);
   });
+}
+
+/**
+ * Sets the reminder offset, or removes it with null (ADR 0013). The same
+ * offset again is a no-op with no event.
+ */
+export async function setTaskReminder(
+  userId: string,
+  { id, reminderOffsetMinutes }: SetTaskReminderInput,
+): Promise<Task> {
+  const row = await db.transaction(async (tx) => {
+    const current = await findForUpdate(tx, userId, id);
+    if (current.reminderOffsetMinutes === reminderOffsetMinutes) return current;
+
+    const [updated] = await tx
+      .update(tasks)
+      .set({ reminderOffsetMinutes })
+      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+      .returning();
+    if (!updated) throw new NotFoundError();
+
+    await recordAudit(tx, {
+      type: "task.reminder_changed",
+      userId,
+      entityId: id,
+      changes: {
+        reminderOffsetMinutes: {
+          from: current.reminderOffsetMinutes,
+          to: reminderOffsetMinutes,
+        },
+      },
+    });
+    await syncTaskReminderInTx(tx, userId, updated);
+    return updated;
+  });
+  return toTask(row);
 }
 
 /** Plans one locked task; the same date again is a no-op with no event. */
@@ -346,6 +394,7 @@ async function dueInTx(
       dueTz: { from: current.dueTz, to: updated.dueTz },
     },
   });
+  await syncTaskReminderInTx(tx, userId, updated);
   return updated;
 }
 
@@ -524,7 +573,8 @@ export async function detachTasksInTx(
 
 /**
  * Hard delete (ADR 0006). Removes the task's audit events with it, and its
- * time blocks with their exceptions and audit events (ADR 0012).
+ * time blocks with their exceptions and audit events (ADR 0012). Its
+ * reminders, scheduled and past, go by cascade (ADR 0013).
  */
 export async function deleteTask(
   userId: string,

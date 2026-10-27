@@ -9,5 +9,6 @@ export * from "./life-areas";
 export * from "./milestones";
 export * from "./preferences";
 export * from "./push-subscriptions";
+export * from "./reminders";
 export * from "./tasks";
 export * from "./time-blocks";

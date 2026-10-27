@@ -50,6 +50,7 @@ describe("createCalendarEventSchema", () => {
       goalId: null,
       lifeAreaId: null,
       rrule: null,
+      reminderOffsetMinutes: null,
       when: {
         allDay: false,
         startDate: "2026-10-24",

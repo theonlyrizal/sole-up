@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { WeekStart } from "@/lib/dates";
 import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
+import { nudgeTimeSchema } from "@/server/modules/reminders/validation";
 
 /** An IANA zone known to the server's runtime, stored in canonical form. */
 export const timeZoneSchema = z
@@ -53,3 +54,10 @@ export const savePreferencesSchema = z.strictObject({
 });
 
 export type SavePreferencesInput = z.output<typeof savePreferencesSchema>;
+
+/** The daily planning nudge's local time (ADR 0013); null turns it off. */
+export const setDailyNudgeTimeSchema = z.strictObject({
+  dailyNudgeTime: nudgeTimeSchema,
+});
+
+export type SetDailyNudgeTimeInput = z.output<typeof setDailyNudgeTimeSchema>;

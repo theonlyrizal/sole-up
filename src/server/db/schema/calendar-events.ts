@@ -5,6 +5,7 @@ import {
   date,
   foreignKey,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -24,6 +25,7 @@ import {
   type CalendarEventSource,
 } from "../../../lib/calendar-events";
 import type { LocalDate } from "../../../lib/dates";
+import { REMINDER_OFFSETS, type ReminderOffset } from "../../../lib/reminders";
 
 import { users } from "./auth";
 import { goals } from "./goals";
@@ -71,6 +73,12 @@ export const calendarEvents = pgTable(
     startDate: date({ mode: "string" }).$type<LocalDate>(),
     endDate: date({ mode: "string" }).$type<LocalDate>(),
     rrule: text(),
+    /**
+     * Minutes before the start to remind (ADR 0013); null for none. A
+     * series' setting applies to every occurrence. All-day events never
+     * remind.
+     */
+    reminderOffsetMinutes: integer().$type<ReminderOffset>(),
     source: text().$type<CalendarEventSource>().notNull().default("internal"),
     externalId: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -140,6 +148,10 @@ export const calendarEvents = pgTable(
     check(
       "calendar_events_rrule_length_check",
       sql`${table.rrule} is null or char_length(${table.rrule}) between 1 and ${sql.raw(String(CALENDAR_EVENT_RRULE_MAX))}`,
+    ),
+    check(
+      "calendar_events_reminder_offset_minutes_check",
+      sql`${table.reminderOffsetMinutes} is null or ${table.reminderOffsetMinutes} in ${sql.raw(`(${REMINDER_OFFSETS.join(", ")})`)}`,
     ),
   ],
 );

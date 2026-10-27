@@ -21,6 +21,7 @@ import {
 import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
 import { PRIORITIES } from "@/lib/priorities";
 import { rruleSchema } from "@/lib/recurrence";
+import { isReminderOffset, NUDGE_TIME_PATTERN } from "@/lib/reminders";
 import {
   TASK_EDITABLE_FIELDS,
   TASK_ESTIMATE_MAX_MINUTES,
@@ -170,6 +171,9 @@ const taskStatus = auditChange(z.enum(TASK_STATUSES));
 /** A stored repeat rule: structured parts only, never free text (ADR 0012). */
 const rrule = z.string().refine((rule) => rruleSchema.safeParse(rule).success);
 const droppedExceptions = z.number().int().min(0);
+/** Minutes before the target a reminder fires (ADR 0013). */
+const reminderOffset = z.number().refine(isReminderOffset);
+const nudgeTime = z.string().regex(NUDGE_TIME_PATTERN);
 
 /**
  * The allowlist. Add each new event here with its entity type and a strict
@@ -194,6 +198,7 @@ export const AUDIT_EVENTS = defineAuditEvents({
       lifeAreaStarters: auditChange(
         z.enum(["accepted", "dismissed"]),
       ).optional(),
+      dailyNudgeTime: auditChange(nudgeTime).optional(),
     }),
   },
 
@@ -310,6 +315,8 @@ export const AUDIT_EVENTS = defineAuditEvents({
       dueDate: auditChange(localDate),
       dueAt: auditChange(instant),
       dueTz: auditChange(timeZone),
+      // Present only when the task was created with a reminder.
+      reminderOffsetMinutes: auditChange(reminderOffset).optional(),
     }),
   },
   "task.updated": {
@@ -353,6 +360,12 @@ export const AUDIT_EVENTS = defineAuditEvents({
       milestoneId: auditChange(z.uuid()),
     }),
   },
+  "task.reminder_changed": {
+    entityType: "task",
+    changes: z.strictObject({
+      reminderOffsetMinutes: auditChange(reminderOffset),
+    }),
+  },
   // No `task.deleted`, for the same reason as life areas (ADR 0005).
 
   // Calendar events (ADR 0012). Title, description and location are user
@@ -374,6 +387,8 @@ export const AUDIT_EVENTS = defineAuditEvents({
       goalId: auditChange(z.uuid()),
       lifeAreaId: auditChange(z.uuid()),
       source: auditChange(z.enum(CALENDAR_EVENT_SOURCES)),
+      // Present only when the event was created with a reminder.
+      reminderOffsetMinutes: auditChange(reminderOffset).optional(),
       scope: z.literal("following").optional(),
       splitFromId: z.uuid().optional(),
     }),
@@ -391,6 +406,7 @@ export const AUDIT_EVENTS = defineAuditEvents({
       rrule: auditChange(rrule).optional(),
       goalId: auditChange(z.uuid()).optional(),
       lifeAreaId: auditChange(z.uuid()).optional(),
+      reminderOffsetMinutes: auditChange(reminderOffset).optional(),
       scope: z.enum(["following", "all"]).optional(),
       splitIntoId: z.uuid().optional(),
       droppedExceptions: droppedExceptions.optional(),

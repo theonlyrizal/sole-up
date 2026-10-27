@@ -36,6 +36,7 @@ describe("createTaskSchema", () => {
       dueDate: null,
       dueTime: null,
       dueTz: null,
+      reminderOffsetMinutes: null,
     });
   });
 

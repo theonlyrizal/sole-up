@@ -6,8 +6,12 @@ import type { WeekStart } from "@/lib/dates";
 import { recordAudit } from "@/server/audit/record";
 import { db, type Db, type DbTransaction } from "@/server/db/client";
 import { userPreferences } from "@/server/db/schema";
+import { syncNudgeReminderInTx } from "@/server/modules/reminders/schedule";
 
-import type { SavePreferencesInput } from "./validation";
+import type {
+  SavePreferencesInput,
+  SetDailyNudgeTimeInput,
+} from "./validation";
 
 export type UserPreferences = {
   /** IANA zone, or `null` until the user has confirmed one. */
@@ -57,7 +61,9 @@ export async function getUserPreferences(
 
 /**
  * Saves the user's preferences and records which fields changed. Changing
- * the time zone never rewrites stored local dates (ADR 0004).
+ * the time zone never rewrites stored local dates (ADR 0004), and of the
+ * reminders it moves only the daily nudge, which follows the user's zone;
+ * task and event reminders follow their instants (ADR 0013).
  */
 export async function savePreferences(
   userId: string,
@@ -105,7 +111,47 @@ export async function savePreferences(
       entityId: userId,
       changes,
     });
+    if (changes.timezone) await syncNudgeReminderInTx(tx, userId, updated);
     return toPreferences(updated);
+  });
+}
+
+/**
+ * Sets the daily planning nudge's local time, or turns it off with null,
+ * and schedules or removes its reminder (ADR 0013). The same time again is
+ * a no-op with no event.
+ */
+export async function setDailyNudgeTime(
+  userId: string,
+  { dailyNudgeTime }: SetDailyNudgeTimeInput,
+): Promise<{ dailyNudgeTime: string | null }> {
+  return db.transaction(async (tx) => {
+    await ensureUserPreferences(userId, tx);
+    const [current] = await tx
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId))
+      .for("update");
+    if (!current) throw new Error("User preferences row is missing");
+    if (current.dailyNudgeTime === dailyNudgeTime) return { dailyNudgeTime };
+
+    const [updated] = await tx
+      .update(userPreferences)
+      .set({ dailyNudgeTime })
+      .where(eq(userPreferences.userId, userId))
+      .returning();
+    if (!updated) throw new Error("User preferences row is missing");
+
+    await recordAudit(tx, {
+      type: "user_preferences.updated",
+      userId,
+      entityId: userId,
+      changes: {
+        dailyNudgeTime: { from: current.dailyNudgeTime, to: dailyNudgeTime },
+      },
+    });
+    await syncNudgeReminderInTx(tx, userId, updated);
+    return { dailyNudgeTime };
   });
 }
 
