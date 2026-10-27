@@ -37,7 +37,7 @@ Application API / Server Actions
     |       +-- PostgreSQL
     |       +-- Object storage only if needed
     |
-    +---- Background jobs
+    +---- Background jobs (v1: a cron-triggered sweep route, see §8)
     |       +-- Reminder delivery
     |       +-- Scheduled summaries
     |
@@ -64,7 +64,7 @@ Preferred starting point for a new project:
 - **AI:** an existing LLM API behind a provider-independent adapter.
 - **Jobs:** managed scheduled jobs or a queue when reminders and recurring tasks require reliable execution.
 
-This was the starting proposal. The concrete choices are now settled in [ADR 0001](decisions/0001-stack.md) (stack), [ADR 0002](decisions/0002-auth.md) (auth) and [ADR 0003](decisions/0003-hosting-and-jobs.md) (hosting and jobs).
+This was the starting proposal. The concrete choices are now settled in [ADR 0001](decisions/0001-stack.md) (stack), [ADR 0002](decisions/0002-auth.md) (auth) and [ADR 0003](decisions/0003-hosting-and-jobs.md) (hosting and jobs), whose worker is replaced for v1 by [ADR 0013](decisions/0013-reminders-sweep-and-delivery.md).
 
 ## 4. Modular monolith
 
@@ -132,6 +132,27 @@ For reliable reminders:
 - Respect quiet hours, time zone, user preferences, and notification permissions.
 - Provide a way to edit, snooze, or disable reminders.
 - Avoid sending sensitive note content in push or email previews by default.
+
+**How v1 does it** ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)). Production runs on free plans that can't keep a worker running (Render Free sleeps; a polling worker would use up Neon Free's compute allowance), so there is no worker process and no pg-boss in v1:
+
+```text
+cron-job.org (every 15 min)
+    |  POST /api/reminders/sweep, Bearer secret
+    v
+Web app: runSweep(now)
+    |-- claim reminders with fire_at < now + 15 min (FOR UPDATE SKIP LOCKED -> sending)
+    |-- skip if stale, turned off or no device; hold if in quiet hours
+    |-- send via web-push to each subscription; record sent / retry / failed
+    `-- for a repeating event, insert the next occurrence's reminder
+```
+
+- **Schedule:** the `reminders` table holds each delivery (`fire_at` in UTC, target, status, attempts). Task and event services write, move or remove an item's reminder **in the same transaction** as the item change. A repeating event keeps one rolling row for its next occurrence. The daily nudge is a local time, recomputed when the user's time zone changes.
+- **Timing:** a sweep sends everything due before the next sweep, so reminders arrive up to 15 minutes early and late only after a missed sweep. Missed sweeps catch up. A reminder whose item has already started or passed is skipped, never sent late.
+- **Idempotency:** claiming moves rows to `sending` under `SKIP LOCKED`, so overlapping sweeps can't double-send. A request cut off after sending may resend once, which is accepted over losing a reminder.
+- **Failures:** a `404`/`410` from the push service deletes the subscription. Other errors retry on later sweeps up to 3 attempts, then `failed`. Each sweep logs counts only, and a stale `last_sweep_at` is surfaced so a stopped trigger is noticed.
+- **Quiet hours:** held until they end in the user's current zone, then delivered as one bundled notification when there are several.
+- **Content:** title and time by default, never descriptions, locations or notes. Private mode leaves the title out of the payload entirely. Payloads and the sweep secret are never logged.
+- **Moving off the free plans** only changes who calls `runSweep` and how often (an always-on process every minute), which shrinks the early window. It needs a new ADR.
 
 ## 9. Analytics
 

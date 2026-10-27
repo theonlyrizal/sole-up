@@ -1,7 +1,7 @@
 # 0009: Production hosting providers
 
 **Date:** 2026-10-20
-**Status:** Accepted
+**Status:** Accepted. The Phase 5 gate kept these free plans and settled reminders without a worker in [ADR 0013](0013-reminders-sweep-and-delivery.md).
 
 ## Context
 [ADR 0003](0003-hosting-and-jobs.md) settled the shape of production: one Node host and managed PostgreSQL with backups. Chunk 0.14 needs actual providers. The app is dogfooded by its developer, and the requirement is free services that need no payment card.

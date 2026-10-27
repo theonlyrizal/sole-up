@@ -397,12 +397,12 @@ Subagent rule: Do all work in this main thread. Never spawn subagents for this s
 Finish line: Stop immediately once the ADR is written, the plan and ARCHITECTURE.md reflect my answers, and the protocol close-out is complete.
 ```
 
-### 5.1: Worker process and pg-boss
+### 5.1: Sweep route and external trigger
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.1 only. Add worker/index.ts running pg-boss on the app database with graceful shutdown and a heartbeat log, the pnpm worker script, a way for the web app to enqueue jobs, and a sample job. Update docs/DEPLOY.md with how to run the worker as a second process; I configure the host myself.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.1 only. Add REMINDER_SWEEP_SECRET (env schema + .env.example placeholder; tell me how to generate it, never commit it), the secret-protected POST /api/reminders/sweep route calling a runSweep stub that logs counts only, the pnpm reminders:sweep script, and the DEPLOY.md steps for the secret and the cron-job.org job every 15 minutes (ADR 0013). No worker and no pg-boss. I configure Render and cron-job.org myself.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify and pnpm build pass, a job enqueued from the web app is processed by pnpm worker locally (show the log line), I've confirmed the worker runs in production (or you've recorded it as unverified), and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify and pnpm build pass, including the 401/200 route tests, pnpm reminders:sweep runs locally (show the log line), I've confirmed sweeps every 15 minutes in Render's logs (or you've recorded it as unverified), and the protocol close-out is complete.
 ```
 
 ### 5.2: Service worker and PWA install
@@ -423,23 +423,23 @@ Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pas
 
 ### 5.4: Reminders, schema and scheduling
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.4 only. Add the reminders table with its uniqueness constraint, schedule/move/cancel reminders in the same transaction as task and event changes, and add the per-minute sweeper job that claims due reminders with FOR UPDATE SKIP LOCKED and enqueues delivery (delivery itself is 5.5).
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.4 only. Add the reminder offset columns, the nudge time preference and the reminders table with its partial unique index; write, move or remove reminders in the same transaction as task and event changes (including the rolling next-occurrence row for repeating events); and add claimDueReminders (FOR UPDATE SKIP LOCKED, fire_at before the next sweep) called from runSweep. Sending is 5.5.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify passes, including the reschedule, complete, delete and time-zone-change tests listed in 5.4, and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify passes, including the scheduling, series-scope, concurrent-claim and time-zone-change tests listed in 5.4, and the protocol close-out is complete.
 ```
 
-### 5.5: Delivery job
+### 5.5: Delivery in the sweep
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.5 only. Implement the idempotent delivery job: status check, send via web-push, delete subscription on 404/410, backoff retries up to a limit then failed, quiet hours, the content privacy setting, and deep-link on click.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.5 only. Make runSweep deliver what it claims: stale/disabled/no-device skips, quiet-hours hold with a bundled release, send via web-push, delete subscription on 404/410, retries on later sweeps up to 3 then failed, the next-occurrence row after a send or skip, title-or-private payloads with deep links, and TTL to the target (ADR 0013).
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify passes, including duplicate-run-sends-once, expired-subscription removal and quiet-hours deferral tests (push mocked at the library boundary), and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify passes, including the overlapping-sweep-sends-once, expired-subscription, skip-reason, quiet-hours, private-payload and never-late-window tests listed in 5.5 (push mocked at the library boundary), and the protocol close-out is complete.
 ```
 
 ### 5.6: Reminder UI and preferences
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.6 only. Add reminder controls to the task and event forms, snooze (from the notification and in-app), and the Settings section: global toggle, quiet hours, content privacy, daily nudge time.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.6 only. Add reminder controls to the task and event forms (fixed offsets, 10 min pre-filled on new events, the "up to 15 minutes early" hint), snooze (from the notification and in-app, as a separate snoozed row), and the Settings section: global toggle, quiet hours, private mode, daily nudge time.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including a test that the global toggle stops all deliveries, and the protocol close-out is complete.
@@ -447,7 +447,7 @@ Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pas
 
 ### 5.7: Reliability pass
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.7 only. Add the reliability tests listed in 5.7 (DST days, user time-zone change, UTC server vs far-zone user, worker restart mid-batch), a job-failure count in logs, and an admin-only query for failed reminders. Fix bugs the tests expose; record anything larger as a follow-up.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 5.7 only. Add the reliability tests listed in 5.7 (DST days, user time-zone change, UTC server vs far-zone user, missed sweeps, a sweep cut off mid-batch, quiet hours on a DST night), per-sweep counts in logs, the last-sweep warning, the pnpm reminders:failed script, and the Neon-usage note for the checkpoint. Fix bugs the tests expose; record anything larger as a follow-up.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify and pnpm build pass, and the protocol close-out is complete.

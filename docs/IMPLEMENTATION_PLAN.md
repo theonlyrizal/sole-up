@@ -129,7 +129,7 @@ Each command exists from the chunk shown.
 | `pnpm db:generate` / `pnpm db:migrate` | 0.4 | Drizzle migrations |
 | `pnpm test:unit` / `pnpm test:integration` / `pnpm test:e2e` | 0.5 | test suites |
 | `pnpm verify` | 0.5 | `format:check` + `lint` + `typecheck` + `test:unit` + `test:integration` |
-| `pnpm worker` | 5.1 | runs the job worker |
+| `pnpm reminders:sweep` | 5.1 | runs one reminder sweep locally (no worker in v1, ADR 0013) |
 
 ## Progress log
 
@@ -185,12 +185,12 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 4.✓ | Phase 4 checkpoint (user) | done | | 2026-10-27 | User confirmed the checkpoint done; no Month view or event dragging requested, no plan changes |
 | 4.10 | Resource columns by life area | done | chunk/4.10-resource-columns | 2026-10-27 | `/plan/calendar?view=areas&date=` "By area": our own day view, a column per active life area + "No area" (archived area marked, only while it holds items), side-by-side overlaps, arrow keys across columns, axe |
 | 4.11 | Resource timeline by life area | done | chunk/4.11-resource-timeline | 2026-10-27 | `/plan/calendar?view=timeline&span=day\|week&date=` "Timeline": our own component, a row per active life area + "No area" on a horizontal axis (week by default), lanes for overlaps, sticky row headings, arrow keys along/across rows, axe |
-| 5.0 | Decision gate: reminders | todo | | | |
-| 5.1 | Worker process and pg-boss | todo | | | |
+| 5.0 | Decision gate: reminders | done | chunk/5.0-reminders-decisions | 2026-10-27 | ADR 0013: stay free, no worker/pg-boss, cron-job.org sweep every 15 min (never late, up to 15 early); deadlines, events (rolling next occurrence) and a daily nudge; quiet hours hold/bundle/skip stale; title or private payload; 5.1–5.7 rewritten |
+| 5.1 | Sweep route and external trigger | todo | | | |
 | 5.2 | Service worker and PWA install | todo | | | |
 | 5.3 | Push subscriptions | todo | | | |
 | 5.4 | Reminders: schema and scheduling | todo | | | |
-| 5.5 | Delivery job | todo | | | |
+| 5.5 | Delivery in the sweep | todo | | | |
 | 5.6 | Reminder UI and preferences | todo | | | |
 | 5.7 | Reliability pass | todo | | | |
 | 5.✓ | Phase 5 checkpoint (user) | todo | | | |
@@ -239,7 +239,7 @@ These were decided on 2026-10-20 and become ADRs in chunk 0.1.
 | Calendar and reminders | In the MVP, as their own phases after the core loop |
 | Platform | Responsive web app, installable as a PWA. Reminders via Web Push |
 | Stack | Next.js App Router, TypeScript (strict), PostgreSQL, Drizzle ORM, Zod |
-| Hosting and jobs | One Node host running the web app and a worker (pg-boss), on managed Postgres |
+| Hosting and jobs | One Node host running the web app and a worker (pg-boss), on managed Postgres. For v1 on free hosting, the worker is replaced by a sweep route called every 15 minutes ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)) |
 | Auth | Better Auth with Google and GitHub OAuth, database sessions, account linking only on a verified email |
 | History | State tables are the source of truth. A full audit log is written in the same transaction, with no user content in it |
 | Deletion | Archive is a reversible status. Delete is a confirmed hard delete. Deleting a goal moves its tasks to the inbox. Deleting the account cascades everything |
@@ -277,9 +277,7 @@ src/
         queries.ts        read models for the UI
         actions.ts        Server Actions: auth → validate → service → revalidate
         *.test.ts
-    jobs/                 pg-boss job definitions (Phase 5)
   lib/                    pure helpers (dates, result types), no server-only imports
-worker/                   worker process entry (Phase 5)
 tests/
   e2e/                    Playwright
   integration/helpers/    test DB setup and fixtures
@@ -787,56 +785,130 @@ Decided 2026-10-23 in [ADR 0012](decisions/0012-calendar-recurrence-time-blocks-
 **Goal:** Reliable reminders that work without the app open.
 
 ### 5.0 Decision gate
-- **What can remind.** Recommended:
-  - timed task deadlines
-  - timed events
-  - an optional daily planning nudge at a chosen local time
-- **Defaults.** Recommended: none on by default for tasks, 10 minutes before for events. Each item can be overridden.
-- **Quiet hours.** Recommended: a per-user start and end in local time. Reminders inside quiet hours are delivered when quiet hours end, or skipped if stale, per user setting.
-- **Notification content.** Recommended: title only by default, with a privacy option for "You have a reminder".
+Decided 2026-10-27 in [ADR 0013](decisions/0013-reminders-sweep-and-delivery.md). The user chose to stay on the free hosting (ADR 0009), against the gate's recommendation of a paid Render instance plus Render Postgres.
+- **Hosting:** no worker process and no pg-boss in v1 (both would keep Neon Free awake and run out its allowance).
+  - A secret-protected `POST /api/reminders/sweep` route in the web app claims and sends due reminders.
+  - cron-job.org (free) calls it **every 15 minutes**.
+  - **Never late:** each sweep sends what is due before the next sweep, so reminders arrive up to 15 minutes early.
+- **What can remind:** timed task deadlines, timed events (including occurrences of repeating events) and an optional daily planning nudge at a local time. Not time blocks, date-only deadlines or all-day events.
+- **Repeating events:** a rolling "next occurrence" row. The series' setting applies to every occurrence, with no per-occurrence override.
+- **Defaults:** one reminder per item, from 0/10/30/60/1440 minutes before.
+  - Tasks get none by default. New events get 10 minutes, and existing events get none.
+  - The nudge is off until a time is chosen. Nothing is delivered without a subscribed device, and there is a global off switch.
+- **Quiet hours:** optional, off by default (suggesting 22:00–07:00). Reminders that come due inside are held, then delivered at the end, bundled when there are several, unless they're stale (the item started or passed), in which case they're skipped.
+- **Content:** title and time by default, never descriptions, locations or notes. Private mode sends "You have a reminder · <time>" with no title in the payload. The nudge and bundles never carry titles.
 
-### 5.1 Worker process and pg-boss
-- A `worker/index.ts` entry that starts pg-boss on the same database, with graceful shutdown, a health log line and a heartbeat.
-- Deploy it as a second process on the host. Document how to run it locally (`pnpm worker`).
-- **Done when:** a test job enqueued from the web app is processed by the worker locally and in production.
+### 5.1 Sweep route and external trigger
+- **Env:** `REMINDER_SWEEP_SECRET` (at least 32 random bytes) in the env schema and as a placeholder in `.env.example`. Tell the user how to generate it, and never commit a value.
+- **Route:** `POST /api/reminders/sweep`.
+  - Bearer secret compared in constant time, with the same `401` for a missing or wrong secret. Outside the session proxy, and no request body.
+  - It calls `runSweep(now)` in `src/server/modules/reminders/sweep.ts`. Until 5.4 that does nothing but log one line: start, counts (all zero), duration.
+  - It never logs the secret or any content.
+- **`pnpm reminders:sweep`:** runs one sweep against the configured database, for local use (there is no cron locally).
+- **`DEPLOY.md`:**
+  - setting the secret on Render
+  - creating the cron-job.org job (every 15 minutes, `POST`, the header, the longest timeout it allows)
+  - the Render free-hours note (one service awake all month)
+  - Neon usage to watch
+- Update `render.yaml`'s comment that says the Phase 5 worker needs a paid plan.
+- **Production check (user):** for an hour, the sweep lines appear in Render's logs every 15 minutes. If a cold start makes calls fail, add a second cron-job.org call every 10 minutes to a new route that doesn't touch the database (not `/api/health`, which does) and document it.
+- **Done when:**
+  - integration tests cover `401` without the secret or with a wrong one, and `200` with counts with the right one
+  - the user has confirmed the production check, or it is recorded as unverified
 
 ### 5.2 Service worker and PWA install
 - A minimal service worker: push and notification-click handlers only. Offline caching is not in scope.
+  - The click handler opens the payload's deep-link URL (focusing an open tab when there is one).
+  - The push handler shows the payload's text as given. It never fetches titles.
 - An install prompt or help text, including iOS "Add to Home Screen" guidance, since iOS needs it for push.
 - **Done when:** the app installs on desktop and on a phone.
 
 ### 5.3 Push subscriptions
-- Generate VAPID keys and add them to the environment and `.env.example`.
+- Generate VAPID keys and add them to the environment and `.env.example`. Add the `web-push` library (check the version and licence first).
 - A `push_subscriptions` table: `user_id`, `endpoint` (unique), `p256dh`, `auth`, `user_agent_label`, `created_at`, `last_success_at`, `failed_count`. Treat the keys as secrets and never log them.
-- Subscribe and unsubscribe actions. A device list in Settings with a revoke button. A "Send test notification" button.
+- Subscribe and unsubscribe actions. A device list in Settings with a revoke button. A "Send test notification" button, which sends directly from the action (there is no queue).
 - **Done when:** the test notification arrives on two devices, and revoking stops delivery.
 
 ### 5.4 Reminders: schema and scheduling
-- A `reminders` table:
-  - `entity_type` (`task | event | daily_nudge`), `entity_id?`
-  - `fire_at` (UTC), `offset_minutes?`, `status` (`scheduled | sent | cancelled | failed | skipped`)
-  - `attempts`, `last_error_code?`, `sent_at?`
-  - a unique constraint preventing duplicate reminders per entity and offset
-- Scheduling happens in the **same transaction** as the entity change. Creating, rescheduling, completing, cancelling or deleting a task or event creates, moves or cancels its reminders.
-- A sweeper job every minute picks due reminders with `FOR UPDATE SKIP LOCKED` and enqueues delivery.
-- **Tests:** rescheduling moves `fire_at`, completing cancels, deleting cancels, and a time-zone change recomputes only daily nudges.
+- **Item settings:** nullable `reminder_offset_minutes` on `tasks` and `calendar_events`, with a CHECK for 0/10/30/60/1440. `user_preferences` gets `daily_nudge_time?` (local `HH:MM`).
+- **A `reminders` table** (ADR 0013):
+  - `kind` (`task_deadline | event | daily_nudge`), with composite FKs `task_id?`/`event_id?` (cascade). A CHECK ties each kind to its link.
+  - `target_at` (the deadline or the occurrence's start; the nudge's local time as an instant), `occurrence_start?` (a repeating event's original start), `fire_at` (UTC)
+  - `status` (`scheduled | sending | sent | skipped | failed`), `skip_reason?` (`stale | disabled | no_device`), `attempts`, `last_error_code?`, `claimed_at?`, `sent_at?`, timestamps
+  - `snoozed` (boolean, default false; 5.6)
+  - a partial unique index: at most one `scheduled`, non-snoozed row per task, per event, and per user for the nudge
+  - an index on `(status, fire_at)` for the sweep
+- **Scheduling in the same transaction as the item change:**
+  - **Tasks:** setting or changing the offset, setting, moving or clearing `due_at`, and reopening write or move the `scheduled` row. Completing, cancelling, a date-only deadline or a removed offset delete it.
+  - **Events:** create (the form pre-fills 10 for new events; the service takes what it's given), edit in all three scopes, and delete. A series gets the rolling row for its next occurrence that is still to fire: a cancelled occurrence is skipped, and a moved one uses its new start.
+  - **Nudge:** the next local occurrence of `daily_nudge_time` in the user's zone. A time-zone change recomputes only the nudge.
+  - A target already past gets no row.
+- **Claim:** `claimDueReminders(now, horizon)` moves rows with `fire_at < now + 15 min` from `scheduled` to `sending` with `FOR UPDATE SKIP LOCKED`, in a short transaction. `runSweep` calls it, and sending is 5.5. Until then, claimed rows stay `sending` (test data only).
+- **Tests:**
+  - rescheduling moves `fire_at`; completing, cancelling and deleting remove the row; reopening restores it
+  - a date-only deadline gets none
+  - each event scope on a series, including the next occurrence cancelled or moved and a split
+  - two concurrent claims never claim the same row
+  - a time-zone change moves only the nudge
+  - cross-user access
+  - the offset CHECK
 
-### 5.5 Delivery job
-- Idempotent: check status before sending, and mark it sent in a transaction.
-- Send with the `web-push` library. A 404 or 410 deletes the subscription. Other errors retry with backoff up to N attempts, then mark `failed`.
-- Respect quiet hours and the privacy content setting. Clicking a notification deep-links to the item.
-- **Tests:** a duplicate job run sends once, an expired subscription is removed, and quiet hours defer delivery.
+### 5.5 Delivery in the sweep
+- `runSweep` sends what it claimed with `web-push` to each of the user's subscriptions, then records `sent` in a transaction.
+  - A row left in `sending` by a cut-off request is claimed again once `claimed_at` is 10 minutes old. A duplicate is accepted; a lost reminder is not.
+  - A 404 or 410 deletes that subscription. Other errors leave the row `scheduled` for the next sweep, up to 3 attempts, then `failed` with the error code.
+  - The push TTL runs until `target_at` (at least 60 seconds).
+- **Before sending, in order:**
+  1. **Stale** (deadline passed or task not open, occurrence started, nudge's local day over): `skipped` / `stale`.
+  2. **Reminders turned off:** `skipped` / `disabled`.
+  3. **No subscription:** `skipped` / `no_device`.
+  4. **Quiet hours** in the user's current zone: held. The row stays `scheduled` and isn't claimed until the end.
+- **Quiet hours:** the first sweep at or after the end sends the held reminders that aren't stale. Several go as one "N reminders from quiet hours" notification that opens Today.
+- **Repeating events:** after a row is sent or skipped, the same transaction inserts the row for the next occurrence (the 5.4 helper).
+- **Payload:**
+  - title and time ("Dentist · 14:00 (in 10 min)", "Due 17:00 · Submit visa form"), or in private mode "You have a reminder · 14:00" with no title in the payload
+  - the nudge is "Time to plan your day"
+  - the deep link: the task's dialog; the event's dialog on Day (`?item=`, 4.9); Today for a bundle or the nudge
+  - payloads are never logged
+- **Tests (push mocked at the library boundary):**
+  - an overlapping or repeated sweep sends once
+  - an expired subscription is removed
+  - retries, then `failed`
+  - every skip reason
+  - quiet hours hold, release, bundle and skip stale, including quiet hours that cross midnight
+  - private mode leaves the title out of the payload
+  - the next occurrence is inserted after a send
+  - the never-late window (a reminder due 14 minutes after the sweep is sent; one due 16 minutes after waits)
 
 ### 5.6 Reminder UI and preferences
-- Add a reminder from the task and event forms. A snooze action from the notification and in the app.
-- Settings: enable or disable reminders globally, quiet hours, content privacy, daily nudge time.
-- **Done when:** disabling reminders globally stops all deliveries (test).
+- **Task and event forms:** a reminder select (none, at the time, 10/30 min, 1 hour, 1 day before).
+  - New events pre-fill 10 minutes. On a series the reminder applies to every occurrence, and the "this event" scope doesn't show it.
+  - The hint says "Reminders may arrive up to 15 minutes early."
+  - The item's dialog shows its next reminder, or the last one skipped ("Skipped: quiet hours").
+- **Snooze** from the notification (a service-worker action posting to an authenticated route) and in the app: 15 minutes or 1 hour. It inserts a new `scheduled` row with `snoozed = true` for the same target, outside the one-per-item index, so a series' next-occurrence row is untouched. A snoozed row goes stale like any other.
+- **Settings:**
+  - reminders on or off
+  - quiet hours (off by default, suggesting 22:00–07:00)
+  - private mode
+  - the daily nudge time (off by default, with a warning when it falls inside quiet hours)
+  - a note when no device is subscribed
+- **Done when:** turning reminders off stops all deliveries (test), and the forms are keyboard operable with field-level errors.
 
 ### 5.7 Reliability pass
-- Tests for DST transition days, a user changing time zone, the server running in UTC versus a user in a far zone, and a worker restart mid-batch.
-- Basic visibility: a job failure count in the logs, and an admin-only query to see failed reminders.
+- **Tests:**
+  - DST transition days (a deadline, a repeating event and the nudge, in `America/New_York`)
+  - a user changing time zone
+  - the server in UTC with a user in a far zone (`Pacific/Kiritimati`, `Pacific/Pago_Pago`)
+  - missed sweeps catching up and skipping stale reminders
+  - a sweep cut off between sending and recording
+  - quiet hours on a DST night
+- **Visibility:**
+  - each sweep logs claimed, sent, skipped (by reason) and failed counts and its duration
+  - a `last_sweep_at` record, with a warning on Settings when no sweep has run for an hour, so a stopped cron-job.org is noticed
+  - `pnpm reminders:failed` prints failed reminders by error code and age, with no content (there is no admin role)
+- **The checkpoint:** record how to read Neon's monthly compute use, and the threshold (about 80 CU-hours) at which to widen the interval or move to paid hosting (ADR 0013).
 
-**Phase 5 checkpoint:** rely on reminders for a week, and track any missed or duplicated notifications.
+**Phase 5 checkpoint:** rely on reminders for a week, and track any missed, late or duplicated notifications and Neon's compute use.
 
 ---
 
@@ -1029,6 +1101,7 @@ Decided 2026-10-23 in [ADR 0012](decisions/0012-calendar-recurrence-time-blocks-
 | Feature | Prerequisite |
 |---|---|
 | Projects as a task parent | Dogfooding shows non-goal work needs grouping |
+| Minute-accurate reminders (a paid always-on host calling the sweep every minute, or a worker), time-block reminders, several reminders per item | The Phase 5 checkpoint shows 15-minute-early delivery or Neon's compute allowance is a real problem (ADR 0013) |
 | Calendar sync, a Month view, dragging events on the grid (time blocks and recurrence are in v1, ADR 0012) | A clear repeated need from real use, judged at the Phase 4 checkpoint |
 | AI-assisted weekly review (roadmap Phase 3) | Phases 7 and 9 stable, a provider ToS review, a provider adapter, cost limits |
 | User-controlled memory (roadmap Phase 4) | The AI review is in use and trusted, and the memory policy is written |
@@ -2218,3 +2291,40 @@ Template:
   - The week opens at its first day's midnight; scrolling the axis to now (or the first item) on load would help on a narrow screen.
   - On a day, an hour is 64 px, so the visible "8:00 AM – 9:00 AM" line truncates on hour-long items (the description and the `title` hold it in full).
   - Earlier follow-ups still open: life area colours; the `preferences.spec.ts` first-sign-in flake; pointer drag for events; undo in the "Block moved" toast; FullCalendar's English labels; closed tasks on past Agenda days; event dialog field errors that stay until the next save; event history for link clears.
+
+### 5.0: Decision gate: reminders (2026-10-27)
+- **Built:** ADR 0013 (reminders: free-hosting sweep, what reminds, quiet hours and content) and its index row. Status lines on ADR 0003 (worker and pg-boss superseded for v1), 0007 and 0009 point to it. Phase 5 is rewritten as 5.0–5.7 (chunk text, progress log titles for 5.1 and 5.5, and the `AGENT_PROMPTS.md` prompts). Also updated: Standard commands (`pnpm reminders:sweep` replaces `pnpm worker`), the code layout (no `worker/` or `src/server/jobs/`), the Settled decisions hosting row, and the "Later" table. `ARCHITECTURE.md` §8 (with §2 and §3 pointers), `ROADMAP.md` 1F, `PRODUCT_SPEC.md` §12 and `DEPLOY.md` "Free-plan limits" are synced. No code.
+- **Deviations:**
+  1. **Two questions beyond the chunk's four:** hosting (ADR 0009 required this gate to revisit it) and whether repeating-event occurrences remind (the 4.0 follow-up).
+  2. **The user chose to stay on free hosting**, against the recommendation (Render Starter running web and worker plus Render Postgres, about $13–14 a month). So 5.1 is now "Sweep route and external trigger" and 5.5 "Delivery in the sweep". There is no worker or pg-boss: pg-boss's polling would keep Neon Free awake and run out its roughly 100 CU-hour allowance, which suspends the whole database.
+- **Decisions:**
+  - **Asked and answered:**
+    - stay free, with coarse reminders
+    - a 15-minute sweep that is never late (sends what is due before the next sweep)
+    - timed deadlines, timed events and a daily nudge (not blocks)
+    - a rolling next-occurrence row for repeating events
+    - defaults as recommended (tasks none, new events 10 min, one per item from a fixed list, nudge off)
+    - quiet hours hold, bundle and skip stale
+    - title and time by default, with a private mode that leaves the title out of the payload
+  - **Derived and recorded in ADR 0013, not asked separately:**
+    - cron-job.org as the trigger (GitHub Actions' schedule would exceed the private repo's free minutes and is often delayed)
+    - a Bearer secret `REMINDER_SWEEP_SECRET`
+    - claiming to `sending` under `SKIP LOCKED`, accepting one possible resend after a cut-off request
+    - the offset list 0/10/30/60/1440 stored on the item
+    - no `cancelled` status (removing a reminder deletes its scheduled row)
+    - skip reasons `stale`/`disabled`/`no_device`
+    - 3 attempts
+    - push TTL until the target
+    - snooze as a separate snoozed row
+    - a last-sweep warning
+    - `pnpm reminders:failed` instead of an admin query (there is no admin role)
+- **Next chunk should know:**
+  - 5.1 needs the user to create the secret on Render and the cron-job.org job, so give exact steps.
+  - `/api/health` touches the database, so don't use it as a keep-awake ping (it would keep Neon awake).
+  - The `render.yaml` comment about the Phase 5 worker is now wrong, and 5.1 updates it (left alone here: docs only, no code).
+  - The prices and limits behind the hosting answer came from 2026 third-party summaries: Render Starter about $7, Render Postgres Basic about $6, Neon Free about 100 CU-hours with a 5-minute suspend. Check the Neon numbers on neon.com/pricing before relying on the about-62 CU-hour sweep budget.
+  - `DATA_MODEL.md` has no Reminder or PushSubscription sections yet. 5.3 and 5.4 add them with their tables.
+- **Unverified:** docs only, so no build or tests. Prettier passes on the changed files, but `docs/` is in `.prettierignore`, so that check covers nothing here. Line endings were checked (LF, no BOM). cron-job.org's free limits (interval, request timeout) and Render cold-start behaviour under a 15-minute call are unverified; 5.1 checks them in production.
+- **Follow-ups:**
+  - At the Phase 5 checkpoint, watch Neon's monthly compute. Above about 80 CU-hours, widen the interval or move to paid hosting (a new ADR).
+  - Phase 10's export (10.1) must include reminder settings and delivery records, and account deletion (10.2) must remove reminders as well as subscriptions.

@@ -1,7 +1,7 @@
 # 0003: Hosting and jobs
 
 **Date:** 2026-10-20
-**Status:** Accepted
+**Status:** Accepted. The worker process and pg-boss are superseded for v1 by [ADR 0013](0013-reminders-sweep-and-delivery.md): on the free hosting of ADR 0009, reminders are sent by a sweep route in the web app, called every 15 minutes by an external cron.
 
 ## Context
 Reminders and periodic reviews need reliable background execution that does not depend on an open browser tab. Serverless hosting makes long-lived workers and scheduling awkward. The app is small, so operational simplicity matters more than scale.

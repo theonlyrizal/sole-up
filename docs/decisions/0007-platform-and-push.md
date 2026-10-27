@@ -1,7 +1,7 @@
 # 0007: Platform and push
 
 **Date:** 2026-10-20
-**Status:** Accepted. The calendar questions left to the Phase 4 gate are settled by [ADR 0012](0012-calendar-recurrence-time-blocks-views.md) (recurrence and time blocks in v1; Week, Day and Agenda views).
+**Status:** Accepted. The calendar questions left to the Phase 4 gate are settled by [ADR 0012](0012-calendar-recurrence-time-blocks-views.md) (recurrence and time blocks in v1; Week, Day and Agenda views). The reminder questions left to the Phase 5 gate are settled by [ADR 0013](0013-reminders-sweep-and-delivery.md) (deadlines, events and a daily nudge; quiet hours; title-or-private content), which also replaces the worker for v1.
 
 ## Context
 The spec left open whether the first platform is responsive web, PWA or native, and which calendar and reminder features belong in the MVP. Reminders must reach the user when no tab is open.

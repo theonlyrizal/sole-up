@@ -226,11 +226,17 @@ Do not optimize for time spent in the app. A good personal management tool may h
 - **Platform:** responsive web, installable as a PWA. See [ADR 0007](decisions/0007-platform-and-push.md).
 - **First audience:** the developer (dogfooding), with public-grade security. See [ADR 0002](decisions/0002-auth.md).
 - **Goals without numeric targets:** progress is completed milestones out of non-dropped milestones, and a goal can have none. Numeric targets are deferred. See [ADR 0010](decisions/0010-goal-status-priority-progress.md).
+- **Reminders in the first release (Phase 5 gate):**
+  - Timed task deadlines, timed events (including repeating ones) and an optional daily planning nudge. One reminder per item.
+  - Tasks have none by default. New events default to 10 minutes before.
+  - Optional quiet hours hold reminders until they end.
+  - Notifications show the title and time, or "You have a reminder" in private mode.
+  - Reminders may arrive up to 15 minutes early, because production stays on free hosting.
+  - See [ADR 0013](decisions/0013-reminders-sweep-and-delivery.md).
 
 ### Still open
 
 Resolve these at the phase decision gates in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), through prototyping or feedback rather than guessing:
 
-- Which reminders should be supported initially? Web Push is the channel; the reminder types are open. (Phase 5 gate)
 - What is the minimum useful weekly review? (Phase 7 gate)
 - Should notes be simple, or should they support backlinks and tags? (Phase 8 gate)
