@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { PreferencesForm } from "@/components/preferences/preferences-form";
+import { InstallHelp } from "@/components/pwa/install-help";
 import { LoadingState } from "@/components/ui/skeleton";
 import { localeOptions, supportedTimeZones } from "@/lib/preferences";
 import { requireUser } from "@/server/auth/session";
@@ -23,6 +24,15 @@ export default function SettingsPage() {
         <Suspense fallback={<LoadingState label="Loading settings" />}>
           <Preferences />
         </Suspense>
+      </section>
+      <section
+        aria-labelledby="install-heading"
+        className="flex flex-col gap-4"
+      >
+        <h2 id="install-heading" className="text-lg font-semibold">
+          Install the app
+        </h2>
+        <InstallHelp />
       </section>
     </div>
   );

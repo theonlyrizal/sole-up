@@ -152,6 +152,7 @@ Web app: runSweep(now)
 - **Failures:** a `404`/`410` from the push service deletes the subscription. Other errors retry on later sweeps up to 3 attempts, then `failed`. Each sweep logs counts only, and a stale `last_sweep_at` is surfaced so a stopped trigger is noticed.
 - **Quiet hours:** held until they end in the user's current zone, then delivered as one bundled notification when there are several.
 - **Content:** title and time by default, never descriptions, locations or notes. Private mode leaves the title out of the payload entirely. Payloads and the sweep secret are never logged.
+- **On the device:** the service worker (`public/sw.js`, chunk 5.2) handles only `push` and `notificationclick`, with no fetch handler or cache. It shows a JSON payload `{ title, body?, url?, tag? }` exactly as sent and never fetches anything, so private mode stays private. A click opens `url` (same origin only, else `/home`), focusing an open SoleUp tab when there is one.
 - **Moving off the free plans** only changes who calls `runSweep` and how often (an always-on process every minute), which shrinks the early window. It needs a new ADR.
 
 ## 9. Analytics
