@@ -9,6 +9,7 @@ import {
   deadlinesNextSevenDays,
   goalsWithoutNextAction,
   listGoalsWithoutNextAction,
+  nextCommitment,
   todayTaskCounts,
 } from "@/server/modules/metrics/home";
 import { getUserPreferences } from "@/server/modules/preferences/service";
@@ -21,8 +22,8 @@ export default function HomePage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Home</h1>
         <p className="text-muted">
-          What matters now: today, goals that need a next step, and the week
-          ahead.
+          What matters now: what&apos;s next on your calendar, today, goals that
+          need a next step, and the week ahead.
         </p>
       </div>
       <Suspense fallback={<LoadingState label="Loading home" />}>
@@ -39,7 +40,8 @@ async function Home() {
   const timeZone = preferences.timezone ?? "UTC";
   // Every metric uses the user's today in their saved zone, at one instant.
   const clock = todayClock(timeZone);
-  const [today, goals, goalList, deadlines] = await Promise.all([
+  const [next, today, goals, goalList, deadlines] = await Promise.all([
+    nextCommitment(user.id, clock, timeZone),
     todayTaskCounts(user.id, clock, timeZone),
     goalsWithoutNextAction(user.id, clock, timeZone),
     listGoalsWithoutNextAction(user.id),
@@ -47,6 +49,7 @@ async function Home() {
   ]);
   return (
     <HomeView
+      next={next}
       today={today}
       goals={goals}
       goalList={goalList}
@@ -54,6 +57,7 @@ async function Home() {
       todayDate={clock.today}
       nextDayStartsAt={clock.dayEnd.toISOString()}
       locale={preferences.locale}
+      timeZone={timeZone}
     />
   );
 }

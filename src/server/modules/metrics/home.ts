@@ -2,11 +2,25 @@ import "server-only";
 
 import { and, asc, eq, gte, isNotNull, lt, lte, or, sql } from "drizzle-orm";
 
+import { addDays } from "@/lib/dates";
+import {
+  NEXT_COMMITMENT_DAYS,
+  nextCommitmentOf,
+  type ScheduleEntry,
+} from "@/lib/schedule";
 import { dateWindowBounds, dateWindowInstants } from "@/lib/task-list";
 import type { TodayClock } from "@/lib/today";
 import { db } from "@/server/db/client";
-import { goals, milestones, tasks } from "@/server/db/schema";
+import {
+  calendarEvents,
+  goals,
+  milestones,
+  tasks,
+  timeBlocks,
+} from "@/server/db/schema";
+import { eventsBetween } from "@/server/modules/calendar-events/service";
 import { listTodayTasks } from "@/server/modules/tasks/queries";
+import { blocksBetween } from "@/server/modules/time-blocks/service";
 
 import type { Metric } from "./metric";
 
@@ -170,5 +184,57 @@ export async function deadlinesNextSevenDays(
       "Open tasks with a deadline from tomorrow through the next 7 days. Today's deadlines are on Today.",
     range: { from, to, timeZone, asOf: clock.now },
     hasData: counts.withDeadline > 0,
+  };
+}
+
+async function hasCalendarItems(userId: string): Promise<boolean> {
+  const [events, blocks] = await Promise.all([
+    db
+      .select({ id: calendarEvents.id })
+      .from(calendarEvents)
+      .where(eq(calendarEvents.userId, userId))
+      .limit(1),
+    db
+      .select({ id: timeBlocks.id })
+      .from(timeBlocks)
+      .where(eq(timeBlocks.userId, userId))
+      .limit(1),
+  ]);
+  return events.length > 0 || blocks.length > 0;
+}
+
+/**
+ * The next commitment (chunk 4.9): the first event or time block, from
+ * today through the next 30 days, that hasn't ended (`nextCommitmentOf`).
+ * One under way counts; blocks marked done or skipped, or for a closed
+ * task, don't. Null when nothing is coming up in the range. No data: the
+ * user has no events or time blocks at all.
+ */
+export async function nextCommitment(
+  userId: string,
+  clock: TodayClock,
+  timeZone: string,
+): Promise<Metric<ScheduleEntry | null>> {
+  const days = {
+    localStart: clock.today,
+    localEnd: addDays(clock.today, NEXT_COMMITMENT_DAYS),
+    tz: timeZone,
+  };
+  const [events, blocks, hasData] = await Promise.all([
+    eventsBetween(userId, days),
+    blocksBetween(userId, days),
+    hasCalendarItems(userId),
+  ]);
+  return {
+    value: nextCommitmentOf(events, blocks, clock.now, timeZone),
+    definition:
+      "The first event or time block that hasn't ended yet, including one already under way. Time blocks marked done or skipped, and blocks for completed or cancelled tasks, are left out.",
+    range: {
+      from: clock.today,
+      to: addDays(days.localEnd, -1),
+      timeZone,
+      asOf: clock.now,
+    },
+    hasData,
   };
 }

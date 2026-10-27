@@ -2,7 +2,10 @@ import Link from "next/link";
 
 import { buttonClass } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
+import { agendaEntryKind } from "@/lib/agenda";
+import { calendarItemHref } from "@/lib/calendar-views";
 import type { LocalDate } from "@/lib/dates";
+import { commitmentWhenLabel, type ScheduleEntry } from "@/lib/schedule";
 import { TODAY_SECTION_LABELS, todaySectionAnchor } from "@/lib/today";
 import type {
   GoalWithoutNextAction,
@@ -21,6 +24,7 @@ import { RefreshOnNewDay } from "./refresh-on-new-day";
 const GOALS_LIST_ID = "goals-without-next-action";
 
 type HomeViewProps = {
+  next: Metric<ScheduleEntry | null>;
   today: Metric<TodayTaskCounts>;
   goals: Metric<number>;
   goalList: GoalWithoutNextAction[];
@@ -28,11 +32,13 @@ type HomeViewProps = {
   todayDate: LocalDate;
   nextDayStartsAt: string;
   locale: string;
+  timeZone: string;
 };
 
 type CardContext = { todayDate: LocalDate; locale: string };
 
 export function HomeView({
+  next,
   today,
   goals,
   goalList,
@@ -40,11 +46,37 @@ export function HomeView({
   todayDate,
   nextDayStartsAt,
   locale,
+  timeZone,
 }: HomeViewProps) {
   const context = { todayDate, locale };
   return (
     <div className="flex flex-col gap-4">
       <RefreshOnNewDay nextDayStartsAt={nextDayStartsAt} />
+      <MetricCard
+        id="home-next"
+        title="Next commitment"
+        metric={next}
+        empty={{
+          description:
+            "Events and time blocks you add to the calendar show here, starting with the next one.",
+        }}
+        {...context}
+      >
+        {next.value === null ? (
+          <p className="text-sm text-muted">
+            Nothing coming up in the next 30 days.
+          </p>
+        ) : (
+          <NextCommitment
+            entry={next.value}
+            now={next.range.asOf}
+            todayDate={todayDate}
+            locale={locale}
+            timeZone={timeZone}
+          />
+        )}
+      </MetricCard>
+
       <MetricCard
         id="home-today"
         title="Today"
@@ -185,6 +217,40 @@ function MetricCard({
         </dl>
       </div>
     </section>
+  );
+}
+
+/**
+ * The next event or time block: what it is, its title linking to it in the
+ * calendar (its dialog opens there), and when.
+ */
+function NextCommitment({
+  entry,
+  now,
+  todayDate,
+  locale,
+  timeZone,
+}: {
+  entry: ScheduleEntry;
+  now: Date;
+  todayDate: LocalDate;
+  locale: string;
+  timeZone: string;
+}) {
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <p className="text-sm text-muted">{agendaEntryKind(entry)}</p>
+      <Link
+        href={calendarItemHref(entry, todayDate, timeZone)}
+        className={cx(
+          "rounded-sm text-xl font-semibold break-words hover:underline",
+          focusRing,
+        )}
+      >
+        {entry.title}
+      </Link>
+      <p>{commitmentWhenLabel(entry, now, todayDate, locale, timeZone)}</p>
+    </div>
   );
 }
 

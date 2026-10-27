@@ -6,6 +6,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -65,7 +66,15 @@ type TimeGridViewProps = EventFormContext & {
   today: LocalDate;
   /** When the user's tomorrow begins (ISO instant). */
   nextDayStartsAt: string;
+  /**
+   * An item to open on arrival (the page's `item` param), from a link to
+   * it on Today or Home (chunk 4.9).
+   */
+  openItemId?: string | null;
 };
+
+/** How many frames to wait for a linked item's button to render. */
+const LINKED_ITEM_FRAMES = 300;
 
 const ITEM_SELECTOR = "[data-calendar-item]";
 
@@ -137,6 +146,7 @@ export function TimeGridView({
   range,
   today,
   nextDayStartsAt,
+  openItemId = null,
   ...context
 }: TimeGridViewProps) {
   useRefreshOnNewDay(nextDayStartsAt);
@@ -154,6 +164,48 @@ export function TimeGridView({
 
   const { containerRef, buttons, openItem, dialog } =
     useItemDialog(ITEM_SELECTOR);
+
+  // A link to one item opens its dialog once FullCalendar has rendered its
+  // button (so focus returns there), then drops `item` from the URL so a
+  // refresh doesn't open it again.
+  const openedLinkedItem = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openItemId || openedLinkedItem.current === openItemId) return;
+    const entry = entries.find((candidate) => candidate.id === openItemId);
+    if (!entry || tooNarrow) return;
+    let frame = 0;
+    let tries = 0;
+    const tryOpen = () => {
+      const button = buttons().find(
+        (candidate) => candidate.dataset.itemId === openItemId,
+      );
+      if (!button) {
+        if (++tries < LINKED_ITEM_FRAMES) {
+          frame = requestAnimationFrame(tryOpen);
+        }
+        return;
+      }
+      openedLinkedItem.current = openItemId;
+      button.scrollIntoView({ block: "center" });
+      openItem(entry, button);
+      window.history.replaceState(
+        null,
+        "",
+        gridHref(range.view, range.date, today),
+      );
+    };
+    tryOpen();
+    return () => cancelAnimationFrame(frame);
+  }, [
+    openItemId,
+    entries,
+    tooNarrow,
+    buttons,
+    openItem,
+    range.view,
+    range.date,
+    today,
+  ]);
   const items = useMemo(
     () =>
       entries.map((entry): CalendarFeedItem<CalendarEntry> => ({
@@ -435,6 +487,7 @@ function GridItem({
       <button
         type="button"
         data-calendar-item=""
+        data-item-id={entry.id}
         data-all-day={entry.allDay}
         aria-describedby={descriptionId}
         onClick={(click) => onOpen(click.currentTarget)}

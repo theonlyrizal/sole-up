@@ -7,6 +7,7 @@ import { LoadingState } from "@/components/ui/skeleton";
 import { formatLocalDate } from "@/lib/dates";
 import { todayClock } from "@/lib/today";
 import { requireUser } from "@/server/auth/session";
+import { listTodayTimeline } from "@/server/modules/calendar-events/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
 import {
   listTodaySuggestions,
@@ -34,7 +35,8 @@ async function Today() {
   const timeZone = preferences.timezone ?? "UTC";
   // Today is the user's date in their saved zone, never the server's.
   const clock = todayClock(timeZone);
-  const [sections, suggestions] = await Promise.all([
+  const [timeline, sections, suggestions] = await Promise.all([
+    listTodayTimeline(user.id, clock, timeZone),
     listTodayTasks(user.id, clock, timeZone),
     listTodaySuggestions(user.id, clock, timeZone),
   ]);
@@ -43,6 +45,8 @@ async function Today() {
       dateLabel={formatLocalDate(clock.today, preferences.locale, "full")}
       today={clock.today}
       nextDayStartsAt={clock.dayEnd.toISOString()}
+      now={clock.now.toISOString()}
+      timeline={timeline}
       sections={sections}
       suggestions={suggestions}
       locale={preferences.locale}

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { CalendarEventOccurrence } from "./calendar-events";
+import { blockEntry, eventEntry } from "./agenda";
 import {
+  calendarItemHref,
   DEADLINE_MARKER_MINUTES,
   gridDays,
   gridDayShortLabel,
@@ -13,6 +15,7 @@ import {
   gridRangeLabel,
   inGridRange,
   isGridKey,
+  parseCalendarItem,
   parseCalendarView,
   parseGridRange,
   shiftGridDate,
@@ -202,6 +205,45 @@ describe("parseGridRange and gridHref", () => {
     expect(shiftGridDate(gridRange("day", "2026-10-31", 1), 1)).toBe(
       "2026-11-01",
     );
+  });
+});
+
+describe("calendarItemHref", () => {
+  it("opens the item on the Day view of its Tokyo start day", () => {
+    // 00:30 on the 24th in Tokyo is still the 23rd in UTC.
+    const block = timeBlock({
+      startAt: new Date("2026-10-23T15:30:00Z"),
+      endAt: new Date("2026-10-23T16:30:00Z"),
+    });
+    const entry = blockEntry(block);
+    const href = calendarItemHref(entry, TODAY, TOKYO);
+    const url = new URL(href, "https://soleup.test");
+    expect(url.pathname).toBe("/plan/calendar");
+    expect(url.searchParams.get("view")).toBe("day");
+    expect(url.searchParams.get("date")).toBe("2026-10-24");
+    expect(url.searchParams.get("item")).toBe(entry.id);
+    expect(
+      parseCalendarItem({
+        item: url.searchParams.get("item") ?? undefined,
+      }),
+    ).toBe(entry.id);
+  });
+
+  it("uses today for an item that is today or began before it", () => {
+    const today = blockEntry(timeBlock());
+    expect(calendarItemHref(today, TODAY, TOKYO)).toBe(
+      `/plan/calendar?view=day&item=${encodeURIComponent(today.id)}`,
+    );
+    const trip = eventEntry(allDayEvent("2026-10-20", "2026-10-26"));
+    expect(calendarItemHref(trip, TODAY, TOKYO)).not.toContain("date=");
+    const later = eventEntry(allDayEvent("2026-10-30", "2026-10-31"));
+    expect(calendarItemHref(later, TODAY, TOKYO)).toContain("date=2026-10-30");
+  });
+
+  it("reads no item from a missing or empty param", () => {
+    expect(parseCalendarItem({})).toBeNull();
+    expect(parseCalendarItem({ item: "" })).toBeNull();
+    expect(parseCalendarItem({ item: ["a", "b"] })).toBe("a");
   });
 });
 
