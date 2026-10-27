@@ -1,3 +1,5 @@
+import { createECDH } from "node:crypto";
+
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import type * as EnvModule from "./env";
@@ -8,7 +10,22 @@ const AUTH = {
   BETTER_AUTH_URL: "http://localhost:3000",
 };
 const SWEEP = { REMINDER_SWEEP_SECRET: "s".repeat(43) };
-const MINIMAL = { DATABASE_URL: VALID_URL, ...AUTH, ...SWEEP };
+
+/** A throwaway P-256 pair in the shape `web-push generate-vapid-keys` prints. */
+function vapidKeys() {
+  const ecdh = createECDH("prime256v1");
+  ecdh.generateKeys();
+  const privateKey = ecdh.getPrivateKey();
+  return {
+    VAPID_PUBLIC_KEY: ecdh.getPublicKey().toString("base64url"),
+    VAPID_PRIVATE_KEY: Buffer.concat([
+      Buffer.alloc(32 - privateKey.length),
+      privateKey,
+    ]).toString("base64url"),
+  };
+}
+const VAPID = { ...vapidKeys(), VAPID_SUBJECT: "mailto:ops@example.test" };
+const MINIMAL = { DATABASE_URL: VALID_URL, ...AUTH, ...SWEEP, ...VAPID };
 
 let parseEnv: typeof EnvModule.parseEnv;
 let EnvValidationError: typeof EnvModule.EnvValidationError;
@@ -19,6 +36,7 @@ beforeAll(async () => {
   vi.stubEnv("BETTER_AUTH_SECRET", AUTH.BETTER_AUTH_SECRET);
   vi.stubEnv("BETTER_AUTH_URL", AUTH.BETTER_AUTH_URL);
   vi.stubEnv("REMINDER_SWEEP_SECRET", SWEEP.REMINDER_SWEEP_SECRET);
+  for (const [key, value] of Object.entries(VAPID)) vi.stubEnv(key, value);
   ({ parseEnv, EnvValidationError } = await import("./env"));
   vi.unstubAllEnvs();
 });
@@ -81,6 +99,49 @@ describe("parseEnv", () => {
     expect(message).not.toContain(short);
   });
 
+  it("requires a VAPID key pair and subject", () => {
+    const message = problemsFor({ DATABASE_URL: VALID_URL, ...AUTH, ...SWEEP });
+    expect(message).toContain("VAPID_PUBLIC_KEY is missing");
+    expect(message).toContain("VAPID_PRIVATE_KEY is missing");
+    expect(message).toContain("VAPID_SUBJECT is missing");
+  });
+
+  it("rejects malformed VAPID keys without echoing them", () => {
+    const message = problemsFor({
+      ...MINIMAL,
+      VAPID_PUBLIC_KEY: "not-a-key",
+      VAPID_PRIVATE_KEY: `${VAPID.VAPID_PRIVATE_KEY}AA`,
+    });
+    expect(message).toContain("VAPID_PUBLIC_KEY must be a P-256 public key");
+    expect(message).toContain("VAPID_PRIVATE_KEY must be a P-256 private key");
+    expect(message).not.toContain(VAPID.VAPID_PRIVATE_KEY);
+    expect(message).not.toContain("not-a-key");
+  });
+
+  it("rejects a public key that doesn't belong to the private key", () => {
+    const other = vapidKeys();
+    const message = problemsFor({
+      ...MINIMAL,
+      VAPID_PUBLIC_KEY: other.VAPID_PUBLIC_KEY,
+    });
+    expect(message).toContain(
+      "VAPID_PUBLIC_KEY does not belong to VAPID_PRIVATE_KEY",
+    );
+    expect(message).not.toContain(other.VAPID_PUBLIC_KEY);
+    expect(message).not.toContain(VAPID.VAPID_PRIVATE_KEY);
+  });
+
+  it("accepts a mailto: or https: VAPID subject only", () => {
+    for (const subject of ["mailto:me@example.com", "https://example.com"])
+      expect(
+        parseEnv({ ...MINIMAL, VAPID_SUBJECT: subject }).VAPID_SUBJECT,
+      ).toBe(subject);
+    for (const subject of ["me@example.com", "http://example.com"])
+      expect(problemsFor({ ...MINIMAL, VAPID_SUBJECT: subject })).toContain(
+        "VAPID_SUBJECT must be a mailto: address or an https:// URL",
+      );
+  });
+
   it("accepts a fully configured provider", () => {
     const env = parseEnv({
       ...MINIMAL,
@@ -125,6 +186,9 @@ describe("env at import", () => {
       "BETTER_AUTH_SECRET",
       "BETTER_AUTH_URL",
       "REMINDER_SWEEP_SECRET",
+      "VAPID_PUBLIC_KEY",
+      "VAPID_PRIVATE_KEY",
+      "VAPID_SUBJECT",
     ])
       vi.stubEnv(key, "");
     for (const [key, value] of Object.entries(values)) vi.stubEnv(key, value);
@@ -147,6 +211,10 @@ describe("env at import", () => {
     });
     expect(env.BETTER_AUTH_SECRET).toContain("build-placeholder");
     expect(env.REMINDER_SWEEP_SECRET).toContain("build-placeholder");
+    // A fresh, matching pair (validated by the schema), never a fixed key.
+    expect(env.VAPID_PUBLIC_KEY).toMatch(/^B[A-Za-z0-9_-]{86}$/);
+    const again = await importEnvWith({ NEXT_PHASE: "phase-production-build" });
+    expect(again.env.VAPID_PRIVATE_KEY).not.toBe(env.VAPID_PRIVATE_KEY);
   });
 
   it("never replaces a real value during `next build`", async () => {
@@ -155,5 +223,6 @@ describe("env at import", () => {
       ...MINIMAL,
     });
     expect(env.BETTER_AUTH_SECRET).toBe(AUTH.BETTER_AUTH_SECRET);
+    expect(env.VAPID_PRIVATE_KEY).toBe(VAPID.VAPID_PRIVATE_KEY);
   });
 });

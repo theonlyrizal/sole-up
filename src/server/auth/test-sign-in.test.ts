@@ -1,3 +1,4 @@
+import webpush from "web-push";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { isTestSignInEnabled } from "./test-sign-in";
@@ -44,6 +45,10 @@ describe("POST /api/test/sign-in", () => {
     vi.stubEnv("BETTER_AUTH_SECRET", "x".repeat(32));
     vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3000");
     vi.stubEnv("REMINDER_SWEEP_SECRET", "s".repeat(43));
+    const vapid = webpush.generateVAPIDKeys();
+    vi.stubEnv("VAPID_PUBLIC_KEY", vapid.publicKey);
+    vi.stubEnv("VAPID_PRIVATE_KEY", vapid.privateKey);
+    vi.stubEnv("VAPID_SUBJECT", "mailto:unit-tests@example.test");
     vi.stubEnv("SOLEUP_TEST_SIGN_IN", "");
     for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
     // env.ts parses process.env on import, so load the route fresh.

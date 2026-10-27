@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 
 import { defineConfig, devices } from "@playwright/test";
+import webpush from "web-push";
 
 const PORT = 3100;
 const baseURL = `http://localhost:${PORT}`;
@@ -16,6 +17,10 @@ function readTestDatabaseUrl(): string {
 }
 
 export const testDatabaseUrl = readTestDatabaseUrl();
+
+// A fresh VAPID key pair for the e2e server on every run, so no key is ever
+// committed. e2e tests never send to a real push service.
+const testVapidKeys = webpush.generateVAPIDKeys();
 
 /**
  * End-to-end tests in tests/e2e. Playwright starts its own app server on
@@ -59,6 +64,9 @@ export default defineConfig({
       BETTER_AUTH_SECRET: "e2e-tests-only-secret-not-for-real-use",
       // Test-only: guards the reminder sweep route on the e2e server only.
       REMINDER_SWEEP_SECRET: "e2e-tests-only-sweep-secret-not-for-real-use",
+      VAPID_PUBLIC_KEY: testVapidKeys.publicKey,
+      VAPID_PRIVATE_KEY: testVapidKeys.privateKey,
+      VAPID_SUBJECT: "mailto:e2e-tests@example.test",
       // Placeholder credentials so the sign-in buttons render. No test
       // clicks them: that would leave for the real provider.
       GOOGLE_CLIENT_ID: "e2e-placeholder",

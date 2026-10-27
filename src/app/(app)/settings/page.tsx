@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { PreferencesForm } from "@/components/preferences/preferences-form";
+import { PushNotifications } from "@/components/push/push-notifications";
 import { InstallHelp } from "@/components/pwa/install-help";
 import { LoadingState } from "@/components/ui/skeleton";
+import { formatInstant } from "@/lib/dates";
 import { localeOptions, supportedTimeZones } from "@/lib/preferences";
 import { requireUser } from "@/server/auth/session";
+import { env } from "@/server/env";
 import { getUserPreferences } from "@/server/modules/preferences/service";
+import { listPushDevices } from "@/server/modules/push/queries";
 
 export const metadata: Metadata = { title: "Settings · SoleUp" };
 
@@ -34,6 +38,17 @@ export default function SettingsPage() {
         </h2>
         <InstallHelp />
       </section>
+      <section
+        aria-labelledby="notifications-heading"
+        className="flex flex-col gap-4"
+      >
+        <h2 id="notifications-heading" className="text-lg font-semibold">
+          Notifications
+        </h2>
+        <Suspense fallback={<LoadingState label="Loading devices" />}>
+          <Notifications />
+        </Suspense>
+      </section>
     </div>
   );
 }
@@ -47,6 +62,30 @@ async function Preferences() {
       initial={preferences}
       timeZones={supportedTimeZones()}
       locales={localeOptions(preferences.locale)}
+    />
+  );
+}
+
+async function Notifications() {
+  const user = await requireUser();
+  const [preferences, devices] = await Promise.all([
+    getUserPreferences(user.id),
+    listPushDevices(user.id),
+  ]);
+  // Formatted here, so server and browser can't disagree while hydrating.
+  const format = (instant: Date) =>
+    formatInstant(instant, preferences.locale, preferences.timezone ?? "UTC");
+  return (
+    <PushNotifications
+      vapidPublicKey={env.VAPID_PUBLIC_KEY}
+      devices={devices.map((device) => ({
+        id: device.id,
+        label: device.label,
+        endpointHash: device.endpointHash,
+        added: format(device.createdAt),
+        lastSuccess: device.lastSuccessAt && format(device.lastSuccessAt),
+        failedCount: device.failedCount,
+      }))}
     />
   );
 }

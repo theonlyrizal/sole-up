@@ -27,9 +27,13 @@ export const REDACTED_KEYS: readonly string[] = [
   "reason",
   "reflection",
   "text",
-  // Push subscription keys (Phase 5)
+  // Push subscriptions (Phase 5): the endpoint and keys together let anyone
+  // with our VAPID key send to the device.
   "keys",
   "p256dh",
+  "auth",
+  "endpoint",
+  "subscription",
 ];
 
 /** Any key ending in one of these is redacted too (`accessToken`, `clientSecret`). */

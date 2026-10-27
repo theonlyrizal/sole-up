@@ -188,7 +188,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 5.0 | Decision gate: reminders | done | chunk/5.0-reminders-decisions | 2026-10-27 | ADR 0013: stay free, no worker/pg-boss, cron-job.org sweep every 15 min (never late, up to 15 early); deadlines, events (rolling next occurrence) and a daily nudge; quiet hours hold/bundle/skip stale; title or private payload; 5.1–5.7 rewritten |
 | 5.1 | Sweep route and external trigger | done | chunk/5.1-sweep-route | 2026-10-27 | Required `REMINDER_SWEEP_SECRET`, `POST /api/reminders/sweep` (constant-time Bearer check, same 401, no body) → `runSweep(now)` stub logging counts only; `pnpm reminders:sweep` calls the local route; DEPLOY.md secret + cron-job.org steps; production check unverified |
 | 5.2 | Service worker and PWA install | done | chunk/5.2-service-worker-install | 2026-10-27 | `public/sw.js` (push + notificationclick only, no fetch/cache; payload text as given, same-origin deep link focusing an open tab), registered on every page, uncached with its own CSP; Settings "Install the app" with iOS Home Screen guidance; desktop install confirmed, phone unverified |
-| 5.3 | Push subscriptions | todo | | | |
+| 5.3 | Push subscriptions | done | chunk/5.3-push-subscriptions | 2026-10-28 | Required VAPID env (pair checked), `push_subscriptions` (endpoint unique, known push hosts only, 20/user), subscribe/unsubscribe/revoke/test actions on `web-push` 3.6.7, Settings "Notifications" device list; user confirmed two browsers + revoke |
 | 5.4 | Reminders: schema and scheduling | todo | | | |
 | 5.5 | Delivery in the sweep | todo | | | |
 | 5.6 | Reminder UI and preferences | todo | | | |
@@ -2386,3 +2386,36 @@ Template:
 - **Follow-ups:**
   - A monochrome `badge` icon for Android's status bar (Android shows a generic one without it). Worth adding with 5.5's real notifications.
   - Safe-area rendering on a real phone in standalone mode (0.10's open item) can be checked during the phone install.
+
+### 5.3: Push subscriptions (2026-10-28)
+- **Built:**
+  - Dependency `web-push` 3.6.7 (MPL-2.0, Jan 2024, the newest; no build scripts) and dev `@types/web-push` 3.6.4, pinned.
+  - Env: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` **required** in `src/server/env.ts`: unpadded base64url of 65/32 bytes, the public key must be derived from the private one (checked with `createECDH`), subject `mailto:` or `https://`. Messages never echo values. `next build` gets a freshly generated throwaway pair (no committed key). Empty placeholders in `.env.example` and `render.yaml`; `vitest.config.mts` and `playwright.config.ts` generate a new pair per run with `web-push`'s `generateVAPIDKeys()`.
+  - Schema `src/server/db/schema/push-subscriptions.ts` + migration `0011_push_subscriptions.sql`: the chunk's columns plus `id`, `endpoint` unique, index on `user_id`, CHECKs (https endpoint ≤ 2048, key lengths 87/22, label 1–64, `failed_count >= 0`), cascade from users.
+  - `src/lib/push.ts` (limits, `PUSH_SERVICE_HOSTS` + `isKnownPushService`, `PushPayload`, `PushDevice`, `TestNotificationResult`), `src/lib/device-label.ts` (`deviceLabel(ua, maxTouchPoints)` → "Chrome on Android"; iPadOS via `installPlatform`).
+  - `src/server/modules/push/`: `validation.ts`, `send.ts` (`sendPush(target, payload, { ttlSeconds, urgency })`, VAPID per call, 10 s timeout, never throws or logs; outcome `ok` / `gone` (404/410) / `http_<status>|timeout|network|invalid`), `service.ts` (`subscribePush` upsert, `unsubscribePush`, `revokePushDevice`, `pushTargetsFor`, `recordPushOutcome`, `sendTestNotification`), `queries.ts` (`listPushDevices` with `endpointHash`), `actions.ts`.
+  - UI: Settings "Notifications" section (`src/components/push/push-notifications.tsx`): this device's state (checking / unsupported / iPhone needs the Home Screen app / worker failed / blocked / on / off), Turn on (permission asked from the click) and Turn off, "Send test notification" (all devices, partial results explained), "Your devices" list with added/last-success dates formatted on the server, failure count, "(this device)", and Revoke with a confirmation.
+  - Redaction: `auth`, `endpoint` and `subscription` added to `REDACTED_KEYS`.
+  - Tests: unit `env.test.ts` (VAPID cases, placeholder pair), `device-label.test.ts`; integration `push.integration.test.ts` (16: label, refresh, move to another user, cap, endpoint and key validation, anonymous, cascade, list without secrets, unsubscribe/revoke cross-user, test send outcomes and row updates, payload and VAPID options, network/timeout codes, no secrets or text in logs); e2e `push-devices.spec.ts` (two tabs as two browsers, revoke, turn off, axe, blocked permission).
+  - Docs: DATA_MODEL PushSubscription, ARCHITECTURE §8, README (Reminders, local setup), DEPLOY.md "Web Push keys" and the env table.
+- **Deviations:**
+  1. **Endpoints must be on a known push service** (FCM, Mozilla, `*.notify.windows.com`, `*.push.apple.com`), https on the default port. Not in the chunk text: the server POSTs to the endpoint, so any URL would be a server-side request forgery hole. A browser on another push service gets "This browser's push service isn't supported yet."
+  2. **A 20-device cap per user** (soft: racing subscribes can pass it), to bound a test send's fan-out.
+  3. **The test notification goes to every device**, not just one, which is what the done-when needed. `last_success_at`/`failed_count` are recorded and 404/410 deletes, the same rules 5.5 uses.
+- **Decisions:**
+  - VAPID variables are required, like the sweep secret, so a missing key fails boot rather than silently breaking push. The public key reaches the page as a prop from the server env, not `NEXT_PUBLIC_*`, so builds need no key.
+  - A browser's endpoint is unique across users; subscribing one another user holds moves the row and resets its stats (whoever subscribed last gets the notifications).
+  - Only a label derived from the user agent is stored, never the raw string. The client hashes its own endpoint to find "this device"; no endpoint or key is ever sent to the browser.
+  - No audit events (a device registration, like a session; revoke hard-deletes). Recorded in `service.ts` and DATA_MODEL.
+  - Turn on replaces a browser subscription made with a different server key (after a key rotation).
+- **Next chunk should know:**
+  - 5.5: send with `sendPush(target, payload, { ttlSeconds })` from `pushTargetsFor(userId)`, then `recordPushOutcome(userId, id, outcome, now)`. TTL is clamped to at least 60. Log `outcome.code` only. Integration tests mock `web-push`'s default export (see `push.integration.test.ts`).
+  - e2e can't subscribe for real (Playwright's Chromium has no push service); reuse `fakePushManager` from `push-devices.spec.ts`.
+  - A unit test that imports a route or the env must stub the three VAPID variables (see `test-sign-in.test.ts`).
+  - This machine's `.env.local` has a local-only VAPID pair and subject `mailto:dev@soleup.invalid`.
+- **Unverified:**
+  - **Two-browser check confirmed by the user** on localhost (two desktop browsers): the test notification arrived in both, and after revoking one it no longer arrived there. A phone needs HTTPS, so it waits for the Render deploy, which needs the production VAPID variables set first (DEPLOY.md > Web Push keys).
+  - Checks: `pnpm verify` (format, lint, typecheck, 647 unit, 442 integration), `pnpm build` and `pnpm test:e2e` (68) pass.
+- **Follow-ups:**
+  - Signing out doesn't unsubscribe the browser, so on a shared computer the next person could see the previous user's reminder titles until someone else subscribes it. Consider unsubscribing on sign-out before 5.5 sends real reminders.
+  - `sw.js` has no `pushsubscriptionchange` handler, so a browser-rotated subscription is lost until the user turns notifications on again (the 410 cleanup removes the old row).
