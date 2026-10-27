@@ -273,6 +273,7 @@ Rules:
   - Marking a block `done` never completes the task.
   - A past `scheduled` block reads "Not marked".
 - The resource lane is derived: the task's goal's life area (direct goal, or the milestone's goal), otherwise "No area".
+- A new block (chunk 4.8) lasts the task's estimate, else 60 minutes, and is in the user's zone. Moving or resizing a block, by dragging or in its dialog, keeps the block's own zone; dragging an occurrence of a repeating weekly or monthly block with "this and following" or "all" moves the rule's day with it, as the form does.
 
 ### TimeBlockException
 One occurrence of a repeating block that differs from its rule.

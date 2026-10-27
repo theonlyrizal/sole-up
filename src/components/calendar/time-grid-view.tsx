@@ -2,13 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useMemo, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { useRefreshOnNewDay } from "@/components/tasks/use-refresh-on-new-day";
 import { Button } from "@/components/ui/button";
 import { cx } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
 import { agendaEntryKind } from "@/lib/agenda";
+import {
+  blockStatusLabel,
+  defaultBlockMinutes,
+  movedBlockTimes,
+} from "@/lib/block-form";
 import { calendarDayLabel } from "@/lib/calendar-list";
 import {
   type GridItemPosition,
@@ -27,18 +39,28 @@ import {
   localDateOf,
 } from "@/lib/dates";
 import { timeRangeLabel } from "@/lib/event-form";
+import {
+  createTimeBlock,
+  updateTimeBlock,
+} from "@/server/modules/time-blocks/actions";
 
+import { type BlockableTask, BlockTimeDialog } from "./block-form";
 import { type EventFormContext, EventFormDialog } from "./event-dialog";
 import {
   Calendar,
   type CalendarFeedItem,
+  type CalendarItemChange,
   type CalendarItemSegment,
 } from "./full-calendar";
 import { type CalendarEntry, ItemDialog, useItemDialog } from "./item-dialog";
+import { MoveBlockDialog, type PendingBlockMove } from "./move-block-dialog";
+import { droppedTaskId, TaskPanel } from "./task-panel";
 import { pillClass, ViewNav } from "./view-nav";
 
 type TimeGridViewProps = EventFormContext & {
   entries: CalendarEntry[];
+  /** The user's open tasks: the block picker's and the task panel's. */
+  tasks: BlockableTask[];
   range: GridRange;
   today: LocalDate;
   /** When the user's tomorrow begins (ISO instant). */
@@ -50,30 +72,68 @@ const ITEM_SELECTOR = "[data-calendar-item]";
 /** Tailwind's `md`: narrower than this, Day stands in for Week. */
 const WIDE_QUERY = "(min-width: 48rem)";
 
-function subscribeToWidth(onChange: () => void) {
-  const query = window.matchMedia(WIDE_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
+/** Tailwind's `lg`: from here the task panel sits beside Week (desktop). */
+const DESKTOP_QUERY = "(min-width: 64rem)";
 
-/** Whether the window is wide enough for Week; null on the server. */
-function useIsWide(): boolean | null {
+/** Whether the window matches `query`; null on the server. */
+function useMediaQuery(query: string): boolean | null {
   return useSyncExternalStore(
-    subscribeToWidth,
-    () => window.matchMedia(WIDE_QUERY).matches,
+    (onChange) => {
+      const list = window.matchMedia(query);
+      list.addEventListener("change", onChange);
+      return () => list.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(query).matches,
     () => null,
   );
 }
 
+/** How an item looks on the grid. */
+function itemStyle(
+  entry: CalendarEntry,
+): Pick<
+  CalendarFeedItem<CalendarEntry>,
+  "color" | "contrastColor" | "className" | "editable"
+> {
+  switch (entry.kind) {
+    // Events are filled blocks.
+    case "event":
+      return { color: "var(--accent)", contrastColor: "var(--accent-fg)" };
+    // Time blocks are tinted with a strong edge, and can be dragged.
+    case "block":
+      return {
+        color: "color-mix(in srgb, var(--accent) 16%, var(--surface))",
+        contrastColor: "var(--fg)",
+        className: `soleup-block soleup-block-${entry.block.status}`,
+        editable: true,
+      };
+    // Deadlines are quiet markers.
+    case "task":
+      return {
+        color: "var(--surface-muted)",
+        contrastColor: "var(--fg)",
+        className: "soleup-deadline",
+      };
+  }
+}
+
 /**
- * The Week and Day views (chunk 4.6): a time grid of the user's events and
- * timed task deadlines over a week (from their week start) or one day, in
- * their zone, with an all-day row. Each item's button opens its dialog;
- * Tab and the arrow keys move between items. The view and day live in the
- * URL. On phone widths Week is replaced by Day for the same day.
+ * The Week and Day views (chunks 4.6 and 4.8): a time grid of the user's
+ * events, time blocks and timed task deadlines over a week (from their
+ * week start) or one day, in their zone, with an all-day row. Each item's
+ * button opens its dialog; Tab and the arrow keys move between items. The
+ * view and day live in the URL. On phone widths Week is replaced by Day
+ * for the same day.
+ *
+ * Blocks can be made and changed with the pointer: select a slot to pick a
+ * task for it, drag a block to move it or its end to resize it, or (on a
+ * desktop Week) drag a task from the panel beside the grid. Each has a
+ * keyboard path through a form: "Block time" (toolbar or panel row), and
+ * the block's own dialog for its times.
  */
 export function TimeGridView({
   entries,
+  tasks,
   range,
   today,
   nextDayStartsAt,
@@ -81,8 +141,13 @@ export function TimeGridView({
 }: TimeGridViewProps) {
   useRefreshOnNewDay(nextDayStartsAt);
   const router = useRouter();
-  const isWide = useIsWide();
+  const isWide = useMediaQuery(WIDE_QUERY);
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const tooNarrow = range.view === "week" && isWide === false;
+  const showPanel = range.view === "week" && isDesktop === true;
+  const [slot, setSlot] = useState<{ start: Date; end: Date } | null>(null);
+  const [slotOpen, setSlotOpen] = useState(false);
+  const [move, setMove] = useState<PendingBlockMove | null>(null);
   useEffect(() => {
     if (tooNarrow) router.replace(gridHref("day", range.date, today));
   }, [tooNarrow, router, range.date, today]);
@@ -98,20 +163,71 @@ export function TimeGridView({
         start: entry.start,
         end: entry.end,
         order: entry.order,
-        // Events are filled blocks; deadlines are quiet markers.
-        ...(entry.kind === "event"
-          ? { color: "var(--accent)", contrastColor: "var(--accent-fg)" }
-          : {
-              color: "var(--surface-muted)",
-              contrastColor: "var(--fg)",
-              className: "soleup-deadline",
-            }),
+        ...itemStyle(entry),
         data: entry,
       })),
     [entries],
   );
   const rangeLabel = gridRangeLabel(range, context.locale);
   const unit = range.view === "week" ? "week" : "day";
+  const { userTimeZone, locale } = context;
+
+  function selectSlot(selected: { start: Date; end: Date }) {
+    setSlot(selected);
+    setSlotOpen(true);
+  }
+
+  /** A block dragged or resized: save a one-off, ask about a series. */
+  async function changeBlock({
+    data,
+    start,
+    end,
+    revert,
+  }: CalendarItemChange<CalendarEntry>) {
+    if (data.kind !== "block") return revert();
+    const { block } = data;
+    const times = movedBlockTimes(block, start, end);
+    const kind =
+      start.getTime() === block.startAt.getTime() ? "resize" : "move";
+    if (block.seriesId !== null) {
+      setMove({ block, times, start, kind, revert });
+      return;
+    }
+    const result = await updateTimeBlock({ id: block.id, ...times });
+    if (result.ok) {
+      toast({
+        title: kind === "move" ? "Block moved" : "Block length changed",
+        variant: "success",
+      });
+    } else {
+      revert();
+      toast({ title: result.error.message, variant: "error" });
+    }
+  }
+
+  /** A task dropped from the panel: a block at that time, for its estimate. */
+  async function dropTask({
+    date,
+    element,
+  }: {
+    date: Date;
+    element: HTMLElement;
+  }) {
+    const task = tasks.find((option) => option.id === droppedTaskId(element));
+    if (!task) return;
+    const minutes = defaultBlockMinutes(task.estimatedMinutes);
+    const times = movedBlockTimes(
+      { tz: userTimeZone },
+      date,
+      new Date(date.getTime() + minutes * 60_000),
+    );
+    const result = await createTimeBlock({ taskId: task.id, ...times });
+    toast(
+      result.ok
+        ? { title: "Time blocked", variant: "success" }
+        : { title: result.error.message, variant: "error" },
+    );
+  }
 
   // Arrow keys move between items: up and down within a day, left and
   // right to the nearest item of the previous or next day.
@@ -141,7 +257,15 @@ export function TimeGridView({
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ViewNav current={range.view} date={range.date} today={today} />
-        <EventFormDialog {...context} trigger={<Button>New event</Button>} />
+        <div className="flex flex-wrap gap-2">
+          <BlockTimeDialog
+            tasks={tasks}
+            timeZone={userTimeZone}
+            locale={locale}
+            trigger={<Button variant="secondary">Block time</Button>}
+          />
+          <EventFormDialog {...context} trigger={<Button>New event</Button>} />
+        </div>
       </div>
       <nav aria-label="Move through the calendar">
         <ul className="flex flex-wrap gap-1">
@@ -179,50 +303,85 @@ export function TimeGridView({
         </p>
         <p className="text-sm text-muted">
           {entries.length === 0
-            ? `Nothing this ${unit}. Events and tasks due at a set time show here.`
+            ? `Nothing this ${unit}. Events, time blocks and tasks due at a set time show here.`
             : "Tab or the arrow keys move between items; Enter opens one."}
+        </p>
+        <p className="text-sm text-muted">
+          Select a time on the grid to block it for a task; drag a block to move
+          it, or its bottom edge to change its length.
         </p>
       </div>
       {tooNarrow ? (
         <LoadingState label="Loading the day" />
       ) : (
-        <div ref={containerRef} onKeyDown={moveFocus}>
-          <Calendar
-            view={range.view}
-            range={range}
-            timeZone={context.userTimeZone}
-            items={items}
-            label={`${range.view === "week" ? "Week" : "Day"}, ${rangeLabel}`}
-            renderDayHeader={(date) => (
-              <DayHeading
-                date={date}
-                range={range}
-                today={today}
-                locale={context.locale}
-              />
-            )}
-            dayLink={
-              range.view === "week"
-                ? {
-                    label: (date) =>
-                      calendarDayLabel(date, today, context.locale),
-                    open: (date) => router.push(gridHref("day", date, today)),
-                  }
-                : undefined
-            }
-            renderItem={(entry, segment) => (
-              <GridItem
-                entry={entry}
-                segment={segment}
-                context={context}
-                onOpen={(opener) => openItem(entry, opener)}
-              />
-            )}
-            empty={null}
-          />
+        <div
+          className={cx(
+            showPanel &&
+              "grid grid-cols-[minmax(0,1fr)_16rem] items-start gap-4",
+          )}
+        >
+          <div ref={containerRef} onKeyDown={moveFocus} className="min-w-0">
+            <Calendar
+              view={range.view}
+              range={range}
+              timeZone={context.userTimeZone}
+              items={items}
+              label={`${range.view === "week" ? "Week" : "Day"}, ${rangeLabel}`}
+              renderDayHeader={(date) => (
+                <DayHeading
+                  date={date}
+                  range={range}
+                  today={today}
+                  locale={context.locale}
+                />
+              )}
+              dayLink={
+                range.view === "week"
+                  ? {
+                      label: (date) =>
+                        calendarDayLabel(date, today, context.locale),
+                      open: (date) => router.push(gridHref("day", date, today)),
+                    }
+                  : undefined
+              }
+              renderItem={(entry, segment) => (
+                <GridItem
+                  entry={entry}
+                  segment={segment}
+                  context={context}
+                  onOpen={(opener) => openItem(entry, opener)}
+                />
+              )}
+              empty={null}
+              onSelect={selectSlot}
+              onItemChange={(change) => void changeBlock(change)}
+              onDrop={showPanel ? (drop) => void dropTask(drop) : undefined}
+            />
+          </div>
+          {showPanel && (
+            <TaskPanel tasks={tasks} timeZone={userTimeZone} locale={locale} />
+          )}
         </div>
       )}
       <ItemDialog {...dialog} context={context} />
+      <BlockTimeDialog
+        // A fresh form for each selected slot.
+        key={
+          slot ? `${slot.start.toISOString()}/${slot.end.toISOString()}` : ""
+        }
+        tasks={tasks}
+        slot={slot ?? undefined}
+        timeZone={userTimeZone}
+        locale={locale}
+        open={slotOpen}
+        onOpenChange={setSlotOpen}
+      />
+      <MoveBlockDialog
+        move={move}
+        locale={locale}
+        timeZone={userTimeZone}
+        onDone={() => setMove(null)}
+      />
     </div>
   );
 }
@@ -292,6 +451,7 @@ function GridItem({
           agendaEntryKind(entry),
           day && formatLocalDate(day, context.locale, "full"),
           time,
+          entry.kind === "block" && blockStatusLabel(entry.block, new Date()),
         ]
           .filter(Boolean)
           .join(", ")}
@@ -333,13 +493,14 @@ function timeLabel(
       ? `Due ${formatTimeOfDay(entry.task.dueAt, locale, userTimeZone)}`
       : null;
   }
-  const { event } = entry;
-  if (event.allDay) return null;
+  if (entry.kind === "event" && entry.event.allDay) return null;
+  const timed = entry.kind === "block" ? entry.block : entry.event;
+  if (!timed.startAt || !timed.endAt) return null;
   if (isStart && isEnd)
-    return timeRangeLabel(event.startAt, event.endAt, locale, userTimeZone);
+    return timeRangeLabel(timed.startAt, timed.endAt, locale, userTimeZone);
   if (isStart)
-    return `From ${formatTimeOfDay(event.startAt, locale, userTimeZone)}`;
+    return `From ${formatTimeOfDay(timed.startAt, locale, userTimeZone)}`;
   if (isEnd)
-    return `Until ${formatTimeOfDay(event.endAt, locale, userTimeZone)}`;
+    return `Until ${formatTimeOfDay(timed.endAt, locale, userTimeZone)}`;
   return null;
 }

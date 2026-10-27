@@ -175,3 +175,9 @@ export type SetTimeBlockStatusInput = z.output<typeof setTimeBlockStatusSchema>;
 /** Whole local days in `tz`, `localEnd` exclusive, as for events. */
 export const blocksBetweenSchema = eventsBetweenSchema;
 export type BlocksBetweenInput = z.output<typeof blocksBetweenSchema>;
+
+/** One of the user's tasks, whose blocks the task dialog lists. */
+export const taskBlocksSchema = z.strictObject({
+  taskId: z.uuid("Choose one of your tasks."),
+});
+export type TaskBlocksInput = z.output<typeof taskBlocksSchema>;

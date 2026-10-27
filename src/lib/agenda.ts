@@ -6,7 +6,8 @@
 // Days are local dates in the user's saved time zone. The range is whole
 // local days, `start` included and `start + days` excluded, which is the
 // range `eventsBetween` takes. All-day task deadlines are not on the Agenda
-// (ADR 0012 lists timed deadlines only); Upcoming shows them.
+// (ADR 0012 lists timed deadlines only); Upcoming shows them. Time blocks
+// (chunk 4.8) are timed rows under their task's title.
 
 import type { CalendarEventOccurrence } from "./calendar-events";
 import { occurrenceKey } from "./calendar-list";
@@ -18,6 +19,7 @@ import {
   localDateOf,
 } from "./dates";
 import type { Task } from "./tasks";
+import type { TimeBlockOccurrence } from "./time-blocks";
 
 /**
  * How many days the Agenda can show at once. The default is 30, the list
@@ -111,7 +113,8 @@ export type AgendaTaskFields = Pick<
 /**
  * One row of the Agenda, ready for the calendar component: `start`/`end`
  * are ISO instants for timed rows and local dates for all-day rows (end
- * exclusive). `order` breaks ties at the same start: events first.
+ * exclusive). `order` breaks ties at the same start: events, then blocks,
+ * then tasks.
  */
 export type AgendaEntry<T extends AgendaTaskFields = AgendaTaskFields> = {
   id: string;
@@ -122,6 +125,7 @@ export type AgendaEntry<T extends AgendaTaskFields = AgendaTaskFields> = {
   order: number;
 } & (
   | { kind: "event"; event: CalendarEventOccurrence }
+  | { kind: "block"; block: TimeBlockOccurrence }
   | { kind: "task"; task: T; role: AgendaTaskRole }
 );
 
@@ -149,6 +153,21 @@ export function eventEntry(event: CalendarEventOccurrence): AgendaEntry<never> {
         kind: "event",
         event,
       };
+}
+
+/** A time block's (or occurrence's) row, under its task's title. */
+export function blockEntry(block: TimeBlockOccurrence): AgendaEntry<never> {
+  const occurrence = block.originalStart?.toISOString() ?? "";
+  return {
+    id: `block:${block.id}:${occurrence}`,
+    title: block.taskTitle,
+    allDay: false,
+    start: block.startAt.toISOString(),
+    end: block.endAt.toISOString(),
+    order: 0.5,
+    kind: "block",
+    block,
+  };
 }
 
 /**
@@ -201,18 +220,20 @@ function taskEntries<T extends AgendaTaskFields>(
 }
 
 /**
- * The Agenda's rows for `range`: every event occurrence given, and each
- * task's plan and timed deadline that fall inside it. The calendar
- * component orders them; this keeps the input order otherwise.
+ * The Agenda's rows for `range`: every event occurrence and time block
+ * given, and each task's plan and timed deadline that fall inside it. The
+ * calendar component orders them; this keeps the input order otherwise.
  */
 export function agendaEntries<T extends AgendaTaskFields>(
   events: CalendarEventOccurrence[],
   tasks: T[],
   range: AgendaRange,
   timeZone: string,
+  blocks: TimeBlockOccurrence[] = [],
 ): AgendaEntry<T>[] {
   return [
     ...events.map((event) => eventEntry(event)),
+    ...blocks.map((block) => blockEntry(block)),
     ...tasks.flatMap((task) => taskEntries(task, range, timeZone)),
   ];
 }
@@ -220,6 +241,7 @@ export function agendaEntries<T extends AgendaTaskFields>(
 /** The short label that says what a row is, read before its title. */
 export function agendaEntryKind(entry: AgendaEntry): string {
   if (entry.kind === "event") return "Event";
+  if (entry.kind === "block") return "Time block";
   switch (entry.role) {
     case "planned":
       return "Planned task";

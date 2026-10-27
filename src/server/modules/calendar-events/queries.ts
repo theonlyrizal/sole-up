@@ -17,6 +17,7 @@ import {
   listAgendaTasks,
   type PlanTaskItem,
 } from "@/server/modules/tasks/queries";
+import { blocksBetween } from "@/server/modules/time-blocks/service";
 
 import { eventsBetween } from "./service";
 
@@ -24,45 +25,45 @@ import { eventsBetween } from "./service";
 
 /**
  * The Agenda's rows for `range` (chunk 4.5): the user's events and
- * occurrences overlapping its local days in `timeZone` (the user's), and
- * their open tasks' plans and timed deadlines on those days.
+ * occurrences and time blocks overlapping its local days in `timeZone`
+ * (the user's), and their open tasks' plans and timed deadlines on those
+ * days.
  */
 export async function listAgenda(
   userId: string,
   range: AgendaRange,
   timeZone: string,
 ): Promise<AgendaEntry<PlanTaskItem>[]> {
-  const to = agendaEnd(range);
-  const [events, tasks] = await Promise.all([
-    eventsBetween(userId, {
-      localStart: range.start,
-      localEnd: to,
-      tz: timeZone,
-    }),
-    listAgendaTasks(userId, { from: range.start, to, timeZone }),
+  const days = {
+    localStart: range.start,
+    localEnd: agendaEnd(range),
+    tz: timeZone,
+  };
+  const [events, blocks, tasks] = await Promise.all([
+    eventsBetween(userId, days),
+    blocksBetween(userId, days),
+    listAgendaTasks(userId, { from: range.start, to: days.localEnd, timeZone }),
   ]);
-  return agendaEntries(events, tasks, range, timeZone);
+  return agendaEntries(events, tasks, range, timeZone, blocks);
 }
 
 /**
- * The Week or Day grid's items for `range` (chunk 4.6): the user's events
- * and occurrences overlapping its local days in `timeZone` (the user's),
- * and their open tasks' timed deadlines on those days.
+ * The Week or Day grid's items for `range` (chunk 4.6): the user's events,
+ * occurrences and time blocks overlapping its local days in `timeZone`
+ * (the user's), and their open tasks' timed deadlines on those days.
  */
 export async function listCalendarGrid(
   userId: string,
   range: GridRange,
   timeZone: string,
 ): Promise<AgendaEntry<PlanTaskItem>[]> {
-  const [events, tasks] = await Promise.all([
-    eventsBetween(userId, {
-      localStart: range.start,
-      localEnd: range.end,
-      tz: timeZone,
-    }),
+  const days = { localStart: range.start, localEnd: range.end, tz: timeZone };
+  const [events, blocks, tasks] = await Promise.all([
+    eventsBetween(userId, days),
+    blocksBetween(userId, days),
     listAgendaTasks(userId, { from: range.start, to: range.end, timeZone }),
   ]);
-  return gridEntries(events, tasks, range, timeZone);
+  return gridEntries(events, tasks, range, timeZone, blocks);
 }
 
 /** What an event can link to: goals (with their area) and life areas. */

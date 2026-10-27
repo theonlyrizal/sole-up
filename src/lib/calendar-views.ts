@@ -4,13 +4,19 @@
 //
 // Week and Day are time grids. Their range is whole local days in the
 // user's saved zone: a week starts on the user's week start, a day is one
-// date. Both hold events (occurrences of repeating ones included) and timed
-// task deadlines, which show as markers. Planned tasks and all-day
-// deadlines stay on Today, Upcoming and the Agenda.
+// date. Both hold events (occurrences of repeating ones included), time
+// blocks (chunk 4.8) and timed task deadlines, which show as markers.
+// Planned tasks and all-day deadlines stay on Today, Upcoming and the Agenda.
 
 import type { AgendaTaskFields } from "./agenda";
-import { type AgendaEntry, AGENDA_PATH, eventEntry } from "./agenda";
+import {
+  type AgendaEntry,
+  AGENDA_PATH,
+  blockEntry,
+  eventEntry,
+} from "./agenda";
 import type { CalendarEventOccurrence } from "./calendar-events";
+import type { TimeBlockOccurrence } from "./time-blocks";
 import {
   addDays,
   formatLocalDate,
@@ -151,8 +157,8 @@ export function gridDayShortLabel(date: LocalDate, locale: string): string {
 }
 
 /**
- * The grid's items for `range`: every event occurrence given, and the timed
- * deadlines of the tasks given that fall on its days in `timeZone`, each a
+ * The grid's items for `range`: every event occurrence and time block
+ * given, and the timed deadlines of the tasks given that fall on its days in `timeZone`, each a
  * short marker at its time. Plans and all-day deadlines are left out.
  */
 export function gridEntries<T extends AgendaTaskFields>(
@@ -160,6 +166,7 @@ export function gridEntries<T extends AgendaTaskFields>(
   tasks: T[],
   range: GridRange,
   timeZone: string,
+  blocks: TimeBlockOccurrence[] = [],
 ): AgendaEntry<T>[] {
   const deadlines = tasks.flatMap((task): AgendaEntry<T>[] => {
     if (task.dueAt === null) return [];
@@ -181,7 +188,11 @@ export function gridEntries<T extends AgendaTaskFields>(
       },
     ];
   });
-  return [...events.map((event) => eventEntry(event)), ...deadlines];
+  return [
+    ...events.map((event) => eventEntry(event)),
+    ...blocks.map((block) => blockEntry(block)),
+    ...deadlines,
+  ];
 }
 
 /** Where an item button sits on the grid, for arrow-key moves. */

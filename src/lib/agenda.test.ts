@@ -13,6 +13,7 @@ import {
 } from "./agenda";
 import type { CalendarEventOccurrence } from "./calendar-events";
 import type { Task } from "./tasks";
+import type { TimeBlockOccurrence } from "./time-blocks";
 
 // Tokyo is UTC+9 with no DST, so a time early in a Tokyo day falls on the
 // day before in UTC: a UTC-date bug puts it on the wrong day.
@@ -180,6 +181,45 @@ describe("agendaEntries", () => {
       end: "2026-10-27",
     });
     expect(agendaEntryKind(first!)).toBe("Event");
+  });
+
+  it("lists time blocks as timed rows under their task's title", () => {
+    const event = timedEvent("2026-10-24T01:00:00Z", "2026-10-24T02:00:00Z");
+    const planned = task({ plannedDate: "2026-10-24" });
+    const block: TimeBlockOccurrence = {
+      id: id(),
+      taskId: planned.id,
+      startAt: new Date("2026-10-24T01:00:00Z"),
+      endAt: new Date("2026-10-24T02:30:00Z"),
+      tz: TOKYO,
+      rrule: null,
+      status: "done",
+      createdAt: new Date("2026-10-01T00:00:00Z"),
+      updatedAt: new Date("2026-10-01T00:00:00Z"),
+      seriesId: null,
+      originalStart: null,
+      modified: false,
+      taskTitle: planned.title,
+      taskStatus: "open",
+      goalId: null,
+      lifeAreaId: null,
+    };
+    const entries = agendaEntries([event], [planned], RANGE, TOKYO, [block]);
+    expect(entries.map((entry) => entry.kind)).toEqual([
+      "event",
+      "block",
+      "task",
+    ]);
+    // At the same start, events come first, then blocks, then tasks.
+    expect(entries.map((entry) => entry.order)).toEqual([0, 0.5, 1]);
+    expect(entries[1]).toMatchObject({
+      id: `block:${block.id}:`,
+      title: planned.title,
+      allDay: false,
+      start: "2026-10-24T01:00:00.000Z",
+      end: "2026-10-24T02:30:00.000Z",
+    });
+    expect(agendaEntryKind(entries[1]!)).toBe("Time block");
   });
 
   it("gives a plan an all-day row and a timed deadline a row at its time", () => {

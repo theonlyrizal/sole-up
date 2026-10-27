@@ -17,12 +17,14 @@ import {
   agendaRangeLabel,
   shiftAgendaRange,
 } from "@/lib/agenda";
+import { blockStatusLabel } from "@/lib/block-form";
 import type { CalendarEventOccurrence } from "@/lib/calendar-events";
 import { calendarDayLabel } from "@/lib/calendar-list";
 import { formatTimeOfDay, type LocalDate, localDateOf } from "@/lib/dates";
 import { timeRangeLabel } from "@/lib/event-form";
 import { PRIORITY_LABELS } from "@/lib/priorities";
 import { describeRecurrence } from "@/lib/recurrence-rules";
+import type { TimeBlockOccurrence } from "@/lib/time-blocks";
 import type { PlanTaskItem } from "@/server/modules/tasks/queries";
 
 import { type EventFormContext, EventFormDialog } from "./event-dialog";
@@ -68,8 +70,14 @@ export function AgendaView({
         start: entry.start,
         end: entry.end,
         order: entry.order,
-        // Events in the accent colour, tasks in a quieter one.
-        color: entry.kind === "event" ? "var(--accent)" : "var(--fg-muted)",
+        // Events in the accent colour, blocks in the success colour,
+        // tasks in a quieter one.
+        color:
+          entry.kind === "event"
+            ? "var(--accent)"
+            : entry.kind === "block"
+              ? "var(--success)"
+              : "var(--fg-muted)",
         data: entry,
       })),
     [entries],
@@ -202,7 +210,9 @@ function AgendaItem({
   const details =
     entry.kind === "event"
       ? eventDetails(entry.event, context)
-      : taskDetails(entry.task);
+      : entry.kind === "block"
+        ? blockDetails(entry.block, context)
+        : taskDetails(entry.task);
   return (
     <div className="flex w-full min-w-0 flex-col gap-1 py-1 sm:flex-row sm:gap-4">
       <p className="shrink-0 text-sm text-muted sm:w-36">
@@ -248,15 +258,32 @@ function timeLabel(
       ? `Due ${formatTimeOfDay(entry.task.dueAt, locale, userTimeZone)}`
       : "Planned";
   }
-  const { event } = entry;
-  if (event.allDay) return "All day";
+  if (entry.kind === "event" && entry.event.allDay) return "All day";
+  const timed = entry.kind === "block" ? entry.block : entry.event;
+  if (!timed.startAt || !timed.endAt) return "All day";
   if (isStart && isEnd)
-    return timeRangeLabel(event.startAt, event.endAt, locale, userTimeZone);
+    return timeRangeLabel(timed.startAt, timed.endAt, locale, userTimeZone);
   if (isStart)
-    return `From ${formatTimeOfDay(event.startAt, locale, userTimeZone)}`;
+    return `From ${formatTimeOfDay(timed.startAt, locale, userTimeZone)}`;
   if (isEnd)
-    return `Until ${formatTimeOfDay(event.endAt, locale, userTimeZone)}`;
+    return `Until ${formatTimeOfDay(timed.endAt, locale, userTimeZone)}`;
   return "All day";
+}
+
+/** A block's status ("Not marked" once past) and its repeat. */
+function blockDetails(
+  block: TimeBlockOccurrence,
+  { locale }: EventFormContext,
+): string[] {
+  return [
+    blockStatusLabel(block, new Date()),
+    block.rrule &&
+      `${describeRecurrence(block.rrule, {
+        start: localDateOf(block.startAt, block.tz),
+        locale,
+      })}${block.modified ? " (this one changed)" : ""}`,
+    block.taskStatus === "completed" && "Task completed",
+  ].filter((detail): detail is string => Boolean(detail));
 }
 
 function eventDetails(

@@ -10,6 +10,7 @@ import { parseAgendaRange } from "@/lib/agenda";
 import { parseCalendarView, parseGridRange } from "@/lib/calendar-views";
 import { addDays, startOfLocalDay, todayFor } from "@/lib/dates";
 import { supportedTimeZones } from "@/lib/preferences";
+import { parseTaskListFilters } from "@/lib/task-list";
 import { requireUser } from "@/server/auth/session";
 import {
   listAgenda,
@@ -17,6 +18,7 @@ import {
   listEventLinkOptions,
 } from "@/server/modules/calendar-events/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
+import { listPlanTasks } from "@/server/modules/tasks/queries";
 
 export const metadata: Metadata = { title: "Calendar · SoleUp" };
 
@@ -42,13 +44,17 @@ async function CalendarPageBody({
     <div
       className={cx(
         "mx-auto flex w-full flex-col gap-6 px-4 py-10",
-        view === "agenda" ? "max-w-2xl" : "max-w-5xl",
+        view === "agenda"
+          ? "max-w-2xl"
+          : view === "week"
+            ? "max-w-5xl lg:max-w-7xl"
+            : "max-w-5xl",
       )}
     >
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
         <p className="text-muted">
-          Appointments, planned tasks and deadlines, day by day.
+          Appointments, time blocks, planned tasks and deadlines, day by day.
         </p>
       </div>
       <PlanSubnav />
@@ -100,15 +106,23 @@ async function Calendar({
   }
 
   const range = parseGridRange(view, params, today, preferences.weekStart);
-  const [entries, options] = await Promise.all([
+  const [entries, options, tasks] = await Promise.all([
     listCalendarGrid(user.id, range, timeZone),
     listEventLinkOptions(user.id),
+    // Open tasks, as the Plan page lists them by default: what a block can
+    // be made for from the grid.
+    listPlanTasks(user.id, parseTaskListFilters({}), { today, timeZone }),
   ]);
   return (
     <TimeGridView
       // A new key per range, so moving resets the grid's scroll and focus.
       key={`${range.view}:${range.start}`}
       entries={entries}
+      tasks={tasks.map(({ id, title, estimatedMinutes }) => ({
+        id,
+        title,
+        estimatedMinutes,
+      }))}
       range={range}
       today={today}
       nextDayStartsAt={nextDayStartsAt}

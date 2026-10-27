@@ -186,10 +186,13 @@ test("a plan from yesterday waits under Earlier, not done until you decide", asy
   await expectNoSeriousViolations(page);
 
   // Plan for today, in one tap.
+  // Retried until hydrated, but clicked only while the button is still
+  // there: a slow refresh after a click that worked must not re-click.
   await expect(async () => {
-    await earlier
-      .getByRole("button", { name: "Plan for today: Call the bank" })
-      .click({ timeout: 1_000 });
+    const plan = earlier.getByRole("button", {
+      name: "Plan for today: Call the bank",
+    });
+    if (await plan.isVisible()) await plan.click({ timeout: 1_000 });
     await expect(
       section(page, "Planned for today").getByText("Call the bank"),
     ).toBeVisible({ timeout: 1_000 });
