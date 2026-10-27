@@ -116,6 +116,7 @@ describe("parseCalendarView", () => {
     expect(parseCalendarView({})).toBe("agenda");
     expect(parseCalendarView({ view: "month" })).toBe("agenda");
     expect(parseCalendarView({ view: "areas" })).toBe("areas");
+    expect(parseCalendarView({ view: "timeline" })).toBe("timeline");
   });
 });
 

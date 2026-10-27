@@ -92,10 +92,23 @@ export async function listDaySchedule(
   date: LocalDate,
   timeZone: string,
 ): Promise<ScheduleEntry[]> {
-  const day = { localStart: date, localEnd: addDays(date, 1), tz: timeZone };
+  return listSchedule(userId, { start: date, end: addDays(date, 1) }, timeZone);
+}
+
+/**
+ * The events, occurrences and time blocks overlapping local days `start`
+ * to `end` (exclusive) in `timeZone` (the user's), all-day events first,
+ * then by start: the Timeline view's items (chunk 4.11), a day or a week.
+ */
+export async function listSchedule(
+  userId: string,
+  days: { start: LocalDate; end: LocalDate },
+  timeZone: string,
+): Promise<ScheduleEntry[]> {
+  const range = { localStart: days.start, localEnd: days.end, tz: timeZone };
   const [events, blocks] = await Promise.all([
-    eventsBetween(userId, day),
-    blocksBetween(userId, day),
+    eventsBetween(userId, range),
+    blocksBetween(userId, range),
   ]);
   return timelineEntries(events, blocks, timeZone);
 }

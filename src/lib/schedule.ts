@@ -28,14 +28,14 @@ export const NEXT_COMMITMENT_DAYS = 30;
 export type ScheduleEntry = AgendaEntry<never>;
 
 /** When an entry starts, as an instant; all-day ones at local midnight. */
-function startInstant(entry: ScheduleEntry, timeZone: string): number {
+export function startInstant(entry: ScheduleEntry, timeZone: string): number {
   return entry.allDay
     ? startOfLocalDay(entry.start, timeZone).getTime()
     : Date.parse(entry.start);
 }
 
 /** When an entry ends, as an instant; all-day ones at the end date's midnight. */
-function endInstant(entry: ScheduleEntry, timeZone: string): number {
+export function endInstant(entry: ScheduleEntry, timeZone: string): number {
   // Events and blocks always have an end; only task markers don't.
   const end = entry.end ?? entry.start;
   return entry.allDay

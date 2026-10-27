@@ -1,5 +1,5 @@
-// The calendar page's views (chunks 4.5, 4.6 and 4.10): Agenda, Week, Day
-// and By area.
+// The calendar page's views (chunks 4.5, 4.6, 4.10 and 4.11): Agenda, Week,
+// Day, By area and Timeline.
 // Pure: no server-only imports, so the query, the page, the calendar
 // components and the tests share it.
 //
@@ -31,7 +31,13 @@ import {
   type WeekStart,
 } from "./dates";
 
-export const CALENDAR_VIEWS = ["agenda", "week", "day", "areas"] as const;
+export const CALENDAR_VIEWS = [
+  "agenda",
+  "week",
+  "day",
+  "areas",
+  "timeline",
+] as const;
 export type CalendarView = (typeof CALENDAR_VIEWS)[number];
 
 /** Each view's tab label. */
@@ -40,10 +46,15 @@ export const CALENDAR_VIEW_LABELS: Record<CalendarView, string> = {
   week: "Week",
   day: "Day",
   areas: "By area",
+  timeline: "Timeline",
 };
 
-/** The views over whole local days: the time grids and By area. */
-export type GridView = Exclude<CalendarView, "agenda">;
+/**
+ * The views over a day or a week named by the view itself: the time grids
+ * and By area. The timeline (chunk 4.11) chooses its span in the URL, so it
+ * has its own range (see area-timeline.ts).
+ */
+export type GridView = Exclude<CalendarView, "agenda" | "timeline">;
 
 /** The views FullCalendar draws as time grids. */
 export type TimeGridType = Exclude<GridView, "areas">;

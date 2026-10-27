@@ -133,6 +133,7 @@ test("the week starts on the user's week start, and moves through the URL", asyn
     "Week",
     "Day",
     "By area",
+    "Timeline",
   ]);
   await expect(views.getByRole("link", { name: "Week" })).toHaveAttribute(
     "aria-current",
@@ -338,6 +339,7 @@ test("a phone gets Day instead of Week, in the dark theme, without sideways scro
     "Agenda",
     "Day",
     "By area",
+    "Timeline",
   ]);
   await page.goto("/plan/calendar?view=day");
   await expect(page.getByRole("grid")).toBeVisible();

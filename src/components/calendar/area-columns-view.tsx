@@ -306,10 +306,21 @@ function Column({
 }
 
 /**
- * An item: events are filled, time blocks tinted with a strong left edge
- * (a done one's in the success colour, a skipped one's dashed), as on Week
- * and Day.
+ * An item's box: events are filled, time blocks tinted with a strong left
+ * edge (a done one's in the success colour, a skipped one's dashed), as on
+ * Week and Day. The Timeline (chunk 4.11) draws its items the same way.
  */
+export function areaItemBoxClass(entry: ScheduleEntry): string {
+  return entry.kind === "block"
+    ? cx(
+        "border border-l-4 bg-[color-mix(in_srgb,var(--accent)_16%,var(--surface))] text-fg",
+        entry.block.status === "done" ? "border-success" : "border-accent",
+        entry.block.status === "skipped" && "border-dashed",
+      )
+    : "bg-accent text-accent-fg";
+}
+
+/** An item in a column, in its box. */
 function ColumnItem({
   entry,
   area,
@@ -331,15 +342,7 @@ function ColumnItem({
       data-kind={entry.kind}
       className={cx(
         "flex h-full min-w-0 flex-col overflow-hidden rounded-sm px-1 py-0.5 text-xs leading-tight",
-        entry.kind === "block"
-          ? cx(
-              "border border-l-4 bg-[color-mix(in_srgb,var(--accent)_16%,var(--surface))] text-fg",
-              entry.block.status === "done"
-                ? "border-success"
-                : "border-accent",
-              entry.block.status === "skipped" && "border-dashed",
-            )
-          : "bg-accent text-accent-fg",
+        areaItemBoxClass(entry),
       )}
     >
       <button
