@@ -296,6 +296,25 @@ Rules:
 
 Do not treat a planned block as proof that work actually happened.
 
+### PushSubscription
+One browser subscribed to Web Push (chunk 5.3). Written only through `src/server/modules/push/service.ts`.
+
+Fields:
+- `id`
+- `user_id` (cascade)
+- `endpoint` (unique across all users: it identifies one browser; `https://` on a known push service only)
+- `p256dh`, `auth` (the browser's key and auth secret, base64url; CHECKed lengths)
+- `user_agent_label` ("Chrome on Android", derived from the user agent; the raw string is never stored)
+- `created_at`
+- `last_success_at?` (the last push the push service accepted)
+- `failed_count` (failures since the last success)
+
+Rules:
+- The endpoint and both keys are secrets: never logged, never sent to the client. Settings matches "this device" by a SHA-256 hash of the endpoint.
+- Subscribing an endpoint another user holds moves the row to the new user and starts it over (a shared computer delivers to whoever subscribed it last).
+- A `404`/`410` from the push service deletes the row. Revoking from Settings deletes it too; the browser keeps its subscription but nothing is sent to it.
+- At most 20 per user (a soft cap). No audit events: a device registration, like a session, not a change to the user's plans.
+
 ### Note
 A piece of personal information the user wants to keep.
 

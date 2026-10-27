@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createECDH } from "node:crypto";
+
 import { z } from "zod";
 
 import { clientEnvSchema, readClientEnv } from "@/lib/client-env";
@@ -41,10 +43,64 @@ const serverEnvSchema = z.object({
     .string()
     .min(43, "must be at least 43 characters (32 random bytes, base64)"),
 
+  // Web Push (chunk 5.3). A P-256 key pair in unpadded base64url, as
+  // `pnpm exec web-push generate-vapid-keys` prints it. The public key goes
+  // to browsers when they subscribe; the private key signs every push. The
+  // subject is a contact push services can use: mailto: or https:.
+  VAPID_PUBLIC_KEY: z
+    .string()
+    .refine(
+      (value) => isVapidKey(value, 65) && value.startsWith("B"),
+      "must be a P-256 public key (65 bytes, unpadded base64url)",
+    ),
+  VAPID_PRIVATE_KEY: z
+    .string()
+    .refine(
+      (value) => isVapidKey(value, 32),
+      "must be a P-256 private key (32 bytes, unpadded base64url)",
+    ),
+  VAPID_SUBJECT: z.string().regex(/^(mailto:\S+@\S+|https:\/\/\S+)$/, {
+    error: "must be a mailto: address or an https:// URL",
+  }),
+
   // End-to-end tests only. Enables the test sign-in shortcut when it is "1"
   // and NODE_ENV is "test" (src/server/auth/test-sign-in.ts).
   SOLEUP_TEST_SIGN_IN: optional(z.string()),
 });
+
+/** Unpadded base64url that decodes to exactly `bytes` bytes. */
+function isVapidKey(value: string, bytes: number): boolean {
+  return (
+    /^[A-Za-z0-9_-]+$/.test(value) &&
+    Buffer.from(value, "base64url").length === bytes
+  );
+}
+
+/** The public key that belongs to a VAPID private key, or null if invalid. */
+function vapidPublicKeyOf(privateKey: string): string | null {
+  try {
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(Buffer.from(privateKey, "base64url"));
+    return ecdh.getPublicKey().toString("base64url");
+  } catch {
+    return null;
+  }
+}
+
+/** A fresh VAPID key pair, for build-phase placeholders. */
+function generateVapidKeys() {
+  const ecdh = createECDH("prime256v1");
+  ecdh.generateKeys();
+  // getPrivateKey() drops leading zero bytes; the key is always 32 bytes.
+  const privateKey = ecdh.getPrivateKey();
+  return {
+    publicKey: ecdh.getPublicKey().toString("base64url"),
+    privateKey: Buffer.concat([
+      Buffer.alloc(32 - privateKey.length),
+      privateKey,
+    ]).toString("base64url"),
+  };
+}
 
 /** OAuth credentials that must be set together or not at all. */
 const providerPairs = [
@@ -65,6 +121,19 @@ const envSchema = serverEnvSchema
         code: "custom",
         path: [missing],
         message: `is missing (required when ${present} is set)`,
+      });
+    }
+
+    // A mismatched pair would pass the shape checks, then every push
+    // service would refuse every notification.
+    const { VAPID_PUBLIC_KEY: publicKey, VAPID_PRIVATE_KEY: privateKey } =
+      values;
+    if (vapidPublicKeyOf(privateKey) !== publicKey) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["VAPID_PUBLIC_KEY"],
+        message:
+          "does not belong to VAPID_PRIVATE_KEY (generate them together)",
       });
     }
   });
@@ -115,6 +184,7 @@ const BUILD_PHASE_PLACEHOLDERS = {
   BETTER_AUTH_SECRET: "build-placeholder-never-used-at-runtime",
   BETTER_AUTH_URL: "http://localhost:3000",
   REMINDER_SWEEP_SECRET: "build-placeholder-never-used-at-runtime-0000",
+  VAPID_SUBJECT: "mailto:build-placeholder@example.invalid",
 };
 
 function withBuildPlaceholders(
@@ -123,6 +193,13 @@ function withBuildPlaceholders(
   const result = { ...source };
   for (const [key, placeholder] of Object.entries(BUILD_PHASE_PLACEHOLDERS)) {
     if (!result[key]) result[key] = placeholder;
+  }
+  // A key pair can't be a fixed string without committing a private key, so
+  // the build gets a throwaway pair (both keys, so they always match).
+  if (!result.VAPID_PUBLIC_KEY || !result.VAPID_PRIVATE_KEY) {
+    const keys = generateVapidKeys();
+    result.VAPID_PUBLIC_KEY = keys.publicKey;
+    result.VAPID_PRIVATE_KEY = keys.privateKey;
   }
   return result;
 }

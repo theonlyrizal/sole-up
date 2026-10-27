@@ -41,6 +41,8 @@ Set these on the Render service (**Environment**). Secrets are entered in the da
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | From the **production** Google client | Set both or neither. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | From the **production** GitHub OAuth app | Set both or neither. |
 | `REMINDER_SWEEP_SECRET` | 32 random bytes you generate (see "Reminder sweep") | Required: the app won't boot without it. Also entered in the cron-job.org job. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | A pair you generate (see "Web Push keys") | Required at boot; the app checks they belong together. |
+| `VAPID_SUBJECT` | `mailto:<your address>` or an `https://` URL | Required. Push services may use it to contact you about your pushes. |
 | `COREPACK_ENABLE_DOWNLOAD_PROMPT` | `0` | Set by `render.yaml`. Lets corepack fetch pnpm without a prompt. |
 | `NEXT_TELEMETRY_DISABLED` | `1` | Set by `render.yaml`. |
 
@@ -176,6 +178,23 @@ For one hour, Render's logs show a `Reminder sweep finished` line every 15 minut
 
 - **Render:** 750 free instance hours a month. Sweeps every 15 minutes keep the service awake almost all the time: about 744 hours in a 31-day month. That is the whole allowance, so no other free Render service can share this workspace. Check the free usage in Render's workspace billing page during the first month.
 - **Neon:** each sweep wakes the compute, which then stays up 5 minutes before it suspends. That is about 62 of Free's roughly 100 CU-hours a month (ADR 0013), leaving about 38 for your own use. Watch the project's compute usage in the Neon console. If the monthly total heads past about 80 CU-hours, widen the interval or move to paid hosting (a new ADR). Check these numbers against [neon.com/pricing](https://neon.com/pricing) once.
+
+## Web Push keys
+
+Push notifications are signed with a VAPID key pair (chunk 5.3). **All three variables are required at boot**, so set them on Render **before** the deploy that introduces them; otherwise that deploy fails its boot check and the previous version keeps serving.
+
+1. On your own machine, in the repo after `pnpm install`:
+
+   ```bash
+   pnpm exec web-push generate-vapid-keys
+   ```
+
+   It prints a public key (87 characters) and a private key (43). Use a new pair for production, not your `.env.local` one.
+2. Keep the private key in your password manager. Never put it in a file in the repo, a PR, an issue or a chat. The public key isn't secret (browsers receive it), but keep the pair together.
+3. Render → the `soleup` service → **Environment:** add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (`mailto:` plus an address you read). **Save only** if the deploy that needs them hasn't landed yet, otherwise **Save, rebuild and deploy**.
+4. **Check:** the deploy goes live; on Settings → Notifications, **Turn on notifications**, then **Send test notification** arrives.
+
+**Rotating the pair** invalidates every subscription: browsers refuse pushes signed with a different key. After rotating, each device must turn notifications on again (Settings replaces the old subscription automatically). Only rotate if the private key leaked.
 
 ## Rollback
 

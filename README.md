@@ -36,7 +36,7 @@ Requires Node 24 (see `.nvmrc`), pnpm 11 (`corepack enable` picks up the version
 
    `--wait` returns once the healthcheck passes; `docker compose ps` should show the service as `healthy`. Data persists in the `soleup_postgres-data` volume. `docker compose down -v` deletes it, and the databases are recreated on the next start.
 
-3. Create your env file. The defaults in `.env.example` match the local Postgres. Set `BETTER_AUTH_SECRET` and `REMINDER_SWEEP_SECRET` to two different random values (the second command prints one; run it twice). OAuth credentials are optional; without them the sign-in page says no provider is configured (see [Authentication](#authentication)).
+3. Create your env file. The defaults in `.env.example` match the local Postgres. Set `BETTER_AUTH_SECRET` and `REMINDER_SWEEP_SECRET` to two different random values (the second command prints one; run it twice). Generate a VAPID pair with `pnpm exec web-push generate-vapid-keys` (after `pnpm install`) and copy both keys into `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, and set `VAPID_SUBJECT` to a `mailto:` address. OAuth credentials are optional; without them the sign-in page says no provider is configured (see [Authentication](#authentication)).
 
    ```bash
    cp .env.example .env.local
@@ -182,6 +182,8 @@ pnpm reminders:sweep
 ```
 
 It calls the route on `BETTER_AUTH_URL` with the secret from `.env.local` and prints the counts. The app logs one `Reminder sweep finished` line with the start, counts and duration, never the secret or reminder content. Until chunk 5.4 every count is zero.
+
+**Push subscriptions** (chunk 5.3): Settings → Notifications turns notifications on or off for the current browser, lists the user's devices with a Revoke button, and sends a test notification to every device. Rows live in `push_subscriptions`. The module is `src/server/modules/push/`; `send.ts` wraps `web-push` (3.6.7, MPL-2.0) with the VAPID pair from `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`. Endpoints are accepted only on known push services (`src/lib/push.ts`). Endpoints and keys are never logged or sent to the browser. Tests mock `web-push`; e2e fakes the browser's `PushManager` (`tests/e2e/push-devices.spec.ts`), since Playwright's Chromium has no push service. Test configs generate a fresh VAPID pair on every run.
 
 ## Testing
 

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 
+import webpush from "web-push";
 import { defineConfig } from "vitest/config";
 
 const fromRoot = (path: string) =>
@@ -21,6 +22,11 @@ function readTestDatabaseUrl(): string {
 }
 
 const testDatabaseUrl = readTestDatabaseUrl();
+
+// A fresh VAPID key pair on every run, so no key is ever committed. Pushes
+// are mocked at the web-push boundary in tests, so nothing is signed for a
+// real push service.
+const testVapidKeys = webpush.generateVAPIDKeys();
 
 export default defineConfig({
   resolve: {
@@ -65,6 +71,9 @@ export default defineConfig({
             // Test-only: guards the reminder sweep route in tests only.
             REMINDER_SWEEP_SECRET:
               "integration-tests-only-sweep-secret-not-for-real-use",
+            VAPID_PUBLIC_KEY: testVapidKeys.publicKey,
+            VAPID_PRIVATE_KEY: testVapidKeys.privateKey,
+            VAPID_SUBJECT: "mailto:integration-tests@example.test",
             // No OAuth credentials reach integration tests: no provider is
             // configured, whatever the shell or .env.local holds.
             GOOGLE_CLIENT_ID: "",
