@@ -6,6 +6,7 @@ import { TaskFormDialog } from "@/components/tasks/task-form";
 import type { AgendaEntry } from "@/lib/agenda";
 import type { PlanTaskItem } from "@/server/modules/tasks/queries";
 
+import { BlockDialog } from "./block-dialog";
 import { type EventFormContext, EventFormDialog } from "./event-dialog";
 
 /** One item of the calendar page, in any view. */
@@ -47,7 +48,7 @@ export function useItemDialog(selector: string) {
   };
 }
 
-/** The selected item's dialog: the event form, or the task form. */
+/** The selected item's dialog: the event form, the block's, or the task form. */
 export function ItemDialog({
   selected,
   open,
@@ -63,6 +64,19 @@ export function ItemDialog({
         key={selected.id}
         {...context}
         event={selected.event}
+        open={open}
+        onOpenChange={onOpenChange}
+        onCloseAutoFocus={returnFocus}
+      />
+    );
+  }
+  if (selected?.kind === "block") {
+    return (
+      <BlockDialog
+        key={selected.id}
+        block={selected.block}
+        userTimeZone={context.userTimeZone}
+        locale={context.locale}
         open={open}
         onOpenChange={onOpenChange}
         onCloseAutoFocus={returnFocus}

@@ -9,10 +9,20 @@ import type { DroppedException } from "@/server/modules/calendar-events/service"
 
 import { ChoiceGroup, Radio } from "./choices";
 
-const SCOPE_LABELS: Record<CalendarEventScope, string> = {
-  this: "This event",
-  following: "This and following events",
-  all: "All events",
+/** What repeats: an event (chunk 4.4) or a time block (chunk 4.8). */
+export type ScopeNoun = "event" | "block";
+
+const SCOPE_LABELS: Record<ScopeNoun, Record<CalendarEventScope, string>> = {
+  event: {
+    this: "This event",
+    following: "This and following events",
+    all: "All events",
+  },
+  block: {
+    this: "This block",
+    following: "This and following blocks",
+    all: "All blocks",
+  },
 };
 
 /** What one scope would do: why it can't be used, or what it would drop. */
@@ -20,7 +30,7 @@ export type ScopeOption = {
   /** Why this scope can't take the change; the option is disabled. */
   blocker?: string | null;
   /** The occurrences with their own changes that it would drop. */
-  dropped?: DroppedException[];
+  dropped?: Pick<DroppedException, "id" | "kind" | "originalStart">[];
 };
 
 type ScopeChooserProps = {
@@ -35,10 +45,12 @@ type ScopeChooserProps = {
   loading: boolean;
   locale: string;
   timeZone: string;
+  /** What the options name; events unless given. */
+  noun?: ScopeNoun;
 };
 
 /**
- * Asks which occurrences of a repeating event an edit or delete applies to
+ * Asks which occurrences of a repeating event or block an edit or delete applies to
  * (ADR 0012), naming the occurrences with their own changes that each
  * choice would drop. Native radios: arrow keys move between them.
  */
@@ -52,6 +64,7 @@ export function ScopeChooser({
   loading,
   locale,
   timeZone,
+  noun = "event",
 }: ScopeChooserProps) {
   return (
     <ChoiceGroup id={id} legend={legend}>
@@ -65,16 +78,17 @@ export function ScopeChooser({
             checked={value === scope}
             disabled={Boolean(option.blocker)}
             onChange={() => onChange(scope)}
-            label={SCOPE_LABELS[scope]}
+            label={SCOPE_LABELS[noun][scope]}
             description={
               option.blocker ? (
                 <p className="text-sm text-muted">{option.blocker}</p>
               ) : scope === "this" ? null : loading ? (
                 <p className="text-sm text-muted">
-                  Checking for events you changed separately…
+                  {`Checking for ${noun}s you changed separately…`}
                 </p>
               ) : (
                 <DroppedList
+                  noun={noun}
                   action={action}
                   dropped={option.dropped ?? []}
                   locale={locale}
@@ -90,18 +104,21 @@ export function ScopeChooser({
 }
 
 function DroppedList({
+  noun,
   action,
   dropped,
   locale,
   timeZone,
 }: {
+  noun: ScopeNoun;
   action: "change" | "delete";
-  dropped: DroppedException[];
+  dropped: NonNullable<ScopeOption["dropped"]>;
   locale: string;
   timeZone: string;
 }) {
   if (dropped.length === 0) return null;
-  const events = dropped.length === 1 ? "1 event" : `${dropped.length} events`;
+  const events =
+    dropped.length === 1 ? `1 ${noun}` : `${dropped.length} ${noun}s`;
   return (
     <div className="flex flex-col gap-1 text-sm text-muted">
       <p>
@@ -122,7 +139,7 @@ function DroppedList({
 
 /** "Tue, 4 Nov 2026, 09:00 (edited)" or "6 Nov 2026 (deleted)". */
 function droppedLabel(
-  exception: DroppedException,
+  exception: NonNullable<ScopeOption["dropped"]>[number],
   locale: string,
   timeZone: string,
 ): string {

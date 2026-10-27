@@ -34,6 +34,7 @@ import {
 } from "@/lib/recurrence";
 import { deleteAuditEventsForEntity, recordAudit } from "@/server/audit/record";
 import { db, type DbTransaction } from "@/server/db/client";
+import { dryRun } from "@/server/db/dry-run";
 import { isForeignKeyViolation } from "@/server/db/errors";
 import { calendarEventExceptions, calendarEvents } from "@/server/db/schema";
 import { ConflictError, NotFoundError, ValidationError } from "@/server/errors";
@@ -962,32 +963,6 @@ async function deleteOccurrenceInTx(
 }
 
 // --- Previews ------------------------------------------------------------------
-
-/** Carries a dry run's result out of the transaction it rolls back. */
-class RollbackWith<T> extends Error {
-  constructor(readonly result: T) {
-    super("Dry run rolled back");
-  }
-}
-
-/**
- * Runs `change` in a transaction and rolls it back, returning what it
- * would have returned. Domain and validation errors pass through as they
- * would on the real change.
- */
-async function dryRun<T>(
-  change: (tx: DbTransaction) => Promise<T>,
-): Promise<T> {
-  try {
-    await db.transaction(async (tx) => {
-      throw new RollbackWith(await change(tx));
-    });
-  } catch (error) {
-    if (error instanceof RollbackWith) return error.result as T;
-    throw error;
-  }
-  throw new Error("Dry run committed");
-}
 
 /**
  * The exceptions `editCalendarEventOccurrence` would drop for this input,

@@ -37,6 +37,7 @@ import {
 import type { TaskStatus } from "@/lib/tasks";
 import { deleteAuditEventsForEntity, recordAudit } from "@/server/audit/record";
 import { db, type DbTransaction } from "@/server/db/client";
+import { dryRun } from "@/server/db/dry-run";
 import { isForeignKeyViolation } from "@/server/db/errors";
 import {
   goals,
@@ -1108,6 +1109,32 @@ async function deleteOccurrenceInTx(
   return { dropped };
 }
 
+// --- Previews ------------------------------------------------------------------
+
+/**
+ * The exceptions `editTimeBlockOccurrence` would drop for this input,
+ * without changing anything, so the scope prompt can name them before the
+ * user confirms. It runs the same change and rolls it back, so the answer
+ * (and any validation error) is exactly what saving would give.
+ */
+export async function previewTimeBlockOccurrenceEdit(
+  userId: string,
+  input: EditTimeBlockOccurrenceInput,
+): Promise<{ dropped: DroppedException[] }> {
+  const { dropped } = await dryRun((tx) =>
+    editOccurrenceInTx(tx, userId, input),
+  );
+  return { dropped };
+}
+
+/** The exceptions `deleteTimeBlockOccurrence` would drop, changing nothing. */
+export async function previewTimeBlockOccurrenceDelete(
+  userId: string,
+  input: DeleteTimeBlockOccurrenceInput,
+): Promise<{ dropped: DroppedException[] }> {
+  return dryRun((tx) => deleteOccurrenceInTx(tx, userId, input));
+}
+
 // --- Reading a range ---------------------------------------------------------
 
 /**
@@ -1117,11 +1144,12 @@ async function deleteOccurrenceInTx(
  * their occurrences and each one's status. Each carries its task's title
  * and status and its lane: the task's goal (direct, or its milestone's, as
  * `goalOf` reads it) and that goal's life area. Ordered by start, then ID
- * and original start.
+ * and original start. With `taskId`, only that task's blocks.
  */
 export async function blocksBetween(
   userId: string,
   { localStart, localEnd, tz }: BlocksBetweenInput,
+  { taskId }: { taskId?: string } = {},
 ): Promise<TimeBlockOccurrence[]> {
   const rangeStart = startOfLocalDay(localStart, tz);
   const rangeEnd = startOfLocalDay(localEnd, tz);
@@ -1153,6 +1181,7 @@ export async function blocksBetween(
     .where(
       and(
         eq(timeBlocks.userId, userId),
+        taskId === undefined ? undefined : eq(timeBlocks.taskId, taskId),
         or(
           and(
             isNull(timeBlocks.rrule),

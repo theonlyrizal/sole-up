@@ -21,6 +21,8 @@ import {
 } from "@/lib/tasks";
 import { changeTaskStatus, updateTask } from "@/server/modules/tasks/actions";
 
+import { TaskBlocks } from "./task-blocks";
+
 const PRIORITY_OPTION_LABELS: Record<Priority, string> = {
   low: "Low",
   medium: "Medium",
@@ -48,7 +50,8 @@ type TaskFormDialogProps = { task: Task } & (
 /**
  * Edits a task's title, notes, priority and estimate in a dialog. Dates and
  * parent are edited inline on the list; the dialog can also cancel or
- * reopen the task.
+ * reopen the task. Below the form it lists the task's upcoming time blocks,
+ * with "Block time" (chunk 4.8).
  */
 export function TaskFormDialog({
   trigger,
@@ -69,6 +72,8 @@ export function TaskFormDialog({
         onCloseAutoFocus={onCloseAutoFocus}
       >
         <TaskForm task={task} onDone={() => setOpen(false)} />
+        {/* Outside the form: the block dialog's own form must not submit it. */}
+        <TaskBlocks task={task} />
       </DialogContent>
     </Dialog>
   );

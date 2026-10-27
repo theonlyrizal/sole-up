@@ -18,6 +18,7 @@ import {
   shiftGridDate,
 } from "./calendar-views";
 import type { Task } from "./tasks";
+import type { TimeBlockOccurrence } from "./time-blocks";
 
 // Tokyo is UTC+9 with no DST, so a time early in a Tokyo day falls on the
 // day before in UTC: a UTC-date bug puts it on the wrong day. 23 October
@@ -50,6 +51,30 @@ function task(fields: Partial<Task> = {}): Task {
     cancelledAt: null,
     sortOrder: nextId,
     createdAt: new Date("2026-10-01T00:00:00Z"),
+    ...fields,
+  };
+}
+
+function timeBlock(
+  fields: Partial<TimeBlockOccurrence> = {},
+): TimeBlockOccurrence {
+  return {
+    id: id(),
+    taskId: id(),
+    startAt: new Date("2026-10-23T00:00:00Z"),
+    endAt: new Date("2026-10-23T01:00:00Z"),
+    tz: TOKYO,
+    rrule: null,
+    status: "scheduled",
+    createdAt: new Date("2026-10-01T00:00:00Z"),
+    updatedAt: new Date("2026-10-01T00:00:00Z"),
+    seriesId: null,
+    originalStart: null,
+    modified: false,
+    taskTitle: "Write report",
+    taskStatus: "open",
+    goalId: null,
+    lifeAreaId: null,
     ...fields,
   };
 }
@@ -242,6 +267,35 @@ describe("gridEntries", () => {
     expect(
       gridEntries([], [planned, allDayDue, nextWeek, lastWeek], week, TOKYO),
     ).toEqual([]);
+  });
+
+  it("adds time blocks as timed items under their task's title, between events and deadlines", () => {
+    const block = timeBlock({
+      startAt: new Date("2026-10-23T15:30:00Z"),
+      endAt: new Date("2026-10-23T16:30:00Z"),
+    });
+    const occurrence = timeBlock({
+      startAt: new Date("2026-10-22T00:00:00Z"),
+      endAt: new Date("2026-10-22T00:30:00Z"),
+      rrule: "FREQ=DAILY",
+      seriesId: "series",
+      originalStart: new Date("2026-10-22T00:00:00Z"),
+    });
+    const entries = gridEntries([], [], week, TOKYO, [block, occurrence]);
+    expect(entries[0]).toEqual({
+      id: `block:${block.id}:`,
+      title: "Write report",
+      allDay: false,
+      start: "2026-10-23T15:30:00.000Z",
+      end: "2026-10-23T16:30:00.000Z",
+      order: 0.5,
+      kind: "block",
+      block,
+    });
+    // Occurrences of one series are told apart by their original start.
+    expect(entries[1]!.id).toBe(
+      `block:${occurrence.id}:2026-10-22T00:00:00.000Z`,
+    );
   });
 
   it("shows a planned task's timed deadline as a deadline only", () => {

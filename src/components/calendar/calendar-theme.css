@@ -59,3 +59,26 @@
   outline-offset: 2px;
   border-radius: var(--corner-sm);
 }
+
+/*
+ * Time blocks (chunk 4.8): time set aside for a task, a tinted block with a
+ * strong left edge, unlike an event's solid fill. A done block's edge is
+ * the success colour; a skipped one is dashed.
+ */
+.soleup-calendar .soleup-block {
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
+}
+
+.soleup-calendar .soleup-block-done {
+  border-color: var(--success);
+}
+
+.soleup-calendar .soleup-block-skipped {
+  border-style: dashed;
+}
+
+/* The task panel's rows while one is dragged onto the grid. */
+.soleup-task-drag {
+  cursor: grab;
+}

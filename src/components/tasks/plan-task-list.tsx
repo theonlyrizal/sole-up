@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useOptimistic, useRef, useState, useTransition } from "react";
 
+import { BlockTimeDialog } from "@/components/calendar/block-form";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { toast } from "@/components/ui/toast";
@@ -157,6 +158,22 @@ function PlanTaskRow({
         >
           Dates and goal
         </Button>
+        {status === "open" && (
+          <BlockTimeDialog
+            task={task}
+            timeZone={timeZone}
+            locale={locale}
+            trigger={
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label={`Block time: ${task.title}`}
+              >
+                Block time
+              </Button>
+            }
+          />
+        )}
         <TaskFormDialog
           task={task}
           trigger={

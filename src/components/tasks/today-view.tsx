@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useOptimistic, useRef, useState, useTransition } from "react";
 
+import { BlockTimeDialog } from "@/components/calendar/block-form";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -309,6 +310,23 @@ function TodayTaskRow({
         >
           {pickLabel}
         </Button>
+        {status === "open" && (
+          <BlockTimeDialog
+            task={task}
+            timeZone={timeZone}
+            locale={locale}
+            trigger={
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pending}
+                aria-label={`Block time: ${task.title}`}
+              >
+                Block time
+              </Button>
+            }
+          />
+        )}
         {(section === "planned" || section === "earlier") && (
           <Button
             variant="ghost"
