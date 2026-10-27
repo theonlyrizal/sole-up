@@ -7,7 +7,8 @@ const AUTH = {
   BETTER_AUTH_SECRET: "x".repeat(32),
   BETTER_AUTH_URL: "http://localhost:3000",
 };
-const MINIMAL = { DATABASE_URL: VALID_URL, ...AUTH };
+const SWEEP = { REMINDER_SWEEP_SECRET: "s".repeat(43) };
+const MINIMAL = { DATABASE_URL: VALID_URL, ...AUTH, ...SWEEP };
 
 let parseEnv: typeof EnvModule.parseEnv;
 let EnvValidationError: typeof EnvModule.EnvValidationError;
@@ -17,6 +18,7 @@ beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", VALID_URL);
   vi.stubEnv("BETTER_AUTH_SECRET", AUTH.BETTER_AUTH_SECRET);
   vi.stubEnv("BETTER_AUTH_URL", AUTH.BETTER_AUTH_URL);
+  vi.stubEnv("REMINDER_SWEEP_SECRET", SWEEP.REMINDER_SWEEP_SECRET);
   ({ parseEnv, EnvValidationError } = await import("./env"));
   vi.unstubAllEnvs();
 });
@@ -69,6 +71,16 @@ describe("parseEnv", () => {
     expect(message).toContain("BETTER_AUTH_URL is missing");
   });
 
+  it("requires a reminder sweep secret of at least 32 random bytes", () => {
+    expect(problemsFor({ DATABASE_URL: VALID_URL, ...AUTH })).toContain(
+      "REMINDER_SWEEP_SECRET is missing",
+    );
+    const short = "s".repeat(42);
+    const message = problemsFor({ ...MINIMAL, REMINDER_SWEEP_SECRET: short });
+    expect(message).toContain("REMINDER_SWEEP_SECRET must be at least 43");
+    expect(message).not.toContain(short);
+  });
+
   it("accepts a fully configured provider", () => {
     const env = parseEnv({
       ...MINIMAL,
@@ -108,7 +120,12 @@ describe("parseEnv", () => {
 describe("env at import", () => {
   async function importEnvWith(values: Record<string, string>) {
     vi.resetModules();
-    for (const key of ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL"])
+    for (const key of [
+      "DATABASE_URL",
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL",
+      "REMINDER_SWEEP_SECRET",
+    ])
       vi.stubEnv(key, "");
     for (const [key, value] of Object.entries(values)) vi.stubEnv(key, value);
     try {
@@ -129,6 +146,7 @@ describe("env at import", () => {
       NEXT_PHASE: "phase-production-build",
     });
     expect(env.BETTER_AUTH_SECRET).toContain("build-placeholder");
+    expect(env.REMINDER_SWEEP_SECRET).toContain("build-placeholder");
   });
 
   it("never replaces a real value during `next build`", async () => {

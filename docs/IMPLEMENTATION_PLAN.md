@@ -186,7 +186,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 4.10 | Resource columns by life area | done | chunk/4.10-resource-columns | 2026-10-27 | `/plan/calendar?view=areas&date=` "By area": our own day view, a column per active life area + "No area" (archived area marked, only while it holds items), side-by-side overlaps, arrow keys across columns, axe |
 | 4.11 | Resource timeline by life area | done | chunk/4.11-resource-timeline | 2026-10-27 | `/plan/calendar?view=timeline&span=day\|week&date=` "Timeline": our own component, a row per active life area + "No area" on a horizontal axis (week by default), lanes for overlaps, sticky row headings, arrow keys along/across rows, axe |
 | 5.0 | Decision gate: reminders | done | chunk/5.0-reminders-decisions | 2026-10-27 | ADR 0013: stay free, no worker/pg-boss, cron-job.org sweep every 15 min (never late, up to 15 early); deadlines, events (rolling next occurrence) and a daily nudge; quiet hours hold/bundle/skip stale; title or private payload; 5.1–5.7 rewritten |
-| 5.1 | Sweep route and external trigger | todo | | | |
+| 5.1 | Sweep route and external trigger | done | chunk/5.1-sweep-route | 2026-10-27 | Required `REMINDER_SWEEP_SECRET`, `POST /api/reminders/sweep` (constant-time Bearer check, same 401, no body) → `runSweep(now)` stub logging counts only; `pnpm reminders:sweep` calls the local route; DEPLOY.md secret + cron-job.org steps; production check unverified |
 | 5.2 | Service worker and PWA install | todo | | | |
 | 5.3 | Push subscriptions | todo | | | |
 | 5.4 | Reminders: schema and scheduling | todo | | | |
@@ -2328,3 +2328,32 @@ Template:
 - **Follow-ups:**
   - At the Phase 5 checkpoint, watch Neon's monthly compute. Above about 80 CU-hours, widen the interval or move to paid hosting (a new ADR).
   - Phase 10's export (10.1) must include reminder settings and delivery records, and account deletion (10.2) must remove reminders as well as subscriptions.
+
+### 5.1: Sweep route and external trigger (2026-10-27)
+- **Built:**
+  - Env: `REMINDER_SWEEP_SECRET` is **required** in `src/server/env.ts` (at least 43 characters, which is 32 random bytes in unpadded base64), with a build-phase placeholder. Added to `.env.example` (empty, with the generate command), `vitest.config.mts` and `playwright.config.ts` (fixed test-only values), and `render.yaml` (`sync: false`).
+  - `src/server/modules/reminders/sweep.ts`: `runSweep(now, log = logger)` → `{ counts: { claimed, sent, skipped, failed }, durationMs }`. It does nothing yet but log one line: `"Reminder sweep finished"` with `source: "reminders"`, `sweepStartedAt`, `counts` (all zero) and `durationMs`.
+  - `src/server/modules/reminders/sweep-auth.ts`: `hasSweepSecret(headers, secret)`. Parses `Authorization: Bearer <token>` (scheme in any case), then compares SHA-256 digests with `timingSafeEqual`, so neither the content nor the length leaks through timing.
+  - `src/app/api/reminders/sweep/route.ts`: `POST` only (GET gets Next's 405). A missing or wrong secret gets the same `401 {"error":"unauthorized"}` with `www-authenticate: Bearer` and a fixed warn line. The right secret gets `200` with the counts. A throw in `runSweep` gets `500 {"error":"internal"}` and an error line (serialized error, no message). Responses are `no-store`, the body is never read, and log lines carry the request ID. Not an (app) path, so the proxy only sets the request ID.
+  - `scripts/reminders-sweep.mts` (`pnpm reminders:sweep`): plays cron-job.org locally. It POSTs to `BETTER_AUTH_URL` + the route with the secret from the shell or `.env.local`, prints the origin and counts, and never prints the secret. It exits 1 with a hint when the app isn't running, the secret is refused, or the sweep fails.
+  - Tests: unit `sweep-auth.test.ts` (scheme case, missing or empty, prefix and longer values, other schemes, extra parts), `sweep.test.ts` (zero counts, one log line), and `env.test.ts` cases (missing or short secret not echoed, build placeholder). Integration `route.integration.test.ts`: `401` without the secret, the same `401` body for a wrong one with neither value logged, and `200` with counts plus one sweep line, a body ignored.
+  - Docs: DEPLOY.md "Reminder sweep" (generating and setting the secret, rotating it, the cron-job.org job, the production check and cold starts, the free-plan budget for Render hours and Neon CU-hours), the env table and "Free-plan limits". README "Reminders" and local setup. `render.yaml` comments.
+- **Deviations:**
+  1. **`pnpm reminders:sweep` calls the running app's route over HTTP** rather than importing `runSweep` directly. Scripts run with Node's type stripping and can't resolve `@/` imports or `server-only`, and `runSweep` will import the db client, env and `web-push`. Importing directly would need a new dev dependency (for example `tsx` with `--conditions=react-server`). Over HTTP, the sweep still runs against the configured database, the local secret is exercised, and it matches what cron-job.org does. The cost: `pnpm dev` must be running, and the sweep's log line appears in the app's output, not the script's.
+  2. **The secret is required, not optional:** a missing secret fails the boot check, like `BETTER_AUTH_SECRET`, instead of silently answering 401 forever.
+- **Decisions:**
+  - Counts are named after delivery outcomes: `claimed` (moved to `sending`), `sent`, `skipped`, `failed`. 5.5 fills them.
+  - `runSweep` takes the logger so the route's line carries the request ID; outside a request it defaults to the app logger.
+  - Refused calls log a fixed warn line with no header details, so a misconfigured cron job shows up in Render's logs.
+  - cron-job.org's FAQ gives a fixed **30-second** timeout for every job. DEPLOY.md says to pick the longest allowed, and explains that a Render cold start (about a minute) then counts as a failed run.
+- **Next chunk should know:**
+  - 5.4/5.5: put the claiming and sending in `runSweep(now, log)` and keep the one-line log shape (start, counts, duration, never content). The route and its tests stay as they are; extend the counts type rather than renaming it.
+  - The sweep secret must be set wherever the app boots: new test configs, CI env (the e2e server gets it from `playwright.config.ts`), Render. This machine's `.env.local` has a generated local-only value.
+  - To see the sweep's log line locally without disturbing a running `pnpm dev`: `SOLEUP_NEXT_DIST_DIR=.next-e2e BETTER_AUTH_URL=http://localhost:3101 pnpm dev --port 3101`, then `BETTER_AUTH_URL=http://localhost:3101 pnpm reminders:sweep`. `.next-e2e` is already in `tsconfig.json`, so the tree stays clean.
+- **Unverified:**
+  - **Production check (user):** for an hour, a `Reminder sweep finished` line in Render's logs every 15 minutes. Not done at close-out: it needs the user to set `REMINDER_SWEEP_SECRET` on Render, this PR deployed, and the cron-job.org job created. Whether cold starts make calls fail (and so whether the keep-awake route from ADR 0013 is needed) is unknown until then.
+  - `pnpm test:e2e` was not run locally (the only e2e-side change is one env value in `playwright.config.ts`); CI runs it.
+  - Checks: `pnpm verify` (format, lint, typecheck, 607 unit, 426 integration) and `pnpm build` (route `ƒ /api/reminders/sweep`) pass. Locally against `pnpm dev`: `pnpm reminders:sweep` printed zero counts and the app logged one `Reminder sweep finished` line with a request ID; no secret → 401, wrong secret → 401 with the refusal line, GET → 405; the secret appears nowhere in the log.
+- **Follow-ups:**
+  - If the production check shows timeouts on cold starts, add the database-free keep-awake route and a second cron-job.org job every 10 minutes (ADR 0013), and update DEPLOY.md.
+  - Confirm Render's and Neon's free usage after the first month (DEPLOY.md > Free-plan budget).

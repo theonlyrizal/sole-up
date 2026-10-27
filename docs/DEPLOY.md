@@ -40,6 +40,7 @@ Set these on the Render service (**Environment**). Secrets are entered in the da
 | `BETTER_AUTH_URL` | `<APP_URL>` | Must match the URL users visit exactly. OAuth callbacks are built from it. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | From the **production** Google client | Set both or neither. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | From the **production** GitHub OAuth app | Set both or neither. |
+| `REMINDER_SWEEP_SECRET` | 32 random bytes you generate (see "Reminder sweep") | Required: the app won't boot without it. Also entered in the cron-job.org job. |
 | `COREPACK_ENABLE_DOWNLOAD_PROMPT` | `0` | Set by `render.yaml`. Lets corepack fetch pnpm without a prompt. |
 | `NEXT_TELEMETRY_DISABLED` | `1` | Set by `render.yaml`. |
 
@@ -111,6 +112,71 @@ Do these in order. Each step says what to check before moving on.
 3. Trigger another deploy: **Manual Deploy → Deploy latest commit**, or merge the next PR. Wait for it to go live.
 4. Reload **Life areas.** `Health` is still there.
 
+## Reminder sweep
+
+Reminders have no worker on the free plans ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)). [cron-job.org](https://cron-job.org) (free) calls `POST <APP_URL>/api/reminders/sweep` every 15 minutes, with the secret in an `Authorization: Bearer` header. Each call sends the reminders due before the next one, so reminders arrive up to 15 minutes early. A call without the right secret gets `401` and does nothing. The route reads no body and answers only counts, for example `{"counts":{"claimed":0,"sent":0,"skipped":0,"failed":0},"durationMs":3}`.
+
+**`REMINDER_SWEEP_SECRET` is required at boot.** Set it on Render **before** the deploy that introduces it (chunk 5.1). Otherwise that deploy fails its boot check and the previous version keeps serving until you add it and redeploy.
+
+### 1. Create the secret and set it on Render
+
+1. Generate 32 random bytes on your own machine. Either command works:
+
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+   ```
+
+   ```bash
+   openssl rand -base64 32
+   ```
+
+   The first prints 43 characters, the second 44. The app refuses anything shorter than 43. Use a new value for production. Don't reuse your `.env.local` one.
+2. Keep it in your password manager. Never put it in a file in the repo, a PR, an issue or a chat.
+3. Render → the `soleup` service → **Environment → Add Environment Variable:** key `REMINDER_SWEEP_SECRET`, the value from step 1. **Save, rebuild and deploy** (or **Save only** when the deploy that needs it hasn't landed yet).
+4. **Check:** the deploy goes live, and this returns `401` (no secret sent):
+
+   ```bash
+   curl -i -X POST <APP_URL>/api/reminders/sweep
+   ```
+
+`render.yaml` declares the variable with `sync: false`, so a Blueprint sync asks for it rather than generating one: you need to know the value to enter it in cron-job.org.
+
+**Rotating it:** generate a new value, update Render (**Save, rebuild and deploy**), then update the cron-job.org header straight away. Calls in between get `401`, so at most one sweep is missed and the next catches up.
+
+### 2. Create the cron-job.org job
+
+1. Sign up at [cron-job.org](https://cron-job.org) (free, no card) and confirm your email.
+2. **Dashboard → Cronjobs → Create cronjob.** On the **Common** tab:
+   - **Title:** `SoleUp reminder sweep`
+   - **URL:** `<APP_URL>/api/reminders/sweep`
+   - **Enable job:** on
+   - **Execution schedule:** **Every 15 minutes** (custom: minutes `0,15,30,45`, every hour, day and month).
+   - **Notify me when:** execution fails, and the job is disabled because of too many failures.
+3. On the **Advanced** tab:
+   - **Time zone:** any. A 15-minute schedule is the same in every zone.
+   - **Request method:** `POST`. Leave the request body empty.
+   - **Headers → Add:** key `Authorization`, value `Bearer <REMINDER_SWEEP_SECRET>`: the word `Bearer`, one space, then the secret.
+   - **Timeout:** the longest allowed. cron-job.org's FAQ gives every job **30 seconds**, after which it closes the connection and records a failure.
+   - **Treat redirects with HTTP 3xx status code as success:** off. The route never redirects, so a redirect means a wrong URL.
+   - **Save responses in job history:** on. Responses hold only counts, which helps when checking the job.
+4. **Create**, then **Test run** (or wait for the next quarter hour). The run history shows `200 OK` and the counts.
+5. **Check in Render's logs** (search `Reminder sweep`): each call writes one line, `"msg":"Reminder sweep finished"`, with `sweepStartedAt`, `counts` and `durationMs`. A call with a bad secret writes `"Reminder sweep refused: bad secret"` instead. The secret and reminder content are never logged.
+
+Field names in cron-job.org's console may differ slightly from the ones above; the settings that matter are the URL, `POST`, the `Authorization` header, every 15 minutes and the timeout.
+
+cron-job.org disables a job after many failures in a row (its FAQ gives more than 25 as an example), and it emails you when it does if you turned that notification on. While the job is off, no reminders go out. Nothing else in the app breaks.
+
+### 3. Production check (chunk 5.1)
+
+For one hour, Render's logs show a `Reminder sweep finished` line every 15 minutes (four lines), and cron-job.org's history shows four successful runs.
+
+**Cold starts:** the free service sleeps after 15 idle minutes, and the sweep comes every 15 minutes, so a call can find the app asleep. Waking takes about a minute, which is longer than cron-job.org's 30 seconds. The run is then recorded as failed (timeout), and its log line may appear later or not at all. Missed reminders go out on the next sweep (ADR 0013). If the history shows regular timeouts, the fallback in ADR 0013 is a second cron-job.org job every 10 minutes to a route that doesn't touch the database, to keep the app awake without keeping Neon awake. Don't use `/api/health` for it: it queries the database.
+
+### Free-plan budget
+
+- **Render:** 750 free instance hours a month. Sweeps every 15 minutes keep the service awake almost all the time: about 744 hours in a 31-day month. That is the whole allowance, so no other free Render service can share this workspace. Check the free usage in Render's workspace billing page during the first month.
+- **Neon:** each sweep wakes the compute, which then stays up 5 minutes before it suspends. That is about 62 of Free's roughly 100 CU-hours a month (ADR 0013), leaving about 38 for your own use. Watch the project's compute usage in the Neon console. If the monthly total heads past about 80 CU-hours, widen the interval or move to paid hosting (a new ADR). Check these numbers against [neon.com/pricing](https://neon.com/pricing) once.
+
 ## Rollback
 
 **Code rollback (no schema change involved):**
@@ -173,7 +239,7 @@ Run it with `DATABASE_URL` set in your shell to the production string. The dump 
 
 - **The app sleeps after 15 idle minutes.** The first request after that takes about a minute while Render wakes it. 750 instance hours a month are free; a sleeping service uses none.
 - **Neon Free** suspends its compute after 5 idle minutes (wake-up is well under a second). It allows 0.5 GB of storage per project and a 6-hour restore window.
-- **No background worker.** Render runs workers on paid plans only, and a sleeping web service can't fire reminders on time. Decision gate 5.0 kept the free plans: an external cron (cron-job.org) calls a reminder sweep route every 15 minutes, so reminders may arrive up to 15 minutes early ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)). Chunk 5.1 adds the setup steps here.
+- **No background worker.** Render runs workers on paid plans only, and a sleeping web service can't fire reminders on time. Decision gate 5.0 kept the free plans: an external cron (cron-job.org) calls a reminder sweep route every 15 minutes, so reminders may arrive up to 15 minutes early ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)). See "Reminder sweep" for the setup and its cost in free hours.
 - **Build minutes and bandwidth** have monthly allowances. Without a card, Render suspends the service when they run out instead of billing.
 
 ## Moving to a paid plan later

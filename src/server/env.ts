@@ -34,6 +34,13 @@ const serverEnvSchema = z.object({
   GITHUB_CLIENT_ID: optional(z.string()),
   GITHUB_CLIENT_SECRET: optional(z.string()),
 
+  // Reminders (ADR 0013). Bearer secret for POST /api/reminders/sweep, which
+  // cron-job.org calls every 15 minutes. At least 32 random bytes; 43
+  // characters is 32 bytes in unpadded base64.
+  REMINDER_SWEEP_SECRET: z
+    .string()
+    .min(43, "must be at least 43 characters (32 random bytes, base64)"),
+
   // End-to-end tests only. Enables the test sign-in shortcut when it is "1"
   // and NODE_ENV is "test" (src/server/auth/test-sign-in.ts).
   SOLEUP_TEST_SIGN_IN: optional(z.string()),
@@ -107,6 +114,7 @@ const BUILD_PHASE_PLACEHOLDERS = {
   DATABASE_URL: "postgres://build-placeholder@localhost:5432/build_placeholder",
   BETTER_AUTH_SECRET: "build-placeholder-never-used-at-runtime",
   BETTER_AUTH_URL: "http://localhost:3000",
+  REMINDER_SWEEP_SECRET: "build-placeholder-never-used-at-runtime-0000",
 };
 
 function withBuildPlaceholders(

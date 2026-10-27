@@ -23,7 +23,8 @@
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:integration",
-    "db:migrate:deploy": "node scripts/db-migrate-deploy.mts"
+    "db:migrate:deploy": "node scripts/db-migrate-deploy.mts",
+    "reminders:sweep": "node scripts/reminders-sweep.mts"
   },
   "dependencies": {
     "@fullcalendar/react": "7.1.1",

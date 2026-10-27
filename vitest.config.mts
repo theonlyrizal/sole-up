@@ -62,6 +62,9 @@ export default defineConfig({
             BETTER_AUTH_SECRET:
               "integration-tests-only-secret-not-for-real-use",
             BETTER_AUTH_URL: "http://localhost:3000",
+            // Test-only: guards the reminder sweep route in tests only.
+            REMINDER_SWEEP_SECRET:
+              "integration-tests-only-sweep-secret-not-for-real-use",
             // No OAuth credentials reach integration tests: no provider is
             // configured, whatever the shell or .env.local holds.
             GOOGLE_CLIENT_ID: "",

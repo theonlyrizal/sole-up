@@ -57,6 +57,8 @@ export default defineConfig({
       BETTER_AUTH_URL: baseURL,
       // Test-only: signs sessions in the local test database only.
       BETTER_AUTH_SECRET: "e2e-tests-only-secret-not-for-real-use",
+      // Test-only: guards the reminder sweep route on the e2e server only.
+      REMINDER_SWEEP_SECRET: "e2e-tests-only-sweep-secret-not-for-real-use",
       // Placeholder credentials so the sign-in buttons render. No test
       // clicks them: that would leave for the real provider.
       GOOGLE_CLIENT_ID: "e2e-placeholder",
