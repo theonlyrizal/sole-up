@@ -3,11 +3,13 @@ import { Suspense } from "react";
 
 import { AgendaView } from "@/components/calendar/agenda-view";
 import { AreaColumnsView } from "@/components/calendar/area-columns-view";
+import { AreaTimelineView } from "@/components/calendar/area-timeline-view";
 import { TimeGridView } from "@/components/calendar/time-grid-view";
 import { PlanSubnav } from "@/components/tasks/plan-subnav";
 import { cx } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
 import { parseAgendaRange } from "@/lib/agenda";
+import { parseTimelineRange } from "@/lib/area-timeline";
 import {
   parseCalendarItem,
   parseCalendarView,
@@ -22,6 +24,7 @@ import {
   listCalendarGrid,
   listDaySchedule,
   listEventLinkOptions,
+  listSchedule,
 } from "@/server/modules/calendar-events/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
 import { listPlanTasks } from "@/server/modules/tasks/queries";
@@ -47,13 +50,13 @@ async function CalendarPageBody({
   const view = parseCalendarView(params);
   return (
     // The time grids need the room for seven day columns, By area for a
-    // column per life area.
+    // column per life area, the Timeline for its time axis.
     <div
       className={cx(
         "mx-auto flex w-full flex-col gap-6 px-4 py-10",
         view === "agenda"
           ? "max-w-2xl"
-          : view === "week" || view === "areas"
+          : view === "week" || view === "areas" || view === "timeline"
             ? "max-w-5xl lg:max-w-7xl"
             : "max-w-5xl",
       )}
@@ -122,6 +125,27 @@ async function Calendar({
       <AreaColumnsView
         // A new key per day, so moving resets the view's scroll and focus.
         key={range.start}
+        entries={entries}
+        areas={options.areas}
+        range={range}
+        today={today}
+        nextDayStartsAt={nextDayStartsAt}
+        options={options}
+        {...context}
+      />
+    );
+  }
+
+  if (view === "timeline") {
+    const range = parseTimelineRange(params, today, preferences.weekStart);
+    const [entries, options] = await Promise.all([
+      listSchedule(user.id, range, timeZone),
+      listEventLinkOptions(user.id),
+    ]);
+    return (
+      <AreaTimelineView
+        // A new key per range, so moving resets the view's scroll and focus.
+        key={`${range.span}:${range.start}`}
         entries={entries}
         areas={options.areas}
         range={range}

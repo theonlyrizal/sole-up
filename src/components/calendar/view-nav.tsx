@@ -3,6 +3,11 @@ import Link from "next/link";
 import { cx, focusRing } from "@/components/ui/cx";
 import { agendaHref, DEFAULT_AGENDA_DAYS } from "@/lib/agenda";
 import {
+  DEFAULT_TIMELINE_SPAN,
+  timelineHref,
+  type TimelineSpan,
+} from "@/lib/area-timeline";
+import {
   CALENDAR_VIEW_LABELS,
   CALENDAR_VIEWS,
   type CalendarView,
@@ -23,24 +28,34 @@ export const pillClass = (current: boolean) =>
   );
 
 /**
- * Agenda, Week, Day and By area. Switching keeps the day the user is looking at:
- * the Agenda starts on it, Week holds it, Day and By area show it. Week is not
- * offered on phone widths, where Day stands in for it.
+ * Agenda, Week, Day, By area and Timeline. Switching keeps the day the user
+ * is looking at: the Agenda starts on it, Week and the Timeline hold it,
+ * Day and By area show it. The Timeline spans a day when coming from Day
+ * or By area, else a week. Week is not offered on phone widths, where Day
+ * stands in for it.
  */
 export function ViewNav({
   current,
   date,
   today,
+  timelineSpan,
 }: {
   current: CalendarView;
   /** The day to carry over to the other views. */
   date: LocalDate;
   today: LocalDate;
+  /** The Timeline's span while it is the current view. */
+  timelineSpan?: TimelineSpan;
 }) {
+  const span =
+    timelineSpan ??
+    (current === "day" || current === "areas" ? "day" : DEFAULT_TIMELINE_SPAN);
   const href = (view: CalendarView) =>
     view === "agenda"
       ? agendaHref({ start: date, days: DEFAULT_AGENDA_DAYS }, today)
-      : gridHref(view, date, today);
+      : view === "timeline"
+        ? timelineHref(span, date, today)
+        : gridHref(view, date, today);
   return (
     <nav aria-label="Calendar view">
       <ul className="flex flex-wrap gap-1">
@@ -61,9 +76,51 @@ export function ViewNav({
 }
 
 /**
- * Previous, Today and Next for a grid view: a week or a day at a time,
- * kept in the URL.
+ * Previous, Today and Next, a week or a day at a time, as links (so the
+ * range is kept in the URL).
  */
+export function MoveNav({
+  unit,
+  previousHref,
+  todayHref,
+  nextHref,
+  atToday,
+}: {
+  unit: "week" | "day";
+  previousHref: string;
+  todayHref: string;
+  nextHref: string;
+  /** The range shown is anchored on today. */
+  atToday: boolean;
+}) {
+  return (
+    <nav aria-label="Move through the calendar">
+      <ul className="flex flex-wrap gap-1">
+        <li>
+          <Link href={previousHref} className={pillClass(false)}>
+            Previous {unit}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href={todayHref}
+            aria-current={atToday ? "page" : undefined}
+            className={pillClass(atToday)}
+          >
+            Today
+          </Link>
+        </li>
+        <li>
+          <Link href={nextHref} className={pillClass(false)}>
+            Next {unit}
+          </Link>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+
+/** `MoveNav` for a grid view (Week, Day, By area). */
 export function GridMoveNav({
   range,
   today,
@@ -71,36 +128,13 @@ export function GridMoveNav({
   range: GridRange;
   today: LocalDate;
 }) {
-  const unit = range.view === "week" ? "week" : "day";
   return (
-    <nav aria-label="Move through the calendar">
-      <ul className="flex flex-wrap gap-1">
-        <li>
-          <Link
-            href={gridHref(range.view, shiftGridDate(range, -1), today)}
-            className={pillClass(false)}
-          >
-            Previous {unit}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href={gridHref(range.view, today, today)}
-            aria-current={range.date === today ? "page" : undefined}
-            className={pillClass(range.date === today)}
-          >
-            Today
-          </Link>
-        </li>
-        <li>
-          <Link
-            href={gridHref(range.view, shiftGridDate(range, 1), today)}
-            className={pillClass(false)}
-          >
-            Next {unit}
-          </Link>
-        </li>
-      </ul>
-    </nav>
+    <MoveNav
+      unit={range.view === "week" ? "week" : "day"}
+      previousHref={gridHref(range.view, shiftGridDate(range, -1), today)}
+      todayHref={gridHref(range.view, today, today)}
+      nextHref={gridHref(range.view, shiftGridDate(range, 1), today)}
+      atToday={range.date === today}
+    />
   );
 }
