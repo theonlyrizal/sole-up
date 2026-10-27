@@ -18,6 +18,7 @@ import {
 } from "@/lib/dates";
 import { PRIORITY_LABELS } from "@/lib/priorities";
 import type { ActionResult } from "@/lib/result";
+import type { ScheduleEntry } from "@/lib/schedule";
 import { formatEstimate } from "@/lib/task-list";
 import { isInboxTask, type Task, type TaskStatus } from "@/lib/tasks";
 import {
@@ -41,6 +42,7 @@ import type {
 } from "@/server/modules/tasks/queries";
 
 import { AddToToday } from "./add-to-today";
+import { TodayTimeline } from "./today-timeline";
 import { useRefreshOnNewDay } from "./use-refresh-on-new-day";
 
 type TodayViewProps = {
@@ -49,6 +51,9 @@ type TodayViewProps = {
   today: LocalDate;
   /** When the user's tomorrow begins (ISO instant). */
   nextDayStartsAt: string;
+  /** The instant the page was read at (ISO), for blocks' "Not marked". */
+  now: string;
+  timeline: ScheduleEntry[];
   sections: TodayTasks;
   suggestions: TodaySuggestions;
   locale: string;
@@ -59,12 +64,15 @@ type TodayViewProps = {
  * Today (chunk 2.5): planned for today, due today, deadlines that need a
  * decision, and earlier plans not done. Each open task shows in one section
  * (see `todaySection`). Planned for today always shows; the others only
- * when they have tasks.
+ * when they have tasks. Today's events and time blocks sit above them, as a
+ * timeline (chunk 4.9).
  */
 export function TodayView({
   dateLabel,
   today,
   nextDayStartsAt,
+  now,
+  timeline,
   sections,
   suggestions,
   locale,
@@ -74,6 +82,13 @@ export function TodayView({
   return (
     <div className="flex flex-col gap-8">
       <p className="-mt-2 text-muted">{dateLabel}</p>
+      <TodayTimeline
+        entries={timeline}
+        today={today}
+        now={new Date(now)}
+        locale={locale}
+        timeZone={timeZone}
+      />
       {TODAY_SECTIONS.filter(
         (section) => section === "planned" || sections[section].length > 0,
       ).map((section) => (

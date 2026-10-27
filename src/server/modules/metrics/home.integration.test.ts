@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { todayClock } from "@/lib/today";
+import { createCalendarEvent } from "@/server/modules/calendar-events/service";
+import { createCalendarEventSchema } from "@/server/modules/calendar-events/validation";
 import { changeGoalStatus, createGoal } from "@/server/modules/goals/service";
 import { createGoalSchema } from "@/server/modules/goals/validation";
 import {
@@ -10,12 +12,18 @@ import {
 import { createMilestoneSchema } from "@/server/modules/milestones/validation";
 import { changeTaskStatus, createTask } from "@/server/modules/tasks/service";
 import { createTaskSchema } from "@/server/modules/tasks/validation";
+import {
+  createTimeBlock,
+  setTimeBlockStatus,
+} from "@/server/modules/time-blocks/service";
+import { createTimeBlockSchema } from "@/server/modules/time-blocks/validation";
 
 import { createTestUser } from "../../../../tests/integration/helpers/users";
 import {
   deadlinesNextSevenDays,
   goalsWithoutNextAction,
   listGoalsWithoutNextAction,
+  nextCommitment,
   todayTaskCounts,
 } from "./home";
 
@@ -25,6 +33,7 @@ import {
 // Tokyo is UTC+9 with no DST. At NOW it is 00:01 on Sat 24 Oct in Tokyo but
 // still the 23rd in UTC, so a UTC or server-date bug shows.
 const TOKYO = "Asia/Tokyo";
+const NEW_YORK = "America/New_York";
 const NOW = new Date("2026-10-23T15:01:00Z");
 const clock = todayClock(TOKYO, NOW);
 
@@ -296,5 +305,216 @@ describe("deadlinesNextSevenDays", () => {
     const metric = await deadlinesNextSevenDays(user.id, clock, TOKYO);
     expect(metric.value).toBe(0);
     expect(metric.hasData).toBe(true);
+  });
+});
+
+describe("nextCommitment", () => {
+  const timedEvent = (
+    userId: string,
+    title: string,
+    start: string,
+    end: string,
+    tz = TOKYO,
+  ) => {
+    const [startDate, startTime] = start.split(" ");
+    const [endDate, endTime] = end.split(" ");
+    return createCalendarEvent(
+      userId,
+      createCalendarEventSchema.parse({
+        title,
+        allDay: false,
+        startDate,
+        startTime,
+        endDate,
+        endTime,
+        tz,
+      }),
+    );
+  };
+
+  const allDayEvent = (
+    userId: string,
+    title: string,
+    startDate: string,
+    endDate = startDate,
+  ) =>
+    createCalendarEvent(
+      userId,
+      createCalendarEventSchema.parse({
+        title,
+        allDay: true,
+        startDate,
+        endDate,
+      }),
+    );
+
+  const block = async (userId: string, title: string, start: string) => {
+    const task = await newTask(userId, { title });
+    const [startDate, startTime] = start.split(" ");
+    const created = await createTimeBlock(
+      userId,
+      createTimeBlockSchema.parse({
+        taskId: task.id,
+        startDate,
+        startTime,
+        durationMinutes: 60,
+        tz: TOKYO,
+      }),
+    );
+    return { task, block: created };
+  };
+
+  const titleOf = async (userId: string) =>
+    (await nextCommitment(userId, clock, TOKYO)).value?.title ?? null;
+
+  it("has no data with no events or time blocks", async () => {
+    const user = await createTestUser();
+    expect(await nextCommitment(user.id, clock, TOKYO)).toEqual({
+      value: null,
+      definition: expect.any(String),
+      // Today and the 29 days after it.
+      range: {
+        from: "2026-10-24",
+        to: "2026-11-22",
+        timeZone: TOKYO,
+        asOf: NOW,
+      },
+      hasData: false,
+    });
+  });
+
+  it("is nothing with only ended or out-of-range items", async () => {
+    const user = await createTestUser();
+    // Ended exactly at Tokyo midnight, a minute ago.
+    await timedEvent(user.id, "Ended", "2026-10-23 23:00", "2026-10-24 00:00");
+    await allDayEvent(user.id, "Yesterday", "2026-10-23");
+    // Day 30 from today, past the range's last day.
+    await timedEvent(
+      user.id,
+      "Too far",
+      "2026-11-23 09:00",
+      "2026-11-23 10:00",
+    );
+    const metric = await nextCommitment(user.id, clock, TOKYO);
+    expect(metric.hasData).toBe(true);
+    expect(metric.value).toBeNull();
+
+    // The range's last day counts.
+    await timedEvent(
+      user.id,
+      "Last day",
+      "2026-11-22 23:00",
+      "2026-11-22 23:30",
+    );
+    expect(await titleOf(user.id)).toBe("Last day");
+  });
+
+  it("picks the earliest start among items that haven't ended", async () => {
+    const user = await createTestUser();
+    await timedEvent(
+      user.id,
+      "Dentist",
+      "2026-10-24 09:00",
+      "2026-10-24 10:00",
+    );
+    await block(user.id, "Write report", "2026-10-24 08:00");
+    expect(await titleOf(user.id)).toBe("Write report");
+
+    // One already under way comes first: it began before now and runs on.
+    await timedEvent(
+      user.id,
+      "Late call",
+      "2026-10-23 23:30",
+      "2026-10-24 00:30",
+    );
+    expect(await titleOf(user.id)).toBe("Late call");
+
+    // An all-day event today starts at local midnight: after the call,
+    // which began the evening before, but before the morning's items.
+    await allDayEvent(user.id, "Birthday", "2026-10-24");
+    expect(await titleOf(user.id)).toBe("Late call");
+
+    const morning = await createTestUser();
+    await block(morning.id, "Write report", "2026-10-24 08:00");
+    await allDayEvent(morning.id, "Birthday", "2026-10-24");
+    const metric = await nextCommitment(morning.id, clock, TOKYO);
+    expect(metric.value).toMatchObject({
+      kind: "event",
+      allDay: true,
+      title: "Birthday",
+      start: "2026-10-24",
+    });
+
+    // A multi-day all-day event that began days ago is still under way.
+    await allDayEvent(morning.id, "Trip", "2026-10-20", "2026-10-26");
+    expect(await titleOf(morning.id)).toBe("Trip");
+  });
+
+  it("puts a New York event on its instant, not its local time", async () => {
+    const user = await createTestUser();
+    // 09:00 in New York on the 23rd is 22:00 on the 23rd in Tokyo: ended.
+    await timedEvent(
+      user.id,
+      "NY ended",
+      "2026-10-23 09:00",
+      "2026-10-23 10:00",
+      NEW_YORK,
+    );
+    // 11:30 in New York on the 23rd is 00:30 on the 24th in Tokyo.
+    await timedEvent(
+      user.id,
+      "NY soon",
+      "2026-10-23 11:30",
+      "2026-10-23 12:00",
+      NEW_YORK,
+    );
+    await timedEvent(
+      user.id,
+      "Tokyo later",
+      "2026-10-24 01:00",
+      "2026-10-24 02:00",
+    );
+    expect(await titleOf(user.id)).toBe("NY soon");
+  });
+
+  it("skips blocks marked done or skipped, and blocks for closed tasks", async () => {
+    const user = await createTestUser();
+    const done = await block(user.id, "Marked done", "2026-10-24 07:00");
+    await setTimeBlockStatus(user.id, { id: done.block.id, status: "done" });
+    const skipped = await block(user.id, "Marked skipped", "2026-10-24 08:00");
+    await setTimeBlockStatus(user.id, {
+      id: skipped.block.id,
+      status: "skipped",
+    });
+    const finished = await block(user.id, "Task finished", "2026-10-24 09:00");
+    await changeTaskStatus(user.id, {
+      id: finished.task.id,
+      status: "completed",
+    });
+    const dropped = await block(user.id, "Task dropped", "2026-10-24 10:00");
+    await changeTaskStatus(user.id, {
+      id: dropped.task.id,
+      status: "cancelled",
+    });
+    await block(user.id, "Still on", "2026-10-24 11:00");
+
+    const metric = await nextCommitment(user.id, clock, TOKYO);
+    expect(metric.value).toMatchObject({ kind: "block", title: "Still on" });
+  });
+
+  it("only looks at the user's own items", async () => {
+    const user = await createTestUser();
+    const other = await createTestUser();
+    await timedEvent(
+      other.id,
+      "Theirs",
+      "2026-10-24 09:00",
+      "2026-10-24 10:00",
+    );
+    await block(other.id, "Their block", "2026-10-24 08:00");
+    const metric = await nextCommitment(user.id, clock, TOKYO);
+    expect(metric.hasData).toBe(false);
+    expect(metric.value).toBeNull();
+    expect(await titleOf(other.id)).toBe("Their block");
   });
 });

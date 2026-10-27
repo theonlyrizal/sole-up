@@ -73,11 +73,13 @@ test("a new user's Home says nothing yet, with each card's definition and range"
   await openHome(page);
 
   await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+    "Next commitment",
     "Today",
     "Goals without a next action",
     "Deadlines in the next 7 days",
   ]);
   for (const name of [
+    "Next commitment",
     "Today",
     "Goals without a next action",
     "Deadlines in the next 7 days",

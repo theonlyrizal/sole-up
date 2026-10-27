@@ -7,7 +7,11 @@ import { PlanSubnav } from "@/components/tasks/plan-subnav";
 import { cx } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
 import { parseAgendaRange } from "@/lib/agenda";
-import { parseCalendarView, parseGridRange } from "@/lib/calendar-views";
+import {
+  parseCalendarItem,
+  parseCalendarView,
+  parseGridRange,
+} from "@/lib/calendar-views";
 import { addDays, startOfLocalDay, todayFor } from "@/lib/dates";
 import { supportedTimeZones } from "@/lib/preferences";
 import { parseTaskListFilters } from "@/lib/task-list";
@@ -126,6 +130,7 @@ async function Calendar({
       range={range}
       today={today}
       nextDayStartsAt={nextDayStartsAt}
+      openItemId={parseCalendarItem(params)}
       options={options}
       {...context}
     />

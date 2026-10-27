@@ -274,6 +274,7 @@ Rules:
   - A past `scheduled` block reads "Not marked".
 - The resource lane is derived: the task's goal's life area (direct goal, or the milestone's goal), otherwise "No area".
 - A new block (chunk 4.8) lasts the task's estimate, else 60 minutes, and is in the user's zone. Moving or resizing a block, by dragging or in its dialog, keeps the block's own zone; dragging an occurrence of a repeating weekly or monthly block with "this and following" or "all" moves the rule's day with it, as the form does.
+- **Today and Home** (chunk 4.9) read blocks with events, derived on read. Today's timeline lists every block overlapping today, whatever its status. Home's next commitment is the earliest-starting event or block that hasn't ended at the moment of reading; blocks marked `done` or `skipped`, and blocks whose task is completed or cancelled, are not commitments. All-day events run from their first day's local midnight to their end date's in the user's zone. See `nextCommitmentOf` in `src/lib/schedule.ts`.
 
 ### TimeBlockException
 One occurrence of a repeating block that differs from its rule.

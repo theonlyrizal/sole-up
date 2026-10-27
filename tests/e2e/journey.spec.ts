@@ -167,8 +167,10 @@ test("area → goal → milestone → tasks → plan today → complete", async 
   await expect(
     page.getByRole("heading", { level: 3, name: "Nothing planned for today" }),
   ).toBeVisible();
-  // The other task was never planned, so Today has only its first section.
+  // The other task was never planned, so Today has only its schedule and
+  // its first section.
   await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+    "Schedule",
     "Planned for today",
   ]);
   await expect(page.getByText(DIRECT_TASK, { exact: true })).toHaveCount(0);

@@ -114,6 +114,34 @@ export function gridHref(
   return `${AGENDA_PATH}?${params.toString()}`;
 }
 
+/**
+ * The Day view that opens one item's dialog (chunk 4.9): the day it starts
+ * on, or today for an item that began before today and is still going,
+ * with the item's entry ID in `item`.
+ */
+export function calendarItemHref(
+  entry: Pick<AgendaEntry, "id" | "allDay" | "start">,
+  today: LocalDate,
+  timeZone: string,
+): string {
+  const startDay = entry.allDay
+    ? entry.start
+    : localDateOf(new Date(entry.start), timeZone);
+  const day = startDay < today ? today : startDay;
+  const params = new URLSearchParams({ view: "day" });
+  if (day !== today) params.set("date", day);
+  params.set("item", entry.id);
+  return `${AGENDA_PATH}?${params.toString()}`;
+}
+
+/** The entry ID from the page's `item` search param, if any. */
+export function parseCalendarItem(params: {
+  item?: SearchParam;
+}): string | null {
+  const item = firstValue(params.item);
+  return item ? item : null;
+}
+
 /** The anchor day of the previous (-1) or next (1) week or day. */
 export function shiftGridDate(range: GridRange, direction: -1 | 1): LocalDate {
   return addDays(range.date, direction * (range.view === "week" ? 7 : 1));

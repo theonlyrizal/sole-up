@@ -9,8 +9,11 @@ import {
   type AgendaRange,
 } from "@/lib/agenda";
 import { gridEntries, type GridRange } from "@/lib/calendar-views";
+import { addDays } from "@/lib/dates";
 import type { GoalStatus } from "@/lib/goals";
 import type { LifeAreaStatus } from "@/lib/life-areas";
+import { type ScheduleEntry, timelineEntries } from "@/lib/schedule";
+import type { TodayClock } from "@/lib/today";
 import { db } from "@/server/db/client";
 import { goals, lifeAreas } from "@/server/db/schema";
 import {
@@ -64,6 +67,28 @@ export async function listCalendarGrid(
     listAgendaTasks(userId, { from: range.start, to: range.end, timeZone }),
   ]);
   return gridEntries(events, tasks, range, timeZone, blocks);
+}
+
+/**
+ * Today's timeline (chunk 4.9): the user's events, occurrences and time
+ * blocks overlapping today in `timeZone` (the user's), all-day events
+ * first, then by start.
+ */
+export async function listTodayTimeline(
+  userId: string,
+  clock: TodayClock,
+  timeZone: string,
+): Promise<ScheduleEntry[]> {
+  const today = {
+    localStart: clock.today,
+    localEnd: addDays(clock.today, 1),
+    tz: timeZone,
+  };
+  const [events, blocks] = await Promise.all([
+    eventsBetween(userId, today),
+    blocksBetween(userId, today),
+  ]);
+  return timelineEntries(events, blocks, timeZone);
 }
 
 /** What an event can link to: goals (with their area) and life areas. */

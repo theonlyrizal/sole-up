@@ -89,8 +89,10 @@ test("an empty day is calm, and Add to today plans suggested tasks", async ({
   await expect(
     page.getByRole("heading", { level: 3, name: "Nothing planned for today" }),
   ).toBeVisible();
-  // Only Planned for today shows while the other sections are empty.
+  // Only the schedule and Planned for today show while the other sections
+  // are empty.
   await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+    "Schedule",
     "Planned for today",
   ]);
 
@@ -157,6 +159,7 @@ test("a plan from yesterday waits under Earlier, not done until you decide", asy
 
   await openToday(page);
   await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+    "Schedule",
     "Planned for today",
     "Due today",
     "Needs a decision",

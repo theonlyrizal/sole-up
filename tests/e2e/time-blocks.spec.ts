@@ -131,6 +131,10 @@ test("blocks time for a task by form, and completing the task marks the block do
   await edit.getByLabel("Estimate (minutes)").fill("45");
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(edit).toHaveCount(0);
+  // The form reads the estimate when it opens: wait for the refreshed row.
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Write report" }).last(),
+  ).toContainText("45 min");
 
   const form = await openDialog(
     page,
