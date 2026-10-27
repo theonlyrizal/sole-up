@@ -189,7 +189,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 5.1 | Sweep route and external trigger | done | chunk/5.1-sweep-route | 2026-10-27 | Required `REMINDER_SWEEP_SECRET`, `POST /api/reminders/sweep` (constant-time Bearer check, same 401, no body) → `runSweep(now)` stub logging counts only; `pnpm reminders:sweep` calls the local route; DEPLOY.md secret + cron-job.org steps; production check unverified |
 | 5.2 | Service worker and PWA install | done | chunk/5.2-service-worker-install | 2026-10-27 | `public/sw.js` (push + notificationclick only, no fetch/cache; payload text as given, same-origin deep link focusing an open tab), registered on every page, uncached with its own CSP; Settings "Install the app" with iOS Home Screen guidance; desktop install confirmed, phone unverified |
 | 5.3 | Push subscriptions | done | chunk/5.3-push-subscriptions | 2026-10-28 | Required VAPID env (pair checked), `push_subscriptions` (endpoint unique, known push hosts only, 20/user), subscribe/unsubscribe/revoke/test actions on `web-push` 3.6.7, Settings "Notifications" device list; user confirmed two browsers + revoke |
-| 5.4 | Reminders: schema and scheduling | todo | | | |
+| 5.4 | Reminders: schema and scheduling | done | chunk/5.4-reminders-scheduling | 2026-10-28 | `reminders` (migration 0012, one-scheduled partial unique index), item offsets + `daily_nudge_time`, sync in the task/event/preferences transactions (rolling next occurrence, nudge per zone), `claimDueReminders` under `SKIP LOCKED` in `runSweep`; no sending |
 | 5.5 | Delivery in the sweep | todo | | | |
 | 5.6 | Reminder UI and preferences | todo | | | |
 | 5.7 | Reliability pass | todo | | | |
@@ -2419,3 +2419,56 @@ Template:
 - **Follow-ups:**
   - Signing out doesn't unsubscribe the browser, so on a shared computer the next person could see the previous user's reminder titles until someone else subscribes it. Consider unsubscribing on sign-out before 5.5 sends real reminders.
   - `sw.js` has no `pushsubscriptionchange` handler, so a browser-rotated subscription is lost until the user turns notifications on again (the 410 cleanup removes the old row).
+
+### 5.4: Reminders: schema and scheduling (2026-10-28)
+- **Built:**
+  - `src/lib/reminders.ts` (pure): `REMINDER_OFFSETS` (0/10/30/60/1440), kinds, statuses, skip reasons, `SWEEP_INTERVAL_MINUTES`, `NUDGE_TIME_PATTERN`, `fireAtFor`.
+  - Migration `0012_reminders.sql` (generated, no hand edit; additive only):
+    - `reminders` per the chunk, with composite task/event FKs (cascade);
+    - CHECKs: kind ↔ link (and `occurrence_start` only on events), status, `skip_reason` set exactly while `skipped`, `sent_at` exactly while `sent`, `fire_at <= target_at`, attempts, error-code length;
+    - the partial unique index `reminders_one_scheduled_key` on `coalesce(task_id, event_id, user_id)` where `status = 'scheduled' and not snoozed`; `(status, fire_at)`; `task_id`, `event_id`, `user_id`;
+    - `tasks.reminder_offset_minutes` and `calendar_events.reminder_offset_minutes` (offset CHECKs); `user_preferences.daily_nudge_time` (`HH:MM` CHECK).
+  - `src/server/modules/reminders/`:
+    - `schedule.ts`: `syncTaskReminderInTx`, `syncEventReminderInTx`, `syncNudgeReminderInTx`. Each recomputes the item's one scheduled row and inserts, moves (resetting `attempts`) or deletes it, in the caller's transaction;
+    - `next-occurrence.ts` (pure): `nextTimedOccurrence(series, exceptions, now, isDone)`, searching up to eight 366-day windows;
+    - `claim.ts`: `claimDueReminders(now, horizonMinutes = 15, limit = 200)`;
+    - `validation.ts`: `reminderOffsetSchema` (absent/blank → null), `reminderOffsetChangeSchema` (absent → unchanged), `nudgeTimeSchema`.
+  - `runSweep` claims and reports `claimed`; sent/skipped/failed stay 0.
+  - Tasks: `reminderOffsetMinutes` on create; new `setTaskReminder` (`setTaskReminderSchema`, event `task.reminder_changed`); status changes, `dueInTx` (reschedule and the Plan page's `scheduleTask`) and create sync the row.
+  - Events: `reminderOffsetMinutes` in `CALENDAR_EVENT_EDITABLE_FIELDS`/`SeriesColumns` and `seriesAfterEdit`; create, one-off update, "following"/"all" edits (a split's new series inherits it) and `isNoOp`; every edit and delete scope syncs the series and a split's new series.
+  - Preferences: `setDailyNudgeTime` (`setDailyNudgeTimeSchema`, audited in `user_preferences.updated`); `savePreferences` recomputes the nudge when the zone changes.
+  - Audit: `task.reminder_changed`; `reminderOffsetMinutes` on `task.created`/`calendar_event.created` (only when set) and `calendar_event.updated`; `dailyNudgeTime` on `user_preferences.updated`.
+  - Tests: integration `reminders.integration.test.ts` (28):
+    - tasks: schedule, reschedule and offset moves, complete/cancel/reopen, date-only/no/passed deadlines, not repeating a delivered target, delete with the record;
+    - one-off events: edits, offset audit, all-day/past/none, delete;
+    - series: the rolling row, a cancelled and a moved next occurrence, a later occurrence moved in front, "all" times and offset, "this" refusing an offset, both sides of a split, delete scopes, rolling past a sent occurrence, a yearly 29 February;
+    - nudge: next local time, off, waits for a zone, malformed time, a zone change moving only the nudge;
+    - schema: offset CHECKs and field errors, link/skip CHECKs, the partial unique index beside snoozed and sent rows, cross-user FKs;
+    - cross-user service calls;
+    - claim: the 14/15/16-minute edges and order, four concurrent claims with no duplicates, a held row skipped rather than waited on, `runSweep`'s count.
+    - Unit: `next-occurrence.test.ts` (DST, cancelled/done, ended) and `sweep.test.ts` (claim mocked).
+  - Docs: DATA_MODEL (Reminder section; Task, CalendarEvent and UserPreference fields), README "Reminders".
+- **Deviations:**
+  1. **No UI or Server Actions** (5.6 builds the forms and Settings), and the `Task`/`CalendarEvent` read types don't carry the offset yet. Services and schemas accept it, so 5.6 adds it to the types, forms and actions.
+  2. **A separate `setTaskReminder` operation and `task.reminder_changed` event** rather than widening `updateTask` (which replaces every editable field, so its callers would all have to send the offset).
+  3. **An absent offset on an event edit keeps the current one**, while on create it means none. This differs from the "replace every field" convention, so the existing event dialog keeps working unchanged until 5.6.
+  4. **A target already reminded about isn't scheduled again** (not in the chunk text): a sent, skipped, failed or claimed row for the same `target_at` and `occurrence_start` blocks a new one. Without it, any edit between a reminder firing and its target would resend it.
+  5. **The claim has a batch limit** (200, oldest first); the rest waits for the next sweep.
+  6. Two existing unit tests that assert the full parsed create input now include `reminderOffsetMinutes: null`.
+- **Decisions:**
+  - "Now" for scheduling is the app's clock (`new Date()`, overridable per call); the claim takes the sweep's `now`.
+  - A target that hasn't passed gets a row even when its fire time has (for example, an event in 5 minutes with a 10-minute reminder); the next sweep claims it at once.
+  - A one-off event's or task's row has no `occurrence_start`; a series row always has one.
+  - The claim stamps `claimed_at` and doesn't touch `attempts`, so 5.5 decides what counts as an attempt.
+  - No audit events for reminder rows (a delivery log); offset and nudge changes are audited on the item.
+  Recorded in code comments and DATA_MODEL > Reminder.
+- **Next chunk should know:**
+  - 5.5: after a row is sent or skipped, call `syncEventReminderInTx(tx, userId, eventId, now)` or `syncNudgeReminderInTx(tx, userId, prefs, now)` in the same transaction. The delivered-target rule makes them roll to the next occurrence or day.
+  - Reclaiming a stale `sending` row (10 minutes after `claimed_at`) means widening `claimDueReminders`'s where clause; the held-lock test shows the pattern for testing it.
+  - Claimed rows carry `snoozed`, so a snoozed row can be told apart. The partial unique index ignores snoozed rows.
+  - Integration tests pin the clock with `vi.useFakeTimers({ toFake: ["Date"] })` + `vi.setSystemTime`, so the pool's timers keep working.
+  - Migration 0012 was regenerated once during this chunk (a CHECK fix). A machine that applied the earlier draft would need it rolled back; only this machine's dev and test DBs did, and both were fixed.
+- **Unverified:** nothing manual (no UI). `pnpm verify` passes: format, lint, typecheck, 651 unit and 470 integration tests. `pnpm db:generate` reports no drift, and the dev DB is migrated. The concurrency tests were mutation-checked: removing `FOR UPDATE SKIP LOCKED` fails both. `pnpm build` and `pnpm test:e2e` weren't run (no route or UI change; CI runs them).
+- **Follow-ups:**
+  - After a "following" split at an occurrence that was already reminded about, the new series reminds about it again: the delivered check is per event ID. Rare (an edit between a reminder and its start); consider carrying delivered rows across the split.
+  - Phase 10 export (10.1) must include `reminders` and the offset/nudge settings (already noted in 5.0).

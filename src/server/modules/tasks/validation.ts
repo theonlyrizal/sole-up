@@ -10,6 +10,7 @@ import {
   TASK_STATUSES,
   TASK_TITLE_MAX,
 } from "@/lib/tasks";
+import { reminderOffsetSchema } from "@/server/modules/reminders/validation";
 
 const idSchema = z.uuid("Choose a task.");
 
@@ -165,6 +166,7 @@ export const createTaskSchema = z
     priority: prioritySchema,
     estimatedMinutes: estimateSchema,
     plannedDate: localDateSchema,
+    reminderOffsetMinutes: reminderOffsetSchema,
     ...parentFields,
     ...dueFields,
   })
@@ -173,6 +175,16 @@ export const createTaskSchema = z
     checkDueShape(task, context);
   });
 export type CreateTaskInput = z.output<typeof createTaskSchema>;
+
+/**
+ * The task's reminder, minutes before a timed deadline (ADR 0013); null
+ * removes it. It only fires while the task is open with a timed deadline.
+ */
+export const setTaskReminderSchema = z.strictObject({
+  id: idSchema,
+  reminderOffsetMinutes: reminderOffsetSchema,
+});
+export type SetTaskReminderInput = z.output<typeof setTaskReminderSchema>;
 
 /** Replaces the plain fields; dates, parent and status have their own paths. */
 export const updateTaskSchema = z.strictObject({

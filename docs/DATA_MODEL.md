@@ -37,7 +37,7 @@ Do not store passwords directly if using an external authentication provider.
 ### UserPreference
 Stores explicit product preferences.
 
-Implemented in chunk 0.9 as `user_preferences`: one row per user (`user_id` is the primary key, cascading from `users`), created with defaults on first sign-in. Typed columns: `timezone` (IANA name, validated against the server runtime's zone list and stored in its canonical spelling; **null until the user confirms one**, since the browser's zone is only proposed), `locale` (BCP 47, default `en-US`), `week_start` (smallint 0–6, 0 = Sunday, default 1 = Monday, CHECK-constrained), `created_at`, `updated_at`. Changes are audited as `user_preferences.updated` with the changed fields' old and new values. Chunk 0.11 added `life_area_starters` (`accepted` | `dismissed`, null until answered): the answer to the one-time starter life areas offer.
+Implemented in chunk 0.9 as `user_preferences`: one row per user (`user_id` is the primary key, cascading from `users`), created with defaults on first sign-in. Typed columns: `timezone` (IANA name, validated against the server runtime's zone list and stored in its canonical spelling; **null until the user confirms one**, since the browser's zone is only proposed), `locale` (BCP 47, default `en-US`), `week_start` (smallint 0–6, 0 = Sunday, default 1 = Monday, CHECK-constrained), `created_at`, `updated_at`. Changes are audited as `user_preferences.updated` with the changed fields' old and new values. Chunk 0.11 added `life_area_starters` (`accepted` | `dismissed`, null until answered): the answer to the one-time starter life areas offer. Chunk 5.4 added `daily_nudge_time` (local `HH:MM` in `timezone`, CHECKed; null = off): the daily planning nudge (see Reminder). Changing the zone moves the nudge's scheduled reminder and nothing else.
 
 Suggested fields:
 - `id`
@@ -140,6 +140,7 @@ Fields ([ADR 0004](decisions/0004-task-hierarchy-and-dates.md), [ADR 0011](decis
 - **Deadline, one shape or none:** `due_date` (local date) **or** `due_at` (UTC instant) + `due_tz` (IANA zone). CHECKs enforce that `due_date` excludes `due_at`, and that `due_at` and `due_tz` are both set or both null.
 - `planned_date` (optional local date): when the user intends to do it, separate from the deadline. Never changed automatically; a past planned date on an open task shows under "Earlier, not done" on Today until the user replans or unplans it.
 - `estimated_minutes` (optional): whole minutes, `CHECK (estimated_minutes between 1 and 1440)`. Actual time is not tracked.
+- `reminder_offset_minutes` (optional): `0 | 10 | 30 | 60 | 1440` (CHECK), minutes before `due_at` to remind; none by default ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)). It reminds only while the task is open with a timed deadline still to come. Set with `setTaskReminder` (`task.reminder_changed`) or on create.
 - `completed_at` (optional): set exactly while `status = completed` (CHECK).
 - `cancelled_at` (optional): set exactly while `status = cancelled` (CHECK).
 - `sort_order`
@@ -219,6 +220,7 @@ Fields:
 - `rrule` (optional): the `RRULE` value of a repeating series, limited to the repeat builder's subset (ADR 0012). A series row's times are its first occurrence's. `UNTIL` is a local date (`UNTIL=20261220`): the last day, inclusive, on which an occurrence may start, in the series' zone.
 - `goal_id` (optional)
 - `life_area_id` (optional; its resource lane. Choosing a goal pre-fills the goal's area.)
+- `reminder_offset_minutes` (optional): `0 | 10 | 30 | 60 | 1440` (CHECK), minutes before the start; the form pre-fills 10 for new events, and the service stores what it's given (absent on create = none, absent on an edit = unchanged). A series' setting applies to every occurrence and changes only with "following" or "all"; "this event" refuses it. All-day events never remind (ADR 0013).
 - `source` (`internal` by default; reserved for future integrations)
 - `external_id` (optional, null in v1)
 - `created_at`
@@ -314,6 +316,31 @@ Rules:
 - Subscribing an endpoint another user holds moves the row to the new user and starts it over (a shared computer delivers to whoever subscribed it last).
 - A `404`/`410` from the push service deletes the row. Revoking from Settings deletes it too; the browser keeps its subscription but nothing is sent to it.
 - At most 20 per user (a soft cap). No audit events: a device registration, like a session, not a change to the user's plans.
+
+### Reminder
+One delivery of a reminder (chunk 5.4, [ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)): the schedule and the record. The setting lives on the item (`reminder_offset_minutes`, `daily_nudge_time`). Written only through `src/server/modules/reminders/`.
+
+Fields:
+- `id`
+- `user_id` (cascade)
+- `kind` (`task_deadline | event | daily_nudge`) with exactly its own link (CHECK): `task_id` (composite FK, cascade) for a deadline, `event_id` (composite FK, cascade) for an event, neither for the nudge
+- `target_at`: the deadline, the occurrence's actual start, or the nudge's local time as an instant
+- `occurrence_start` (optional): a repeating event occurrence's original start (ADR 0012's key); only on `event` rows
+- `fire_at` (UTC): `target_at` minus the offset (CHECK `fire_at <= target_at`)
+- `status` (`scheduled | sending | sent | skipped | failed`), `skip_reason` (`stale | disabled | no_device`, set exactly while `skipped`), `attempts`, `last_error_code` (optional), `claimed_at` (optional), `sent_at` (set exactly while `sent`)
+- `snoozed` (default false; 5.6)
+- `created_at`, `updated_at`
+
+Indexes: a partial unique index on `coalesce(task_id, event_id, user_id)` where `status = 'scheduled' and not snoozed` (one scheduled row per task, per event and per user's nudge), `(status, fire_at)` for the sweep, and `task_id`, `event_id`, `user_id`.
+
+Rules:
+- **Scheduling is in the item's transaction.** Each change recomputes the item's one scheduled row and inserts, moves (resetting `attempts`) or deletes it:
+  - **Tasks:** create, a status change, a deadline change and `setTaskReminder`. Completing, cancelling, a date-only or cleared deadline, or no offset delete it; reopening restores it.
+  - **Events:** create, edit (one-off, and every scope of a series) and delete. A series has one **rolling** row for its next occurrence that starts after now: cancelled occurrences are skipped, a moved one fires from its new start (`target_at`) and keeps its original start (`occurrence_start`). The search expands up to eight 366-day windows.
+  - **Nudge:** the next local occurrence of `daily_nudge_time` in the user's zone, firing at that time. Setting the time and changing the zone recompute it; no confirmed zone or no time removes it.
+- A target already past gets no row. A target already reminded about (a non-scheduled, non-snoozed row with the same `target_at` and `occurrence_start`) isn't scheduled again, so an edit after a reminder went out doesn't repeat it, and the series' row rolls on past it.
+- **Claiming:** `claimDueReminders(now, horizon = 15)` moves `scheduled` rows with `fire_at < now + 15 min` to `sending` and stamps `claimed_at`, at most 200 per sweep, oldest first, under `FOR UPDATE SKIP LOCKED`, so overlapping sweeps never claim the same row. Sending, retries and recording `sent`/`skipped`/`failed` are chunk 5.5.
+- Deleting the item deletes its rows, the record included (cascade). No audit events: rows are a delivery log, not a change to the user's plans; the offset changes are audited on the item.
 
 ### Note
 A piece of personal information the user wants to keep.

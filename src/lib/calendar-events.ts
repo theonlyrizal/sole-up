@@ -73,6 +73,7 @@ export const CALENDAR_EVENT_EDITABLE_FIELDS = [
   "rrule",
   "goalId",
   "lifeAreaId",
+  "reminderOffsetMinutes",
 ] as const;
 export type CalendarEventEditableField =
   (typeof CALENDAR_EVENT_EDITABLE_FIELDS)[number];

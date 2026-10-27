@@ -2,6 +2,8 @@ import "server-only";
 
 import { logger as appLogger, type Logger } from "@/server/logging/logger";
 
+import { claimDueReminders } from "./claim";
+
 /** What one sweep did, by delivery outcome (ADR 0013). */
 export type SweepCounts = {
   /** Due reminders claimed (moved to `sending`) by this sweep. */
@@ -21,16 +23,22 @@ export type SweepResult = {
  * delivers them (ADR 0013). Called by `POST /api/reminders/sweep` every 15
  * minutes, and locally by `pnpm reminders:sweep`.
  *
- * Until reminders exist (5.4) it only writes its log line. That line, here
- * and later, holds the start, the counts and the duration, never a reminder
- * or its content.
+ * It claims the due reminders (moving them to `sending`). Sending them is
+ * 5.5's, so until then claimed rows stay `sending`. The log line holds the
+ * start, the counts and the duration, never a reminder or its content.
  */
 export async function runSweep(
   now: Date,
   log: Logger = appLogger,
 ): Promise<SweepResult> {
   const startedAt = performance.now();
-  const counts: SweepCounts = { claimed: 0, sent: 0, skipped: 0, failed: 0 };
+  const claimed = await claimDueReminders(now);
+  const counts: SweepCounts = {
+    claimed: claimed.length,
+    sent: 0,
+    skipped: 0,
+    failed: 0,
+  };
 
   const durationMs = Math.round(performance.now() - startedAt);
   log.info(

@@ -11,6 +11,11 @@ import {
 import { addDays, isLocalDate, type LocalDate } from "@/lib/dates";
 import { canonicalTimeZone } from "@/lib/preferences";
 import { fromRrule, rruleSchema, toRrule } from "@/lib/recurrence";
+import type { ReminderOffset } from "@/lib/reminders";
+import {
+  reminderOffsetChangeSchema,
+  reminderOffsetSchema,
+} from "@/server/modules/reminders/validation";
 
 const idSchema = z.uuid("Choose an event.");
 
@@ -182,27 +187,45 @@ function toEventInput(event: EventFields) {
   };
 }
 
-/** A one-off event, or a repeating series when `rrule` is set. */
+/**
+ * A one-off event, or a repeating series when `rrule` is set. The reminder
+ * is what the form sends (it pre-fills 10 minutes for a new event; ADR
+ * 0013); absent means none. All-day events never remind.
+ */
 export const createCalendarEventSchema = z
-  .strictObject({ ...eventFields, rrule: rruleFieldSchema })
+  .strictObject({
+    ...eventFields,
+    rrule: rruleFieldSchema,
+    reminderOffsetMinutes: reminderOffsetSchema,
+  })
   .superRefine(checkEventTimes)
-  .transform(({ rrule, ...event }) => ({ ...toEventInput(event), rrule }));
+  .transform(({ rrule, reminderOffsetMinutes, ...event }) => ({
+    ...toEventInput(event),
+    rrule,
+    reminderOffsetMinutes,
+  }));
 export type CreateCalendarEventInput = z.output<
   typeof createCalendarEventSchema
 >;
 
 /**
  * Replaces every editable field of a one-off event, like the create form;
- * setting `rrule` makes it a series. A series is changed through
- * `editCalendarEventOccurrenceSchema` instead.
+ * setting `rrule` makes it a series. An absent reminder is kept. A series
+ * is changed through `editCalendarEventOccurrenceSchema` instead.
  */
 export const updateCalendarEventSchema = z
-  .strictObject({ id: idSchema, ...eventFields, rrule: rruleFieldSchema })
+  .strictObject({
+    id: idSchema,
+    ...eventFields,
+    rrule: rruleFieldSchema,
+    reminderOffsetMinutes: reminderOffsetChangeSchema,
+  })
   .superRefine(checkEventTimes)
-  .transform(({ id, rrule, ...event }) => ({
+  .transform(({ id, rrule, reminderOffsetMinutes, ...event }) => ({
     id,
     ...toEventInput(event),
     rrule,
+    reminderOffsetMinutes,
   }));
 export type UpdateCalendarEventInput = z.output<
   typeof updateCalendarEventSchema
@@ -232,7 +255,9 @@ const occurrenceFields = { id: idSchema, originalStart: originalStartSchema };
  * A change to one occurrence of a series, with the scope it applies to
  * (ADR 0012). The fields are the occurrence's new values as the event form
  * sends them. "this" changes only that occurrence, so it can't change the
- * rule; "following" and "all" take the series' rule (null stops repeating).
+ * rule or the reminder (one setting per series, ADR 0013); "following" and
+ * "all" take the series' rule (null stops repeating) and may change the
+ * reminder (absent keeps it).
  */
 export const editCalendarEventOccurrenceSchema = z
   .discriminatedUnion(
@@ -248,20 +273,35 @@ export const editCalendarEventOccurrenceSchema = z
         scope: z.literal("following"),
         ...eventFields,
         rrule: rruleFieldSchema,
+        reminderOffsetMinutes: reminderOffsetChangeSchema,
       }),
       z.strictObject({
         ...occurrenceFields,
         scope: z.literal("all"),
         ...eventFields,
         rrule: rruleFieldSchema,
+        reminderOffsetMinutes: reminderOffsetChangeSchema,
       }),
     ],
     "Choose which events to change.",
   )
   .superRefine(checkEventTimes)
   .transform(({ id, originalStart, scope, ...fields }) => {
-    const { rrule = null, ...event } = fields as EventFields;
-    return { id, originalStart, scope, rrule, ...toEventInput(event) };
+    const {
+      rrule = null,
+      reminderOffsetMinutes,
+      ...event
+    } = fields as EventFields & {
+      reminderOffsetMinutes?: ReminderOffset | null;
+    };
+    return {
+      id,
+      originalStart,
+      scope,
+      rrule,
+      reminderOffsetMinutes,
+      ...toEventInput(event),
+    };
   });
 export type EditCalendarEventOccurrenceInput = z.output<
   typeof editCalendarEventOccurrenceSchema

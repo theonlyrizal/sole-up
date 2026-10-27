@@ -31,6 +31,7 @@ import {
   seriesStartDate,
   type TimedSeries,
 } from "@/lib/recurrence";
+import type { ReminderOffset } from "@/lib/reminders";
 import type {
   calendarEventExceptions,
   calendarEvents,
@@ -202,6 +203,7 @@ export function seriesColumnsOf(row: CalendarEventRow): SeriesColumns {
     startDate: row.startDate,
     endDate: row.endDate,
     rrule: row.rrule,
+    reminderOffsetMinutes: row.reminderOffsetMinutes,
   };
 }
 
@@ -311,17 +313,30 @@ export type SeriesEdit = {
  *   days as the occurrence moved, at the new time of day and zone, with
  *   the new length (elapsed time, or whole days for all-day).
  * - The rule is the one the form sent; null stops the repeat.
+ * - The reminder applies to the whole series (ADR 0013): a sent one
+ *   replaces the base's, and an absent one keeps it.
  */
 export function seriesAfterEdit(
   base: SeriesColumns,
   displayed: OccurrenceValues,
-  input: Details & { when: When; rrule: string | null },
+  input: Details & {
+    when: When;
+    rrule: string | null;
+    reminderOffsetMinutes?: ReminderOffset | null;
+  },
 ): SeriesEdit {
-  const { when, rrule, ...details } = input;
+  const { when, rrule, reminderOffsetMinutes, ...details } = input;
   const changed = DETAIL_FIELDS.filter(
     (field) => details[field] !== displayed[field],
   );
-  const next: SeriesColumns = { ...base, rrule };
+  const next: SeriesColumns = {
+    ...base,
+    rrule,
+    reminderOffsetMinutes:
+      reminderOffsetMinutes === undefined
+        ? base.reminderOffsetMinutes
+        : reminderOffsetMinutes,
+  };
   for (const field of changed) Object.assign(next, { [field]: details[field] });
 
   const inputTiming = calendarEventTiming(when);

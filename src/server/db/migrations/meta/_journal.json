@@ -85,6 +85,13 @@
       "when": 1793123416735,
       "tag": "0011_push_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793130165296,
+      "tag": "0012_reminders",
+      "breakpoints": true
     }
   ]
 }

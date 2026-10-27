@@ -24,6 +24,7 @@ import {
   calendarEventTiming,
 } from "@/lib/calendar-events";
 import { startOfLocalDay, type LocalDate } from "@/lib/dates";
+import type { ReminderOffset } from "@/lib/reminders";
 import {
   countOccurrencesBefore,
   endRuleBefore,
@@ -38,6 +39,7 @@ import { dryRun } from "@/server/db/dry-run";
 import { isForeignKeyViolation } from "@/server/db/errors";
 import { calendarEventExceptions, calendarEvents } from "@/server/db/schema";
 import { ConflictError, NotFoundError, ValidationError } from "@/server/errors";
+import { syncEventReminderInTx } from "@/server/modules/reminders/schedule";
 
 import {
   asSeries,
@@ -83,7 +85,10 @@ import type {
 // Rules: ADR 0012 (shapes, links, recurrence, scopes, history). A series is
 // one row with an RRULE; its occurrences are expanded at query time, and
 // the occurrences that differ are rows in `calendar_event_exceptions`
-// (see series.ts for how a scoped change carries them over).
+// (see series.ts for how a scoped change carries them over). Every change
+// recalculates the event's scheduled reminder in the same transaction (a
+// series' rolling next-occurrence row, ADR 0013); a delete takes its
+// reminders by cascade.
 
 const GOAL_KEYS = [
   "calendar_events_goal_id_user_id_fk",
@@ -243,6 +248,9 @@ async function insertEvent(
       goalId: { from: null, to: row.goalId },
       lifeAreaId: { from: null, to: row.lifeAreaId },
       source: { from: null, to: row.source },
+      ...(row.reminderOffsetMinutes !== null && {
+        reminderOffsetMinutes: { from: null, to: row.reminderOffsetMinutes },
+      }),
       ...(split && { scope: "following" as const, splitFromId: split.fromId }),
     },
   });
@@ -313,6 +321,12 @@ async function updateEvent(
       ...(changed("lifeAreaId") && {
         lifeAreaId: { from: current.lifeAreaId, to: updated.lifeAreaId },
       }),
+      ...(changed("reminderOffsetMinutes") && {
+        reminderOffsetMinutes: {
+          from: current.reminderOffsetMinutes,
+          to: updated.reminderOffsetMinutes,
+        },
+      }),
       ...(context.scope && { scope: context.scope }),
       ...(context.splitIntoId && { splitIntoId: context.splitIntoId }),
       ...(context.droppedExceptions !== undefined &&
@@ -330,7 +344,11 @@ export async function createCalendarEvent(
   input: CreateCalendarEventInput,
 ): Promise<CalendarEvent> {
   const row = await guardLinks(() =>
-    db.transaction((tx) => insertEvent(tx, userId, editableColumns(input))),
+    db.transaction(async (tx) => {
+      const row = await insertEvent(tx, userId, editableColumns(input));
+      await syncEventReminderInTx(tx, userId, row.id);
+      return row;
+    }),
   );
   return toCalendarEvent(row);
 }
@@ -356,7 +374,7 @@ export async function getCalendarEvent(
  */
 export async function updateCalendarEvent(
   userId: string,
-  { id, ...input }: UpdateCalendarEventInput,
+  { id, reminderOffsetMinutes, ...input }: UpdateCalendarEventInput,
 ): Promise<CalendarEvent> {
   const row = await guardLinks(() =>
     db.transaction(async (tx) => {
@@ -366,7 +384,20 @@ export async function updateCalendarEvent(
           "Choose which events to change: this one, this and following, or all.",
         );
       }
-      return updateEvent(tx, userId, current, editableColumns(input));
+      const updated = await updateEvent(
+        tx,
+        userId,
+        current,
+        editableColumns({
+          ...input,
+          reminderOffsetMinutes:
+            reminderOffsetMinutes === undefined
+              ? current.reminderOffsetMinutes
+              : reminderOffsetMinutes,
+        }),
+      );
+      await syncEventReminderInTx(tx, userId, id);
+      return updated;
     }),
   );
   return toCalendarEvent(row);
@@ -683,7 +714,12 @@ async function findOccurrence(
   };
 }
 
-type EditInput = Details & { when: When; rrule: string | null };
+type EditInput = Details & {
+  when: When;
+  rrule: string | null;
+  /** Absent keeps the series' reminder; never sent for "this". */
+  reminderOffsetMinutes?: ReminderOffset | null;
+};
 
 /**
  * Changes occurrences of a series (ADR 0012), from the occurrence starting
@@ -707,6 +743,20 @@ export async function editCalendarEventOccurrence(
 }
 
 async function editOccurrenceInTx(
+  tx: DbTransaction,
+  userId: string,
+  input: EditCalendarEventOccurrenceInput,
+): Promise<OccurrenceEditResult> {
+  const result = await editScopedInTx(tx, userId, input);
+  // The series' rolling reminder, and the new series' after a split.
+  await syncEventReminderInTx(tx, userId, input.id);
+  if (result.event.id !== input.id) {
+    await syncEventReminderInTx(tx, userId, result.event.id);
+  }
+  return result;
+}
+
+async function editScopedInTx(
   tx: DbTransaction,
   userId: string,
   {
@@ -761,12 +811,17 @@ async function editThisOccurrence(
   return { event: toCalendarEvent(series), dropped: [] };
 }
 
-/** True when the form sent what the occurrence shows and the same rule. */
+/**
+ * True when the form sent what the occurrence shows, the same rule and the
+ * same reminder (or none).
+ */
 function isNoOp(occurrence: Occurrence, input: EditInput): boolean {
-  const { when, rrule, ...details } = input;
+  const { when, rrule, reminderOffsetMinutes, ...details } = input;
   const timing = calendarEventTiming(when);
   return (
     rrule === occurrence.series.rrule &&
+    (reminderOffsetMinutes === undefined ||
+      reminderOffsetMinutes === occurrence.series.reminderOffsetMinutes) &&
     sameValues({ ...details, times: timesOf(timing) }, occurrence.displayed) &&
     (timing.allDay || timing.tz === occurrence.series.tz)
   );
@@ -922,6 +977,17 @@ export async function deleteCalendarEventOccurrence(
 }
 
 async function deleteOccurrenceInTx(
+  tx: DbTransaction,
+  userId: string,
+  input: DeleteCalendarEventOccurrenceInput,
+): Promise<{ dropped: DroppedException[] }> {
+  const result = await deleteScopedInTx(tx, userId, input);
+  // A shortened series rolls on; a deleted one took its rows by cascade.
+  await syncEventReminderInTx(tx, userId, input.id);
+  return result;
+}
+
+async function deleteScopedInTx(
   tx: DbTransaction,
   userId: string,
   { id, originalStart, scope }: DeleteCalendarEventOccurrenceInput,
