@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
@@ -31,7 +30,7 @@ import {
   type GridRange,
   gridRangeLabel,
   isGridKey,
-  shiftGridDate,
+  type TimeGridType,
 } from "@/lib/calendar-views";
 import {
   formatLocalDate,
@@ -56,13 +55,13 @@ import {
 import { type CalendarEntry, ItemDialog, useItemDialog } from "./item-dialog";
 import { MoveBlockDialog, type PendingBlockMove } from "./move-block-dialog";
 import { droppedTaskId, TaskPanel } from "./task-panel";
-import { pillClass, ViewNav } from "./view-nav";
+import { GridMoveNav, ViewNav } from "./view-nav";
 
 type TimeGridViewProps = EventFormContext & {
   entries: CalendarEntry[];
   /** The user's open tasks: the block picker's and the task panel's. */
   tasks: BlockableTask[];
-  range: GridRange;
+  range: GridRange<TimeGridType>;
   today: LocalDate;
   /** When the user's tomorrow begins (ISO instant). */
   nextDayStartsAt: string;
@@ -319,35 +318,7 @@ export function TimeGridView({
           <EventFormDialog {...context} trigger={<Button>New event</Button>} />
         </div>
       </div>
-      <nav aria-label="Move through the calendar">
-        <ul className="flex flex-wrap gap-1">
-          <li>
-            <Link
-              href={gridHref(range.view, shiftGridDate(range, -1), today)}
-              className={pillClass(false)}
-            >
-              Previous {unit}
-            </Link>
-          </li>
-          <li>
-            <Link
-              href={gridHref(range.view, today, today)}
-              aria-current={range.date === today ? "page" : undefined}
-              className={pillClass(range.date === today)}
-            >
-              Today
-            </Link>
-          </li>
-          <li>
-            <Link
-              href={gridHref(range.view, shiftGridDate(range, 1), today)}
-              className={pillClass(false)}
-            >
-              Next {unit}
-            </Link>
-          </li>
-        </ul>
-      </nav>
+      <GridMoveNav range={range} today={today} />
       <div className="flex flex-col gap-1">
         <p className="text-muted">
           <span className="sr-only">Showing </span>

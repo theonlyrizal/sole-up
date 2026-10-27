@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type AgendaEntry, agendaEntryKind } from "@/lib/agenda";
-import { gridRange } from "@/lib/calendar-views";
+import { gridRange, type GridRange } from "@/lib/calendar-views";
 import { localDateOf } from "@/lib/dates";
 import { changeTaskStatus, createTask } from "@/server/modules/tasks/service";
 import { createTaskSchema } from "@/server/modules/tasks/validation";
@@ -18,7 +18,7 @@ import { createCalendarEventSchema } from "./validation";
 const TOKYO = "Asia/Tokyo";
 const NEW_YORK = "America/New_York";
 // Monday week start: 26 Oct (Mon) to 1 Nov (Sun).
-const WEEK = gridRange("week", "2026-10-28", 1);
+const WEEK: GridRange = gridRange("week", "2026-10-28", 1);
 
 const newTask = (userId: string, fields: Record<string, unknown>) =>
   createTask(userId, createTaskSchema.parse(fields));

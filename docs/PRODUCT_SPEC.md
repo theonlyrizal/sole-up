@@ -80,7 +80,7 @@ Not every object must be linked to every other object. Relationships should be e
 10. Home with a small set of actionable summaries.
 11. Basic analytics based on stored records and the audit log.
 12. Weekly review workflow.
-13. Calendar: internal events and time blocks for tasks, both repeatable, with no external sync. Week, Day and Agenda views, and resource views by life area after the Phase 4 checkpoint ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)).
+13. Calendar: internal events and time blocks for tasks, both repeatable, with no external sync. Week, Day and Agenda views, and resource views by life area after the Phase 4 checkpoint ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)). "By area" shows one day with a column per active life area plus "No area": an event sits in its own area, a time block in its task's goal's area, and an archived area gets a marked column only while it holds an item that day.
 14. Reminders delivered via Web Push to the installed PWA.
 15. Data export and account deletion, implemented before inviting other users.
 16. Responsive, accessible, installable (PWA) interface with loading, empty, and error states.

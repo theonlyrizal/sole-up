@@ -7,6 +7,8 @@ import {
   CALENDAR_VIEWS,
   type CalendarView,
   gridHref,
+  type GridRange,
+  shiftGridDate,
 } from "@/lib/calendar-views";
 import type { LocalDate } from "@/lib/dates";
 
@@ -21,8 +23,8 @@ export const pillClass = (current: boolean) =>
   );
 
 /**
- * Agenda, Week and Day. Switching keeps the day the user is looking at:
- * the Agenda starts on it, Week holds it and Day shows it. Week is not
+ * Agenda, Week, Day and By area. Switching keeps the day the user is looking at:
+ * the Agenda starts on it, Week holds it, Day and By area show it. Week is not
  * offered on phone widths, where Day stands in for it.
  */
 export function ViewNav({
@@ -53,6 +55,51 @@ export function ViewNav({
             </Link>
           </li>
         ))}
+      </ul>
+    </nav>
+  );
+}
+
+/**
+ * Previous, Today and Next for a grid view: a week or a day at a time,
+ * kept in the URL.
+ */
+export function GridMoveNav({
+  range,
+  today,
+}: {
+  range: GridRange;
+  today: LocalDate;
+}) {
+  const unit = range.view === "week" ? "week" : "day";
+  return (
+    <nav aria-label="Move through the calendar">
+      <ul className="flex flex-wrap gap-1">
+        <li>
+          <Link
+            href={gridHref(range.view, shiftGridDate(range, -1), today)}
+            className={pillClass(false)}
+          >
+            Previous {unit}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href={gridHref(range.view, today, today)}
+            aria-current={range.date === today ? "page" : undefined}
+            className={pillClass(range.date === today)}
+          >
+            Today
+          </Link>
+        </li>
+        <li>
+          <Link
+            href={gridHref(range.view, shiftGridDate(range, 1), today)}
+            className={pillClass(false)}
+          >
+            Next {unit}
+          </Link>
+        </li>
       </ul>
     </nav>
   );

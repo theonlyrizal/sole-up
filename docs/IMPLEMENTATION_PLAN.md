@@ -182,8 +182,8 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 4.7 | Time blocks: schema and service | done | chunk/4.7-time-blocks | 2026-10-26 | `time_blocks` + `time_block_exceptions` (24-hour CHECKs, task cascade, migration 0010), block service with three scopes, `setTimeBlockStatus`, `blocksBetween` with task and lane, auto-mark on completion, task delete removes blocks and their events; no UI |
 | 4.8 | Time blocks UI | done | chunk/4.8-time-blocks-ui | 2026-10-27 | "Block time" form (Plan, Today, task dialog, grid toolbar), blocks on Week/Day/Agenda, slot select → task picker, drag to move/resize with a scope prompt, desktop task panel, block dialog with status, "Also complete the task" and "End series here" |
 | 4.9 | Integrations with Today and Home | done | chunk/4.9-today-home-integrations | 2026-10-27 | Today opens with a "Schedule" timeline (events + blocks, all-day first); Home's "Next commitment" card from `nextCommitment` in `metrics/home.ts`; links open the item's dialog on Day via `?item=` |
-| 4.✓ | Phase 4 checkpoint (user) | todo | | | |
-| 4.10 | Resource columns by life area | todo | | | |
+| 4.✓ | Phase 4 checkpoint (user) | done | | 2026-10-27 | User confirmed the checkpoint done; no Month view or event dragging requested, no plan changes |
+| 4.10 | Resource columns by life area | done | chunk/4.10-resource-columns | 2026-10-27 | `/plan/calendar?view=areas&date=` "By area": our own day view, a column per active life area + "No area" (archived area marked, only while it holds items), side-by-side overlaps, arrow keys across columns, axe |
 | 4.11 | Resource timeline by life area | todo | | | |
 | 5.0 | Decision gate: reminders | todo | | | |
 | 5.1 | Worker process and pg-boss | todo | | | |
@@ -2161,5 +2161,34 @@ Template:
 - **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 565 unit, 414 integration), `pnpm build` and `pnpm test:e2e` (56 tests) pass; `schedule.spec.ts` and `home.spec.ts` passed 9 of 9 with `--repeat-each=3`. One full e2e run failed on the known `preferences.spec.ts` first-sign-in flake and the next full run passed 56 of 56. No schema change, so no migration. No screen-reader or phone pass.
 - **Follow-ups:**
   - Checkpoint question: a multi-day all-day event (a trip) that is under way stays Home's next commitment for its whole span, ahead of the day's timed items. If that hides what's next while dogfooding, rank timed items first or show both.
+  - The `preferences.spec.ts` first-sign-in flake is still open.
+  - Earlier follow-ups still open: pointer drag for events; undo in the "Block moved" toast; FullCalendar's English labels; closed tasks on past Agenda days; event dialog field errors that stay until the next save; event history for link clears.
+
+### 4.10: Resource columns by life area (2026-10-27)
+- **Built:**
+  - `src/lib/area-columns.ts` (pure): `entryAreaId` (an event's own area, a block's task's goal's area), `areaColumns(entries, areas, date, tz)` (active areas in the user's order, then an archived area holding an item, then "No area"; all-day and timed items per column), `layoutDay` (elapsed-time placement on the local day, clipped at both midnights, `MIN_LAYOUT_MINUTES` = 30, greedy lanes per run of overlaps with an even width split), `dayHourMarks` and `dayLengthHours` (23/24/25 hours).
+  - `listDaySchedule(userId, date, tz)` in `calendar-events/queries.ts` (events + blocks for one local day, timeline order); `listTodayTimeline` now calls it.
+  - `src/components/calendar/area-columns-view.tsx` (`AreaColumnsView`): our own component, no FullCalendar and none of its premium code. A focusable region ("By area, <date>") that scrolls sideways, a CSS grid with `subgrid` rows (heading, all-day, timed) so each column is one `role="group"` named by its `h2`, a hidden hour axis labelled in local time, items as our own buttons (`data-calendar-item`, `data-item-id`) with a description (kind, time, area, block status), events filled and blocks tinted with the 4.8 edge styles. Browser-only render, like the FullCalendar wrapper.
+  - `calendar-views.ts`: an `areas` view ("By area") and `TimeGridType`; `GridRange` and `gridRange`/`parseGridRange` are generic over the view; `GridItemPosition.day` is any key that sorts in column order. `GridMoveNav` (Previous/Today/Next) moved into `view-nav.tsx` and is used by Week/Day too.
+  - Page: `?view=areas&date=` loads `listDaySchedule` + `listEventLinkOptions` (its areas are the columns), `max-w-7xl` from `lg`.
+  - Tests: unit `area-columns.test.ts` (14: area rules incl. archived and unknown areas, Tokyo placement, side by side and lane reuse, touching items, midnight clipping, the 30-minute minimum at the day's end, a 25-hour New York day, hour marks on both DST days) and `areas` cases in `calendar-views.test.ts`; integration `area-columns.integration.test.ts` (4, Tokyo: events by area and blocks by their goal's area with overlaps, Tokyo time not UTC, an archived area kept and marked and an empty one hidden, cross-user); e2e `tests/e2e/area-columns.spec.ts` (2, Tokyo: columns in order, Dentist/Physio side by side in Health and Standup level in Work, Tab into the items, ArrowUp/Down/Left/Right/Home/End, Enter/Escape with focus back, Next day/Today in the URL through a reload, switching to Day keeps the day, axe with and without a dialog; a phone in the dark theme with only "No area" and the hint, then four columns scrolling inside the view and not the page, arrow keys scrolling it, axe). `week-day.spec.ts` expects the new "By area" link.
+  - Docs: README (By area), PRODUCT_SPEC §5 item 13.
+- **Deviations:**
+  1. **Archived areas:** an item whose area is archived gets that area's column, marked "(archived area)", only while it holds an item that day, rather than going under "No area" (which would say it has no area). Unknown areas fall back to "No area".
+  2. **Events and time blocks only**, as the chunk text names; timed task deadlines stay on Week and Day.
+  3. **No create or drag on this view:** "New event" and "Block time" stay on Week and Day; clicking an item opens its usual dialog.
+- **Decisions:**
+  1. **URL:** `?view=areas&date=YYYY-MM-DD` (date left out for today), one day at a time; the view tab is "By area" and shows at every width (columns scroll sideways inside the region on a phone).
+  2. **Layout:** 48 px an hour; an item takes at least 30 minutes of room (24 px, the WCAG 2.2 target size axe checks), so two short items closer than that sit side by side. Items are sorted by start, longer first; each takes the first free lane, and a run of overlapping items shares its lane count (no widening into free space, unlike FullCalendar).
+  3. **Keyboard:** the region is a Tab stop (sideways scrolling), then each item; `gridItemTarget` is reused with zero-padded column indexes as keys, so Up/Down stay in a column (all-day first), Left/Right go to the nearest-in-time item of the next column with items, Home/End to the first/last.
+  4. **Full-height columns, page scroll** (as 4.6): no inner vertical scroller, so the column headings scroll away on a long day.
+- **Next chunk should know:**
+  - 4.11 can reuse `areaColumns`'s grouping (`entryAreaId`, archived/unknown rules) and `layoutDay`'s lanes with a horizontal axis, `listDaySchedule` (or `eventsBetween` + `blocksBetween` for a week), and `GridMoveNav` (it says "week" for a week range).
+  - Locators: the region `getByRole("region", { name: /^By area, / })`, a column `getByRole("group", { name, exact: true })` inside it, item buttons by title; `data-column` (zero-padded) and `data-area-id` on columns.
+  - On `/goals/areas`, wait for each new area to be listed before typing the next: Enter is ignored while the previous save is pending.
+- **Unverified:** none for the automated checks. `pnpm verify` (format, lint, typecheck, 580 unit, 418 integration), `pnpm build` and `pnpm test:e2e` (58 tests) pass; `area-columns.spec.ts` passed 6 of 6 with `--repeat-each=3`. One full e2e run failed on the known `preferences.spec.ts` first-sign-in flake, and one on a race in this chunk's own `addAreas` helper (fixed above); the final full run passed 58 of 58. No schema change, so no migration. No screen-reader or real-phone pass.
+- **Follow-ups:**
+  - Sticky column headings and a time axis that stays in view on a long day would need an inner vertical scroller (rejected in 4.6); revisit if the headings scrolling away bothers.
+  - Life area colours (`life_areas.color`) aren't shown anywhere yet; the column headings would be a natural place.
   - The `preferences.spec.ts` first-sign-in flake is still open.
   - Earlier follow-ups still open: pointer drag for events; undo in the "Block moved" toast; FullCalendar's English labels; closed tasks on past Agenda days; event dialog field errors that stay until the next save; event history for link clears.
