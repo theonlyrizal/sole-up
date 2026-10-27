@@ -187,7 +187,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 4.11 | Resource timeline by life area | done | chunk/4.11-resource-timeline | 2026-10-27 | `/plan/calendar?view=timeline&span=day\|week&date=` "Timeline": our own component, a row per active life area + "No area" on a horizontal axis (week by default), lanes for overlaps, sticky row headings, arrow keys along/across rows, axe |
 | 5.0 | Decision gate: reminders | done | chunk/5.0-reminders-decisions | 2026-10-27 | ADR 0013: stay free, no worker/pg-boss, cron-job.org sweep every 15 min (never late, up to 15 early); deadlines, events (rolling next occurrence) and a daily nudge; quiet hours hold/bundle/skip stale; title or private payload; 5.1–5.7 rewritten |
 | 5.1 | Sweep route and external trigger | done | chunk/5.1-sweep-route | 2026-10-27 | Required `REMINDER_SWEEP_SECRET`, `POST /api/reminders/sweep` (constant-time Bearer check, same 401, no body) → `runSweep(now)` stub logging counts only; `pnpm reminders:sweep` calls the local route; DEPLOY.md secret + cron-job.org steps; production check unverified |
-| 5.2 | Service worker and PWA install | todo | | | |
+| 5.2 | Service worker and PWA install | done | chunk/5.2-service-worker-install | 2026-10-27 | `public/sw.js` (push + notificationclick only, no fetch/cache; payload text as given, same-origin deep link focusing an open tab), registered on every page, uncached with its own CSP; Settings "Install the app" with iOS Home Screen guidance; desktop install confirmed, phone unverified |
 | 5.3 | Push subscriptions | todo | | | |
 | 5.4 | Reminders: schema and scheduling | todo | | | |
 | 5.5 | Delivery in the sweep | todo | | | |
@@ -2357,3 +2357,32 @@ Template:
 - **Follow-ups:**
   - If the production check shows timeouts on cold starts, add the database-free keep-awake route and a second cron-job.org job every 10 minutes (ADR 0013), and update DEPLOY.md.
   - Confirm Render's and Neon's free usage after the first month (DEPLOY.md > Free-plan budget).
+
+### 5.2: Service worker and PWA install (2026-10-27)
+- **Built:**
+  - `public/sw.js`: plain browser JavaScript (no imports, no logging) with `install` (`skipWaiting`), `activate` (`clients.claim`), `push` and `notificationclick` handlers only. No fetch handler and no cache.
+    - Push payload contract (JSON): `{ title, body?, url?, tag? }`. `title`/`body` are shown exactly as sent, with the app icon. The worker never fetches anything. A push with no payload, unreadable JSON or a blank title shows "SoleUp" / "You have a reminder" (browsers require a notification for every push).
+    - Click: closes the notification, then focuses a tab already on `url`, or focuses any open SoleUp tab and `navigate()`s it, or `openWindow(url)` when there is none (also when the tab can't be navigated). `url` must resolve to this origin; anything else (another origin, `//host`, `javascript:`, missing) opens `/home`.
+  - `src/components/pwa/service-worker-registration.tsx`: `ServiceWorkerRegistration` in the root layout registers `/sw.js` (scope `/`, `updateViaCache: "none"`) on every page, signed out too. Failures are ignored.
+  - `next.config.ts` `headers()`: `/sw.js` gets `Content-Type: application/javascript; charset=utf-8`, `Cache-Control: no-cache, no-store, must-revalidate` and `Content-Security-Policy: default-src 'self'; script-src 'self'`. The proxy already skips paths with a dot.
+  - Install help: `src/components/pwa/install-help.tsx` (`InstallHelp`) in a new Settings section, "Install the app". It always shows steps for iPhone and iPad (Safari → Share → Add to Home Screen → open from the icon; notifications only from the Home Screen app, iOS/iPadOS 16.4+), Android and computers (Chrome/Edge install icon or menu, Safari File › Add to Dock). This device's heading gets "(this device)". An iPhone/iPad not running standalone gets a note that notifications need the Home Screen app, and the standalone app (`display-mode: standalone` or `navigator.standalone`) says "You're using the installed app on this device." Platform detection is `src/lib/install-platform.ts` (`installPlatform(ua, maxTouchPoints)`, iPadOS's Mac user agent with touch counts as iOS).
+  - Tests: unit `src/components/pwa/service-worker.test.ts` (runs `sw.js` in a `node:vm` fake worker scope: only the four listeners, payload as given, fallbacks, wrong-type fields, no fetch, every click path and rejected URLs), `src/lib/install-platform.test.ts`. e2e `tests/e2e/pwa.spec.ts` (`/sw.js` headers, registration with scope `/` and the right script signed out, install help on desktop and with an iPhone user agent, the standalone note, axe) and `tests/e2e/push.spec.ts` (a real push delivered with CDP `ServiceWorker.deliverPushMessage` shows its title, body and `data.url`). `activeServiceWorker(page)` added to `tests/e2e/helpers.ts`.
+  - Docs: README "UI shell and components" (service worker, install help), ARCHITECTURE §8 "On the device", the manifest comment.
+- **Deviations:** none from the chunk text. "An install prompt or help text": help text only, with no custom install button. `beforeinstallprompt` is Chromium-only, could fire before hydration and be missed, and browsers already offer their own install UI. This matches Next's PWA guide.
+- **Decisions:**
+  - The worker lives in `public/` as a classic script (module service workers aren't safe across all target browsers yet), so its logic is tested by evaluating the file rather than importing it.
+  - `skipWaiting` + `clients.claim`: safe with no cache, and it lets the click handler `navigate()` tabs opened before the worker installed.
+  - Registered everywhere, including `pnpm dev` and the e2e dev server. With no fetch handler it can't change how pages load.
+  Recorded in `sw.js` comments, the README and ARCHITECTURE §8.
+- **Next chunk should know:**
+  - 5.3: subscribe with `(await navigator.serviceWorker.ready).pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })`. The registration already exists on every page. Notification permission must be requested from a user gesture (the subscribe button).
+  - 5.5: build payloads to the contract above. Put the item's deep link in `url` as a path (for example the `?item=` Day link from 4.9), and use `tag` per reminder so a resend replaces rather than duplicates. Private mode and bundles: put "You have a reminder · <time>" in `title` and no item text anywhere.
+  - e2e push tests need `test.use({ channel: "chromium" })` at the top level of their own file. The default headless shell denies notification permission, and a channel can't be set per describe group. CI's `playwright install --with-deps chromium` already installs the full build.
+  - The Claude desktop app's browser pane can't register service workers ("unknown error occurred when fetching the script"). Use Chrome or Playwright for anything involving the worker.
+- **Unverified:**
+  - **Phone install (user):** needs HTTPS, so it can only be checked on Render after this PR deploys: on iPhone, Safari → Share → Add to Home Screen, then open from the icon (Settings should say it's the installed app); on Android, Chrome ⋮ → Install app. Not done at close-out.
+  - Notification clicks are covered only by the unit tests' fake scope. CDP can't click a notification, so focus/navigate on a real browser is first exercised by 5.3's test notification.
+  - Checks: `pnpm verify` (format, lint, typecheck, 629 unit, 426 integration), `pnpm build` and `pnpm test:e2e` (66) pass on the tree merged with 5.1. Production build (`pnpm start`): the worker registered with scope `/`, activated and controlled the page after a reload in Playwright's Chromium, with no console errors. **Desktop install confirmed by the user** (Chrome/Edge from localhost, opened in its own window).
+- **Follow-ups:**
+  - A monochrome `badge` icon for Android's status bar (Android shows a generic one without it). Worth adding with 5.5's real notifications.
+  - Safe-area rendering on a real phone in standalone mode (0.10's open item) can be checked during the phone install.

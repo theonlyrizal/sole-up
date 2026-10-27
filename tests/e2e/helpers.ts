@@ -16,6 +16,17 @@ export async function signInAndConfirm(page: Page, name = "Alan Turing") {
   ).toBeVisible();
 }
 
+/** Waits for the page's service worker to be active; its scope and script. */
+export async function activeServiceWorker(page: Page) {
+  return page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready;
+    return {
+      scope: registration.scope,
+      scriptURL: registration.active?.scriptURL,
+    };
+  });
+}
+
 /** Fails on any serious or critical WCAG 2.x A/AA violation. */
 export async function expectNoSeriousViolations(page: Page) {
   const results = await new AxeBuilder({ page })
