@@ -43,6 +43,7 @@ describe("POST /api/test/sign-in", () => {
     vi.stubEnv("DATABASE_URL", "postgres://u:p@localhost:5432/soleup_dev");
     vi.stubEnv("BETTER_AUTH_SECRET", "x".repeat(32));
     vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3000");
+    vi.stubEnv("REMINDER_SWEEP_SECRET", "s".repeat(43));
     vi.stubEnv("SOLEUP_TEST_SIGN_IN", "");
     for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
     // env.ts parses process.env on import, so load the route fresh.

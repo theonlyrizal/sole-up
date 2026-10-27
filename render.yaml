@@ -5,7 +5,9 @@ services:
     name: soleup
     runtime: node
     # Free: sleeps after 15 idle minutes, no pre-deploy command, no workers.
-    # The Phase 5 worker needs a paid plan or another host (docs/DEPLOY.md).
+    # Reminders need no worker: cron-job.org calls POST /api/reminders/sweep
+    # every 15 minutes, which keeps this service awake most of the month
+    # (ADR 0013, docs/DEPLOY.md > Reminder sweep).
     plan: free
     # Can't be changed after creation. Neon's project is in AWS ap-southeast-1.
     region: singapore
@@ -48,4 +50,9 @@ services:
       - key: GITHUB_CLIENT_ID
         sync: false
       - key: GITHUB_CLIENT_SECRET
+        sync: false
+      # Bearer secret for POST /api/reminders/sweep, at least 32 random bytes.
+      # Entered by hand (not generateValue): the same value goes into the
+      # cron-job.org job. Required at boot.
+      - key: REMINDER_SWEEP_SECRET
         sync: false

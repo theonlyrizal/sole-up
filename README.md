@@ -36,7 +36,7 @@ Requires Node 24 (see `.nvmrc`), pnpm 11 (`corepack enable` picks up the version
 
    `--wait` returns once the healthcheck passes; `docker compose ps` should show the service as `healthy`. Data persists in the `soleup_postgres-data` volume. `docker compose down -v` deletes it, and the databases are recreated on the next start.
 
-3. Create your env file. The defaults in `.env.example` match the local Postgres. Set `BETTER_AUTH_SECRET` to a random value of at least 32 characters (the second command prints one). OAuth credentials are optional; without them the sign-in page says no provider is configured (see [Authentication](#authentication)).
+3. Create your env file. The defaults in `.env.example` match the local Postgres. Set `BETTER_AUTH_SECRET` and `REMINDER_SWEEP_SECRET` to two different random values (the second command prints one; run it twice). OAuth credentials are optional; without them the sign-in page says no provider is configured (see [Authentication](#authentication)).
 
    ```bash
    cp .env.example .env.local
@@ -168,6 +168,18 @@ Every service mutation records a content-free audit event in the same transactio
 - Local dates are `YYYY-MM-DD` strings (Postgres `date`, string mode); instants are `Date` (`timestamptz`); zones are IANA names. Only `src/lib/dates.ts` imports `temporal-polyfill`.
 - Repeating events and blocks go through `src/lib/recurrence.ts`, the only module that imports `rrule-temporal` ([ADR 0012](docs/decisions/0012-calendar-recurrence-time-blocks-views.md)): `rruleSchema` / `recurrenceSchema`, `fromRrule` / `toRrule`, `expandOccurrences(series, { localStart, localEnd, tz }, exceptions)` (at most 366 days) and `describeRecurrence`. The builder's values, schemas, rule conversion and summary live in `src/lib/recurrence-rules.ts` (re-exported by `recurrence.ts`): client components import that module, so the library and its bundled Temporal polyfill stay out of the browser bundle.
 - The user's zone, locale and week start come from `getUserPreferences(userId)` (`src/server/modules/preferences/service.ts`). `timezone` is `null` until the user confirms it; the (app) layout shows the confirmation form until then.
+
+## Reminders
+
+There is no worker ([ADR 0013](docs/decisions/0013-reminders-sweep-and-delivery.md)). Reminders go out from one sweep, `runSweep(now)` in `src/server/modules/reminders/sweep.ts`, run by `POST /api/reminders/sweep`. The route needs `Authorization: Bearer $REMINDER_SWEEP_SECRET`, compared in constant time, and answers the same `401` for a missing or wrong secret. It is not a session route and reads no body. In production cron-job.org calls it every 15 minutes ([docs/DEPLOY.md](docs/DEPLOY.md) > Reminder sweep).
+
+Locally there is no cron. With `pnpm dev` running, run one sweep with:
+
+```bash
+pnpm reminders:sweep
+```
+
+It calls the route on `BETTER_AUTH_URL` with the secret from `.env.local` and prints the counts. The app logs one `Reminder sweep finished` line with the start, counts and duration, never the secret or reminder content. Until chunk 5.4 every count is zero.
 
 ## Testing
 
