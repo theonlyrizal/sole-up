@@ -128,7 +128,12 @@ test("the week starts on the user's week start, and moves through the URL", asyn
   await openCalendar(page, "/plan/calendar?view=week");
 
   const views = page.getByRole("navigation", { name: "Calendar view" });
-  await expect(views.getByRole("link")).toHaveText(["Agenda", "Week", "Day"]);
+  await expect(views.getByRole("link")).toHaveText([
+    "Agenda",
+    "Week",
+    "Day",
+    "By area",
+  ]);
   await expect(views.getByRole("link", { name: "Week" })).toHaveAttribute(
     "aria-current",
     "page",
@@ -329,7 +334,11 @@ test("a phone gets Day instead of Week, in the dark theme, without sideways scro
     new RegExp(`/plan/calendar\\?view=day&date=${tokyoDate(2)}$`),
   );
   const views = page.getByRole("navigation", { name: "Calendar view" });
-  await expect(views.getByRole("link")).toHaveText(["Agenda", "Day"]);
+  await expect(views.getByRole("link")).toHaveText([
+    "Agenda",
+    "Day",
+    "By area",
+  ]);
   await page.goto("/plan/calendar?view=day");
   await expect(page.getByRole("grid")).toBeVisible();
   await addEvent(page, "Dentist", today, "09:00");

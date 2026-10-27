@@ -9,7 +9,7 @@ import {
   type AgendaRange,
 } from "@/lib/agenda";
 import { gridEntries, type GridRange } from "@/lib/calendar-views";
-import { addDays } from "@/lib/dates";
+import { addDays, type LocalDate } from "@/lib/dates";
 import type { GoalStatus } from "@/lib/goals";
 import type { LifeAreaStatus } from "@/lib/life-areas";
 import { type ScheduleEntry, timelineEntries } from "@/lib/schedule";
@@ -79,14 +79,23 @@ export async function listTodayTimeline(
   clock: TodayClock,
   timeZone: string,
 ): Promise<ScheduleEntry[]> {
-  const today = {
-    localStart: clock.today,
-    localEnd: addDays(clock.today, 1),
-    tz: timeZone,
-  };
+  return listDaySchedule(userId, clock.today, timeZone);
+}
+
+/**
+ * One local day's events, occurrences and time blocks in `timeZone` (the
+ * user's), all-day events first, then by start: Today's timeline, and the
+ * By area view's items (chunk 4.10), which carry each item's life area.
+ */
+export async function listDaySchedule(
+  userId: string,
+  date: LocalDate,
+  timeZone: string,
+): Promise<ScheduleEntry[]> {
+  const day = { localStart: date, localEnd: addDays(date, 1), tz: timeZone };
   const [events, blocks] = await Promise.all([
-    eventsBetween(userId, today),
-    blocksBetween(userId, today),
+    eventsBetween(userId, day),
+    blocksBetween(userId, day),
   ]);
   return timelineEntries(events, blocks, timeZone);
 }

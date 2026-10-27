@@ -1,4 +1,5 @@
-// The calendar page's views (chunks 4.5 and 4.6): Agenda, Week and Day.
+// The calendar page's views (chunks 4.5, 4.6 and 4.10): Agenda, Week, Day
+// and By area.
 // Pure: no server-only imports, so the query, the page, the calendar
 // components and the tests share it.
 //
@@ -7,6 +8,9 @@
 // date. Both hold events (occurrences of repeating ones included), time
 // blocks (chunk 4.8) and timed task deadlines, which show as markers.
 // Planned tasks and all-day deadlines stay on Today, Upcoming and the Agenda.
+//
+// By area is one day too, with a column per life area (see area-columns.ts).
+// It shows events and time blocks only, so it has its own query.
 
 import type { AgendaTaskFields } from "./agenda";
 import {
@@ -27,7 +31,7 @@ import {
   type WeekStart,
 } from "./dates";
 
-export const CALENDAR_VIEWS = ["agenda", "week", "day"] as const;
+export const CALENDAR_VIEWS = ["agenda", "week", "day", "areas"] as const;
 export type CalendarView = (typeof CALENDAR_VIEWS)[number];
 
 /** Each view's tab label. */
@@ -35,18 +39,22 @@ export const CALENDAR_VIEW_LABELS: Record<CalendarView, string> = {
   agenda: "Agenda",
   week: "Week",
   day: "Day",
+  areas: "By area",
 };
 
-/** The time-grid views. */
+/** The views over whole local days: the time grids and By area. */
 export type GridView = Exclude<CalendarView, "agenda">;
 
+/** The views FullCalendar draws as time grids. */
+export type TimeGridType = Exclude<GridView, "areas">;
+
 /**
- * A time grid's range: `date` is the day the user asked for (the anchor,
+ * A grid view's range: `date` is the day the user asked for (the anchor,
  * kept so Day can stand in for Week on a phone), `start`/`end` the local
  * days shown, `end` exclusive.
  */
-export type GridRange = {
-  view: GridView;
+export type GridRange<View extends GridView = GridView> = {
+  view: View;
   date: LocalDate;
   start: LocalDate;
   end: LocalDate;
@@ -72,12 +80,12 @@ export function parseCalendarView(params: {
   return CALENDAR_VIEWS.find((known) => known === view) ?? "agenda";
 }
 
-/** The days a grid view shows around `date`. */
-export function gridRange(
-  view: GridView,
+/** The days a grid view shows around `date`: a week, or one day. */
+export function gridRange<View extends GridView>(
+  view: View,
   date: LocalDate,
   weekStart: WeekStart,
-): GridRange {
+): GridRange<View> {
   const start = view === "week" ? startOfWeek(date, weekStart) : date;
   return { view, date, start, end: addDays(start, view === "week" ? 7 : 1) };
 }
@@ -86,12 +94,12 @@ export function gridRange(
  * A grid's range from the page's `date` search param: a missing or
  * malformed date is today.
  */
-export function parseGridRange(
-  view: GridView,
+export function parseGridRange<View extends GridView>(
+  view: View,
   params: { date?: SearchParam },
   today: LocalDate,
   weekStart: WeekStart,
-): GridRange {
+): GridRange<View> {
   const date = firstValue(params.date);
   return gridRange(
     view,
@@ -166,7 +174,8 @@ export function gridDays(range: GridRange): LocalDate[] {
  * October 2026") for a day.
  */
 export function gridRangeLabel(range: GridRange, locale: string): string {
-  if (range.view === "day") return formatLocalDate(range.start, locale, "full");
+  if (range.view !== "week")
+    return formatLocalDate(range.start, locale, "full");
   const last = addDays(range.end, -1);
   return `${formatLocalDate(range.start, locale)} to ${formatLocalDate(last, locale)}`;
 }
@@ -225,8 +234,11 @@ export function gridEntries<T extends AgendaTaskFields>(
 
 /** Where an item button sits on the grid, for arrow-key moves. */
 export type GridItemPosition = {
-  /** The local day of the column it is in. */
-  day: LocalDate;
+  /**
+   * The column it is in: its local day on Week and Day, or any key that
+   * sorts in column order (By area's column index, zero-padded).
+   */
+  day: string;
   /** In the all-day row (before the day's timed items). */
   allDay: boolean;
   /** Its top and left edge on screen. */

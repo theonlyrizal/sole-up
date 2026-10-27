@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { AgendaView } from "@/components/calendar/agenda-view";
+import { AreaColumnsView } from "@/components/calendar/area-columns-view";
 import { TimeGridView } from "@/components/calendar/time-grid-view";
 import { PlanSubnav } from "@/components/tasks/plan-subnav";
 import { cx } from "@/components/ui/cx";
@@ -19,6 +20,7 @@ import { requireUser } from "@/server/auth/session";
 import {
   listAgenda,
   listCalendarGrid,
+  listDaySchedule,
   listEventLinkOptions,
 } from "@/server/modules/calendar-events/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
@@ -44,13 +46,14 @@ async function CalendarPageBody({
   const params = await searchParams;
   const view = parseCalendarView(params);
   return (
-    // The time grids need the room for seven day columns.
+    // The time grids need the room for seven day columns, By area for a
+    // column per life area.
     <div
       className={cx(
         "mx-auto flex w-full flex-col gap-6 px-4 py-10",
         view === "agenda"
           ? "max-w-2xl"
-          : view === "week"
+          : view === "week" || view === "areas"
             ? "max-w-5xl lg:max-w-7xl"
             : "max-w-5xl",
       )}
@@ -100,6 +103,27 @@ async function Calendar({
     return (
       <AgendaView
         entries={entries}
+        range={range}
+        today={today}
+        nextDayStartsAt={nextDayStartsAt}
+        options={options}
+        {...context}
+      />
+    );
+  }
+
+  if (view === "areas") {
+    const range = parseGridRange(view, params, today, preferences.weekStart);
+    const [entries, options] = await Promise.all([
+      listDaySchedule(user.id, range.date, timeZone),
+      listEventLinkOptions(user.id),
+    ]);
+    return (
+      <AreaColumnsView
+        // A new key per day, so moving resets the view's scroll and focus.
+        key={range.start}
+        entries={entries}
+        areas={options.areas}
         range={range}
         today={today}
         nextDayStartsAt={nextDayStartsAt}

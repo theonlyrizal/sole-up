@@ -115,6 +115,7 @@ describe("parseCalendarView", () => {
     expect(parseCalendarView({ view: ["day", "week"] })).toBe("day");
     expect(parseCalendarView({})).toBe("agenda");
     expect(parseCalendarView({ view: "month" })).toBe("agenda");
+    expect(parseCalendarView({ view: "areas" })).toBe("areas");
   });
 });
 
@@ -255,6 +256,24 @@ describe("labels", () => {
     expect(gridRangeLabel(gridRange("day", TODAY, 1), "en-GB")).toBe(
       "Friday, 23 October 2026",
     );
+    expect(gridRangeLabel(gridRange("areas", TODAY, 1), "en-GB")).toBe(
+      "Friday, 23 October 2026",
+    );
+  });
+
+  it("holds one day in By area, moved a day at a time in the URL", () => {
+    const areas = gridRange("areas", TODAY, 1);
+    expect(areas).toEqual({
+      view: "areas",
+      date: TODAY,
+      start: TODAY,
+      end: "2026-10-24",
+    });
+    expect(shiftGridDate(areas, 1)).toBe("2026-10-24");
+    expect(gridHref("areas", "2026-10-24", TODAY)).toBe(
+      "/plan/calendar?view=areas&date=2026-10-24",
+    );
+    expect(gridHref("areas", TODAY, TODAY)).toBe("/plan/calendar?view=areas");
   });
 
   it("gives a column's short heading for its own date in any zone", () => {
