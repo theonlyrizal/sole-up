@@ -198,7 +198,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 6.0 | Decision gate: habits | done | chunk/6.0-habits-decisions | 2026-10-29 | ADR 0014: three cadences, check or quantity (partial credit), completed/skipped with derived "Missed", versioned schedules, exact week-based denominators, skips excluded; 6.1–6.6 and DATA_MODEL synced |
 | 6.1 | Habits: schema and service | done | chunk/6.1-habits-schema-service | 2026-10-29 | `habits`, `habit_schedules`, `habit_pauses`, `habit_logs` (migration 0015, hand-edited `SET NULL (goal_id)`, one-open-pause index), per-type cadence Zod schemas, service with versioned schedules, pause/archive rows and `habit.*` events; no UI, logs or consistency |
 | 6.2 | Cadence engine | done | chunk/6.2-cadence-engine | 2026-10-29 | `src/lib/habits/consistency.ts`: `isActiveDay`, `weekTarget`, `habitDays`, `consistency`, `weekProgress`, `formatConsistency`, `cutToOneDecimal`, with definition text; exact credit sums; current week for quantity amended in ADR 0014 |
-| 6.3 | Habit CRUD UI | todo | | | |
+| 6.3 | Habit CRUD UI | done | chunk/6.3-habit-crud-ui | 2026-10-29 | Track in the nav (`/track`, `/track/archived`), create/edit dialog (measure on create only, unit + target, daily/chosen days/N a week picker, seven days → daily, "applies from this week" note), pause/resume, archive/restore, delete naming the log count, optional goal link; edits save in one transaction |
 | 6.4 | Logging | todo | | | |
 | 6.5 | Track page and history | todo | | | |
 | 6.6 | Home integration | todo | | | |
@@ -2778,3 +2778,28 @@ Template:
 - **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint (1 pre-existing warning, below), typecheck, 888 unit and 581 integration tests. Pure code only: no schema, UI, build or e2e.
 - **Follow-ups:**
   - Lint warns about an unused `_omitted` in `src/server/modules/habits/validation.test.ts:108` (from 6.1).
+
+### 6.3: Habit CRUD UI (2026-10-29)
+- **Built:**
+  - Navigation: Track after Plan in `NAV_ITEMS` (a bar-chart icon; the phone bar is now 5 columns) and `APP_ROUTE_SEGMENTS`.
+  - Routes: `/track` (active, then paused, each its own section; "Archived (n)" link; empty state) and `/track/archived` (newest first, "Archived on …", Restore behind a confirmation, Delete), each with `error.tsx`.
+  - `src/components/habits/`: `habit-form.tsx` (`HabitFormDialog` + the cadence picker), `track-view.tsx` (`TrackView`, `HabitSummary`), `archived-habits-view.tsx`, `delete-habit-dialog.tsx`.
+  - `src/lib/habits/habit-form.ts` (pure): `weekdaysFrom`, `WEEKDAY_NAMES`, `pickerValueOf`, `cadenceInput` (all seven weekdays → daily), `isEveryDay`, `describeCadence` ("Every day", "Mon, Wed, Fri" in week order, "3 times a week"), `describeTarget` ("8 glasses a day", locale digits), `habitDeleteConsequences`.
+  - `src/server/modules/habits/`: `queries.ts` (`getTrackView`, `getArchivedHabits`: this week's schedule via `scheduleForWeek`, labels, goal title, log count, goal options), `actions.ts` (create, edit, pause, resume, archive, restore, delete), and in `service.ts` a new `editHabit` with `updateHabit`/`changeHabitSchedule` split into in-transaction helpers.
+  - Tests: unit `habit-form.test.ts`, `editHabitSchema` and all-errors-at-once cases in `validation.test.ts`, nav test; integration `track.integration.test.ts` (17: edit atomicity and events, read models, cross-user, actions incl. signed out and NotFound, delete removing logs); e2e `habits.spec.ts` (create check + quantity with field errors, schedule edit with the this-week note and seven days → daily, target edit, pause/resume, archive/restore, confirmed delete, keyboard-only create, axe) and `shell.spec.ts` updated for Track.
+- **Deviations:**
+  1. **`editHabit` (service + action + `editHabitSchema`)**, not in the chunk text: the dialog edits fields and schedule together, so one transaction saves both, and a target refused by the measure leaves the other fields unsaved. Each part still writes its own event (`habit.updated`, `habit.schedule_changed`) only when it changed something; both share the transaction's instant.
+  2. **6.1's habit schemas now report every error in one submit.** Zod skipped the cross-field rules (unit/target vs measure, date order, cadence config) whenever any field failed, so a blank title hid the rest. Each rule is now a `superRefine` with `when` (`acrossFields` in `validation.ts`) that runs once its own fields parse; the transform only builds the cadence pair. Messages and paths are unchanged.
+- **Decisions:**
+  - Delete is offered on every row (Track and archive), behind a confirmation naming the log count, with "archive it" suggested for live habits. Pause, resume and archive act at once with a toast; restore asks first, like goals.
+  - The goal select offers active and paused goals, plus the habit's own goal whatever its status (as the event form does).
+  - The start date defaults to the user's today. Times a week is a 1–6 select, so 7 can't be entered.
+- **Next chunk should know:**
+  - `HabitListItem` already carries `schedule` (this week's), `cadenceLabel`, `targetLabel` and `logCount`; 6.4/6.5 can extend `getTrackView` rather than add a second list query. `HabitSummary` renders a row's text.
+  - Same-transaction audit events share `occurred_at`; order by type in tests, not by time.
+  - The primary button's hover state (`hover:opacity-90`) is 4.25:1, below AA; axe flags it while the pointer rests on one (the habits e2e moves the pointer away first).
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint (the 6.1 warning, below), typecheck, 911 unit and 598 integration tests. `pnpm build` passes. `pnpm test:e2e`: 74 passed; one earlier full run had `reminders.spec.ts` "turning reminders off…" fail once under load, and it passed alone and on the full rerun.
+- **Follow-ups:**
+  - Primary button hover contrast below 4.5:1 (design tokens, all primary buttons).
+  - The goal delete confirmation still doesn't say linked habits lose their goal (from 6.1).
+  - Lint warns about the unused `_omitted` in `src/server/modules/habits/validation.test.ts` (from 6.1).

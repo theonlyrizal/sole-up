@@ -8,6 +8,7 @@ export const APP_ROUTE_SEGMENTS = [
   "home",
   "goals",
   "plan",
+  "track",
   "settings",
 ] as const;
 
