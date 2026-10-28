@@ -20,6 +20,11 @@ type Props = {
   initial: ReminderSettings;
   /** False when no device is subscribed: nothing could be delivered. */
   hasDevice: boolean;
+  /**
+   * Set when no reminder sweep has run for an hour (5.7): when the last
+   * one ran, formatted, or null when none has yet.
+   */
+  sweepsStopped: { lastSweep: string | null } | null;
 };
 
 /**
@@ -27,7 +32,11 @@ type Props = {
  * private mode, quiet hours (off by default, suggesting 22:00–07:00) and
  * the daily planning nudge (off until a time is chosen). Saved together.
  */
-export function ReminderSettingsForm({ initial, hasDevice }: Props) {
+export function ReminderSettingsForm({
+  initial,
+  hasDevice,
+  sweepsStopped,
+}: Props) {
   const ids = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const [enabled, setEnabled] = useState(initial.remindersEnabled);
@@ -93,6 +102,13 @@ export function ReminderSettingsForm({ initial, hasDevice }: Props) {
       aria-label="Reminder settings"
       className="flex flex-col gap-5"
     >
+      {enabled && sweepsStopped && (
+        <p className="rounded-md border border-border bg-surface p-3 text-sm">
+          {sweepsStopped.lastSweep
+            ? `Reminders were last checked ${sweepsStopped.lastSweep}, over an hour ago. The regular check that sends them seems to have stopped, so reminders won't arrive until it runs again.`
+            : "Reminders haven't been checked yet. The regular check that sends them isn't running, so reminders won't arrive until it does."}
+        </p>
+      )}
       {!hasDevice && (
         <p className="rounded-md border border-border bg-surface p-3 text-sm">
           No device is set up for notifications yet, so reminders can&apos;t

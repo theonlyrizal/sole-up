@@ -24,7 +24,8 @@
     "test:e2e": "playwright test",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:integration",
     "db:migrate:deploy": "node scripts/db-migrate-deploy.mts",
-    "reminders:sweep": "node scripts/reminders-sweep.mts"
+    "reminders:sweep": "node scripts/reminders-sweep.mts",
+    "reminders:failed": "node scripts/reminders-failed.mts"
   },
   "dependencies": {
     "@fullcalendar/react": "7.1.1",

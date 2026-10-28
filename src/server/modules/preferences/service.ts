@@ -62,10 +62,34 @@ export async function getUserPreferences(
 }
 
 /**
+ * Releases the user's reminders held for quiet hours (5.5's `held_until`)
+ * when what the hold was worked out from changes: the quiet hours or the
+ * zone. The next sweep sends them, or holds them again for the hours as
+ * they now are.
+ */
+async function releaseHeldRemindersInTx(
+  tx: DbTransaction,
+  userId: string,
+): Promise<void> {
+  await tx
+    .update(reminders)
+    .set({ heldUntil: null })
+    .where(
+      and(
+        eq(reminders.userId, userId),
+        eq(reminders.status, "scheduled"),
+        isNotNull(reminders.heldUntil),
+      ),
+    );
+}
+
+/**
  * Saves the user's preferences and records which fields changed. Changing
  * the time zone never rewrites stored local dates (ADR 0004), and of the
  * reminders it moves only the daily nudge, which follows the user's zone;
- * task and event reminders follow their instants (ADR 0013).
+ * task and event reminders follow their instants (ADR 0013). Reminders held
+ * for quiet hours in the old zone are released, so the next sweep sends
+ * them or holds them again by the new zone's clock.
  */
 export async function savePreferences(
   userId: string,
@@ -113,7 +137,10 @@ export async function savePreferences(
       entityId: userId,
       changes,
     });
-    if (changes.timezone) await syncNudgeReminderInTx(tx, userId, updated);
+    if (changes.timezone) {
+      await syncNudgeReminderInTx(tx, userId, updated);
+      await releaseHeldRemindersInTx(tx, userId);
+    }
     return toPreferences(updated);
   });
 }
@@ -253,16 +280,7 @@ export async function saveReminderSettings(
       changed.includes("quietHoursStart") ||
       changed.includes("quietHoursEnd")
     ) {
-      await tx
-        .update(reminders)
-        .set({ heldUntil: null })
-        .where(
-          and(
-            eq(reminders.userId, userId),
-            eq(reminders.status, "scheduled"),
-            isNotNull(reminders.heldUntil),
-          ),
-        );
+      await releaseHeldRemindersInTx(tx, userId);
     }
     return toReminderSettings(updated);
   });

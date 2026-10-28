@@ -15,6 +15,7 @@ import {
   getUserPreferences,
 } from "@/server/modules/preferences/service";
 import { listPushDevices } from "@/server/modules/push/queries";
+import { sweepHealth } from "@/server/modules/reminders/sweep-status";
 
 export const metadata: Metadata = { title: "Settings · SoleUp" };
 
@@ -83,12 +84,30 @@ async function Preferences() {
 
 async function Reminders() {
   const user = await requireUser();
-  const [settings, devices] = await Promise.all([
+  const [settings, devices, preferences, sweeps] = await Promise.all([
     getReminderSettings(user.id),
     listPushDevices(user.id),
+    getUserPreferences(user.id),
+    sweepHealth(),
   ]);
+  // Formatted here, so server and browser can't disagree while hydrating.
+  const sweepsStopped = sweeps.overdue
+    ? {
+        lastSweep:
+          sweeps.lastSweepAt &&
+          formatInstant(
+            sweeps.lastSweepAt,
+            preferences.locale,
+            preferences.timezone ?? "UTC",
+          ),
+      }
+    : null;
   return (
-    <ReminderSettingsForm initial={settings} hasDevice={devices.length > 0} />
+    <ReminderSettingsForm
+      initial={settings}
+      hasDevice={devices.length > 0}
+      sweepsStopped={sweepsStopped}
+    />
   );
 }
 

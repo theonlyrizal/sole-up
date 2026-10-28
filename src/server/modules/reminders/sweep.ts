@@ -5,7 +5,11 @@ import { and, eq, inArray } from "drizzle-orm";
 import { addDays, localDateOf, startOfLocalDay } from "@/lib/dates";
 import type { PushPayload } from "@/lib/push";
 import { quietHoursEndAt, quietHoursOf } from "@/lib/quiet-hours";
-import { REMINDER_MAX_ATTEMPTS } from "@/lib/reminders";
+import {
+  REMINDER_MAX_ATTEMPTS,
+  REMINDER_SKIP_REASONS,
+  type ReminderSkipReason,
+} from "@/lib/reminders";
 import { db } from "@/server/db/client";
 import { calendarEvents, tasks, userPreferences } from "@/server/db/schema";
 import { logger as appLogger, type Logger } from "@/server/logging/logger";
@@ -15,7 +19,11 @@ import {
   recordPushOutcome,
 } from "@/server/modules/push/service";
 
-import { claimDueReminders, type ClaimedReminder } from "./claim";
+import {
+  CLAIM_BATCH_MAX,
+  claimDueReminders,
+  type ClaimedReminder,
+} from "./claim";
 import {
   bundlePayload,
   reminderPayload,
@@ -23,13 +31,16 @@ import {
   type ReminderSubject,
 } from "./payload";
 import { recordDelivery, type DeliveryOutcome } from "./record";
+import { recordSweepFinished } from "./sweep-status";
 
 /** What one sweep did, by delivery outcome (ADR 0013). */
 export type SweepCounts = {
   /** Due reminders claimed (moved to `sending`) by this sweep. */
   claimed: number;
   sent: number;
+  /** All skipped reminders; `skippedByReason` splits them. */
   skipped: number;
+  skippedByReason: Record<ReminderSkipReason, number>;
   failed: number;
   /** Held for quiet hours: back to `scheduled` until they end. */
   held: number;
@@ -74,22 +85,69 @@ const DEFAULT_PREFERENCES: DeliveryPreferences = {
  * them again (`RECLAIM_AFTER_MINUTES`); the other users are unaffected. The
  * log lines hold counts, durations and error names, never a reminder, a
  * payload or a subscription.
+ *
+ * After missed sweeps, rolling a series or the nudge past a stale row can
+ * schedule a row that is already due (the next occurrence starts within
+ * the interval). A second claim picks those up, so they aren't left for a
+ * sweep that comes too late. It skips the rows the first pass handled, so a
+ * failed send still waits for the next sweep, and it doesn't run when the
+ * first pass filled its batch (the rest waits, as ever). One more pass is
+ * enough: a series has at most one occurrence a day.
+ *
+ * A finished sweep is recorded for Settings' "reminders have stopped"
+ * warning (`recordSweepFinished`).
  */
 export async function runSweep(
   now: Date,
   log: Logger = appLogger,
 ): Promise<SweepResult> {
   const startedAt = performance.now();
-  const claimed = await claimDueReminders(now);
   const counts: SweepCounts = {
-    claimed: claimed.length,
+    claimed: 0,
     sent: 0,
     skipped: 0,
+    skippedByReason: Object.fromEntries(
+      REMINDER_SKIP_REASONS.map((reason) => [reason, 0]),
+    ) as Record<ReminderSkipReason, number>,
     failed: 0,
     held: 0,
     retrying: 0,
   };
 
+  const first = await claimDueReminders(now);
+  await deliverClaimed(first, now, counts, log);
+  if (first.length > 0 && first.length < CLAIM_BATCH_MAX) {
+    const rolled = await claimDueReminders(
+      now,
+      undefined,
+      undefined,
+      first.map(({ id }) => id),
+    );
+    await deliverClaimed(rolled, now, counts, log);
+  }
+  await recordSweepFinished(now);
+
+  const durationMs = Math.round(performance.now() - startedAt);
+  log.info(
+    {
+      source: "reminders",
+      sweepStartedAt: now.toISOString(),
+      counts,
+      durationMs,
+    },
+    "Reminder sweep finished",
+  );
+  return { counts, durationMs };
+}
+
+/** Delivers one claim's rows, user by user, adding to `counts`. */
+async function deliverClaimed(
+  claimed: ClaimedReminder[],
+  now: Date,
+  counts: SweepCounts,
+  log: Logger,
+): Promise<void> {
+  counts.claimed += claimed.length;
   for (const [userId, rows] of groupByUser(claimed)) {
     try {
       await deliverForUser(userId, rows, now, counts);
@@ -104,18 +162,6 @@ export async function runSweep(
       );
     }
   }
-
-  const durationMs = Math.round(performance.now() - startedAt);
-  log.info(
-    {
-      source: "reminders",
-      sweepStartedAt: now.toISOString(),
-      counts,
-      durationMs,
-    },
-    "Reminder sweep finished",
-  );
-  return { counts, durationMs };
 }
 
 function groupByUser(rows: ClaimedReminder[]): Map<string, ClaimedReminder[]> {
@@ -287,7 +333,10 @@ function outcomeOfSend(
     : { status: "retry", code: result.code };
 }
 
-const COUNTED: Record<DeliveryOutcome["status"], keyof SweepCounts> = {
+const COUNTED: Record<
+  DeliveryOutcome["status"],
+  Exclude<keyof SweepCounts, "skippedByReason">
+> = {
   sent: "sent",
   skipped: "skipped",
   failed: "failed",
@@ -324,7 +373,11 @@ async function deliverForUser(
 
   const record = async (row: ClaimedReminder, outcome: DeliveryOutcome) => {
     const recorded = await recordDelivery(row, outcome, preferences, now);
-    if (recorded) counts[COUNTED[recorded.status]] += 1;
+    if (!recorded) return;
+    counts[COUNTED[recorded.status]] += 1;
+    if (recorded.status === "skipped") {
+      counts.skippedByReason[recorded.reason] += 1;
+    }
   };
 
   const deliverable: ClaimedReminder[] = [];

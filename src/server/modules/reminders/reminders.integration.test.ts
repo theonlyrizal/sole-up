@@ -1092,6 +1092,7 @@ describe("claimDueReminders", () => {
       claimed: 2,
       sent: 0,
       skipped: 2,
+      skippedByReason: { stale: 2, disabled: 0, no_device: 0 },
       failed: 0,
       held: 0,
       retrying: 0,

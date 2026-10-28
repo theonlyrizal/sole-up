@@ -100,3 +100,18 @@ export function skippedLabel(
       return "Skipped: no device was set up";
   }
 }
+
+/**
+ * Settings warns that reminders have stopped when no sweep has finished for
+ * longer than this: four sweeps in a row missed, so cron-job.org has likely
+ * stopped calling the sweep (5.7).
+ */
+export const SWEEP_OVERDUE_MINUTES = 60;
+
+/** True when no sweep has finished yet, or none for `SWEEP_OVERDUE_MINUTES`. */
+export function isSweepOverdue(lastSweepAt: Date | null, now: Date): boolean {
+  return (
+    lastSweepAt === null ||
+    now.getTime() - lastSweepAt.getTime() > SWEEP_OVERDUE_MINUTES * 60_000
+  );
+}

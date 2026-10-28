@@ -116,7 +116,7 @@ Do these in order. Each step says what to check before moving on.
 
 ## Reminder sweep
 
-Reminders have no worker on the free plans ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)). [cron-job.org](https://cron-job.org) (free) calls `POST <APP_URL>/api/reminders/sweep` every 15 minutes, with the secret in an `Authorization: Bearer` header. Each call sends the reminders due before the next one, so reminders arrive up to 15 minutes early. A call without the right secret gets `401` and does nothing. The route reads no body and answers only counts, for example `{"counts":{"claimed":0,"sent":0,"skipped":0,"failed":0},"durationMs":3}`.
+Reminders have no worker on the free plans ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)). [cron-job.org](https://cron-job.org) (free) calls `POST <APP_URL>/api/reminders/sweep` every 15 minutes, with the secret in an `Authorization: Bearer` header. Each call sends the reminders due before the next one, so reminders arrive up to 15 minutes early. A call without the right secret gets `401` and does nothing. The route reads no body and answers only counts, for example `{"counts":{"claimed":2,"sent":1,"skipped":1,"skippedByReason":{"stale":1,"disabled":0,"no_device":0},"failed":0,"held":0,"retrying":0},"durationMs":38}`.
 
 **`REMINDER_SWEEP_SECRET` is required at boot.** Set it on Render **before** the deploy that introduces it (chunk 5.1). Otherwise that deploy fails its boot check and the previous version keeps serving until you add it and redeploy.
 
@@ -162,11 +162,21 @@ Reminders have no worker on the free plans ([ADR 0013](decisions/0013-reminders-
    - **Treat redirects with HTTP 3xx status code as success:** off. The route never redirects, so a redirect means a wrong URL.
    - **Save responses in job history:** on. Responses hold only counts, which helps when checking the job.
 4. **Create**, then **Test run** (or wait for the next quarter hour). The run history shows `200 OK` and the counts.
-5. **Check in Render's logs** (search `Reminder sweep`): each call writes one line, `"msg":"Reminder sweep finished"`, with `sweepStartedAt`, `counts` and `durationMs`. A call with a bad secret writes `"Reminder sweep refused: bad secret"` instead. The secret and reminder content are never logged.
+5. **Check in Render's logs** (search `Reminder sweep`): each call writes one line, `"msg":"Reminder sweep finished"`, with `sweepStartedAt`, `counts` (claimed, sent, skipped with `skippedByReason`, failed, held, retrying) and `durationMs`. A call with a bad secret writes `"Reminder sweep refused: bad secret"` instead. The secret and reminder content are never logged.
 
 Field names in cron-job.org's console may differ slightly from the ones above; the settings that matter are the URL, `POST`, the `Authorization` header, every 15 minutes and the timeout.
 
-cron-job.org disables a job after many failures in a row (its FAQ gives more than 25 as an example), and it emails you when it does if you turned that notification on. While the job is off, no reminders go out. Nothing else in the app breaks.
+cron-job.org disables a job after many failures in a row (its FAQ gives more than 25 as an example), and it emails you when it does if you turned that notification on. While the job is off, no reminders go out. Nothing else in the app breaks. Each finished sweep records its time, and **Settings → Reminders warns when no sweep has run for over an hour**, so a stopped job shows up in the app too. When the job runs again, the first sweep sends what is still useful and skips the rest as stale.
+
+### Failed reminders
+
+A reminder that fails 3 times in a row (an error other than an expired subscription) is marked `failed` with its error code. There is no admin page; list them from your machine:
+
+```bash
+pnpm reminders:failed
+```
+
+It prints a table of error codes with counts in the last day, the last week and older, and how long ago the newest and oldest failed. No titles, users or IDs. It reads `DATABASE_URL` from the shell or `.env.local`, so for production set `DATABASE_URL` in your shell to the Neon direct connection string first (it only reads). Codes are `http_<status>` from the push service, `timeout`, `network` or `invalid`.
 
 ### 3. Production check (chunk 5.1)
 
@@ -177,7 +187,21 @@ For one hour, Render's logs show a `Reminder sweep finished` line every 15 minut
 ### Free-plan budget
 
 - **Render:** 750 free instance hours a month. Sweeps every 15 minutes keep the service awake almost all the time: about 744 hours in a 31-day month. That is the whole allowance, so no other free Render service can share this workspace. Check the free usage in Render's workspace billing page during the first month.
-- **Neon:** each sweep wakes the compute, which then stays up 5 minutes before it suspends. That is about 62 of Free's roughly 100 CU-hours a month (ADR 0013), leaving about 38 for your own use. Watch the project's compute usage in the Neon console. If the monthly total heads past about 80 CU-hours, widen the interval or move to paid hosting (a new ADR). Check these numbers against [neon.com/pricing](https://neon.com/pricing) once.
+- **Neon:** each sweep wakes the compute, which then stays up 5 minutes before it suspends. That is about 62 of Free's 100 CU-hours a month (ADR 0013), leaving about 38 for your own use. See "Watching Neon's compute" below.
+
+### Watching Neon's compute (Phase 5 checkpoint)
+
+Neon Free allows **100 CU-hours per project per month** (checked on Neon's plans page, 2026-10-29). A CU-hour is the compute size times the hours it runs: the smallest size, 0.25 CU, for 4 hours is 1 CU-hour. The compute suspends after 5 idle minutes, and that can't be turned off on Free. **When the allowance runs out, the compute is suspended until the next month**, which takes the whole app down (no data is lost).
+
+**How to read it:**
+
+1. Neon console → the SoleUp project → **Overview**. The **Usage** panel shows **Compute** for this project since the start of the current billing period.
+2. For the plan summary, open your organization from the profile menu (top right) → **Billing**.
+3. The figures lag by about an hour.
+
+**What to do with it:** during the Phase 5 checkpoint week, write down the Compute figure on the first and last day, and divide by the days between to get a daily rate. A month at that rate is about 30 times it. Expect about 2 CU-hours a day from sweeps alone.
+
+**Threshold: about 80 CU-hours a month.** If the month is heading past that, act before it runs out: widen the sweep interval (cron-job.org schedule; reminders then arrive earlier, and `SWEEP_INTERVAL_MINUTES` in `src/lib/reminders.ts` must match it) or move to paid hosting. Either is a change to ADR 0013, so record it in a new ADR.
 
 ## Web Push keys
 
