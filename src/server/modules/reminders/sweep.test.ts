@@ -6,8 +6,16 @@ import { captureLogs } from "../../../../tests/helpers/logs";
 import { claimDueReminders } from "./claim";
 import { runSweep } from "./sweep";
 
-// The claim needs the database; the integration tests cover it for real.
+// Delivery needs the database and push; the integration tests cover them
+// (reminders.integration.test.ts). Here the claim finds nothing due.
 vi.mock("./claim", () => ({ claimDueReminders: vi.fn() }));
+vi.mock("./record", () => ({ recordDelivery: vi.fn() }));
+vi.mock("@/server/db/client", () => ({ db: {} }));
+vi.mock("@/server/modules/push/send", () => ({ sendPush: vi.fn() }));
+vi.mock("@/server/modules/push/service", () => ({
+  pushTargetsFor: vi.fn(),
+  recordPushOutcome: vi.fn(),
+}));
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -15,10 +23,7 @@ afterEach(() => {
 
 describe("runSweep", () => {
   it("claims with the sweep's time and logs one line with the start, counts and duration", async () => {
-    vi.mocked(claimDueReminders).mockResolvedValueOnce([
-      { id: "a" },
-      { id: "b" },
-    ] as Awaited<ReturnType<typeof claimDueReminders>>);
+    vi.mocked(claimDueReminders).mockResolvedValueOnce([]);
     const logs = captureLogs();
     const now = new Date("2026-10-27T09:15:00.000Z");
 
@@ -26,7 +31,14 @@ describe("runSweep", () => {
 
     expect(claimDueReminders).toHaveBeenCalledWith(now);
     expect(result).toEqual({
-      counts: { claimed: 2, sent: 0, skipped: 0, failed: 0 },
+      counts: {
+        claimed: 0,
+        sent: 0,
+        skipped: 0,
+        failed: 0,
+        held: 0,
+        retrying: 0,
+      },
       durationMs: expect.any(Number),
     });
     expect(logs.entries()).toEqual([
@@ -39,19 +51,5 @@ describe("runSweep", () => {
         durationMs: result.durationMs,
       }),
     ]);
-  });
-
-  it("returns zero counts when nothing is due", async () => {
-    vi.mocked(claimDueReminders).mockResolvedValueOnce([]);
-    captureLogs();
-
-    const result = await runSweep(new Date(), logger);
-
-    expect(result.counts).toEqual({
-      claimed: 0,
-      sent: 0,
-      skipped: 0,
-      failed: 0,
-    });
   });
 });

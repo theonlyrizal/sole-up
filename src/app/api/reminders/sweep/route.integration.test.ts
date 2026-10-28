@@ -67,7 +67,14 @@ describe("POST /api/reminders/sweep", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({
-      counts: { claimed: 0, sent: 0, skipped: 0, failed: 0 },
+      counts: {
+        claimed: 0,
+        sent: 0,
+        skipped: 0,
+        failed: 0,
+        held: 0,
+        retrying: 0,
+      },
       durationMs: expect.any(Number),
     });
     expect(logs.entries()).toEqual([
@@ -77,7 +84,14 @@ describe("POST /api/reminders/sweep", () => {
         source: "reminders",
         msg: "Reminder sweep finished",
         sweepStartedAt: expect.any(String),
-        counts: { claimed: 0, sent: 0, skipped: 0, failed: 0 },
+        counts: {
+          claimed: 0,
+          sent: 0,
+          skipped: 0,
+          failed: 0,
+          held: 0,
+          retrying: 0,
+        },
         durationMs: expect.any(Number),
       }),
     ]);

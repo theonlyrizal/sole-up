@@ -102,7 +102,8 @@ async function deliveredFor(
 
 /**
  * Makes the item's one non-snoozed `scheduled` row match `target`: inserts
- * it, moves it (resetting its attempts), leaves it, or deletes it for null.
+ * it, moves it (resetting its attempts and any quiet-hours hold), leaves
+ * it, or deletes it for null.
  */
 async function writeScheduled(
   tx: DbTransaction,
@@ -144,7 +145,7 @@ async function writeScheduled(
   }
   await tx
     .update(reminders)
-    .set({ ...target, attempts: 0, lastErrorCode: null })
+    .set({ ...target, attempts: 0, lastErrorCode: null, heldUntil: null })
     .where(and(eq(reminders.id, current.id), eq(reminders.userId, userId)));
 }
 

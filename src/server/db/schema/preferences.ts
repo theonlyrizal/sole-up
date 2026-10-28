@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   pgTable,
   smallint,
@@ -38,6 +39,19 @@ export const userPreferences = pgTable(
      * while it is off (ADR 0013).
      */
     dailyNudgeTime: text(),
+    /**
+     * The global reminders switch. While off, reminders that come due are
+     * skipped, not held (ADR 0013). Settings arrive in 5.6.
+     */
+    remindersEnabled: boolean().notNull().default(true),
+    /** Private mode: notifications carry the time but never the title. */
+    remindersPrivate: boolean().notNull().default(false),
+    /**
+     * Quiet hours, "HH:MM" local times in `timezone`, both null while off.
+     * The end may be earlier than the start: the hours then cross midnight.
+     */
+    quietHoursStart: text(),
+    quietHoursEnd: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
       .notNull()
@@ -64,6 +78,13 @@ export const userPreferences = pgTable(
     check(
       "user_preferences_daily_nudge_time_check",
       sql`${table.dailyNudgeTime} is null or ${table.dailyNudgeTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`,
+    ),
+    check(
+      "user_preferences_quiet_hours_check",
+      sql`(${table.quietHoursStart} is null and ${table.quietHoursEnd} is null)
+        or (${table.quietHoursStart} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          and ${table.quietHoursEnd} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          and ${table.quietHoursStart} <> ${table.quietHoursEnd})`,
     ),
   ],
 );

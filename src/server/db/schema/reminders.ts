@@ -68,6 +68,12 @@ export const reminders = pgTable(
     claimedAt: timestamp({ withTimezone: true }),
     sentAt: timestamp({ withTimezone: true }),
     snoozed: boolean().notNull().default(false),
+    /**
+     * Set when a sweep held the row for quiet hours (5.5): the end of those
+     * quiet hours. The claim leaves it until then, and the sweep that
+     * releases it bundles it with the user's other held reminders.
+     */
+    heldUntil: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
       .notNull()

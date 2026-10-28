@@ -60,3 +60,6 @@ export const NUDGE_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 export function fireAtFor(target: Date, offsetMinutes: ReminderOffset): Date {
   return new Date(target.getTime() - offsetMinutes * 60_000);
 }
+
+/** Send attempts before a reminder that keeps failing is marked `failed`. */
+export const REMINDER_MAX_ATTEMPTS = 3;
