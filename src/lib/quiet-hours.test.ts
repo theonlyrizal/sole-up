@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { instantFromLocal } from "@/lib/dates";
 
-import { quietHoursEndAt, quietHoursOf } from "./quiet-hours";
+import { isInQuietHours, quietHoursEndAt, quietHoursOf } from "./quiet-hours";
 
 const ZONE = "America/New_York";
 const at = (date: string, time: string) => instantFromLocal(date, time, ZONE);
@@ -16,6 +16,20 @@ describe("quietHoursOf", () => {
       start: "22:00",
       end: "07:00",
     });
+  });
+});
+
+describe("isInQuietHours", () => {
+  it("includes the start and excludes the end, across midnight too", () => {
+    const overnight = { start: "22:00", end: "07:00" };
+    expect(isInQuietHours("22:00", overnight)).toBe(true);
+    expect(isInQuietHours("06:59", overnight)).toBe(true);
+    expect(isInQuietHours("07:00", overnight)).toBe(false);
+    expect(isInQuietHours("12:00", overnight)).toBe(false);
+    const afternoon = { start: "13:00", end: "15:00" };
+    expect(isInQuietHours("14:00", afternoon)).toBe(true);
+    expect(isInQuietHours("15:00", afternoon)).toBe(false);
+    expect(isInQuietHours("08:00", afternoon)).toBe(false);
   });
 });
 

@@ -199,6 +199,10 @@ export const AUDIT_EVENTS = defineAuditEvents({
         z.enum(["accepted", "dismissed"]),
       ).optional(),
       dailyNudgeTime: auditChange(nudgeTime).optional(),
+      remindersEnabled: auditChange(z.boolean()).optional(),
+      remindersPrivate: auditChange(z.boolean()).optional(),
+      quietHoursStart: auditChange(nudgeTime).optional(),
+      quietHoursEnd: auditChange(nudgeTime).optional(),
     }),
   },
 

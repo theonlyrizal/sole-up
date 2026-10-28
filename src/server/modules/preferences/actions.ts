@@ -5,7 +5,10 @@ import { refresh } from "next/cache";
 import { authedAction } from "@/server/auth/authed-action";
 
 import * as service from "./service";
-import { savePreferencesSchema } from "./validation";
+import {
+  savePreferencesSchema,
+  saveReminderSettingsSchema,
+} from "./validation";
 
 /** Saves time zone, locale and week start for the signed-in user. */
 export const savePreferences = authedAction(
@@ -15,5 +18,15 @@ export const savePreferences = authedAction(
     // Pages read the time zone on the server (e.g. what "today" is).
     refresh();
     return preferences;
+  },
+);
+
+/** Settings' Reminders form: on/off, private mode, quiet hours, the nudge. */
+export const saveReminderSettings = authedAction(
+  saveReminderSettingsSchema,
+  async (input, { userId }) => {
+    const settings = await service.saveReminderSettings(userId, input);
+    refresh();
+    return settings;
   },
 );

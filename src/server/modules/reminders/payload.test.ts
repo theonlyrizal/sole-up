@@ -21,7 +21,7 @@ const TASK_ID = "0b6c6d0e-0000-4000-8000-000000000001";
 const EVENT_ID = "0b6c6d0e-0000-4000-8000-000000000002";
 
 describe("reminderPayload", () => {
-  it("names an event with its time and how soon it starts, opening its dialog on Day", () => {
+  it("names an event with its time and how soon it starts, opening its dialog on Day, with snooze", () => {
     const payload = reminderPayload(
       {
         kind: "event",
@@ -37,6 +37,7 @@ describe("reminderPayload", () => {
       title: "Dentist · 14:00 (in 15 min)",
       url: `/plan/calendar?view=day&item=event%3A${EVENT_ID}`,
       tag: "reminder-r1",
+      reminderId: "r1",
     });
   });
 
@@ -90,6 +91,8 @@ describe("reminderPayload", () => {
       context,
     );
     expect(payload.title).toBe("You have a reminder · 17:00");
+    // Snooze still works: the ID says nothing about the task.
+    expect(payload.reminderId).toBe("r4");
   });
 
   it("names a day further out by its weekday", () => {
@@ -107,7 +110,7 @@ describe("reminderPayload", () => {
     expect(payload.title).toBe("You have a reminder · Wed 08:00");
   });
 
-  it("sends the nudge without a title, opening Today", () => {
+  it("sends the nudge without a title or snooze, opening Today", () => {
     expect(
       reminderPayload({ kind: "daily_nudge", reminderId: "r6" }, context),
     ).toEqual({ title: NUDGE_TEXT, url: "/plan/today", tag: "reminder-r6" });

@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test, type Page } from "@playwright/test";
 
+/** Settings' "Time and region" section (Reminders has its own Save). */
+const timeAndRegion = (page: Page) =>
+  page.getByRole("region", { name: "Time and region" });
+
 // The browser reports this zone and language, as a real device would.
 test.use({ timezoneId: "Asia/Tokyo", locale: "en-GB" });
 
@@ -60,8 +64,8 @@ test("settings round-trip: time zone, locale and week start", async ({
   await page.getByLabel("Time zone").selectOption("America/New_York");
   await page.getByLabel("Language and region").selectOption("de-DE");
   await page.getByLabel("Week starts on").selectOption({ label: "Sunday" });
-  await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved.");
+  await timeAndRegion(page).getByRole("button", { name: "Save" }).click();
+  await expect(timeAndRegion(page).getByRole("status")).toHaveText("Saved.");
 
   // A device zone different from the saved one is pointed out, not applied.
   await expect(
@@ -75,8 +79,8 @@ test("settings round-trip: time zone, locale and week start", async ({
 
   await page.getByRole("button", { name: "Use it" }).click();
   await expect(page.getByLabel("Time zone")).toHaveValue("Asia/Tokyo");
-  await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved.");
+  await timeAndRegion(page).getByRole("button", { name: "Save" }).click();
+  await expect(timeAndRegion(page).getByRole("status")).toHaveText("Saved.");
   await page.reload();
   await expect(page.getByLabel("Time zone")).toHaveValue("Asia/Tokyo");
   await expect(page.getByText(/This device is set to/)).toHaveCount(0);

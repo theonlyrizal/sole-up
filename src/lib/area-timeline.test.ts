@@ -67,6 +67,7 @@ const eventFields = {
   location: null,
   goalId: null,
   source: "internal" as const,
+  reminderOffsetMinutes: null,
 };
 
 /** A timed event's row between two local "date time"s. */

@@ -44,6 +44,7 @@ const eventBase = {
   goalId: null,
   lifeAreaId: null,
   source: "internal" as const,
+  reminderOffsetMinutes: null,
   ...stamps,
 };
 

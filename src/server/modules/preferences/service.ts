@@ -1,15 +1,17 @@
 import "server-only";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
 import type { WeekStart } from "@/lib/dates";
+import { type QuietHours, quietHoursOf } from "@/lib/quiet-hours";
 import { recordAudit } from "@/server/audit/record";
 import { db, type Db, type DbTransaction } from "@/server/db/client";
-import { userPreferences } from "@/server/db/schema";
+import { reminders, userPreferences } from "@/server/db/schema";
 import { syncNudgeReminderInTx } from "@/server/modules/reminders/schedule";
 
 import type {
   SavePreferencesInput,
+  SaveReminderSettingsInput,
   SetDailyNudgeTimeInput,
 } from "./validation";
 
@@ -152,6 +154,117 @@ export async function setDailyNudgeTime(
     });
     await syncNudgeReminderInTx(tx, userId, updated);
     return { dailyNudgeTime };
+  });
+}
+
+/** Settings' Reminders section (ADR 0013). */
+export type ReminderSettings = {
+  remindersEnabled: boolean;
+  remindersPrivate: boolean;
+  /** Null while quiet hours are off. */
+  quietHours: QuietHours | null;
+  /** The daily nudge's local "HH:MM", or null while it is off. */
+  dailyNudgeTime: string | null;
+};
+
+function toReminderSettings(
+  row: typeof userPreferences.$inferSelect,
+): ReminderSettings {
+  return {
+    remindersEnabled: row.remindersEnabled,
+    remindersPrivate: row.remindersPrivate,
+    quietHours: quietHoursOf(row.quietHoursStart, row.quietHoursEnd),
+    dailyNudgeTime: row.dailyNudgeTime,
+  };
+}
+
+/** The user's reminder settings, creating the default row on first use. */
+export async function getReminderSettings(
+  userId: string,
+): Promise<ReminderSettings> {
+  await ensureUserPreferences(userId);
+  const [row] = await db
+    .select()
+    .from(userPreferences)
+    .where(eq(userPreferences.userId, userId));
+  if (!row) throw new Error("User preferences row is missing");
+  return toReminderSettings(row);
+}
+
+const REMINDER_SETTING_FIELDS = [
+  "remindersEnabled",
+  "remindersPrivate",
+  "quietHoursStart",
+  "quietHoursEnd",
+  "dailyNudgeTime",
+] as const;
+
+/**
+ * Saves Settings' Reminders form and records which settings changed in one
+ * `user_preferences.updated` event; saving it unchanged is a no-op.
+ *
+ * - The nudge time reschedules or removes the nudge's reminder.
+ * - Changing quiet hours releases reminders held for the old ones (5.5's
+ *   `held_until`): the next sweep sends them, or holds them again for the
+ *   new hours.
+ * - Turning reminders off leaves the schedule as it is; the sweep skips
+ *   what comes due while they're off (`disabled`), and nothing is sent.
+ */
+export async function saveReminderSettings(
+  userId: string,
+  input: SaveReminderSettingsInput,
+): Promise<ReminderSettings> {
+  return db.transaction(async (tx) => {
+    await ensureUserPreferences(userId, tx);
+    const [current] = await tx
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId))
+      .for("update");
+    if (!current) throw new Error("User preferences row is missing");
+
+    const changed = REMINDER_SETTING_FIELDS.filter(
+      (field) => current[field] !== input[field],
+    );
+    if (changed.length === 0) return toReminderSettings(current);
+
+    const [updated] = await tx
+      .update(userPreferences)
+      .set(input)
+      .where(eq(userPreferences.userId, userId))
+      .returning();
+    if (!updated) throw new Error("User preferences row is missing");
+
+    await recordAudit(tx, {
+      type: "user_preferences.updated",
+      userId,
+      entityId: userId,
+      changes: Object.fromEntries(
+        changed.map((field) => [
+          field,
+          { from: current[field], to: input[field] },
+        ]),
+      ),
+    });
+    if (changed.includes("dailyNudgeTime")) {
+      await syncNudgeReminderInTx(tx, userId, updated);
+    }
+    if (
+      changed.includes("quietHoursStart") ||
+      changed.includes("quietHoursEnd")
+    ) {
+      await tx
+        .update(reminders)
+        .set({ heldUntil: null })
+        .where(
+          and(
+            eq(reminders.userId, userId),
+            eq(reminders.status, "scheduled"),
+            isNotNull(reminders.heldUntil),
+          ),
+        );
+    }
+    return toReminderSettings(updated);
   });
 }
 

@@ -23,6 +23,7 @@ const base = () => {
     goalId: null,
     lifeAreaId: null,
     source: "internal" as const,
+    reminderOffsetMinutes: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     seriesId: null,

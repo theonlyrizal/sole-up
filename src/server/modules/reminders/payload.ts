@@ -111,18 +111,25 @@ export function reminderPayload(
   const tag = `reminder-${subject.reminderId}`;
   if (subject.kind === "daily_nudge") return { title: NUDGE_TEXT, url, tag };
 
+  // The worker offers snooze on task and event reminders.
+  const { reminderId } = subject;
   const when = whenLabel(subject.targetAt, context);
   if (subject.title === null) {
-    return { title: `You have a reminder · ${when}`, url, tag };
+    return { title: `You have a reminder · ${when}`, url, tag, reminderId };
   }
   if (subject.kind === "task_deadline") {
-    return { title: `Due ${when} · ${subject.title}`, url, tag };
+    return { title: `Due ${when} · ${subject.title}`, url, tag, reminderId };
   }
   const suffix =
     daysAhead(subject.targetAt, context) <= 0
       ? ` ${startsIn(subject.targetAt, context.now)}`
       : "";
-  return { title: `${subject.title} · ${when}${suffix}`, url, tag };
+  return {
+    title: `${subject.title} · ${when}${suffix}`,
+    url,
+    tag,
+    reminderId,
+  };
 }
 
 /** One notification for several reminders held by quiet hours. */

@@ -221,6 +221,8 @@ describe("sending", () => {
       title: "Due 10:40 · Submit visa form",
       url: `/plan/calendar?view=day&item=task%3A${task.id}%3Adue`,
       tag: expect.stringMatching(/^reminder-/),
+      // The row's ID, for the notification's snooze actions (5.6).
+      reminderId: (await rowFor(user.id, task.id)).id,
     });
     // TTL: until the deadline, 40 minutes away.
     expect(sent[0]!.options.TTL).toBe(40 * 60);
