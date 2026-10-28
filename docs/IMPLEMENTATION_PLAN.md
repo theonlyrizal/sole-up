@@ -197,7 +197,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 5.✓ | Phase 5 checkpoint (user) | done | | 2026-10-29 | User marked done without the week of relying on reminders; production setup (sweep secret, VAPID keys, cron-job.org), phone checks, the missed/late/duplicate log, `pnpm reminders:failed` and Neon compute readings are deferred to a whole-app check later |
 | 6.0 | Decision gate: habits | done | chunk/6.0-habits-decisions | 2026-10-29 | ADR 0014: three cadences, check or quantity (partial credit), completed/skipped with derived "Missed", versioned schedules, exact week-based denominators, skips excluded; 6.1–6.6 and DATA_MODEL synced |
 | 6.1 | Habits: schema and service | done | chunk/6.1-habits-schema-service | 2026-10-29 | `habits`, `habit_schedules`, `habit_pauses`, `habit_logs` (migration 0015, hand-edited `SET NULL (goal_id)`, one-open-pause index), per-type cadence Zod schemas, service with versioned schedules, pause/archive rows and `habit.*` events; no UI, logs or consistency |
-| 6.2 | Cadence engine | todo | | | |
+| 6.2 | Cadence engine | done | chunk/6.2-cadence-engine | 2026-10-29 | `src/lib/habits/consistency.ts`: `isActiveDay`, `weekTarget`, `habitDays`, `consistency`, `weekProgress`, `formatConsistency`, `cutToOneDecimal`, with definition text; exact credit sums; current week for quantity amended in ADR 0014 |
 | 6.3 | Habit CRUD UI | todo | | | |
 | 6.4 | Logging | todo | | | |
 | 6.5 | Track page and history | todo | | | |
@@ -938,7 +938,7 @@ Decided 2026-10-29 in [ADR 0014](decisions/0014-habit-cadence-logs-consistency.m
     - a partial week expects `round(N × active days ÷ 7)`
     - each skip lowers the week's target by one
     - completions are capped at the target
-    - the current week counts only what's done (`min(done, target)`)
+    - the current week counts only what's done (`min(done, target)`); for quantity habits it expects the completed days, up to the target (amended in 6.2)
 - **Skips:** excluded from the denominator, never a miss, and always shown next to the figure.
 - **Shown as:** "12 of 14 days · 2 skipped" or "7 of 9 times". Never a percentage, a score or a total across habits. With nothing expected, there is no figure.
 
@@ -988,7 +988,7 @@ Decided 2026-10-29 in [ADR 0014](decisions/0014-habit-cadence-logs-consistency.m
   - `scheduleForWeek(schedules, week)`
   - `isActiveDay(habit, pauses, date)`
   - `weekTarget(N, activeDays)` (integer form `floor((2·N·a + 7) / 14)`)
-  - `habitDays(input)` (each day's state for history strips: inactive, not scheduled, completed with credit, extra, skipped, missed, today, future)
+  - `habitDays(input)` (each day's state for history strips: inactive, not scheduled, completed with credit, extra, skipped, missed, unlogged (a past `times_per_week` day), today, future)
   - `consistency(input) → { completed, expected, skipped, atTarget?, definition }`
   - `weekProgress(input)` (the current week's done of target, for "so far this week")
   - `formatConsistency(result, cadence, measure)` (cut to one decimal, "Nothing expected in this range" at 0)
@@ -2747,3 +2747,34 @@ Template:
 - **Follow-ups:**
   - Phase 10 export (10.1) must include habits, schedules, pauses and logs (already noted in 6.0).
   - The goal delete confirmation doesn't say linked habits lose their goal (6.3 or later, when habits have UI).
+
+### 6.2: Cadence engine (2026-10-29)
+- **Built:**
+  - `src/lib/habits/consistency.ts` (pure, client-safe), per ADR 0014 "Consistency":
+    - `isActiveDay(habit, pauses, date)`, `weekTarget(N, activeDays)` (`floor((2·N·a + 7) / 14)`, refuses a > 7 or non-integers)
+    - `habitDays(input)` → `{ date, state, credit, log }` per day; `HABIT_DAY_STATES`
+    - `consistency(input)` → `{ completed, expected, skipped, atTarget? (quantity), definition }`
+    - `weekProgress(input)` → `{ from, to, done, target, skipped, atTarget?, definition }` for the week holding today
+    - `formatConsistency(result, cadenceType, measure)` and `cutToOneDecimal`
+    - input types `EngineHabit`, `EngineSchedule` (`HabitSchedule` fits), `EnginePause`, `EngineLog`, `HabitWeekInput`, `HabitRangeInput`
+  - Tests: `src/lib/habits/consistency.test.ts` (161): all seven week starts (first/last day, neighbours excluded, misaligned ranges refused), start/end/pause mid-week for `daily` and `times_per_week`, the full N = 1–6 × 0–7 table (direct and end to end), skips to 0 and never below, the current week (never lowers, caps, skips, later pauses), today unlogged/completed/skipped, extras, quantity below/at/above target and the weekly cap, exact sums (0.7 + 0.1 = 0.8, across targets), schedule changes (cadence, weekdays, earliest-row fallback), a week-start change regrouping, inactive-day logs, empty/reversed/before-start/future ranges, formatting and definition text.
+- **Deviations:**
+  1. **The current week for quantity habits (ADR 0014 amended, user's choice):** the ADR said `expected = completed = min(done, target)` but also that `expected` is whole. Now `expected` = `min(completed-log days, target)`, `completed` = `min(done, target)`. Check habits are unchanged.
+  2. **An `unlogged` day state** for a past `times_per_week` day with no log, since the ADR gives that cadence no per-day Missed.
+  3. **`scheduleForWeek` reused from 6.1** (`cadence.ts`, takes the week's last day), not rewritten.
+- **Decisions:**
+  1. **Ranges are whole weeks** (`from` a week start, a multiple of 7 days); anything else throws `RangeError`. `to` = the day before `from` is an empty range. Weeks after the one holding today are skipped for every cadence.
+  2. **Credit is summed exactly** (BigInt fractions over each week's target in cents), so 0.7 + 0.1 shows 0.8, not 0.7. `cutToOneDecimal` is `floor(x·10)/10`, exact for any reduced total.
+  3. **`atTarget` for `times_per_week`** is `min(days at target, the week's target)`, the full days among the completions counted.
+  4. **`weekProgress` covers every cadence:** `daily`/`weekly_days` take the week's active, scheduled, unskipped days (later days included) as the target. `done` is capped at the target.
+  5. **The skip count is shown only when above 0** (the ADR's examples omit it at 0), and with nothing expected only "Nothing expected in this range" is shown.
+  6. A completed quantity log without a value earns no credit; a skip on a `weekly_days` off day is shown (`not_scheduled` with its log) but not counted; a quantity schedule without a target, or no schedule at all, throws.
+  7. The definition text uses the schedule of the range's last counted week, and adds a sentence when weeks in the range had different schedules.
+- **Next chunk should know:**
+  - 6.3/6.4: map rows with `toHabit`/`toHabitSchedule`, plus pauses and logs (`value` as a number), and pass the user's today and `week_start`. `range` must be whole weeks: `from = startOfWeek(...)`, `to = addDays(from, 7·n − 1)`.
+  - 6.4 Today rows: a `times_per_week` habit shows while `weekProgress(...).done < target`. "1 of 3 so far this week" is `cutToOneDecimal(done)` of `target`.
+  - `formatConsistency` takes the cadence type of the latest schedule (the definition's). With mixed schedules, the noun ("days"/"times") follows it.
+  - `habitDays` gives `log` on every state, including `inactive` and `not_scheduled`, so the strip can show kept logs.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint (1 pre-existing warning, below), typecheck, 888 unit and 581 integration tests. Pure code only: no schema, UI, build or e2e.
+- **Follow-ups:**
+  - Lint warns about an unused `_omitted` in `src/server/modules/habits/validation.test.ts:108` (from 6.1).
