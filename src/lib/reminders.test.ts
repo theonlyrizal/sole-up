@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isSweepOverdue,
   REMINDER_EARLY_HINT,
   REMINDER_OFFSET_LABELS,
   REMINDER_OFFSETS,
@@ -33,5 +34,22 @@ describe("reminder labels", () => {
     expect(skippedLabel("no_device", false)).toBe(
       "Skipped: no device was set up",
     );
+  });
+});
+
+describe("isSweepOverdue", () => {
+  const now = new Date("2027-01-11T15:00:00.000Z");
+  const minutesAgo = (minutes: number) =>
+    new Date(now.getTime() - minutes * 60_000);
+
+  it("is overdue when no sweep has run, or none for more than an hour", () => {
+    expect(isSweepOverdue(null, now)).toBe(true);
+    expect(isSweepOverdue(minutesAgo(61), now)).toBe(true);
+  });
+
+  it("isn't overdue within the hour", () => {
+    expect(isSweepOverdue(minutesAgo(0), now)).toBe(false);
+    expect(isSweepOverdue(minutesAgo(45), now)).toBe(false);
+    expect(isSweepOverdue(minutesAgo(60), now)).toBe(false);
   });
 });

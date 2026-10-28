@@ -130,6 +130,7 @@ Each command exists from the chunk shown.
 | `pnpm test:unit` / `pnpm test:integration` / `pnpm test:e2e` | 0.5 | test suites |
 | `pnpm verify` | 0.5 | `format:check` + `lint` + `typecheck` + `test:unit` + `test:integration` |
 | `pnpm reminders:sweep` | 5.1 | runs one reminder sweep locally (no worker in v1, ADR 0013) |
+| `pnpm reminders:failed` | 5.7 | prints failed reminders by error code and age, no content |
 
 ## Progress log
 
@@ -192,7 +193,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 5.4 | Reminders: schema and scheduling | done | chunk/5.4-reminders-scheduling | 2026-10-28 | `reminders` (migration 0012, one-scheduled partial unique index), item offsets + `daily_nudge_time`, sync in the task/event/preferences transactions (rolling next occurrence, nudge per zone), `claimDueReminders` under `SKIP LOCKED` in `runSweep`; no sending |
 | 5.5 | Delivery in the sweep | done | chunk/5.5-sweep-delivery | 2026-10-28 | `runSweep` sends via `web-push` (stale → disabled → no_device → quiet-hours hold, bundled release), 404/410 deletes the device, 3 attempts then `failed`, rolls series/nudge, title-or-private payloads with deep links, TTL to stale; migration 0013 adds the delivery prefs + `held_until` |
 | 5.6 | Reminder UI and preferences | done | chunk/5.6-reminder-ui | 2026-10-29 | Reminder select in task/event forms (events pre-fill 10, series-wide, early hint), dialog status with in-app snooze, notification snooze actions → `POST /api/reminders/[id]/snooze`, Settings → Reminders (switch, private, quiet hours, nudge, no-device note) |
-| 5.7 | Reliability pass | todo | | | |
+| 5.7 | Reliability pass | done | chunk/5.7-reliability-pass | 2026-10-29 | `reliability.integration.test.ts` (DST, zone change, far zones on UTC, missed/cut-off sweeps, DST quiet hours) found 3 bugs, fixed; skips by reason in the sweep log, `reminder_sweep_status` + Settings warning, `pnpm reminders:failed`, Neon note in DEPLOY.md |
 | 5.✓ | Phase 5 checkpoint (user) | todo | | | |
 | 6.0 | Decision gate: habits | todo | | | |
 | 6.1 | Habits: schema | todo | | | |
@@ -2532,3 +2533,41 @@ Template:
   - Drop or move snoozed event rows when the event is edited or deleted in scope (deleted events cascade already).
   - Consider a finer snooze (for example claiming snoozed rows only when `fire_at <= now + 5 min`), which would need an ADR 0013 change.
   - The 5.3/5.5 sign-out follow-up still stands: signing out doesn't unsubscribe the browser.
+
+### 5.7: Reliability pass (2026-10-29)
+- **Built:**
+  - Tests: integration `src/server/modules/reminders/reliability.integration.test.ts` (31), driving sweeps every 15 minutes across the hours that matter:
+    - New York DST days in 2027: deadlines on both transition days, a day-before reminder, a daily event and the nudge across each transition, an occurrence and a nudge at a skipped (02:30) and a repeated (01:30) time, once each
+    - quiet hours on DST nights: 22:00–07:00 both ways, an end the gap skips, an end in the repeated hour
+    - a time-zone change (New York → Tokyo): instants kept, times formatted in the new zone, a hold from the old zone released, quiet hours and the nudge in the new zone
+    - `process.env.TZ = "UTC"` with users in `Pacific/Kiritimati` and `Pacific/Pago_Pago`: the nudge by local day, a missed nudge stale at local midnight, quiet hours, "tomorrow" labels
+    - missed sweeps: a day and a half without sweeps (send what is still useful, skip the rest, a series and the nudge roll once), no in-sweep retry of a failed send
+    - a sweep cut off between sending and recording (simulated by making `recordDelivery` throw): resent once the claim is 10 minutes old under the same tag, nothing recorded resent, stale if the target passed
+    - the log line's counts with skips by reason, and the last-sweep record
+    - Unit: `instantAtOrAfterLocal`, the quiet-hours gap/overlap cases, `isSweepOverdue`.
+  - **Bugs the tests found, fixed:**
+    1. **A quiet-hours end inside a spring-forward gap** resolved to the gap's length later (02:30 → 03:30 EDT), so held reminders waited 30 minutes past the end and could go stale. New `instantAtOrAfterLocal` in `src/lib/dates.ts` (the gap's end, via `getTimeZoneTransition`), used by `quietHoursEndAt`.
+    2. **A time-zone change kept holds worked out in the old zone**: reminders held until 07:00 New York stayed held after moving to Tokyo, where it was the afternoon. `savePreferences` now clears `held_until` on a zone change, through `releaseHeldRemindersInTx`, shared with 5.6's quiet-hours change.
+    3. **After missed sweeps, a row rolled to an imminent occurrence or nudge was left for a sweep that came too late** (stale, or late for the nudge). `runSweep` claims a second time with `exceptIds` (new `claimDueReminders` parameter), skipping rows the first pass handled so a failed send still waits for the next sweep, and not when the first claim filled its batch.
+  - Visibility: `SweepCounts.skippedByReason` (`stale`/`disabled`/`no_device`) in the result, the route's response and the log line. Migration `0014_reminder_sweep_status.sql` (generated, additive): `reminder_sweep_status` (single row, `last_sweep_at`). `sweep-status.ts`: `recordSweepFinished` (at the end of `runSweep`, `greatest` so an overlapping earlier sweep doesn't move it back), `lastSweepAt`, `sweepHealth`. Settings → Reminders shows a note when reminders are on and no sweep has finished for over an hour (`SWEEP_OVERDUE_MINUTES`, `isSweepOverdue` in `src/lib/reminders.ts`), with the last time formatted on the server.
+  - `scripts/reminders-failed.mts` (`pnpm reminders:failed`): reads `DATABASE_URL` with `pg`, prints failed reminders grouped by error code with counts in the last day / last week / older and the newest and oldest age. No titles, users, IDs or the URL; read-only. Checked against seeded rows in the test database.
+  - Docs: DEPLOY.md (sweep counts, the Settings warning, "Failed reminders", "Watching Neon's compute (Phase 5 checkpoint)" with the console path and the 80 CU-hour threshold, checked against Neon's plans and usage docs), DATA_MODEL (catching up, DST rules, ReminderSweepStatus, zone change clears holds), README "Reminders", the Standard commands table.
+- **Deviations:**
+  1. **Three behaviour fixes** beyond tests, as listed above (the chunk text asks to fix what the tests expose).
+  2. **The Settings warning shows only while reminders are on**; with them off nothing is expected to arrive.
+- **Decisions:**
+  - "1 day before" stays exactly 24 hours (ADR 0013 stores minutes), so across a DST change it fires an hour off the wall clock. Pinned by a test; see follow-ups.
+  - In a fall-back overlap, quiet hours end at the first time the clock reads the end; the repeated hour after it isn't quiet. Pinned by tests and a comment in `quiet-hours.ts`.
+  - The last-sweep record is app-wide, written after a sweep finishes (not when it starts), so a sweep that throws before the end doesn't count.
+  - Recorded in code comments, DATA_MODEL > Reminder and DEPLOY.md.
+- **Next chunk should know:**
+  - Reuse `sweepEvery15(from, to)` and the `cutOff` mock of `./record` from `reliability.integration.test.ts` for time-driven sweep tests. A test can set `process.env.TZ` at runtime (Node applies it at once); restore it in `afterAll`.
+  - `instantAtOrAfterLocal` is for the end of a local span; keep `instantFromLocal` for targets.
+  - Locally, Settings shows the "reminders haven't been checked" note until a sweep runs (`pnpm reminders:sweep`). e2e tests that assert the Reminders section's text may see it.
+  - Phase 5 checkpoint (user): rely on reminders for a week; note missed, late or duplicated notifications, `pnpm reminders:failed` with the production `DATABASE_URL`, and Neon's Compute figure on the first and last day (DEPLOY.md > Watching Neon's compute).
+- **Unverified:** the warning and the per-reason counts in production (need the deploy and the cron job); Neon's console labels may differ slightly from its docs. Checks: `pnpm verify` (format, lint, typecheck, 688 unit, 550 integration) and `pnpm build` pass; `pnpm db:generate` reports no drift and the dev DB is migrated. The new tests failed before each fix (4 failures) and pass after; dropping the second claim's `exceptIds` fails the in-sweep retry test. `pnpm test:e2e` wasn't run locally (CI runs it).
+- **Follow-ups:**
+  - Consider making "1 day before" the same wall-clock time the day before (needs the item's zone in `fireAtFor` and an ADR 0013 change).
+  - The stopped-sweeps note is app-wide; before inviting others (Phase 11), decide whether ordinary users should see it or only an operator alert.
+  - A backlog over the 200-row claim batch skips the catch-up pass, so rows rolled in that sweep wait for the next one (may arrive stale). Only after long outages with many users.
+  - The 5.3/5.5/5.6 sign-out follow-up still stands: signing out doesn't unsubscribe the browser.

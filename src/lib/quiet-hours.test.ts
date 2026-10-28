@@ -93,4 +93,25 @@ describe("quietHoursEndAt", () => {
       new Date("2027-03-14T11:00:00.000Z"),
     );
   });
+
+  it("ends when the clock jumps past an end that spring-forward skips", () => {
+    // 02:30 doesn't exist on 14 March 2027; 01:59 EST is followed by 03:00
+    // EDT (07:00 UTC).
+    const hours = { start: "01:00", end: "02:30" };
+    expect(
+      quietHoursEndAt(new Date("2027-03-14T06:45:00.000Z"), ZONE, hours),
+    ).toEqual(new Date("2027-03-14T07:00:00.000Z"));
+  });
+
+  it("is over in the repeated fall-back hour once the first end has passed", () => {
+    // 01:30 happens twice on 7 November 2027: EDT (05:30 UTC), then EST.
+    const hours = { start: "00:00", end: "01:30" };
+    expect(
+      quietHoursEndAt(new Date("2027-11-07T05:15:00.000Z"), ZONE, hours),
+    ).toEqual(new Date("2027-11-07T05:30:00.000Z"));
+    // 01:15 EST, the second time the clock reads it.
+    expect(
+      quietHoursEndAt(new Date("2027-11-07T06:15:00.000Z"), ZONE, hours),
+    ).toBeNull();
+  });
 });

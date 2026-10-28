@@ -1,6 +1,16 @@
 import "server-only";
 
-import { and, asc, eq, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  notInArray,
+  or,
+} from "drizzle-orm";
 
 import { SWEEP_INTERVAL_MINUTES } from "@/lib/reminders";
 import { db } from "@/server/db/client";
@@ -36,14 +46,17 @@ export type ClaimedReminder = Pick<
  * horizonMinutes`, ADR 0013's "never late" rule): moves them from
  * `scheduled` to `sending` and stamps `claimed_at`, oldest first, in one
  * short transaction. A row held for quiet hours waits until `held_until`,
- * and a row left `sending` for `RECLAIM_AFTER_MINUTES` is claimed again. `FOR UPDATE SKIP LOCKED` lets overlapping sweeps run
- * side by side without ever claiming the same row: a row another sweep is
- * claiming is skipped, and one it has claimed is no longer `scheduled`.
+ * and a row left `sending` for `RECLAIM_AFTER_MINUTES` is claimed again.
+ * `FOR UPDATE SKIP LOCKED` lets overlapping sweeps run side by side without
+ * ever claiming the same row: a row another sweep is claiming is skipped,
+ * and one it has claimed is no longer `scheduled`. Rows in `exceptIds` (the
+ * ones this sweep already handled) are left alone.
  */
 export async function claimDueReminders(
   now: Date,
   horizonMinutes: number = SWEEP_INTERVAL_MINUTES,
   limit: number = CLAIM_BATCH_MAX,
+  exceptIds: readonly string[] = [],
 ): Promise<ClaimedReminder[]> {
   const horizon = new Date(now.getTime() + horizonMinutes * 60_000);
   const abandoned = new Date(now.getTime() - RECLAIM_AFTER_MINUTES * 60_000);
@@ -52,15 +65,20 @@ export async function claimDueReminders(
       .select({ id: reminders.id })
       .from(reminders)
       .where(
-        or(
-          and(
-            eq(reminders.status, "scheduled"),
-            lt(reminders.fireAt, horizon),
-            or(isNull(reminders.heldUntil), lte(reminders.heldUntil, now)),
-          ),
-          and(
-            eq(reminders.status, "sending"),
-            lte(reminders.claimedAt, abandoned),
+        and(
+          exceptIds.length > 0
+            ? notInArray(reminders.id, [...exceptIds])
+            : undefined,
+          or(
+            and(
+              eq(reminders.status, "scheduled"),
+              lt(reminders.fireAt, horizon),
+              or(isNull(reminders.heldUntil), lte(reminders.heldUntil, now)),
+            ),
+            and(
+              eq(reminders.status, "sending"),
+              lte(reminders.claimedAt, abandoned),
+            ),
           ),
         ),
       )

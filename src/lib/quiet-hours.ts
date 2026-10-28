@@ -3,7 +3,7 @@
 // the hours then cross midnight. Pure: shared by the sweep and, from 5.6,
 // the Settings form.
 
-import { addDays, instantFromLocal, localDateTimeOf } from "@/lib/dates";
+import { addDays, instantAtOrAfterLocal, localDateTimeOf } from "@/lib/dates";
 
 export type QuietHours = {
   /** "HH:MM" local time the quiet hours begin. */
@@ -51,7 +51,9 @@ export function quietHoursEndAt(
     crossesMidnight && local.time >= start
       ? addDays(local.date, 1)
       : local.date;
-  const endAt = instantFromLocal(endDate, end, timeZone);
-  // A DST gap can resolve the end to an instant already past; then they're over.
+  // An end a spring-forward gap skips is when the clock jumps past it. In a
+  // fall-back overlap it is the first time the clock reads `end`, so in the
+  // repeated hour after it the end has passed and they're over.
+  const endAt = instantAtOrAfterLocal(endDate, end, timeZone);
   return endAt > now ? endAt : null;
 }

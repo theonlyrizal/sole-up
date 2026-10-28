@@ -7,6 +7,7 @@ import {
   formatInstant,
   formatLocalDate,
   formatTimeOfDay,
+  instantAtOrAfterLocal,
   instantFromLocal,
   isLocalDate,
   localDateOf,
@@ -145,6 +146,24 @@ describe("local date and instant conversion", () => {
     expect(
       instantFromLocal("2026-11-01", "01:30", "America/New_York").toISOString(),
     ).toBe("2026-11-01T05:30:00.000Z");
+  });
+
+  it("finds the first instant at or after a local time, the gap's end for a skipped one", () => {
+    const zone = "America/New_York";
+    // A normal time and a repeated one: the same as instantFromLocal.
+    expect(instantAtOrAfterLocal("2026-10-20", "09:30", zone)).toEqual(
+      instantFromLocal("2026-10-20", "09:30", zone),
+    );
+    expect(
+      instantAtOrAfterLocal("2026-11-01", "01:30", zone).toISOString(),
+    ).toBe("2026-11-01T05:30:00.000Z");
+    // 02:30 on 2026-03-08 is skipped: the clock jumps to 03:00 EDT.
+    expect(
+      instantAtOrAfterLocal("2026-03-08", "02:30", zone).toISOString(),
+    ).toBe("2026-03-08T07:00:00.000Z");
+    expect(() => instantAtOrAfterLocal("2026-10-20", "24:00", zone)).toThrow(
+      RangeError,
+    );
   });
 
   it("rejects malformed dates and times", () => {

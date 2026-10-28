@@ -96,6 +96,35 @@ export function instantFromLocal(
 }
 
 /**
+ * The first instant at which the wall clock in `timeZone` reads `time` on
+ * `date` or later. It differs from `instantFromLocal` only for a time a
+ * spring-forward gap skips: that resolves to the end of the gap, when the
+ * clock jumps past it (02:30 on a 02:00 → 03:00 night is 03:00), rather
+ * than moving forward by the gap's length (03:30). For the end of a span
+ * of local time, such as quiet hours.
+ */
+export function instantAtOrAfterLocal(
+  date: LocalDate,
+  time: string,
+  timeZone: string,
+): Date {
+  if (!LOCAL_TIME_PATTERN.test(time))
+    throw new RangeError("Invalid local time");
+  const wallClock = parseLocalDate(date).toPlainDateTime(
+    Temporal.PlainTime.from(time, { overflow: "reject" }),
+  );
+  const earlier = wallClock.toZonedDateTime(timeZone, {
+    disambiguation: "earlier",
+  });
+  if (earlier.toPlainDateTime().equals(wallClock)) {
+    return new Date(earlier.epochMilliseconds);
+  }
+  // In a gap, "earlier" lands before it; the gap ends at the next transition.
+  const gapEnd = earlier.getTimeZoneTransition("next");
+  return new Date((gapEnd ?? earlier).epochMilliseconds);
+}
+
+/**
  * The first instant of a local date in `timeZone`. Usually midnight, but not
  * in zones whose DST change skips midnight (the day then starts at 01:00).
  */

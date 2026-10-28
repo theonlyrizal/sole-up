@@ -181,9 +181,17 @@ Locally there is no cron. With `pnpm dev` running, run one sweep with:
 pnpm reminders:sweep
 ```
 
-It calls the route on `BETTER_AUTH_URL` with the secret from `.env.local` and prints the counts. The app logs one `Reminder sweep finished` line with the start, counts and duration, never the secret or reminder content.
+It calls the route on `BETTER_AUTH_URL` with the secret from `.env.local` and prints the counts. The app logs one `Reminder sweep finished` line with the start, counts (claimed, sent, skipped with `skippedByReason`, failed, held, retrying) and duration, never the secret or reminder content. Each finished sweep records its time in `reminder_sweep_status`, and Settings → Reminders warns when none has run for over an hour (locally that is normal until you run a sweep).
 
-Each task or event change writes, moves or removes its one scheduled row in `reminders` in the same transaction (`src/server/modules/reminders/schedule.ts`; repeating events keep a rolling row for their next occurrence), and the daily nudge follows the user's zone. A sweep claims what fires before the next one (`fire_at < now + 15 min`) by moving it to `sending` under `FOR UPDATE SKIP LOCKED` (`claim.ts`). The sweep then sends each claimed reminder with `web-push` to the user's subscribed devices, skips it (stale, reminders off, no device), or holds it for quiet hours (`sweep.ts`, `record.ts`); the counts show which. The rules are in [docs/DATA_MODEL.md](docs/DATA_MODEL.md) > Reminder.
+To list reminders that failed to send, by error code and age (counts only, no content), run:
+
+```bash
+pnpm reminders:failed
+```
+
+It reads `DATABASE_URL` directly, so the app doesn't need to be running.
+
+Each task or event change writes, moves or removes its one scheduled row in `reminders` in the same transaction (`src/server/modules/reminders/schedule.ts`; repeating events keep a rolling row for their next occurrence), and the daily nudge follows the user's zone. A sweep claims what fires before the next one (`fire_at < now + 15 min`) by moving it to `sending` under `FOR UPDATE SKIP LOCKED` (`claim.ts`). The sweep then sends each claimed reminder with `web-push` to the user's subscribed devices, skips it (stale, reminders off, no device), or holds it for quiet hours (`sweep.ts`, `record.ts`); the counts show which. After missed sweeps, a second claim in the same sweep picks up rows that rolling a series or the nudge made due at once. Chunk 5.7's `reliability.integration.test.ts` covers DST days, time-zone changes, far zones on a UTC server, missed and cut-off sweeps, and quiet hours on DST nights. The rules are in [docs/DATA_MODEL.md](docs/DATA_MODEL.md) > Reminder.
 
 **Reminder settings and snooze** (chunk 5.6): the task and event forms have a "Reminder" select (none, at the time, 10 or 30 minutes, 1 hour or 1 day before; new events start at 10 minutes, and a series' reminder applies to every occurrence), with the hint that reminders may arrive up to 15 minutes early. The item's dialog shows its next reminder, or what happened to the last one ("Skipped: quiet hours"), and offers "Snooze 15 min" / "Snooze 1 hour" for one that went out. The notification offers the same two actions: the service worker POSTs to `/api/reminders/<id>/snooze` with the session cookie (same origin only) and opens the item instead if that fails. Settings → Reminders holds the on/off switch, private mode, quiet hours and the daily nudge time, with a note when no device is subscribed.
 
