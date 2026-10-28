@@ -13,6 +13,13 @@ import {
   GOAL_PRIORITIES,
   GOAL_STATUSES,
 } from "@/lib/goals";
+import { anyCadenceConfigSchema } from "@/lib/habits/cadence";
+import {
+  HABIT_CADENCE_TYPES,
+  HABIT_EDITABLE_FIELDS,
+  HABIT_MEASURES,
+  HABIT_STATUSES,
+} from "@/lib/habits/habit";
 import { LIFE_AREA_COLORS, LIFE_AREA_STATUSES } from "@/lib/life-areas";
 import {
   MILESTONE_EDITABLE_FIELDS,
@@ -530,6 +537,52 @@ export const AUDIT_EVENTS = defineAuditEvents({
     }),
   },
   // No `time_block_exception.deleted`, as for event exceptions.
+
+  // Habits (ADR 0014). Title, description, unit and note are user content,
+  // and target and value amounts can be health data: events name a changed
+  // target, never its number. `habit.updated` records which fields changed,
+  // plus old and new values for the dates and the goal link only.
+  "habit.created": {
+    entityType: "habit",
+    changes: z.strictObject({
+      status: auditChange(z.enum(HABIT_STATUSES)),
+      measure: auditChange(z.enum(HABIT_MEASURES)),
+      startDate: auditChange(localDate),
+      endDate: auditChange(localDate),
+      goalId: auditChange(z.uuid()),
+      effectiveFrom: localDate,
+      cadenceType: auditChange(z.enum(HABIT_CADENCE_TYPES)),
+      cadenceConfig: auditChange(anyCadenceConfigSchema),
+    }),
+  },
+  "habit.updated": {
+    entityType: "habit",
+    changes: z.strictObject({
+      fields: z.array(z.enum(HABIT_EDITABLE_FIELDS)).min(1),
+      startDate: auditChange(localDate).optional(),
+      endDate: auditChange(localDate).optional(),
+      goalId: auditChange(z.uuid()).optional(),
+    }),
+  },
+  "habit.status_changed": {
+    entityType: "habit",
+    changes: z.strictObject({ status: auditChange(z.enum(HABIT_STATUSES)) }),
+  },
+  // The schedule in effect for the week of `effectiveFrom` before and after
+  // the edit. A changed target appears in `fields` by name only.
+  "habit.schedule_changed": {
+    entityType: "habit",
+    changes: z.strictObject({
+      effectiveFrom: localDate,
+      fields: z
+        .array(z.enum(["cadenceType", "cadenceConfig", "target"]))
+        .min(1),
+      cadenceType: auditChange(z.enum(HABIT_CADENCE_TYPES)),
+      cadenceConfig: auditChange(anyCadenceConfigSchema),
+    }),
+  },
+  // No `habit.deleted`, for the same reason as life areas (ADR 0005). The
+  // log events (`habit.logged|log_changed|log_removed`) come with 6.4.
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;
