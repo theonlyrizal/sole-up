@@ -171,39 +171,90 @@ Suggested fields:
 Prevent self-dependencies and cycles at the domain layer if dependency graphs are introduced.
 
 ### Habit
-A recurring behavior the user wants to track.
+A recurring behavior the user wants to track. Rules: [ADR 0014](decisions/0014-habit-cadence-logs-consistency.md).
 
-Suggested fields:
+Fields:
 - `id`
 - `user_id`
 - `title`
 - `description` (optional)
-- `cadence_type`
-- `cadence_config` (validated structure for days/frequency)
-- `start_date`
-- `end_date` (optional)
-- `status` (active, paused, archived)
-- `goal_id` (optional)
+- `measure` (`check | quantity`), fixed at creation
+- `unit` (set exactly when `measure` is `quantity`, such as "glasses" or "km"), fixed at creation
+- `start_date` (local date)
+- `end_date` (optional local date, inclusive, not before `start_date`)
+- `status` (`active | paused | archived`)
+- `status_changed_at`
+- `goal_id` (optional; composite FK, `ON DELETE SET NULL (goal_id)`)
 - `created_at`
 - `updated_at`
 
-Define cadence semantics before implementing analytics. For example, “three times per week” needs a different denominator from “every day.”
+Rules:
+- Cadence and target are not on the habit. They live in versioned HabitSchedule rows, so editing them never rewrites past weeks.
+- Pausing opens a HabitPause from today (from tomorrow if today is already logged), and resuming closes it today. Archiving opens one if none is open, so archived days count like paused ones. Restore always returns to `active`.
+- `unique (id, user_id)`. Deleting a habit is a confirmed hard delete: schedules, pauses and logs cascade, and its audit events are removed in the same transaction.
+- Audit events are on the habit: `habit.created|updated|status_changed|schedule_changed|logged|log_changed|log_removed`. They never hold the title, description, unit, note, or a target or value number (amounts can be health data).
 
-### HabitLog
-A dated record of a habit occurrence.
+### HabitSchedule
+The cadence and target in effect from a given week.
 
-Suggested fields:
+Fields:
 - `id`
 - `user_id`
-- `habit_id`
-- `local_date`
-- `status` (completed, skipped, missed only if the user explicitly records or the system can validly determine it)
-- `value` (optional for quantity-based habits)
-- `note` (optional)
+- `habit_id` (composite FK, cascade)
+- `effective_from` (local date: the start of the user week the edit was made in)
+- `cadence_type` (`daily | weekly_days | times_per_week`)
+- `cadence_config` (jsonb, validated per type: `{}`; `{ "days": [...] }` with 1–6 distinct weekdays, 0 = Sunday … 6 = Saturday; `{ "timesPerWeek": N }` with N 1–6)
+- `target` (quantity habits only: above 0, at most 2 decimals, up to 99,999.99; the amount per expected day)
 - `created_at`
 - `updated_at`
 
-Use a uniqueness constraint appropriate to the habit's cadence and logging model. Do not automatically treat an unlogged day as a failure without defining that behavior.
+Rules:
+- `unique (habit_id, effective_from)`. A habit always has at least one row. A second edit in the same week replaces that week's row.
+- **The schedule for a week** is the row with the latest `effective_from` on or before the week's last day, or the earliest row if none is. Every day in a week uses its week's schedule.
+
+### HabitPause
+A span of days a habit was paused or archived.
+
+Fields:
+- `id`
+- `user_id`
+- `habit_id` (composite FK, cascade)
+- `start_date` (the first paused day)
+- `end_date` (optional, exclusive: the first active day again; null while ongoing)
+- `created_at`
+
+Rules: CHECK `end_date > start_date`, at most one open pause per habit (partial unique index), and no overlaps (service). A pause that would be empty is deleted instead.
+
+### HabitLog
+What the user recorded for a habit on one local date.
+
+Fields:
+- `id`
+- `user_id`
+- `habit_id` (composite FK, cascade)
+- `local_date`
+- `status` (`completed | skipped`)
+- `value` (required on a completed log of a quantity habit, above 0 with the target's bounds; null on a skip and for check habits)
+- `note` (optional; never logged or put in an audit event)
+- `created_at`
+- `updated_at`
+
+Rules:
+- `unique (habit_id, local_date)`: at most one log per habit per day. Logs are accepted only on active days on or before today.
+- **"Missed" is never stored.** It is derived for display only: a past counted day (`daily`/`weekly_days`) with no log, labelled "Missed" in neutral styling. `times_per_week` has no per-day Missed.
+- A completed log on a non-scheduled weekday of a `weekly_days` habit is an "extra": shown, never counted.
+- Logs on days that later become inactive are kept and shown, never counted.
+
+**Consistency** is computed on read by the pure engine in `src/lib/habits/` (chunk 6.2), never stored. The exact definitions are in ADR 0014. In short:
+- **Daily or weekly days:** completed credit out of counted days over whole user weeks.
+- **Credit:** 1 for a check, `min(value ÷ target, 1)` for a quantity.
+- **Today** counts only once logged, and skips leave the denominator.
+- **N times a week:**
+  - a partial week expects N × active days ÷ 7, rounded
+  - each skip lowers the week's target by one
+  - completions are capped at the target
+  - the current week counts only what's done
+- **Shown as** a count ("12 of 14 days · 2 skipped"), never a percentage or a total across habits.
 
 ### CalendarEvent
 A time commitment or event managed by SoleUp. Rules: [ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md).
@@ -477,7 +528,7 @@ User
  │    ├── Tasks
  │    └── Habits
  ├── Tasks (inbox: no parent) ── TimeBlocks ── TimeBlockExceptions
- ├── Habits ── HabitLogs
+ ├── Habits ── HabitSchedules, HabitPauses, HabitLogs
  ├── CalendarEvents ── CalendarEventExceptions
  ├── Notes ── NoteLinks
  ├── AuditEvents
@@ -493,7 +544,7 @@ Likely constraints and indexes:
 - Foreign keys for all ordinary relationships.
 - Index user-owned records by `user_id` and common sort/filter fields.
 - Index tasks by `(user_id, status, planned_date)`, `(user_id, status, due_date)` and `(user_id, status, due_at)` where query patterns justify it.
-- Index habit logs by `(user_id, habit_id, local_date)`.
+- Habit logs are unique on `(habit_id, local_date)`, which also serves per-habit lookups. Index them by `(user_id, local_date)` for Today and Home across habits.
 - Index events by `(user_id, start_at)` and `(user_id, start_date)`, and time blocks by `(user_id, start_at)`. Repeating series are expanded in application code, so a series' end may need its own index once query plans show it.
 - Add unique constraints for external IDs within the correct integration/account scope.
 - Ensure a goal's milestone belongs to the same user as the goal.
@@ -537,8 +588,8 @@ Settled:
 7. Goal statuses, priority, progress and dates; numeric targets deferred ([ADR 0010](decisions/0010-goal-status-priority-progress.md)).
 8. Task statuses, derived inbox, overdue planned tasks, priority and estimates ([ADR 0011](decisions/0011-task-status-planning-priority-estimates.md)).
 9. Calendar event shapes, recurrence with exceptions, and time blocks ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)).
+10. Habit cadences, check and quantity measures, logs, versioned schedules, pauses and consistency denominators ([ADR 0014](decisions/0014-habit-cadence-logs-consistency.md)).
 
 Still open (decided at phase gates in the implementation plan):
-1. Habit cadence and logging semantics (Phase 6).
-2. Supported note links (Phase 8).
-3. Backup and log retention (Phase 10 privacy notes).
+1. Supported note links (Phase 8).
+2. Backup and log retention (Phase 10 privacy notes).

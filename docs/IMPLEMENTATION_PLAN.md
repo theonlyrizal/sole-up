@@ -195,8 +195,8 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 5.6 | Reminder UI and preferences | done | chunk/5.6-reminder-ui | 2026-10-29 | Reminder select in task/event forms (events pre-fill 10, series-wide, early hint), dialog status with in-app snooze, notification snooze actions → `POST /api/reminders/[id]/snooze`, Settings → Reminders (switch, private, quiet hours, nudge, no-device note) |
 | 5.7 | Reliability pass | done | chunk/5.7-reliability-pass | 2026-10-29 | `reliability.integration.test.ts` (DST, zone change, far zones on UTC, missed/cut-off sweeps, DST quiet hours) found 3 bugs, fixed; skips by reason in the sweep log, `reminder_sweep_status` + Settings warning, `pnpm reminders:failed`, Neon note in DEPLOY.md |
 | 5.✓ | Phase 5 checkpoint (user) | done | | 2026-10-29 | User marked done without the week of relying on reminders; production setup (sweep secret, VAPID keys, cron-job.org), phone checks, the missed/late/duplicate log, `pnpm reminders:failed` and Neon compute readings are deferred to a whole-app check later |
-| 6.0 | Decision gate: habits | todo | | | |
-| 6.1 | Habits: schema | todo | | | |
+| 6.0 | Decision gate: habits | done | chunk/6.0-habits-decisions | 2026-10-29 | ADR 0014: three cadences, check or quantity (partial credit), completed/skipped with derived "Missed", versioned schedules, exact week-based denominators, skips excluded; 6.1–6.6 and DATA_MODEL synced |
+| 6.1 | Habits: schema and service | todo | | | |
 | 6.2 | Cadence engine | todo | | | |
 | 6.3 | Habit CRUD UI | todo | | | |
 | 6.4 | Logging | todo | | | |
@@ -918,41 +918,133 @@ Decided 2026-10-27 in [ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)
 **Goal:** Track repeated behaviors accurately and without streak pressure (Journey C).
 
 ### 6.0 Decision gate
-- **Cadences.** Recommended:
+Decided 2026-10-29 in [ADR 0014](decisions/0014-habit-cadence-logs-consistency.md), which holds the exact denominator definitions. Later chunks follow it rather than this summary. The user chose full quantity habits, against the gate's recommendation to defer them, and the "Missed" label instead of "Not logged". The sixth question (versioned schedules) was added beyond the gate's five.
+- **Cadences:**
   - `daily`
-  - `weekly_days` (specific weekdays)
-  - `times_per_week` (N per week, counted on the user's week start)
-- **Log statuses.** Recommended: `completed | skipped`. "Missed" is never stored; it is derived only for display, and only for days strictly in the past.
-- **Quantity habits.** Recommended: deferred.
-- **Denominators:**
-  - daily: active days in the range, excluding paused periods
-  - weekly_days: scheduled days in the range
-  - times_per_week: weeks × N
-- **Skips.** Recommended: excluded from the denominator. Document this.
+  - `weekly_days`: 1–6 chosen weekdays, 0 = Sunday … 6 = Saturday
+  - `times_per_week`: N = 1–6 per user week, counted from the saved week start
+- **Measure:** `check` or `quantity`. A quantity habit has a `unit` and a per-day `target` (above 0, 2 decimals). Partial credit `min(value ÷ target, 1)` per day, never carried over. Measure and unit are fixed at creation.
+- **Logs:**
+  - one per habit per local date, `completed | skipped`
+  - `value` only on a completed quantity log
+  - "Missed" never stored: derived for past counted days with no log, in neutral styling
+  - no per-day Missed for `times_per_week`
+- **Schedules:** cadence and target are versioned in `habit_schedules`, effective from the start of the current user week. Past weeks keep theirs.
+- **Denominators:** over whole user weeks.
+  - Today counts only once it has a completed log.
+  - `daily`/`weekly_days`: counted days (active, scheduled, not skipped, past or logged today).
+  - `weekly_days`: completions on other weekdays are "extra", not counted.
+  - `times_per_week`:
+    - a partial week expects `round(N × active days ÷ 7)`
+    - each skip lowers the week's target by one
+    - completions are capped at the target
+    - the current week counts only what's done (`min(done, target)`)
+- **Skips:** excluded from the denominator, never a miss, and always shown next to the figure.
+- **Shown as:** "12 of 14 days · 2 skipped" or "7 of 9 times". Never a percentage, a score or a total across habits. With nothing expected, there is no figure.
 
-### 6.1 Habits: schema
-- Table `habits`: `title`, `description?`, `cadence_type`, `cadence_config` (validated JSON: weekdays or count), `start_date`, `end_date?`, `status` (`active | paused | archived`), `goal_id?`, timestamps.
-- Table `habit_pauses` with `(habit_id, start_date, end_date?)`, so history stays correct across pauses.
-- Table `habit_logs` with `(habit_id, local_date)` unique, `status`, `note?`, timestamps.
+### 6.1 Habits: schema and service
+- **Tables** (ADR 0014), each with `user_id`, `unique (id, user_id)` where referenced, and composite FKs `(habit_id, user_id) → habits(id, user_id)` with cascade:
+  - `habits`:
+    - `title`, `description?`, `measure` (`check | quantity`), `unit?`, `start_date`, `end_date?`
+    - `status` (`active | paused | archived`), `status_changed_at`, `goal_id?`, timestamps
+    - CHECKs: status, measure, `unit` set exactly for `quantity`, `end_date >= start_date`, lengths
+    - the goal FK hand-edited to `ON DELETE SET NULL (goal_id)` (see the 1.1 note)
+  - `habit_schedules`:
+    - `habit_id`, `effective_from` (local date), `cadence_type` (`daily | weekly_days | times_per_week`), `cadence_config` (jsonb), `target?` (numeric, above 0, at most 99,999.99), timestamps
+    - `unique (habit_id, effective_from)`
+  - `habit_pauses`:
+    - `habit_id`, `start_date`, `end_date?` (exclusive: the first active day again)
+    - CHECK `end_date > start_date`
+    - a partial unique index: at most one open pause (`end_date is null`) per habit
+  - `habit_logs`:
+    - `habit_id`, `local_date`, `status` (`completed | skipped`), `value?` (numeric, same bounds as `target`), `note?`, timestamps
+    - `unique (habit_id, local_date)` and an index `(user_id, local_date)`
+    - CHECKs: status, a skip has no `value`, `value > 0`
+- **Validation (Zod):**
+  - `cadence_config` per type: `{}`, `{ days }` with 1–6 distinct weekdays 0–6, `{ timesPerWeek }` 1–6
+  - `target` and `unit` required for `quantity` and refused for `check`
+  - the date pair checked together
+- **Service** (create, edit, change schedule, pause, resume, archive, restore, delete), with the ADR's rules:
+  - **Create** writes the habit and its first schedule (`effective_from` = the start of the week holding `start_date`) in one transaction.
+  - **Change schedule** upserts the row for the current week's start. It can't change `measure` or `unit`.
+  - **Pause** opens a pause from today, or from tomorrow if today has a log. **Resume** closes it today, or deletes it if it would be empty. **Archive** opens one if none is open. **Restore** goes to `active` and closes it.
+  - **Delete** is a hard delete that removes the habit's events.
+  - Audit events `habit.created|updated|status_changed|schedule_changed`, with no title, description, unit or target number in them.
+  - Deleting a goal clears habits' `goal_id` with a `habit.updated` event for each, in the same transaction (like 2.7's `task.moved`).
+- **No log writes** (6.4 owns them) and no consistency (6.2).
+- **Tests:**
+  - every CHECK and unique index, including a duplicate log and a second open pause
+  - invalid cadence configs per type
+  - quantity/check field rules
+  - pause/resume/archive/restore rows, including a same-day pause and resume
+  - a second schedule edit in one week replacing the first
+  - the goal-delete `SET NULL` keeping `user_id`
+  - delete removing children and events
+  - cross-user access
+  - audit privacy
 
 ### 6.2 Cadence engine (pure functions)
-- `expectedOccurrences(habit, pauses, range)` and `consistency(habit, logs, pauses, range) → { completed, expected, skipped, definition }`.
-- Exhaustive unit tests: week boundaries for each week start, a pause in the middle of a week, a start date in the middle of a week, an end date, and ranges with no data.
+- **In `src/lib/habits/`** (pure, no server imports), exactly per ADR 0014 "Consistency":
+  - `scheduleForWeek(schedules, week)`
+  - `isActiveDay(habit, pauses, date)`
+  - `weekTarget(N, activeDays)` (integer form `floor((2·N·a + 7) / 14)`)
+  - `habitDays(input)` (each day's state for history strips: inactive, not scheduled, completed with credit, extra, skipped, missed, today, future)
+  - `consistency(input) → { completed, expected, skipped, atTarget?, definition }`
+  - `weekProgress(input)` (the current week's done of target, for "so far this week")
+  - `formatConsistency(result, cadence, measure)` (cut to one decimal, "Nothing expected in this range" at 0)
+- **Input:** the habit, its schedules, pauses and logs, a whole-week range, `today` and the week start.
+- **Definition text** is built from the habit's schedule, and names the partial-week, skip, today/this-week and partial-credit rules.
+- **Exhaustive unit tests:**
+  - week boundaries for all seven week starts
+  - a start date, end date or pause in the middle of a week
+  - N = 1–6 against 0–7 active days (the rounding table)
+  - skips lowering a week's target to 0
+  - the current week never lowering the figure
+  - today unlogged vs logged
+  - `weekly_days` extras
+  - quantity credit below, at and above the target, and the weekly cap
+  - a schedule change mid-history
+  - a week-start change regrouping weeks
+  - logs on inactive days ignored
+  - empty ranges and ranges before the start
 
 ### 6.3 Habit CRUD UI
-- Create and edit with a cadence picker. Pause, resume and archive. An optional goal link.
+- A Track destination in the navigation (`NAV_ITEMS`, `APP_ROUTE_SEGMENTS`, `shell.spec.ts`) with the habits list: active and paused, and archived behind a link.
+- **Create/edit dialog:**
+  - title, description, measure (on create only; "can't be changed later"), unit and target for quantity
+  - a cadence picker: daily / chosen weekdays / N times a week; all seven weekdays becomes daily
+  - start and end dates, and the optional goal link (active and paused goals)
+  - a cadence or target edit says it applies from the start of this week
+- **Status actions:** pause, resume, archive, restore (to active), and delete behind a confirmation naming how many logs go with it.
+- **Done when:** keyboard-operable forms with field-level errors, axe passes, and the e2e test covers create (check and quantity), a schedule edit, pause/resume and archive/restore.
 
 ### 6.4 Logging
-- A "Habits" section on Today with one-tap complete or skip, and undo.
-- A calendar strip per habit for backfilling and correcting past days.
-- **Done when:** correcting a past log updates consistency immediately, and the audit log records the correction.
+- **Log service and actions:** set (create or change) and clear a log.
+  - Only on active days, on or before today in the user's saved zone. No future logs.
+  - `value` is required for completed quantity logs and refused otherwise.
+  - Events `habit.logged|log_changed|log_removed` on the habit (local date, status from/to, `value` by name only; never the note).
+- **A "Habits" section on Today:**
+  - Which habits show: active habits on an active day, when today is scheduled (`weekly_days`), or while the week's target isn't met (`times_per_week`), plus any already logged today.
+  - One tap completes (a quantity habit logs its full target, and "Change amount" takes another value) or skips, with undo in the toast.
+  - `times_per_week` rows show "1 of 3 so far this week".
+- **A calendar strip per habit** (the `habitDays` states) for backfilling and correcting past active days. "Missed" is neutral, and extras and inactive days are marked.
+- **Done when:** correcting a past log updates consistency immediately, and the audit log records the correction (tests); cross-user, future-date and inactive-day logs are refused.
 
 ### 6.5 Track page and history
-- A Track destination in the navigation. Each habit shows its history and consistency for the selected range, with the definition visible.
-- No streak counters by default. If streaks are added, keep them optional and never the main number.
+- Each habit on Track shows:
+  - its history (the strip, by week)
+  - its consistency for the selected range: the last 4 weeks (default) or the last 12, each including the current week, or this week alone
+  - the definition visible next to the figure
+- **"This week"** shows the week in progress ("1 of 3 so far this week" for `times_per_week`), not a consistency figure.
+- The range is in the URL, and the dates are worked out on the server from the saved zone and week start.
+- No streak counters, percentages or totals across habits. If streaks are ever added, keep them optional and never the main number.
 
 ### 6.6 Home integration
-- A habit summary card on Home that uses the metrics module.
+- A `habitsSummary` metric in `metrics/home.ts`, reusing the 6.2 engine (never recounting).
+  - Active habits, each with its last-4-weeks consistency and this week's progress.
+  - `range`, `asOf` and a definition.
+  - `hasData` = the user has any active habit.
+- A "Habits" `<MetricCard>` on Home listing each habit's figure, linking to Track. No combined number across habits.
 
 **Phase 6 checkpoint:** track real habits for two weeks, and validate that the numbers feel fair.
 
@@ -2571,3 +2663,59 @@ Template:
   - The stopped-sweeps note is app-wide; before inviting others (Phase 11), decide whether ordinary users should see it or only an operator alert.
   - A backlog over the 200-row claim batch skips the catch-up pass, so rows rolled in that sweep wait for the next one (may arrive stale). Only after long outages with many users.
   - The 5.3/5.5/5.6 sign-out follow-up still stands: signing out doesn't unsubscribe the browser.
+
+### 6.0: Decision gate: habits (2026-10-29)
+- **Built:**
+  - ADR 0014 (habits: cadences, logs, quantities and consistency, with the exact denominator definitions) and its index row.
+  - Chunks 6.0–6.6 rewritten to match. The 6.1 title is now "Habits: schema and service" (Progress log and `AGENT_PROMPTS.md`).
+  - `DATA_MODEL.md`: Habit and HabitLog rewritten, HabitSchedule and HabitPause added, plus §4, §5 and §7.
+  - `PRODUCT_SPEC.md` §12 (habits settled), `ROADMAP.md` 1D, and the `AGENT_PROMPTS.md` prompts for 6.1–6.5.
+  - No code.
+- **Deviations:**
+  1. **Two questions beyond the gate's five:**
+     - how quantity habits count (asked once the user chose them)
+     - what a cadence or target edit does to past numbers (it decides 6.1's schema)
+  2. **Full quantity habits, against the recommendation to defer:** `measure`, `unit`, per-day `target` and log `value`, with partial credit.
+  3. **The "Missed" label, against the recommendation of "Not logged":** shown in neutral styling, and still never stored.
+  4. **A new `habit_schedules` table** holds the cadence and target, so `habits` has no `cadence_type`/`cadence_config` (the old 6.1 text had them on `habits`).
+  5. **Log writes moved from 6.1 to 6.4,** so 6.1 stays one chunk and 6.4 owns the log events. The Track destination moved from 6.5 to 6.3, matching its existing agent prompt.
+- **Decisions:**
+  - **Asked and answered:**
+    - three cadences (`daily`, `weekly_days`, `times_per_week` N 1–6)
+    - `completed | skipped` with a derived "Missed"
+    - full quantity habits with partial credit `min(value ÷ target, 1)`
+    - the denominators as recommended
+    - skips excluded
+    - versioned schedules effective from the current week start
+  - **The denominators the user accepted:**
+    - whole user-week ranges
+    - today counts only once logged
+    - `times_per_week` partial weeks pro-rated (round, halves up) and completions capped per week
+    - the current week can't lower the figure
+    - `weekly_days` off-day completions are "extra", not counted
+  - **Derived and recorded in ADR 0014, not asked separately:**
+    - weekdays numbered 0 = Sunday … 6, like `week_start`; all seven weekdays (or N = 7) is `daily`
+    - measure and unit fixed at creation
+    - the "schedule for a week" rule (it survives a week-start change and earlier start dates)
+    - exclusive pause ends; pausing starts tomorrow if today is logged; archive opens a pause; restore → `active`
+    - no backdated pauses (skip past days instead)
+    - logs only on active days up to today; logs on days that later become inactive are kept but not counted
+    - each skip lowers a `times_per_week` week's target by one
+    - this week shown as progress ("1 of 3 so far"), not a figure
+    - quantity totals cut to one decimal
+    - "Nothing expected in this range" at 0
+    - no percentages, totals or streaks
+    - log audit events on the habit entity, so undo keeps the history; no title, unit, note, value or target numbers in events
+    - goal delete → `SET NULL (goal_id)` with `habit.updated`
+    - habits don't remind
+- **Next chunk should know:**
+  - 6.1 needs the hand-edited `SET NULL (goal_id)` (see the 1.1 note), the partial unique index for one open pause, and numeric columns for `target` and `value` (Drizzle returns `numeric` as a string, so convert at the boundary).
+  - The `times_per_week` rounding is `floor((2·N·a + 7) / 14)` in integers, so there is no floating point.
+  - `weekly_days` uses `dayOfWeek` from `src/lib/dates.ts` (0 = Sunday).
+  - Today, Track, Home and 7.1 must call the 6.2 engine, never recount.
+- **Unverified:** none (docs only). Line endings checked (LF). `docs/` is in `.prettierignore`, so `format:check` covers nothing here.
+- **Follow-ups:**
+  - Backdated pauses ("I was ill last week") if marking skips day by day proves tedious while dogfooding.
+  - A weekly-total quantity target ("150 min a week") if wanted. It would be a new way to count (ADR 0014 alternatives).
+  - Showing a goal's linked habits on the goal page isn't planned in any chunk.
+  - Phase 10: export (10.1) must include habits, schedules, pauses and logs.

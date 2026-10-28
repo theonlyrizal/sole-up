@@ -465,9 +465,9 @@ Subagent rule: Do all work in this main thread. Never spawn subagents for this s
 Finish line: Stop immediately once the ADR is written, the plan and DATA_MODEL.md reflect my answers, and the protocol close-out is complete.
 ```
 
-### 6.1: Habits, schema
+### 6.1: Habits, schema and service
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.1 only. Create the habits, habit_pauses and habit_logs tables with composite FKs, unique (habit_id, local_date), and a Zod schema validating cadence_config per cadence type, plus a basic CRUD service with audit events. No UI, no consistency calculations.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.1 only. Create the habits, habit_schedules, habit_pauses and habit_logs tables per ADR 0014 with composite FKs, unique (habit_id, local_date) and (habit_id, effective_from), and a Zod schema validating cadence_config per cadence type and the check/quantity fields, plus the habit service (create, edit, schedule change, pause/resume, archive/restore, delete) with audit events. No UI, no log writes, no consistency calculations.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify passes, including cross-user, duplicate-log and invalid-cadence tests, and the protocol close-out is complete.
@@ -475,15 +475,15 @@ Finish line: Stop immediately once pnpm verify passes, including cross-user, dup
 
 ### 6.2: Cadence engine
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.2 only. Implement expectedOccurrences and consistency as pure functions in lib or the habits module, exactly per the 6.0 ADR, returning their definition text. Pure code only: no database, no UI.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.2 only. Implement the engine functions the chunk lists (habitDays, consistency, weekProgress and helpers) as pure functions in src/lib/habits/, exactly per ADR 0014, returning their definition text. Pure code only: no database, no UI.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify passes with exhaustive unit tests for every week start, mid-week pauses and starts, end dates and empty ranges, and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify passes with exhaustive unit tests for every week start, mid-week pauses and starts, end dates, the partial-week rounding table, skips, the current-week rule, quantity credit, schedule changes and empty ranges, and the protocol close-out is complete.
 ```
 
 ### 6.3: Habit CRUD UI
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.3 only. Build habit create/edit with a cadence picker, pause/resume (writing habit_pauses), archive, and the optional goal link. Add the Track destination to navigation.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.3 only. Build habit create/edit with the measure (check or quantity, unit and target), a cadence picker (edits apply from this week), pause/resume, archive/restore, confirmed delete and the optional goal link. Add the Track destination to navigation.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, and the protocol close-out is complete.
@@ -491,7 +491,7 @@ Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pas
 
 ### 6.4: Logging
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.4 only. Add the Habits section on Today (one-tap complete/skip with undo) and the per-habit calendar strip for backfilling and correcting past days, with audit events for corrections.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.4 only. Add the habit log service and actions per ADR 0014, the Habits section on Today (one-tap complete/skip with undo, amounts for quantity habits) and the per-habit calendar strip for backfilling and correcting past days, with audit events for corrections.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including a test that correcting a past log updates consistency immediately, and the protocol close-out is complete.
@@ -499,7 +499,7 @@ Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pas
 
 ### 6.5: Track page and history
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.5 only. Build the Track page: each habit's history and consistency for a selectable range, with the definition visible. No streak counters.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 6.5 only. Build the Track page: each habit's history and consistency for a selectable whole-week range, with the definition visible. No streak counters, percentages or totals across habits.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, and the protocol close-out is complete.

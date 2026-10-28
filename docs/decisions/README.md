@@ -19,3 +19,4 @@ To change a decision, add a new ADR that supersedes the old one and update the o
 | [0011](0011-task-status-planning-priority-estimates.md) | Task status, overdue plans, priority and estimates | Accepted |
 | [0012](0012-calendar-recurrence-time-blocks-views.md) | Calendar: event shapes, recurrence, time blocks and views | Accepted |
 | [0013](0013-reminders-sweep-and-delivery.md) | Reminders: free-hosting sweep, what reminds, quiet hours and content | Accepted |
+| [0014](0014-habit-cadence-logs-consistency.md) | Habits: cadences, logs, quantities and consistency | Accepted |
