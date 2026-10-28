@@ -209,7 +209,7 @@ Fields:
 - `updated_at`
 
 Rules:
-- `unique (habit_id, effective_from)`. A habit always has at least one row. A second edit in the same week replaces that week's row.
+- `unique (habit_id, effective_from)`. A habit always has at least one row. A second edit in the same week replaces that week's row. An edit also replaces any row that starts after the current week (a habit whose start date is in a later week, or weeks regrouped by a week-start change), so the edit is what the current week uses.
 - **The schedule for a week** is the row with the latest `effective_from` on or before the week's last day, or the earliest row if none is. Every day in a week uses its week's schedule.
 
 ### HabitPause

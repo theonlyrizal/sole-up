@@ -5,6 +5,7 @@ export * from "./auth";
 export * from "./audit";
 export * from "./calendar-events";
 export * from "./goals";
+export * from "./habits";
 export * from "./life-areas";
 export * from "./milestones";
 export * from "./preferences";

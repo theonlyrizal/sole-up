@@ -196,7 +196,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 5.7 | Reliability pass | done | chunk/5.7-reliability-pass | 2026-10-29 | `reliability.integration.test.ts` (DST, zone change, far zones on UTC, missed/cut-off sweeps, DST quiet hours) found 3 bugs, fixed; skips by reason in the sweep log, `reminder_sweep_status` + Settings warning, `pnpm reminders:failed`, Neon note in DEPLOY.md |
 | 5.✓ | Phase 5 checkpoint (user) | done | | 2026-10-29 | User marked done without the week of relying on reminders; production setup (sweep secret, VAPID keys, cron-job.org), phone checks, the missed/late/duplicate log, `pnpm reminders:failed` and Neon compute readings are deferred to a whole-app check later |
 | 6.0 | Decision gate: habits | done | chunk/6.0-habits-decisions | 2026-10-29 | ADR 0014: three cadences, check or quantity (partial credit), completed/skipped with derived "Missed", versioned schedules, exact week-based denominators, skips excluded; 6.1–6.6 and DATA_MODEL synced |
-| 6.1 | Habits: schema and service | todo | | | |
+| 6.1 | Habits: schema and service | done | chunk/6.1-habits-schema-service | 2026-10-29 | `habits`, `habit_schedules`, `habit_pauses`, `habit_logs` (migration 0015, hand-edited `SET NULL (goal_id)`, one-open-pause index), per-type cadence Zod schemas, service with versioned schedules, pause/archive rows and `habit.*` events; no UI, logs or consistency |
 | 6.2 | Cadence engine | todo | | | |
 | 6.3 | Habit CRUD UI | todo | | | |
 | 6.4 | Logging | todo | | | |
@@ -2719,3 +2719,31 @@ Template:
   - A weekly-total quantity target ("150 min a week") if wanted. It would be a new way to count (ADR 0014 alternatives).
   - Showing a goal's linked habits on the goal page isn't planned in any chunk.
   - Phase 10: export (10.1) must include habits, schedules, pauses and logs.
+
+### 6.1: Habits: schema and service (2026-10-29)
+- **Built:**
+  - `src/lib/habits/habit.ts` (pure): statuses, measures, cadence types, log statuses, length limits (title 200, description 2000, unit 30, note 2000), amount bounds (`numeric(7, 2)`, above 0), `HABIT_EDITABLE_FIELDS`, `HABIT_STATUS_ACTIONS` + `habitStatusActionOutcome`, `pauseStartDate`, `closePause`, the `Habit` type.
+  - `src/lib/habits/cadence.ts` (pure, Zod): `CADENCE_CONFIG_SCHEMAS` per type (`{}`, `{ days }` 1–6 distinct weekdays 0–6 stored ascending, `{ timesPerWeek }` 1–6), `cadenceSchema`, `anyCadenceConfigSchema` (audit), `parseCadence(row)` for jsonb read back, the `HabitCadence`/`HabitSchedule` types, and `scheduleForWeek(schedules, weekLastDay)`.
+  - Schema `src/server/db/schema/habits.ts` + migration `0015_habits.sql`: `habits`, `habit_schedules`, `habit_pauses`, `habit_logs` per the chunk. Composite FKs `(habit_id, user_id) → habits(id, user_id)` with cascade; `habits_goal_id_user_id_fk` **hand-edited** to `ON DELETE SET NULL ("goal_id")`. `unique (habit_id, effective_from)`, `unique (habit_id, local_date)`, `habit_pauses_one_open_key` (partial unique on `habit_id` where `end_date is null`), indexes `habits (user_id, status)`, `(goal_id, user_id)`, `habit_pauses (habit_id, start_date)`, `habit_logs (user_id, local_date)`. CHECKs: status, measure, unit exactly for quantity, end ≥ start, lengths; cadence type; cadence config keys per type; target > 0; pause end > start; log status, skip has no value, value > 0, note length.
+  - `src/server/modules/habits/`: `validation.ts` (`createHabitSchema`, `updateHabitSchema`, `changeHabitScheduleSchema`, `habitIdSchema`), `service.ts` (`createHabit`, `updateHabit`, `changeHabitSchedule`, `pauseHabit`, `resumeHabit`, `archiveHabit`, `restoreHabit`, `deleteHabit`, `detachHabitsFromGoalInTx`, `toHabit`, `toHabitSchedule`).
+  - Audit events `habit.created|updated|status_changed|schedule_changed`. `deleteGoal` now calls `detachHabitsFromGoalInTx` (goal → tasks → habits lock order).
+  - Tests: unit `src/lib/habits/habit.test.ts` (every action × status, pause start/close, `scheduleForWeek`, `parseCadence`), `habits/validation.test.ts` (invalid configs per type, quantity/check fields, amounts incl. `0.1 + 0.2`, date pair, unknown keys); integration `habits/habits.integration.test.ts` (31: every CHECK and unique index incl. a duplicate log, a second open pause and a duplicate schedule week, numeric overflow, cross-user composite FKs, goal `SET NULL` keeping `user_id`, account cascade, create/edit/schedule/status rules, same-day pause and resume, pause from tomorrow when logged, the user's zone, archive/restore pauses, a second schedule edit in one week replacing the first, delete removing children and events, goal delete events, cross-user NotFound, audit privacy).
+- **Deviations:**
+  1. **`scheduleForWeek` is in 6.1**, not 6.2: the schedule change needs "the schedule in effect this week" to compare and to record `from`. It takes the week's last day, not a week object. 6.2 should reuse it rather than write another.
+  2. **A schedule change also replaces rows after the current week.** Otherwise a habit whose `start_date` is in a later week (its first row is there), or weeks regrouped by a week-start change, would keep outranking the edit. The ADR's rules still hold: past weeks keep theirs, and a habit always has a row.
+  3. **No `actions.ts` or `queries.ts`** ("no UI"), as in 1.1 and 2.2. 6.3 adds them.
+- **Decisions:**
+  1. **Validation output** is `{ ...fields, cadence: { cadenceType, cadenceConfig }, target }`; the form sends flat `cadenceType`, `cadenceConfig` (optional for `daily`) and `target`. Config issues come back under `cadenceConfig.days` / `cadenceConfig.timesPerWeek`. Seven days or seven times is refused with "Every day is the daily cadence." (the picker should turn it into `daily`).
+  2. **Amounts** are validated as text (`^\d{1,5}(\.\d{1,2})?$`, above 0), stored as `numeric(7, 2)` strings (`toFixed(2)`), and returned as numbers. A target that doesn't fit the measure on a schedule change is a `target` field error from the service.
+  3. **Status actions:** pause from active; resume from paused; archive from active or paused; restore from archived. The status already reached is a no-op with no event; anything else (pause/resume an archived habit, restore a paused one) is a `ConflictError`. "Today" is the user's zone (UTC until confirmed), with `now` injectable.
+  4. **A new pause never starts before the latest closed pause's end** (`pauseStartDate`'s `notBefore`), so a zone moved back a day can't make pauses overlap.
+  5. **`habit.schedule_changed`** records `effectiveFrom`, `fields` (`cadenceType`/`cadenceConfig`/`target` by name), and cadence type and config from/to. `habit.created` records status, measure, dates, goal, the first `effectiveFrom` and the cadence. No title, description, unit or amount anywhere (tested).
+  6. **The config CHECK** holds only keys to type (`coalesce(..., false)`, so a missing key can't pass as NULL); Zod checks the values.
+- **Next chunk should know:**
+  - 6.2: read rows with `toHabitSchedule` (parses jsonb, converts `target`), and reuse `scheduleForWeek`. Pauses are `[start_date, end_date)`.
+  - 6.3: wire the service through `authedAction`; field errors come back on `title`, `startDate`, `endDate`, `goalId`, `unit`, `target`, `cadenceType`, `cadenceConfig.*`.
+  - 6.4: `habit_logs` is in place; the log events still need adding to `AUDIT_EVENTS`. Value-vs-measure is the service's rule (the CHECKs only cover skip/value and value > 0). `pauseHabit` already reads today's log.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint, typecheck, 727 unit tests and 581 integration tests. `pnpm db:generate` reports no schema changes; dev DB migrated. No UI, so `pnpm build` and `pnpm test:e2e` were not run.
+- **Follow-ups:**
+  - Phase 10 export (10.1) must include habits, schedules, pauses and logs (already noted in 6.0).
+  - The goal delete confirmation doesn't say linked habits lose their goal (6.3 or later, when habits have UI).
