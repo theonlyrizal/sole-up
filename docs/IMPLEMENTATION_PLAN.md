@@ -190,7 +190,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 5.2 | Service worker and PWA install | done | chunk/5.2-service-worker-install | 2026-10-27 | `public/sw.js` (push + notificationclick only, no fetch/cache; payload text as given, same-origin deep link focusing an open tab), registered on every page, uncached with its own CSP; Settings "Install the app" with iOS Home Screen guidance; desktop install confirmed, phone unverified |
 | 5.3 | Push subscriptions | done | chunk/5.3-push-subscriptions | 2026-10-28 | Required VAPID env (pair checked), `push_subscriptions` (endpoint unique, known push hosts only, 20/user), subscribe/unsubscribe/revoke/test actions on `web-push` 3.6.7, Settings "Notifications" device list; user confirmed two browsers + revoke |
 | 5.4 | Reminders: schema and scheduling | done | chunk/5.4-reminders-scheduling | 2026-10-28 | `reminders` (migration 0012, one-scheduled partial unique index), item offsets + `daily_nudge_time`, sync in the task/event/preferences transactions (rolling next occurrence, nudge per zone), `claimDueReminders` under `SKIP LOCKED` in `runSweep`; no sending |
-| 5.5 | Delivery in the sweep | todo | | | |
+| 5.5 | Delivery in the sweep | done | chunk/5.5-sweep-delivery | 2026-10-28 | `runSweep` sends via `web-push` (stale → disabled → no_device → quiet-hours hold, bundled release), 404/410 deletes the device, 3 attempts then `failed`, rolls series/nudge, title-or-private payloads with deep links, TTL to stale; migration 0013 adds the delivery prefs + `held_until` |
 | 5.6 | Reminder UI and preferences | todo | | | |
 | 5.7 | Reliability pass | todo | | | |
 | 5.✓ | Phase 5 checkpoint (user) | todo | | | |
@@ -2472,3 +2472,37 @@ Template:
 - **Follow-ups:**
   - After a "following" split at an occurrence that was already reminded about, the new series reminds about it again: the delivered check is per event ID. Rare (an edit between a reminder and its start); consider carrying delivered rows across the split.
   - Phase 10 export (10.1) must include `reminders` and the offset/nudge settings (already noted in 5.0).
+
+### 5.5: Delivery in the sweep (2026-10-28)
+- **Built:**
+  - Migration `0013_reminder_delivery.sql` (generated, additive): `user_preferences.reminders_enabled` (default true), `reminders_private` (default false), `quiet_hours_start`/`quiet_hours_end` (`HH:MM`, both or neither, different; CHECK); `reminders.held_until`.
+  - `src/lib/quiet-hours.ts` (pure): `quietHoursOf`, `quietHoursEndAt(now, zone, hours)` (crosses midnight, DST via `instantFromLocal`). `REMINDER_MAX_ATTEMPTS = 3` in `src/lib/reminders.ts`.
+  - `src/server/modules/reminders/`:
+    - `claim.ts`: leaves rows with `held_until > now`; claims again rows left `sending` for `RECLAIM_AFTER_MINUTES` (10); returns `attempts` and `heldUntil`.
+    - `payload.ts` (pure): `reminderPayload`, `bundlePayload`, `whenLabel` ("14:00", "tomorrow 14:00", "Wed 14:00"); links via `calendarItemHref` (`task:<id>:due`, `event:<occurrenceKey>`), Today for the nudge and bundles; tag `reminder-<rowId>`.
+    - `record.ts`: `recordDelivery(row, outcome, prefs, now)`, one transaction per row guarded by `status = 'sending' and claimed_at = now`; rolls a series (`syncEventReminderInTx`) or the nudge (`syncNudgeReminderInTx`) after sent, skipped or failed.
+    - `sweep.ts`: `runSweep` per user: stale → disabled → no_device → held; sends with `sendPush` to every device and `recordPushOutcome` per device; counts gained `held` and `retrying`.
+  - `schedule.ts`'s move clears `held_until`.
+  - Tests: integration `delivery.integration.test.ts` (22): send to every device with TTL, the 14/16-minute window, overlapping and repeated sweeps send once, reclaim after 10 minutes, 410 removes one device, 404 on the only device gives `no_device`, retries then `failed` with the code, logs without title/endpoint/key, stale task/event/nudge, disabled after stale, no device per user, quiet-hours hold/release/bundle/stale, a single held reminder, across midnight, outside quiet hours, event content and link, private mode, nudge with TTL and tomorrow's row, a series' next occurrence after send/skip/fail. Unit `quiet-hours.test.ts`, `payload.test.ts`, `sweep.test.ts` (log line). The 5.4 "runSweep counts" test and the route test take the new counts. Mutation-checked: dropping the `held_until` claim filter or the private-mode rule fails the matching tests.
+  - Docs: DATA_MODEL (UserPreference fields; Reminder `held_until`, delivery and payload rules), README "Reminders".
+- **Deviations:**
+  1. **The delivery preferences are added here, not in 5.6.** The sweep can't skip `disabled`, hold for quiet hours or send private payloads without them. Only the columns: no service setters, actions or UI (5.6 adds those). ADR 0013 already lists them under "5.4 and 5.6".
+  2. **`reminders.held_until`** (not in the chunk text) marks a held row, so the claim leaves it until quiet hours end ("isn't claimed until the end") and the releasing sweep knows which rows to bundle.
+  3. **The push TTL runs until the row would go stale:** the target for tasks and events, but the end of the local day for the nudge (its target is its own fire time, so a TTL to it would be about a minute).
+  4. **A failed row also rolls a series to its next occurrence** (the chunk says sent or skipped). Otherwise three failures would stop a repeating event reminding for good.
+- **Decisions** (code comments and DATA_MODEL > Reminder):
+  - "Inside quiet hours" means the sweep's time is inside them, in the user's current zone. A reminder firing in quiet hours that a sweep before them reaches is sent then (never late); one that an in-quiet sweep reaches is held to the end.
+  - One device receiving it makes it `sent`. Otherwise the first non-404/410 error code counts an attempt; every device gone gives `no_device`. A hold isn't an attempt.
+  - A held or retried row that can't go back to `scheduled` because an edit wrote a newer row during the sweep is skipped as `stale`.
+  - A task row is stale if the task isn't open or its `due_at` no longer equals `target_at` (a claimed row doesn't move with an edit).
+  - Users are processed one at a time. An unexpected error logs only the error's name, and that user's rows stay `sending` for the 10-minute reclaim. Payloads, titles, endpoints and keys are never logged.
+  - No confirmed zone: times are formatted in UTC, quiet hours are off, and a nudge (which needs a zone) is stale.
+- **Next chunk should know:**
+  - 5.6: add setters for `remindersEnabled`, `remindersPrivate` and the quiet hours to the preferences service and actions (audited on `user_preferences.updated`). When quiet hours change or turn off, consider clearing `held_until` on the user's scheduled rows, or held rows wait for the old end.
+  - 5.6 snooze: a snoozed row goes through the same path. Snoozed rows are outside the one-scheduled index, so a held or retried one always goes back to `scheduled`.
+  - 5.7: `SweepCounts` has `held` and `retrying`; skipped isn't split by reason yet. Rows are sent one at a time per user (devices in parallel), so a large backlog makes a long request.
+  - Tests mock `web-push`'s default `sendNotification` (see `delivery.integration.test.ts`); its `sweepAt` sets the faked clock to the sweep's time.
+- **Unverified:** a real push to a device from the sweep (needs a subscribed browser and a due reminder; in production also the 5.1 cron-job.org job and the VAPID variables on Render). `pnpm verify` passes: format, lint, typecheck, 664 unit and 492 integration tests. `pnpm db:generate` reports no drift, and the dev DB is migrated. `pnpm build` and `pnpm test:e2e` weren't run locally (no route or UI change; CI runs them).
+- **Follow-ups:**
+  - The 5.3 follow-up matters more now: signing out doesn't unsubscribe the browser, so a shared computer keeps receiving the previous user's reminder titles.
+  - Several reminders for one user in one sweep (outside quiet hours) go as separate notifications; bundling those isn't in the ADR.

@@ -1031,7 +1031,7 @@ describe("claimDueReminders", () => {
     expect(await statusOf(inSixteen!)).toMatchObject({ status: "scheduled" });
     expect(await statusOf(sent!)).toMatchObject({ status: "sent" });
 
-    // Claimed rows stay claimed until 5.5 sends them.
+    // Claimed rows aren't claimed again while a sweep is sending them.
     expect(await claimDueReminders(NOW)).toEqual([]);
   });
 
@@ -1082,6 +1082,8 @@ describe("claimDueReminders", () => {
   });
 
   it("is what runSweep counts", async () => {
+    // Nudge rows for users with no confirmed zone: claimed, then skipped as
+    // stale (delivery.integration.test.ts covers sending).
     await dueRows([minutesBefore(NOW, 1), NOW]);
     captureLogs();
     const sweep = await runSweep(NOW);
@@ -1089,13 +1091,15 @@ describe("claimDueReminders", () => {
     expect(sweep.counts).toEqual({
       claimed: 2,
       sent: 0,
-      skipped: 0,
+      skipped: 2,
       failed: 0,
+      held: 0,
+      retrying: 0,
     });
     const rows = await db
       .select({ status: reminders.status })
       .from(reminders)
-      .where(eq(reminders.status, "sending"));
+      .where(eq(reminders.status, "skipped"));
     expect(rows).toHaveLength(2);
   });
 });
