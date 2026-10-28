@@ -79,6 +79,7 @@ A habit's cadence is one of:
 - `done(w)` = the sum of credit on active days in `w`.
 - **A past week** (its last day before today): `expected(w)` = `target(w)`, `completed(w)` = `min(done(w), target(w))`.
 - **The current week** (it contains today): `expected(w)` = `completed(w)` = `min(done(w), target(w))`. It can raise the figure but never lower it until the week ends.
+  - *Amended 2026-10-29 (chunk 6.2), so `expected` stays a whole number for quantity habits:* `expected(w)` = `min(days with a completed log, target(w))` and `completed(w)` = `min(done(w), target(w))`. For check habits this is the rule above. A partial quantity day counts with its partial credit, as today does for `daily`.
 - `expected`, `completed` and `skipped` are the sums over the range's weeks.
 - **Week in progress:** the current week is also reported on its own as progress against its target ("1 of 3 so far this week"), never as a consistency figure. That is what "this week" shows for a `times_per_week` habit.
 
