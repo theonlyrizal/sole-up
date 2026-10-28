@@ -194,7 +194,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 5.5 | Delivery in the sweep | done | chunk/5.5-sweep-delivery | 2026-10-28 | `runSweep` sends via `web-push` (stale → disabled → no_device → quiet-hours hold, bundled release), 404/410 deletes the device, 3 attempts then `failed`, rolls series/nudge, title-or-private payloads with deep links, TTL to stale; migration 0013 adds the delivery prefs + `held_until` |
 | 5.6 | Reminder UI and preferences | done | chunk/5.6-reminder-ui | 2026-10-29 | Reminder select in task/event forms (events pre-fill 10, series-wide, early hint), dialog status with in-app snooze, notification snooze actions → `POST /api/reminders/[id]/snooze`, Settings → Reminders (switch, private, quiet hours, nudge, no-device note) |
 | 5.7 | Reliability pass | done | chunk/5.7-reliability-pass | 2026-10-29 | `reliability.integration.test.ts` (DST, zone change, far zones on UTC, missed/cut-off sweeps, DST quiet hours) found 3 bugs, fixed; skips by reason in the sweep log, `reminder_sweep_status` + Settings warning, `pnpm reminders:failed`, Neon note in DEPLOY.md |
-| 5.✓ | Phase 5 checkpoint (user) | todo | | | |
+| 5.✓ | Phase 5 checkpoint (user) | done | | 2026-10-29 | User marked done without the week of relying on reminders; production setup (sweep secret, VAPID keys, cron-job.org), phone checks, the missed/late/duplicate log, `pnpm reminders:failed` and Neon compute readings are deferred to a whole-app check later |
 | 6.0 | Decision gate: habits | todo | | | |
 | 6.1 | Habits: schema | todo | | | |
 | 6.2 | Cadence engine | todo | | | |
