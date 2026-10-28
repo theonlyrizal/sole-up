@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { instantFromLocal, type LocalDate } from "@/lib/dates";
+import type { ReminderOffset } from "@/lib/reminders";
 import {
   type Task,
   TASK_EDITABLE_FIELDS,
@@ -62,6 +63,7 @@ export function toTask(row: TaskRow): Task {
     dueTz: row.dueTz,
     plannedDate: row.plannedDate,
     estimatedMinutes: row.estimatedMinutes,
+    reminderOffsetMinutes: row.reminderOffsetMinutes,
     completedAt: row.completedAt,
     cancelledAt: row.cancelledAt,
     sortOrder: row.sortOrder,
@@ -197,10 +199,14 @@ export async function createTask(
  */
 export async function updateTask(
   userId: string,
-  { id, ...input }: UpdateTaskInput,
+  { id, reminderOffsetMinutes, ...input }: UpdateTaskInput,
 ): Promise<Task> {
   const row = await db.transaction(async (tx) => {
-    const current = await findForUpdate(tx, userId, id);
+    let current = await findForUpdate(tx, userId, id);
+    // The edit form also sets the reminder: its own operation and event.
+    if (reminderOffsetMinutes !== undefined) {
+      current = await reminderInTx(tx, userId, current, reminderOffsetMinutes);
+    }
     const fields = TASK_EDITABLE_FIELDS.filter(
       (field) => current[field] !== input[field],
     );
@@ -282,30 +288,40 @@ export async function setTaskReminder(
 ): Promise<Task> {
   const row = await db.transaction(async (tx) => {
     const current = await findForUpdate(tx, userId, id);
-    if (current.reminderOffsetMinutes === reminderOffsetMinutes) return current;
-
-    const [updated] = await tx
-      .update(tasks)
-      .set({ reminderOffsetMinutes })
-      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
-      .returning();
-    if (!updated) throw new NotFoundError();
-
-    await recordAudit(tx, {
-      type: "task.reminder_changed",
-      userId,
-      entityId: id,
-      changes: {
-        reminderOffsetMinutes: {
-          from: current.reminderOffsetMinutes,
-          to: reminderOffsetMinutes,
-        },
-      },
-    });
-    await syncTaskReminderInTx(tx, userId, updated);
-    return updated;
+    return reminderInTx(tx, userId, current, reminderOffsetMinutes);
   });
   return toTask(row);
+}
+
+/** `setTaskReminder` in the caller's transaction, on the locked row. */
+async function reminderInTx(
+  tx: DbTransaction,
+  userId: string,
+  current: TaskRow,
+  reminderOffsetMinutes: ReminderOffset | null,
+): Promise<TaskRow> {
+  if (current.reminderOffsetMinutes === reminderOffsetMinutes) return current;
+
+  const [updated] = await tx
+    .update(tasks)
+    .set({ reminderOffsetMinutes })
+    .where(and(eq(tasks.id, current.id), eq(tasks.userId, userId)))
+    .returning();
+  if (!updated) throw new NotFoundError();
+
+  await recordAudit(tx, {
+    type: "task.reminder_changed",
+    userId,
+    entityId: current.id,
+    changes: {
+      reminderOffsetMinutes: {
+        from: current.reminderOffsetMinutes,
+        to: reminderOffsetMinutes,
+      },
+    },
+  });
+  await syncTaskReminderInTx(tx, userId, updated);
+  return updated;
 }
 
 /** Plans one locked task; the same date again is a no-op with no event. */

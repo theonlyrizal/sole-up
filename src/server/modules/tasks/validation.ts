@@ -10,7 +10,10 @@ import {
   TASK_STATUSES,
   TASK_TITLE_MAX,
 } from "@/lib/tasks";
-import { reminderOffsetSchema } from "@/server/modules/reminders/validation";
+import {
+  reminderOffsetChangeSchema,
+  reminderOffsetSchema,
+} from "@/server/modules/reminders/validation";
 
 const idSchema = z.uuid("Choose a task.");
 
@@ -186,13 +189,18 @@ export const setTaskReminderSchema = z.strictObject({
 });
 export type SetTaskReminderInput = z.output<typeof setTaskReminderSchema>;
 
-/** Replaces the plain fields; dates, parent and status have their own paths. */
+/**
+ * Replaces the plain fields; dates, parent and status have their own paths.
+ * The edit form also sends the reminder, saved as `setTaskReminder` in the
+ * same transaction; absent keeps it.
+ */
 export const updateTaskSchema = z.strictObject({
   id: idSchema,
   title: titleSchema,
   notes: notesSchema,
   priority: prioritySchema,
   estimatedMinutes: estimateSchema,
+  reminderOffsetMinutes: reminderOffsetChangeSchema,
 });
 export type UpdateTaskInput = z.output<typeof updateTaskSchema>;
 

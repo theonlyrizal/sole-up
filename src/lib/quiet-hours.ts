@@ -12,6 +12,19 @@ export type QuietHours = {
   end: string;
 };
 
+/** What Settings suggests when quiet hours are first turned on (ADR 0013). */
+export const SUGGESTED_QUIET_HOURS: QuietHours = {
+  start: "22:00",
+  end: "07:00",
+};
+
+/** True when a local "HH:MM" time falls inside the quiet hours. */
+export function isInQuietHours(time: string, { start, end }: QuietHours) {
+  return end < start
+    ? time >= start || time < end
+    : time >= start && time < end;
+}
+
 /** Quiet hours from the stored columns, or null while they are off. */
 export function quietHoursOf(
   start: string | null,
@@ -31,10 +44,7 @@ export function quietHoursEndAt(
 ): Date | null {
   const local = localDateTimeOf(now, timeZone);
   const crossesMidnight = end < start;
-  const inside = crossesMidnight
-    ? local.time >= start || local.time < end
-    : local.time >= start && local.time < end;
-  if (!inside) return null;
+  if (!isInQuietHours(local.time, { start, end })) return null;
 
   // Before midnight in hours that cross it, they end tomorrow.
   const endDate =

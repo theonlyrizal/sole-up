@@ -3,13 +3,17 @@ import { Suspense } from "react";
 
 import { PreferencesForm } from "@/components/preferences/preferences-form";
 import { PushNotifications } from "@/components/push/push-notifications";
+import { ReminderSettingsForm } from "@/components/reminders/reminder-settings-form";
 import { InstallHelp } from "@/components/pwa/install-help";
 import { LoadingState } from "@/components/ui/skeleton";
 import { formatInstant } from "@/lib/dates";
 import { localeOptions, supportedTimeZones } from "@/lib/preferences";
 import { requireUser } from "@/server/auth/session";
 import { env } from "@/server/env";
-import { getUserPreferences } from "@/server/modules/preferences/service";
+import {
+  getReminderSettings,
+  getUserPreferences,
+} from "@/server/modules/preferences/service";
 import { listPushDevices } from "@/server/modules/push/queries";
 
 export const metadata: Metadata = { title: "Settings · SoleUp" };
@@ -27,6 +31,17 @@ export default function SettingsPage() {
         </h2>
         <Suspense fallback={<LoadingState label="Loading settings" />}>
           <Preferences />
+        </Suspense>
+      </section>
+      <section
+        aria-labelledby="reminders-heading"
+        className="flex flex-col gap-4"
+      >
+        <h2 id="reminders-heading" className="text-lg font-semibold">
+          Reminders
+        </h2>
+        <Suspense fallback={<LoadingState label="Loading reminder settings" />}>
+          <Reminders />
         </Suspense>
       </section>
       <section
@@ -63,6 +78,17 @@ async function Preferences() {
       timeZones={supportedTimeZones()}
       locales={localeOptions(preferences.locale)}
     />
+  );
+}
+
+async function Reminders() {
+  const user = await requireUser();
+  const [settings, devices] = await Promise.all([
+    getReminderSettings(user.id),
+    listPushDevices(user.id),
+  ]);
+  return (
+    <ReminderSettingsForm initial={settings} hasDevice={devices.length > 0} />
   );
 }
 

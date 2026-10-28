@@ -126,6 +126,7 @@ export function toCalendarEvent(row: CalendarEventRow): CalendarEvent {
     rrule: row.rrule,
     goalId: row.goalId,
     lifeAreaId: row.lifeAreaId,
+    reminderOffsetMinutes: row.reminderOffsetMinutes,
     source: row.source,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

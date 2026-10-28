@@ -4,6 +4,7 @@ import {
   isReminderOffset,
   NUDGE_TIME_PATTERN,
   type ReminderOffset,
+  SNOOZE_MINUTES,
 } from "@/lib/reminders";
 
 const OFFSET_MESSAGE = "Choose a reminder from the list.";
@@ -43,3 +44,20 @@ export const nudgeTimeSchema = z
   )
   .nullish()
   .transform((value) => value || null);
+
+/** Snoozing a reminder that went out: 15 minutes or 1 hour. */
+export const snoozeReminderSchema = z.strictObject({
+  id: z.uuid("Choose a reminder."),
+  minutes: z.union(
+    SNOOZE_MINUTES.map((minutes) => z.literal(minutes)),
+    { error: "Choose 15 minutes or 1 hour." },
+  ),
+});
+export type SnoozeReminderInput = z.output<typeof snoozeReminderSchema>;
+
+/** The item whose reminder an item's dialog shows. */
+export const reminderItemSchema = z.strictObject({
+  kind: z.enum(["task", "event"], { error: "Choose a task or an event." }),
+  id: z.uuid("Choose a task or an event."),
+});
+export type ReminderItem = z.output<typeof reminderItemSchema>;

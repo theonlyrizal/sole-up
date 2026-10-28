@@ -5,6 +5,7 @@
 
 import type { LocalDate } from "./dates";
 import type { Priority } from "./priorities";
+import type { ReminderOffset } from "./reminders";
 
 export const TASK_STATUSES = ["open", "completed", "cancelled"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
@@ -66,6 +67,8 @@ export type Task = {
   dueTz: string | null;
   plannedDate: LocalDate | null;
   estimatedMinutes: number | null;
+  /** Minutes before a timed deadline to remind (ADR 0013); null for none. */
+  reminderOffsetMinutes: ReminderOffset | null;
   completedAt: Date | null;
   cancelledAt: Date | null;
   sortOrder: number;

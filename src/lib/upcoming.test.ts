@@ -37,6 +37,7 @@ function task(fields: Partial<Task> = {}): Task {
     dueTz: null,
     plannedDate: null,
     estimatedMinutes: null,
+    reminderOffsetMinutes: null,
     completedAt: null,
     cancelledAt: null,
     sortOrder: nextId,

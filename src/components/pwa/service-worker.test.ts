@@ -64,9 +64,12 @@ function loadWorker(windows: FakeWindow[] = []) {
     return self.registration.showNotification.mock.calls.at(-1);
   }
 
-  async function click(data: unknown) {
+  async function click(data: unknown, action = "") {
     const notification = { data, close: vi.fn() };
-    const result = await dispatch("notificationclick", { notification });
+    const result = await dispatch("notificationclick", {
+      notification,
+      action,
+    });
     return { result, notification };
   }
 
@@ -74,6 +77,7 @@ function loadWorker(windows: FakeWindow[] = []) {
 }
 
 const payload = (value: unknown) => ({ json: () => value });
+const ID = "0b6c6d0e-0000-4000-8000-000000000001";
 
 describe("service worker", () => {
   it("handles install, activate, push and clicks only (no fetch, no cache)", async () => {
@@ -126,6 +130,33 @@ describe("service worker", () => {
         tag: undefined,
         data: { url: "/home" },
       });
+    });
+
+    it("offers snooze on a task or event reminder, keeping its ID", async () => {
+      const worker = loadWorker();
+      const [, options] = (await worker.push(
+        payload({ title: "Dentist · 14:00", url: "/plan", reminderId: ID }),
+      ))!;
+      expect(options).toMatchObject({
+        actions: [
+          { action: "snooze-15", title: "Snooze 15 min" },
+          { action: "snooze-60", title: "Snooze 1 hour" },
+        ],
+        data: { url: "/plan", reminderId: ID },
+      });
+      expect(worker.fetch).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["no reminder ID", {}],
+      ["a reminder ID that isn't one", { reminderId: "../../sign-out" }],
+    ])("offers no snooze with %s", async (_, extra) => {
+      const worker = loadWorker();
+      const [, options] = (await worker.push(
+        payload({ title: "Time to plan your day", ...extra }),
+      ))!;
+      expect(options).not.toHaveProperty("actions");
+      expect(options).toMatchObject({ data: { reminderId: undefined } });
     });
 
     it.each([
@@ -193,6 +224,58 @@ describe("service worker", () => {
       });
       const worker = loadWorker([tab]);
       await worker.click({ url: "/plan/today" });
+      expect(worker.self.clients.openWindow).toHaveBeenCalledWith(
+        `${ORIGIN}/plan/today`,
+      );
+    });
+
+    it.each([
+      ["snooze-15", 15],
+      ["snooze-60", 60],
+    ])(
+      "%s snoozes the reminder with the session cookie and opens nothing",
+      async (action, minutes) => {
+        const worker = loadWorker();
+        worker.fetch.mockResolvedValue({ ok: true });
+        const { notification } = await worker.click(
+          { url: "/plan/today", reminderId: ID },
+          action,
+        );
+        expect(notification.close).toHaveBeenCalled();
+        expect(worker.fetch).toHaveBeenCalledWith(
+          new URL(`${ORIGIN}/api/reminders/${ID}/snooze`),
+          {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ minutes }),
+          },
+        );
+        expect(worker.self.clients.openWindow).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ["refused (signed out, too late)", async () => ({ ok: false })],
+      [
+        "unreachable",
+        async () => {
+          throw new TypeError("offline");
+        },
+      ],
+    ])("opens the deep link when the snooze is %s", async (_, response) => {
+      const worker = loadWorker();
+      worker.fetch.mockImplementation(response);
+      await worker.click({ url: "/plan/today", reminderId: ID }, "snooze-15");
+      expect(worker.self.clients.openWindow).toHaveBeenCalledWith(
+        `${ORIGIN}/plan/today`,
+      );
+    });
+
+    it("opens the app for a snooze action without a reminder ID", async () => {
+      const worker = loadWorker();
+      await worker.click({ url: "/plan/today" }, "snooze-15");
+      expect(worker.fetch).not.toHaveBeenCalled();
       expect(worker.self.clients.openWindow).toHaveBeenCalledWith(
         `${ORIGIN}/plan/today`,
       );

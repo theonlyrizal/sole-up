@@ -3,6 +3,7 @@
 // The rules come from docs/decisions/0012-calendar-recurrence-time-blocks-views.md.
 
 import { addDays, instantFromLocal, type LocalDate } from "./dates";
+import type { ReminderOffset } from "./reminders";
 
 export const CALENDAR_EVENT_TITLE_MAX = 200;
 export const CALENDAR_EVENT_DESCRIPTION_MAX = 2000;
@@ -87,6 +88,11 @@ type CalendarEventBase = {
   rrule: string | null;
   goalId: string | null;
   lifeAreaId: string | null;
+  /**
+   * Minutes before a timed event (every occurrence of a series) to remind
+   * (ADR 0013); null for none. All-day events never remind.
+   */
+  reminderOffsetMinutes: ReminderOffset | null;
   source: CalendarEventSource;
   createdAt: Date;
   updatedAt: Date;

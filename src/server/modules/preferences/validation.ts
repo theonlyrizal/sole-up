@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { WeekStart } from "@/lib/dates";
 import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
+import { NUDGE_TIME_PATTERN } from "@/lib/reminders";
 import { nudgeTimeSchema } from "@/server/modules/reminders/validation";
 
 /** An IANA zone known to the server's runtime, stored in canonical form. */
@@ -61,3 +62,65 @@ export const setDailyNudgeTimeSchema = z.strictObject({
 });
 
 export type SetDailyNudgeTimeInput = z.output<typeof setDailyNudgeTimeSchema>;
+
+const QUIET_TIME_MESSAGE = "Enter a valid time.";
+
+/** A quiet-hours bound as the form sends it, "HH:MM"; blank while off. */
+const quietTimeSchema = z
+  .string({ error: QUIET_TIME_MESSAGE })
+  .trim()
+  .refine(
+    (value) => value === "" || NUDGE_TIME_PATTERN.test(value),
+    QUIET_TIME_MESSAGE,
+  );
+
+/**
+ * Settings' Reminders form (ADR 0013), saved together: the global switch,
+ * private mode, quiet hours (off unless `quietHours` is true, with a start
+ * and an end that differ) and the daily nudge time (blank turns it off).
+ */
+export const saveReminderSettingsSchema = z
+  .strictObject({
+    remindersEnabled: z.boolean({ error: "Choose on or off." }),
+    remindersPrivate: z.boolean({ error: "Choose on or off." }),
+    quietHours: z.boolean({ error: "Choose on or off." }),
+    quietHoursStart: quietTimeSchema,
+    quietHoursEnd: quietTimeSchema,
+    dailyNudgeTime: nudgeTimeSchema,
+  })
+  .superRefine((input, context) => {
+    if (!input.quietHours) return;
+    if (input.quietHoursStart === "") {
+      context.addIssue({
+        code: "custom",
+        path: ["quietHoursStart"],
+        message: "Enter when quiet hours start.",
+      });
+    }
+    if (input.quietHoursEnd === "") {
+      context.addIssue({
+        code: "custom",
+        path: ["quietHoursEnd"],
+        message: "Enter when quiet hours end.",
+      });
+    }
+    if (
+      input.quietHoursStart !== "" &&
+      input.quietHoursStart === input.quietHoursEnd
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["quietHoursEnd"],
+        message: "Quiet hours need to end at a different time than they start.",
+      });
+    }
+  })
+  .transform(({ quietHours, quietHoursStart, quietHoursEnd, ...input }) => ({
+    ...input,
+    quietHoursStart: quietHours ? quietHoursStart : null,
+    quietHoursEnd: quietHours ? quietHoursEnd : null,
+  }));
+
+export type SaveReminderSettingsInput = z.output<
+  typeof saveReminderSettingsSchema
+>;

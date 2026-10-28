@@ -2,6 +2,8 @@
 
 import { useId, useState, useTransition } from "react";
 
+import { ReminderSelect } from "@/components/reminders/reminder-select";
+import { ReminderStatus } from "@/components/reminders/reminder-status";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/form-error";
@@ -48,10 +50,11 @@ type TaskFormDialogProps = { task: Task } & (
 );
 
 /**
- * Edits a task's title, notes, priority and estimate in a dialog. Dates and
- * parent are edited inline on the list; the dialog can also cancel or
- * reopen the task. Below the form it lists the task's upcoming time blocks,
- * with "Block time" (chunk 4.8).
+ * Edits a task's title, notes, priority, estimate and reminder in a dialog.
+ * Dates and parent are edited inline on the list; the dialog can also
+ * cancel or reopen the task. Below the form it shows the task's reminder
+ * with snooze (chunk 5.6) and lists its upcoming time blocks, with "Block
+ * time" (chunk 4.8).
  */
 export function TaskFormDialog({
   trigger,
@@ -72,7 +75,9 @@ export function TaskFormDialog({
         onCloseAutoFocus={onCloseAutoFocus}
       >
         <TaskForm task={task} onDone={() => setOpen(false)} />
-        {/* Outside the form: the block dialog's own form must not submit it. */}
+        {/* Outside the form: their buttons and the block dialog's own form
+            must not submit it. */}
+        <ReminderStatus item={{ kind: "task", id: task.id }} />
         <TaskBlocks task={task} />
       </DialogContent>
     </Dialog>
@@ -87,6 +92,9 @@ function TaskForm({ task, onDone }: { task: Task; onDone: () => void }) {
   const [estimate, setEstimate] = useState(
     task.estimatedMinutes?.toString() ?? "",
   );
+  const [reminder, setReminder] = useState(
+    task.reminderOffsetMinutes?.toString() ?? "",
+  );
   const [error, setError] = useState<ActionError | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -99,6 +107,7 @@ function TaskForm({ task, onDone }: { task: Task; onDone: () => void }) {
         notes,
         priority: priority || null,
         estimatedMinutes: estimate.trim(),
+        reminderOffsetMinutes: reminder,
       });
       if (result.ok) {
         toast({ title: "Task saved", variant: "success" });
@@ -211,6 +220,17 @@ function TaskForm({ task, onDone }: { task: Task; onDone: () => void }) {
           )}
         </FormField>
       </div>
+      <ReminderSelect
+        id={`${id}-reminder`}
+        value={reminder}
+        onChange={setReminder}
+        errors={fieldErrors.reminderOffsetMinutes}
+        note={
+          task.dueAt
+            ? "Before the task's due time."
+            : "Only a deadline with a time can remind, and this task has none yet."
+        }
+      />
       <FormError error={error} />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" disabled={pending}>

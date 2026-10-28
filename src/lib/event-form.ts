@@ -38,6 +38,9 @@ import {
 /** A new event's length, and the length kept when an event has none. */
 export const DEFAULT_EVENT_DURATION_MINUTES = 60;
 
+/** New events remind 10 minutes before by default (ADR 0013). */
+export const NEW_EVENT_REMINDER = "10";
+
 /** Times a timed event falls back to when it was all-day. */
 const DEFAULT_START_TIME = "09:00";
 
@@ -75,6 +78,11 @@ export type EventFormValues = {
   goalId: string;
   lifeAreaId: string;
   repeat: RepeatValues;
+  /**
+   * Minutes before the start to remind, as the select holds it ("" for
+   * none). A series has one setting for every occurrence (ADR 0013).
+   */
+  reminder: string;
 };
 
 // --- Wall-clock arithmetic ----------------------------------------------------
@@ -177,6 +185,7 @@ export function newEventValues(now: Date, timeZone: string): EventFormValues {
     goalId: "",
     lifeAreaId: "",
     repeat: defaultRepeat(start.date),
+    reminder: NEW_EVENT_REMINDER,
   };
 }
 
@@ -195,6 +204,7 @@ export function eventFormValuesOf(
     description: event.description ?? "",
     goalId: event.goalId ?? "",
     lifeAreaId: event.lifeAreaId ?? "",
+    reminder: event.reminderOffsetMinutes?.toString() ?? "",
   };
   if (event.allDay) {
     const end = fromFloatingMinutes(
@@ -497,6 +507,8 @@ export type EventPayload = {
   tz: string | null;
   goalId: string | null;
   lifeAreaId: string | null;
+  /** All-day events never remind, so they send none. */
+  reminderOffsetMinutes: string | null;
 };
 
 export function eventPayload(values: EventFormValues): EventPayload {
@@ -512,12 +524,14 @@ export function eventPayload(values: EventFormValues): EventPayload {
     tz: values.allDay ? null : values.tz,
     goalId: values.goalId || null,
     lifeAreaId: values.lifeAreaId || null,
+    reminderOffsetMinutes: values.allDay ? null : values.reminder,
   };
 }
 
 /**
  * Why "this event" can't take the change, or null when it can. One
- * occurrence keeps its series' shape, zone and rule (ADR 0012).
+ * occurrence keeps its series' shape, zone and rule (ADR 0012), and its
+ * series' reminder (ADR 0013).
  */
 export function thisEventBlocker(
   initial: EventFormValues,
@@ -529,6 +543,8 @@ export function thisEventBlocker(
   if (!values.allDay && initial.tz !== values.tz)
     return "A new time zone applies to more than one event.";
   if (repeatChanged) return "A new repeat applies to more than one event.";
+  if (initial.reminder !== values.reminder)
+    return "A reminder applies to every event in the series.";
   return null;
 }
 

@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
+import { ReminderSelect } from "@/components/reminders/reminder-select";
+import { ReminderStatus } from "@/components/reminders/reminder-status";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -105,6 +107,7 @@ export function EventFormDialog({
           onCancel={() => setOpen(false)}
           onSaved={() => setOpen(false)}
         />
+        {event && <ReminderStatus item={{ kind: "event", id: event.id }} />}
       </DialogContent>
     </Dialog>
   );
@@ -124,6 +127,7 @@ const SHOWN_FIELDS = new Set([
   "goalId",
   "lifeAreaId",
   "rrule",
+  "reminderOffsetMinutes",
 ]);
 
 type Step =
@@ -268,7 +272,8 @@ function EventForm({
     const originalStart = originalStartParam(event);
     const payload = readPayload();
     if (originalStart === null || !payload) return;
-    const { rrule, ...fields } = payload;
+    // "This event" keeps its series' rule and reminder.
+    const { rrule, reminderOffsetMinutes, ...fields } = payload;
     startTransition(async () => {
       const key = { id: event.id, originalStart };
       const result: ActionResult<unknown> =
@@ -279,6 +284,7 @@ function EventForm({
               scope,
               ...fields,
               rrule,
+              reminderOffsetMinutes,
             });
       if (result.ok) saved();
       else fail(result.error);
@@ -506,6 +512,20 @@ function EventForm({
         errors={repeatErrors}
         ruleErrors={fieldErrors.rrule}
       />
+
+      {!values.allDay && (
+        <ReminderSelect
+          id={`${id}-reminder`}
+          value={values.reminder}
+          onChange={(reminder) => set({ reminder })}
+          errors={fieldErrors.reminderOffsetMinutes}
+          note={
+            values.repeat.frequency !== "none"
+              ? "Applies to every event in the series."
+              : undefined
+          }
+        />
+      )}
 
       <FormField
         id={`${id}-location`}

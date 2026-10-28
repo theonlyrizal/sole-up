@@ -42,6 +42,7 @@ const base = {
   goalId: null,
   lifeAreaId: null,
   source: "internal" as const,
+  reminderOffsetMinutes: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   modified: false,
@@ -58,6 +59,8 @@ describe("newEventValues", () => {
       endTime: "10:00",
       tz: TOKYO,
       repeat: { frequency: "none", weekdays: ["WE"] },
+      // New events remind 10 minutes before (ADR 0013).
+      reminder: "10",
     });
   });
 
@@ -86,8 +89,10 @@ describe("eventFormValuesOf", () => {
       rrule: "FREQ=WEEKLY;BYDAY=WE",
       seriesId: base.id,
       originalStart: new Date("2026-11-04T14:00:00Z"),
+      reminderOffsetMinutes: 30,
     };
     expect(eventFormValuesOf(event, TOKYO)).toMatchObject({
+      reminder: "30",
       allDay: false,
       startDate: "2026-11-04",
       startTime: "09:00",
@@ -116,6 +121,8 @@ describe("eventFormValuesOf", () => {
       startDate: "2026-11-04",
       endDate: "2026-11-06",
       tz: TOKYO,
+      // An existing event without a reminder keeps none.
+      reminder: "",
     });
   });
 });
@@ -375,6 +382,16 @@ describe("eventPayload", () => {
       tz: null,
       goalId: null,
       lifeAreaId: null,
+      reminderOffsetMinutes: null,
+    });
+  });
+
+  it("sends a timed event's reminder as chosen", () => {
+    expect(eventPayload(values())).toMatchObject({
+      reminderOffsetMinutes: "10",
+    });
+    expect(eventPayload(values({ reminder: "" }))).toMatchObject({
+      reminderOffsetMinutes: "",
     });
   });
 });
@@ -395,6 +412,12 @@ describe("thisEventBlocker", () => {
       thisEventBlocker(initial, { ...initial, tz: NEW_YORK }, false),
     ).toMatch(/time zone/);
     expect(thisEventBlocker(initial, initial, true)).toMatch(/repeat/);
+  });
+
+  it("refuses a new reminder: it applies to the whole series", () => {
+    expect(
+      thisEventBlocker(initial, { ...initial, reminder: "60" }, false),
+    ).toBe("A reminder applies to every event in the series.");
   });
 });
 

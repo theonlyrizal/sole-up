@@ -63,3 +63,40 @@ export function fireAtFor(target: Date, offsetMinutes: ReminderOffset): Date {
 
 /** Send attempts before a reminder that keeps failing is marked `failed`. */
 export const REMINDER_MAX_ATTEMPTS = 3;
+
+/**
+ * Snoozing a reminder that went out sends it again this many minutes later
+ * (ADR 0013), at the latest at its target.
+ */
+export const SNOOZE_MINUTES = [15, 60] as const;
+export type SnoozeMinutes = (typeof SNOOZE_MINUTES)[number];
+
+/** The forms' reminder choices, in order. */
+export const REMINDER_OFFSET_LABELS: Record<ReminderOffset, string> = {
+  0: "At the time",
+  10: "10 minutes before",
+  30: "30 minutes before",
+  60: "1 hour before",
+  1440: "1 day before",
+};
+
+/** The forms' hint: the sweep never sends late, so it may send early. */
+export const REMINDER_EARLY_HINT = `Reminders may arrive up to ${SWEEP_INTERVAL_MINUTES} minutes early.`;
+
+/**
+ * Why a reminder wasn't sent, as an item's dialog says it. A reminder held
+ * for quiet hours that had passed by their end was skipped because of them.
+ */
+export function skippedLabel(
+  reason: ReminderSkipReason,
+  heldForQuietHours: boolean,
+): string {
+  switch (reason) {
+    case "stale":
+      return heldForQuietHours ? "Skipped: quiet hours" : "Skipped: too late";
+    case "disabled":
+      return "Skipped: reminders were off";
+    case "no_device":
+      return "Skipped: no device was set up";
+  }
+}

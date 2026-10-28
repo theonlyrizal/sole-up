@@ -2,6 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 
+/** Settings' "Time and region" section (Reminders has its own Save). */
+const timeAndRegion = (page: Page) =>
+  page.getByRole("region", { name: "Time and region" });
+
 // The Week and Day views (chunk 4.6): a time grid from the user's week
 // start, timed events by local time, an all-day row, timed task deadlines
 // as markers, overlapping events side by side, keyboard movement between
@@ -197,8 +201,8 @@ test("the week starts on the user's week start, and moves through the URL", asyn
       timeout: 1_000,
     });
   }).toPass();
-  await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved.");
+  await timeAndRegion(page).getByRole("button", { name: "Save" }).click();
+  await expect(timeAndRegion(page).getByRole("status")).toHaveText("Saved.");
   await openCalendar(page, "/plan/calendar?view=week");
   await expect(columns(page).first()).toHaveAttribute(
     "datetime",
