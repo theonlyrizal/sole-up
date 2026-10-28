@@ -40,6 +40,7 @@ import {
   TARGET_REQUIRED,
   type ChangeHabitScheduleInput,
   type CreateHabitInput,
+  type EditHabitInput,
   type HabitIdInput,
   type UpdateHabitInput,
 } from "./validation";
@@ -183,40 +184,47 @@ export async function updateHabit(
   { id, ...input }: UpdateHabitInput,
 ): Promise<Habit> {
   const row = await guardGoal(() =>
-    db.transaction(async (tx) => {
-      const current = await findForUpdate(tx, userId, id);
-      const fields = HABIT_EDITABLE_FIELDS.filter(
-        (field) => current[field] !== input[field],
-      );
-      if (fields.length === 0) return current;
-
-      const [updated] = await tx
-        .update(habits)
-        .set(input)
-        .where(and(eq(habits.id, id), eq(habits.userId, userId)))
-        .returning();
-      if (!updated) throw new NotFoundError();
-
-      const change = <K extends "startDate" | "endDate" | "goalId">(field: K) =>
-        fields.includes(field) && {
-          [field]: { from: current[field], to: updated[field] },
-        };
-
-      await recordAudit(tx, {
-        type: "habit.updated",
-        userId,
-        entityId: id,
-        changes: {
-          fields,
-          ...change("startDate"),
-          ...change("endDate"),
-          ...change("goalId"),
-        },
-      });
-      return updated;
-    }),
+    db.transaction((tx) => updateHabitInTx(tx, userId, id, input)),
   );
   return toHabit(row);
+}
+
+async function updateHabitInTx(
+  tx: DbTransaction,
+  userId: string,
+  id: string,
+  input: Omit<UpdateHabitInput, "id">,
+): Promise<HabitRow> {
+  const current = await findForUpdate(tx, userId, id);
+  const fields = HABIT_EDITABLE_FIELDS.filter(
+    (field) => current[field] !== input[field],
+  );
+  if (fields.length === 0) return current;
+
+  const [updated] = await tx
+    .update(habits)
+    .set(input)
+    .where(and(eq(habits.id, id), eq(habits.userId, userId)))
+    .returning();
+  if (!updated) throw new NotFoundError();
+
+  const change = <K extends "startDate" | "endDate" | "goalId">(field: K) =>
+    fields.includes(field) && {
+      [field]: { from: current[field], to: updated[field] },
+    };
+
+  await recordAudit(tx, {
+    type: "habit.updated",
+    userId,
+    entityId: id,
+    changes: {
+      fields,
+      ...change("startDate"),
+      ...change("endDate"),
+      ...change("goalId"),
+    },
+  });
+  return updated;
 }
 
 /**
@@ -230,7 +238,7 @@ export async function updateHabit(
  */
 export async function changeHabitSchedule(
   userId: string,
-  { id, cadence, target }: ChangeHabitScheduleInput,
+  { id, ...schedule }: ChangeHabitScheduleInput,
   now: Date = new Date(),
 ): Promise<HabitSchedule> {
   const { today, weekStart } = await userCalendar(userId, now);
@@ -238,70 +246,110 @@ export async function changeHabitSchedule(
 
   return db.transaction(async (tx) => {
     const habit = await findForUpdate(tx, userId, id);
-    if (habit.measure === "quantity" && target === null) {
-      throw new ValidationError({ target: [TARGET_REQUIRED] });
-    }
-    if (habit.measure === "check" && target !== null) {
-      throw new ValidationError({ target: [CHECK_HAS_NO_TARGET] });
-    }
-
-    const rows = await tx
-      .select()
-      .from(habitSchedules)
-      .where(
-        and(eq(habitSchedules.habitId, id), eq(habitSchedules.userId, userId)),
-      )
-      .orderBy(asc(habitSchedules.effectiveFrom));
-    const currentRow = scheduleForWeek(rows, addDays(effectiveFrom, 6));
-    if (!currentRow) throw new Error("Habit has no schedule");
-    const current = toHabitSchedule(currentRow);
-
-    const fields = (
-      [
-        current.cadenceType !== cadence.cadenceType && "cadenceType",
-        JSON.stringify(current.cadenceConfig) !==
-          JSON.stringify(cadence.cadenceConfig) && "cadenceConfig",
-        current.target !== target && "target",
-      ] as const
-    ).filter((field) => field !== false);
-    if (fields.length === 0) return current;
-
-    await tx
-      .delete(habitSchedules)
-      .where(
-        and(
-          eq(habitSchedules.habitId, id),
-          eq(habitSchedules.userId, userId),
-          gt(habitSchedules.effectiveFrom, effectiveFrom),
-        ),
-      );
-    const values = { ...cadence, target: amountToRow(target) };
-    const [saved] = await tx
-      .insert(habitSchedules)
-      .values({ userId, habitId: id, effectiveFrom, ...values })
-      .onConflictDoUpdate({
-        target: [habitSchedules.habitId, habitSchedules.effectiveFrom],
-        set: values,
-      })
-      .returning();
-    if (!saved) throw new Error("Habit schedule upsert returned no row");
-
-    await recordAudit(tx, {
-      type: "habit.schedule_changed",
-      userId,
-      entityId: id,
-      changes: {
-        effectiveFrom,
-        fields,
-        cadenceType: { from: current.cadenceType, to: cadence.cadenceType },
-        cadenceConfig: {
-          from: current.cadenceConfig,
-          to: cadence.cadenceConfig,
-        },
-      },
-    });
-    return toHabitSchedule(saved);
+    return changeScheduleInTx(tx, userId, habit, schedule, effectiveFrom);
   });
+}
+
+async function changeScheduleInTx(
+  tx: DbTransaction,
+  userId: string,
+  habit: HabitRow,
+  { cadence, target }: Omit<ChangeHabitScheduleInput, "id">,
+  effectiveFrom: LocalDate,
+): Promise<HabitSchedule> {
+  const id = habit.id;
+  if (habit.measure === "quantity" && target === null) {
+    throw new ValidationError({ target: [TARGET_REQUIRED] });
+  }
+  if (habit.measure === "check" && target !== null) {
+    throw new ValidationError({ target: [CHECK_HAS_NO_TARGET] });
+  }
+
+  const rows = await tx
+    .select()
+    .from(habitSchedules)
+    .where(
+      and(eq(habitSchedules.habitId, id), eq(habitSchedules.userId, userId)),
+    )
+    .orderBy(asc(habitSchedules.effectiveFrom));
+  const currentRow = scheduleForWeek(rows, addDays(effectiveFrom, 6));
+  if (!currentRow) throw new Error("Habit has no schedule");
+  const current = toHabitSchedule(currentRow);
+
+  const fields = (
+    [
+      current.cadenceType !== cadence.cadenceType && "cadenceType",
+      JSON.stringify(current.cadenceConfig) !==
+        JSON.stringify(cadence.cadenceConfig) && "cadenceConfig",
+      current.target !== target && "target",
+    ] as const
+  ).filter((field) => field !== false);
+  if (fields.length === 0) return current;
+
+  await tx
+    .delete(habitSchedules)
+    .where(
+      and(
+        eq(habitSchedules.habitId, id),
+        eq(habitSchedules.userId, userId),
+        gt(habitSchedules.effectiveFrom, effectiveFrom),
+      ),
+    );
+  const values = { ...cadence, target: amountToRow(target) };
+  const [saved] = await tx
+    .insert(habitSchedules)
+    .values({ userId, habitId: id, effectiveFrom, ...values })
+    .onConflictDoUpdate({
+      target: [habitSchedules.habitId, habitSchedules.effectiveFrom],
+      set: values,
+    })
+    .returning();
+  if (!saved) throw new Error("Habit schedule upsert returned no row");
+
+  await recordAudit(tx, {
+    type: "habit.schedule_changed",
+    userId,
+    entityId: id,
+    changes: {
+      effectiveFrom,
+      fields,
+      cadenceType: { from: current.cadenceType, to: cadence.cadenceType },
+      cadenceConfig: {
+        from: current.cadenceConfig,
+        to: cadence.cadenceConfig,
+      },
+    },
+  });
+  return toHabitSchedule(saved);
+}
+
+/**
+ * The edit dialog's save: the in-place fields (as `updateHabit`) and the
+ * schedule from this week (as `changeHabitSchedule`) in one transaction,
+ * so a refused target leaves the other fields unsaved too. Each part
+ * records its own event, and only when it changed something.
+ */
+export async function editHabit(
+  userId: string,
+  { id, cadence, target, ...input }: EditHabitInput,
+  now: Date = new Date(),
+): Promise<{ habit: Habit; schedule: HabitSchedule }> {
+  const { today, weekStart } = await userCalendar(userId, now);
+  const effectiveFrom = startOfWeek(today, weekStart);
+
+  return guardGoal(() =>
+    db.transaction(async (tx) => {
+      const row = await updateHabitInTx(tx, userId, id, input);
+      const schedule = await changeScheduleInTx(
+        tx,
+        userId,
+        row,
+        { cadence, target },
+        effectiveFrom,
+      );
+      return { habit: toHabit(row), schedule };
+    }),
+  );
 }
 
 /**

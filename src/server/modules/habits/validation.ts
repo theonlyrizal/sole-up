@@ -93,11 +93,27 @@ const cadenceFields = {
 type Context = z.core.$RefinementCtx;
 
 /**
+ * A rule across several fields, run as soon as those fields parse, even
+ * when other fields don't, so a form gets every error in one go. The rule
+ * receives the fields as parsed.
+ */
+function acrossFields<Shape extends z.core.$ZodShape>(
+  shape: Shape,
+  rule: (input: z.output<z.ZodObject<Shape>>, context: Context) => void,
+) {
+  const fields = z.object(shape);
+  return z.superRefine<unknown>(
+    (value, context) => rule(fields.parse(value), context),
+    { when: (payload) => fields.safeParse(payload.value).success },
+  );
+}
+
+/**
  * The cadence's config checked against its type, as the stored pair, or
  * NEVER with the config's issues under `cadenceConfig`.
  */
 function checkCadence(
-  input: { cadenceType: HabitCadence["cadenceType"]; cadenceConfig: unknown },
+  input: { cadenceType: HabitCadence["cadenceType"]; cadenceConfig?: unknown },
   context: Context,
 ): HabitCadence | typeof z.NEVER {
   const result = CADENCE_CONFIG_SCHEMAS[input.cadenceType].safeParse(
@@ -148,63 +164,65 @@ export const TARGET_REQUIRED = "Enter the amount to aim for each day.";
 export const CHECK_HAS_NO_UNIT = "Only quantity habits have a unit.";
 export const CHECK_HAS_NO_TARGET = "Only quantity habits have a target.";
 
+const measureFields = {
+  measure: z.enum(HABIT_MEASURES, {
+    error: "Choose how the habit is measured.",
+  }),
+  unit: optionalText(HABIT_UNIT_MAX, "unit"),
+  target: optionalAmountSchema,
+};
+
+/** `unit` and `target` are required for quantity and refused for check. */
+const measureRule = acrossFields(measureFields, (input, context) => {
+  const issue = (path: "unit" | "target", message: string) =>
+    context.addIssue({ code: "custom", path: [path], message });
+  if (input.measure === "quantity") {
+    if (!input.unit) issue("unit", UNIT_REQUIRED);
+    if (input.target === null) issue("target", TARGET_REQUIRED);
+  } else {
+    if (input.unit) issue("unit", CHECK_HAS_NO_UNIT);
+    if (input.target !== null) issue("target", CHECK_HAS_NO_TARGET);
+  }
+});
+
+const dateRule = acrossFields(
+  { startDate: startDateSchema, endDate: endDateSchema },
+  checkDateOrder,
+);
+
+const cadenceRule = acrossFields(cadenceFields, (input, context) => {
+  checkCadence(input, context);
+});
+
+/**
+ * The flat form fields as the stored cadence pair. Runs only once every
+ * rule above has passed, so the config is known to fit its type.
+ */
+function withCadence<
+  T extends {
+    cadenceType: HabitCadence["cadenceType"];
+    cadenceConfig?: unknown;
+  },
+>({ cadenceType, cadenceConfig, ...input }: T, context: Context) {
+  const cadence = checkCadence({ cadenceType, cadenceConfig }, context);
+  return { ...input, cadence };
+}
+
 /**
  * A new habit and its first schedule. `unit` and `target` are required for
  * a quantity habit and refused for a check habit. Measure and unit can't be
  * changed afterwards.
  */
 export const createHabitSchema = z
-  .strictObject({
-    ...habitFields,
-    measure: z.enum(HABIT_MEASURES, {
-      error: "Choose how the habit is measured.",
-    }),
-    unit: optionalText(HABIT_UNIT_MAX, "unit"),
-    ...cadenceFields,
-    target: optionalAmountSchema,
-  })
-  .transform(({ cadenceType, cadenceConfig, ...input }, context) => {
-    checkDateOrder(input, context);
-    if (input.measure === "quantity") {
-      if (!input.unit) {
-        context.addIssue({
-          code: "custom",
-          path: ["unit"],
-          message: UNIT_REQUIRED,
-        });
-      }
-      if (input.target === null) {
-        context.addIssue({
-          code: "custom",
-          path: ["target"],
-          message: TARGET_REQUIRED,
-        });
-      }
-    } else {
-      if (input.unit) {
-        context.addIssue({
-          code: "custom",
-          path: ["unit"],
-          message: CHECK_HAS_NO_UNIT,
-        });
-      }
-      if (input.target !== null) {
-        context.addIssue({
-          code: "custom",
-          path: ["target"],
-          message: CHECK_HAS_NO_TARGET,
-        });
-      }
-    }
-    const cadence = checkCadence({ cadenceType, cadenceConfig }, context);
-    return { ...input, cadence };
-  });
+  .strictObject({ ...habitFields, ...measureFields, ...cadenceFields })
+  .check(dateRule, measureRule, cadenceRule)
+  .transform(withCadence);
 export type CreateHabitInput = z.output<typeof createHabitSchema>;
 
 /** Replaces every field edited in place (HABIT_EDITABLE_FIELDS). */
 export const updateHabitSchema = z
   .strictObject({ id: idSchema, ...habitFields })
-  .superRefine(checkDateOrder);
+  .check(dateRule);
 export type UpdateHabitInput = z.output<typeof updateHabitSchema>;
 
 /**
@@ -217,13 +235,27 @@ export const changeHabitScheduleSchema = z
     ...cadenceFields,
     target: optionalAmountSchema,
   })
-  .transform(({ cadenceType, cadenceConfig, ...input }, context) => ({
-    ...input,
-    cadence: checkCadence({ cadenceType, cadenceConfig }, context),
-  }));
+  .check(cadenceRule)
+  .transform(withCadence);
 export type ChangeHabitScheduleInput = z.output<
   typeof changeHabitScheduleSchema
 >;
+
+/**
+ * The edit dialog's input: the fields edited in place plus the schedule
+ * from this week (`updateHabitSchema` and `changeHabitScheduleSchema`
+ * together), saved in one transaction.
+ */
+export const editHabitSchema = z
+  .strictObject({
+    id: idSchema,
+    ...habitFields,
+    ...cadenceFields,
+    target: optionalAmountSchema,
+  })
+  .check(dateRule, cadenceRule)
+  .transform(withCadence);
+export type EditHabitInput = z.output<typeof editHabitSchema>;
 
 export const habitIdSchema = z.strictObject({ id: idSchema });
 export type HabitIdInput = z.output<typeof habitIdSchema>;

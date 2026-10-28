@@ -7,6 +7,7 @@ import {
   CHECK_HAS_NO_TARGET,
   CHECK_HAS_NO_UNIT,
   createHabitSchema,
+  editHabitSchema,
   END_BEFORE_START,
   habitIdSchema,
   TARGET_REQUIRED,
@@ -236,6 +237,49 @@ describe("createHabitSchema", () => {
   });
 });
 
+describe("every error at once", () => {
+  it("reports a blank title with the quantity and cadence rules", () => {
+    expect(
+      issues(
+        createHabitSchema.safeParse({
+          ...quantityHabit,
+          title: "",
+          unit: "",
+          target: "",
+          endDate: "2026-11-01",
+          cadenceType: "times_per_week",
+          cadenceConfig: { timesPerWeek: 7 },
+        }),
+      ),
+    ).toEqual([
+      "title: Give the habit a title.",
+      `endDate: ${END_BEFORE_START}`,
+      `unit: ${UNIT_REQUIRED}`,
+      `target: ${TARGET_REQUIRED}`,
+      "cadenceConfig.timesPerWeek: Choose 1 to 6 times a week. Every day is the daily cadence.",
+    ]);
+  });
+
+  it("skips a rule whose own fields don't parse", () => {
+    expect(
+      issues(
+        createHabitSchema.safeParse({
+          ...checkHabit,
+          measure: "sometimes",
+          unit: "km",
+          startDate: "soon",
+          endDate: "2026-01-01",
+          cadenceType: "hourly",
+        }),
+      ),
+    ).toEqual([
+      "startDate: Pick a start date.",
+      "measure: Choose how the habit is measured.",
+      "cadenceType: Choose how often from the list.",
+    ]);
+  });
+});
+
 describe("updateHabitSchema", () => {
   const edit = { id: ID, title: "Stretch", startDate: "2026-11-02" };
 
@@ -286,6 +330,63 @@ describe("changeHabitScheduleSchema", () => {
         }),
       )[0],
     ).toMatch(/^cadenceConfig\.timesPerWeek/);
+  });
+});
+
+describe("editHabitSchema", () => {
+  const edit = {
+    id: ID,
+    title: "Stretch",
+    description: "",
+    startDate: "2026-11-02",
+    endDate: "",
+    goalId: null,
+    cadenceType: "weekly_days",
+    cadenceConfig: { days: [5, 1, 3] },
+    target: null,
+  };
+
+  it("parses the fields and the schedule together, days sorted", () => {
+    expect(editHabitSchema.parse(edit)).toEqual({
+      id: ID,
+      title: "Stretch",
+      description: null,
+      startDate: "2026-11-02",
+      endDate: null,
+      goalId: null,
+      target: null,
+      cadence: {
+        cadenceType: "weekly_days",
+        cadenceConfig: { days: [1, 3, 5] },
+      },
+    });
+  });
+
+  it("reports field, date and cadence errors in one go", () => {
+    expect(
+      issues(
+        editHabitSchema.safeParse({
+          ...edit,
+          title: " ",
+          target: "1.234",
+          endDate: "2026-11-01",
+          cadenceConfig: { days: [] },
+        }),
+      ),
+    ).toEqual([
+      "title: Give the habit a title.",
+      `target: ${AMOUNT_MESSAGE}`,
+      `endDate: ${END_BEFORE_START}`,
+      "cadenceConfig.days: Choose 1 to 6 days. Every day is the daily cadence.",
+    ]);
+  });
+
+  it("refuses the measure and unit, which can't change", () => {
+    expect(
+      issues(
+        editHabitSchema.safeParse({ ...edit, measure: "quantity", unit: "km" }),
+      ),
+    ).toEqual([': Unrecognized keys: "measure", "unit"']);
   });
 });
 

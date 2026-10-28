@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 
-const NAV_LABELS = ["Home", "Goals", "Plan", "Settings"];
+const NAV_LABELS = ["Home", "Goals", "Plan", "Track", "Settings"];
 /** The sidebar also lists Today, Upcoming, Calendar and Inbox under Plan. */
 const SIDEBAR_LABELS = [
   "Home",
@@ -14,6 +14,7 @@ const SIDEBAR_LABELS = [
   "Upcoming",
   "Calendar",
   "Inbox",
+  "Track",
   "Settings",
 ];
 
@@ -22,7 +23,7 @@ function mainNav(page: Page) {
 }
 
 test.describe("desktop", () => {
-  test("the sidebar shows only Home, Goals, Plan (with its sub-pages) and Settings", async ({
+  test("the sidebar shows only Home, Goals, Plan (with its sub-pages), Track and Settings", async ({
     page,
   }) => {
     await signInAndConfirm(page);
@@ -39,7 +40,7 @@ test.describe("desktop", () => {
     const mainBox = (await page.locator("main").boundingBox())!;
     expect(navBox.x + navBox.width).toBeLessThanOrEqual(mainBox.x);
 
-    for (const label of ["Goals", "Plan", "Settings"]) {
+    for (const label of ["Goals", "Plan", "Track", "Settings"]) {
       await nav.getByRole("link", { name: label }).click();
       await expect(
         page.getByRole("heading", { level: 1, name: label }),
@@ -78,6 +79,8 @@ test.describe("desktop", () => {
       "/plan/today",
       "/plan/upcoming",
       "/plan/inbox",
+      "/track",
+      "/track/archived",
       "/settings",
     ]) {
       await page.goto(path);
@@ -102,7 +105,7 @@ test.describe("desktop", () => {
     await expect(page.locator("main")).toBeFocused();
 
     // From the top: skip link, brand, Add task, the destinations (with
-    // Today, Upcoming, Calendar and Inbox under Plan), sign out.
+    // Today, Upcoming, Calendar and Inbox under Plan, then Track), sign out.
     await page.goto("/home");
     await expect(
       page.getByRole("heading", { level: 1, name: "Home" }),
@@ -126,9 +129,9 @@ test.describe("desktop", () => {
       expect(outline).not.toBe("none");
     }
 
-    // Shift+Tab back to Plan (past Settings, Inbox, Calendar, Upcoming and
-    // Today) and follow it with Enter.
-    for (let step = 0; step < 6; step += 1) {
+    // Shift+Tab back to Plan (past Settings, Track, Inbox, Calendar,
+    // Upcoming and Today) and follow it with Enter.
+    for (let step = 0; step < 7; step += 1) {
       await page.keyboard.press("Shift+Tab");
     }
     const plan = mainNav(page).getByRole("link", { name: "Plan" });
