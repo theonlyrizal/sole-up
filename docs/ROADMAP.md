@@ -51,8 +51,8 @@ Build a useful personal management product first. Add AI when the product has re
 - Today and upcoming views.
 
 ### 1D. Habits
-- Define habit and cadence.
-- Log completion.
+- Define habit and cadence (daily, chosen weekdays, N per week), as a yes/no check or a quantity with a target ([ADR 0014](decisions/0014-habit-cadence-logs-consistency.md)).
+- Log completion or a deliberate skip.
 - Correct past logs.
 - Pause or archive a habit.
 - Show history and transparent consistency calculations.

@@ -233,6 +233,12 @@ Do not optimize for time spent in the app. A good personal management tool may h
   - Notifications show the title and time, or "You have a reminder" in private mode.
   - Reminders may arrive up to 15 minutes early, because production stays on free hosting.
   - See [ADR 0013](decisions/0013-reminders-sweep-and-delivery.md).
+- **Habits (Phase 6 gate):**
+  - Daily, chosen weekdays, or N times a week. A habit is a yes/no check or a quantity with a unit and a per-day target (partial credit).
+  - Logs are "completed" or "skipped". "Missed" is shown for past expected days with no log, but never stored.
+  - Skips and paused days don't count, today counts only once logged, and editing a cadence or target applies from the current week on.
+  - Consistency is a count such as "12 of 14 days", never a percentage or a score.
+  - See [ADR 0014](decisions/0014-habit-cadence-logs-consistency.md).
 
 ### Still open
 
