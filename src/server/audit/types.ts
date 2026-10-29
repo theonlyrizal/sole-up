@@ -17,6 +17,7 @@ import { anyCadenceConfigSchema } from "@/lib/habits/cadence";
 import {
   HABIT_CADENCE_TYPES,
   HABIT_EDITABLE_FIELDS,
+  HABIT_LOG_STATUSES,
   HABIT_MEASURES,
   HABIT_STATUSES,
 } from "@/lib/habits/habit";
@@ -181,6 +182,15 @@ const droppedExceptions = z.number().int().min(0);
 /** Minutes before the target a reminder fires (ADR 0013). */
 const reminderOffset = z.number().refine(isReminderOffset);
 const nudgeTime = z.string().regex(NUDGE_TIME_PATTERN);
+/**
+ * A habit log on `localDate`: what it holds or changed by name (never the
+ * amount itself), and its status before and after.
+ */
+const habitLogChange = z.strictObject({
+  localDate,
+  fields: z.array(z.enum(["status", "value"])).min(1),
+  status: auditChange(z.enum(HABIT_LOG_STATUSES)),
+});
 
 /**
  * The allowlist. Add each new event here with its entity type and a strict
@@ -581,8 +591,24 @@ export const AUDIT_EVENTS = defineAuditEvents({
       cadenceConfig: auditChange(anyCadenceConfigSchema),
     }),
   },
-  // No `habit.deleted`, for the same reason as life areas (ADR 0005). The
-  // log events (`habit.logged|log_changed|log_removed`) come with 6.4.
+  // No `habit.deleted`, for the same reason as life areas (ADR 0005).
+
+  // A habit's log on one local date, recorded on the habit so its history
+  // outlives the log row (undo deletes it). `fields` names what the log
+  // holds (`logged`, `log_removed`) or what changed (`log_changed`): a
+  // value appears by name only, and the note never does.
+  "habit.logged": {
+    entityType: "habit",
+    changes: habitLogChange,
+  },
+  "habit.log_changed": {
+    entityType: "habit",
+    changes: habitLogChange,
+  },
+  "habit.log_removed": {
+    entityType: "habit",
+    changes: habitLogChange,
+  },
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;

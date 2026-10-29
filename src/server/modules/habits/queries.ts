@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 
 import {
   addDays,
@@ -13,16 +13,42 @@ import {
 } from "@/lib/dates";
 import type { GoalStatus } from "@/lib/goals";
 import { scheduleForWeek, type HabitSchedule } from "@/lib/habits/cadence";
-import type { Habit } from "@/lib/habits/habit";
+import {
+  consistency,
+  formatConsistency,
+  habitDays,
+  weekProgress,
+  type EngineLog,
+  type EnginePause,
+  type HabitDayState,
+  type HabitRange,
+  type HabitWeekInput,
+} from "@/lib/habits/consistency";
+import type { Habit, HabitMeasure } from "@/lib/habits/habit";
 import { describeCadence, describeTarget } from "@/lib/habits/habit-form";
+import {
+  habitDayLabel,
+  isLoggableDay,
+  showsOnToday,
+  stripRange,
+  weekProgressLabel,
+  type HabitLogValue,
+} from "@/lib/habits/logging";
 import { db } from "@/server/db/client";
-import { goals, habitLogs, habits, habitSchedules } from "@/server/db/schema";
+import {
+  goals,
+  habitLogs,
+  habitPauses,
+  habits,
+  habitSchedules,
+} from "@/server/db/schema";
 import { getUserPreferences } from "@/server/modules/preferences/service";
 
-import { toHabit, toHabitSchedule } from "./service";
+import { toHabit, toHabitLogValue, toHabitSchedule } from "./service";
 
-// Read models for the Track pages (chunk 6.3). Every query is scoped to the
-// user. Consistency figures are 6.5's, from the 6.2 engine.
+// Read models for the Track pages (chunk 6.3), their history strips and
+// Today's Habits section (chunk 6.4). Every query is scoped to the user.
+// Every count comes from the 6.2 engine; nothing here recounts.
 
 /** A habit as Track lists it, with this week's schedule and its labels. */
 export type HabitListItem = Habit & {
@@ -41,14 +67,48 @@ export type HabitListItem = Habit & {
 /** A goal a habit can link to. The form offers active and paused ones. */
 export type HabitGoalOption = { id: string; title: string; status: GoalStatus };
 
+/** One day of a history strip, ready to show. */
+export type HabitHistoryDay = {
+  date: LocalDate;
+  state: HabitDayState;
+  /** 0 to 1; above 0 only when completed. */
+  credit: number;
+  log: HabitLogValue | null;
+  /** The day of the month, "26". */
+  dayOfMonth: string;
+  /** "Monday, 26 October 2026". */
+  dateLabel: string;
+  /** "Missed", "5 of 8 glasses", "Not active · Done". */
+  stateLabel: string;
+  /** Whether the day can be opened to log or correct it. */
+  loggable: boolean;
+  /** Whether a new log is accepted (an active day up to today). */
+  active: boolean;
+  /** That week's per-day target for a quantity habit; null for check. */
+  target: number | null;
+};
+
+/** A habit's last two weeks, with the figure for them. */
+export type HabitHistory = {
+  weeks: { from: LocalDate; label: string; days: HabitHistoryDay[] }[];
+  /** "9 of 10 days · 1 skipped", or "Nothing expected in this range". */
+  figure: string;
+  definition: string;
+  /** "1 of 3 so far this week", for a `times_per_week` habit only. */
+  progressLabel: string | null;
+};
+
+export type TrackHabit = HabitListItem & { history: HabitHistory };
+
 export type TrackView = {
   /** Active habits, then paused ones, oldest first within each. */
-  habits: HabitListItem[];
+  habits: TrackHabit[];
   archivedCount: number;
   /** Every goal, live ones first (see `HabitGoalOption`). */
   goals: HabitGoalOption[];
   today: LocalDate;
   weekStart: WeekStart;
+  locale: string;
   /** "26 Oct 2026": where a schedule edit takes effect. */
   thisWeekStartLabel: string;
 };
@@ -126,6 +186,132 @@ async function listItems(
   });
 }
 
+type UserContext = Awaited<ReturnType<typeof userContext>>;
+
+/** What the engine needs for one habit. */
+type EngineData = {
+  schedules: HabitSchedule[];
+  pauses: EnginePause[];
+  logs: EngineLog[];
+};
+
+/**
+ * The schedules, pauses and the logs in `logRange` of some of the user's
+ * habits, for the 6.2 engine, by habit ID.
+ */
+async function engineData(
+  userId: string,
+  ids: string[],
+  logRange: HabitRange,
+): Promise<Map<string, EngineData>> {
+  const data = new Map<string, EngineData>(
+    ids.map((id) => [id, { schedules: [], pauses: [], logs: [] }]),
+  );
+  if (ids.length === 0) return data;
+
+  const [scheduleRows, pauseRows, logRows] = await Promise.all([
+    db
+      .select()
+      .from(habitSchedules)
+      .where(
+        and(
+          eq(habitSchedules.userId, userId),
+          inArray(habitSchedules.habitId, ids),
+        ),
+      ),
+    db
+      .select()
+      .from(habitPauses)
+      .where(
+        and(eq(habitPauses.userId, userId), inArray(habitPauses.habitId, ids)),
+      ),
+    db
+      .select()
+      .from(habitLogs)
+      .where(
+        and(
+          eq(habitLogs.userId, userId),
+          inArray(habitLogs.habitId, ids),
+          gte(habitLogs.localDate, logRange.from),
+          lte(habitLogs.localDate, logRange.to),
+        ),
+      ),
+  ]);
+  for (const row of scheduleRows) {
+    data.get(row.habitId)?.schedules.push(toHabitSchedule(row));
+  }
+  for (const row of pauseRows) {
+    data
+      .get(row.habitId)
+      ?.pauses.push({ startDate: row.startDate, endDate: row.endDate });
+  }
+  for (const row of logRows) {
+    data
+      .get(row.habitId)
+      ?.logs.push({ localDate: row.localDate, ...toHabitLogValue(row) });
+  }
+  return data;
+}
+
+function engineInput(
+  habit: Habit,
+  data: EngineData | undefined,
+  context: UserContext,
+): HabitWeekInput {
+  return {
+    habit,
+    schedules: data?.schedules ?? [],
+    pauses: data?.pauses ?? [],
+    logs: data?.logs ?? [],
+    today: context.today,
+    weekStart: context.weekStart,
+  };
+}
+
+/** The last two weeks of a habit as the Track strip shows them. */
+function habitHistory(
+  habit: HabitListItem,
+  input: HabitWeekInput,
+  context: UserContext,
+): HabitHistory {
+  const range = stripRange(context.today, context.weekStart);
+  const days = habitDays({ ...input, range });
+  const weeks = [range.from, addDays(range.from, 7)].map((from) => {
+    const to = addDays(from, 6);
+    const target = scheduleForWeek(input.schedules, to)?.target ?? null;
+    return {
+      from,
+      label: `Week of ${formatLocalDate(from, context.locale)}`,
+      days: days
+        .filter((day) => day.date >= from && day.date <= to)
+        .map((day): HabitHistoryDay => ({
+          date: day.date,
+          state: day.state,
+          credit: day.credit,
+          log: day.log && { status: day.log.status, value: day.log.value },
+          dayOfMonth: String(Number(day.date.slice(8))),
+          dateLabel: formatLocalDate(day.date, context.locale, "full"),
+          stateLabel: habitDayLabel(day, habit, target, context.locale),
+          loggable: isLoggableDay(day, context.today),
+          active: day.state !== "inactive" && day.date <= context.today,
+          target,
+        })),
+    };
+  });
+
+  const result = consistency({ ...input, range });
+  const cadence = habit.schedule.cadenceType;
+  return {
+    weeks,
+    figure: formatConsistency(result, cadence, habit.measure),
+    definition: result.definition,
+    progressLabel:
+      cadence === "times_per_week"
+        ? weekProgressLabel(weekProgress(input))
+        : null,
+  };
+}
+
 /** The user's today, week start, locale and zone. */
 async function userContext(userId: string, now: Date) {
   const preferences = await getUserPreferences(userId);
@@ -161,12 +347,26 @@ export async function getTrackView(
       .orderBy(GOAL_STATUS_ORDER, asc(goals.createdAt), asc(goals.id)),
   ]);
 
+  const items = await listItems(userId, habitRows, context);
+  const data = await engineData(
+    userId,
+    items.map((item) => item.id),
+    stripRange(context.today, context.weekStart),
+  );
   return {
-    habits: await listItems(userId, habitRows, context),
+    habits: items.map((item) => ({
+      ...item,
+      history: habitHistory(
+        item,
+        engineInput(item, data.get(item.id), context),
+        context,
+      ),
+    })),
     archivedCount: archived?.count ?? 0,
     goals: goalRows,
     today: context.today,
     weekStart: context.weekStart,
+    locale: context.locale,
     thisWeekStartLabel: formatLocalDate(
       startOfWeek(context.today, context.weekStart),
       context.locale,
@@ -193,4 +393,90 @@ export async function getArchivedHabits(
       context.locale,
     ),
   }));
+}
+
+/** One habit on Today, with today's log. */
+export type TodayHabit = {
+  id: string;
+  title: string;
+  measure: HabitMeasure;
+  unit: string | null;
+  /** "Every day · 8 glasses a day". */
+  scheduleLabel: string;
+  /** This week's per-day target for a quantity habit; null for check. */
+  target: number | null;
+  /** Today's log, or null before it is logged. */
+  log: HabitLogValue | null;
+  /** "1 of 3 so far this week", for a `times_per_week` habit only. */
+  progressLabel: string | null;
+};
+
+export type TodayHabits = {
+  /** In the Track order: active, then paused, oldest first. */
+  habits: TodayHabit[];
+  /** Whether the user has any active habit, shown today or not. */
+  hasActiveHabits: boolean;
+};
+
+/**
+ * Today's Habits section (chunk 6.4): which habits show is `showsOnToday`,
+ * and a `times_per_week` habit's progress is `weekProgress`.
+ */
+export async function getTodayHabits(
+  userId: string,
+  now: Date = new Date(),
+): Promise<TodayHabits> {
+  const context = await userContext(userId, now);
+  const rows = await db
+    .select()
+    .from(habits)
+    .where(and(eq(habits.userId, userId), ne(habits.status, "archived")))
+    .orderBy(STATUS_ORDER, asc(habits.createdAt), asc(habits.id));
+
+  const weekFrom = startOfWeek(context.today, context.weekStart);
+  const weekTo = addDays(weekFrom, 6);
+  const data = await engineData(
+    userId,
+    rows.map((row) => row.id),
+    { from: weekFrom, to: weekTo },
+  );
+
+  const shown = rows.flatMap((row): TodayHabit[] => {
+    const habit = toHabit(row);
+    const input = engineInput(habit, data.get(row.id), context);
+    if (!showsOnToday(habit.status, input)) return [];
+
+    const schedule = scheduleForWeek(input.schedules, weekTo);
+    if (!schedule) throw new Error("Habit has no schedule");
+    const targetLabel =
+      habit.unit !== null && schedule.target !== null
+        ? describeTarget(schedule.target, habit.unit, context.locale)
+        : null;
+    const log = input.logs.find((entry) => entry.localDate === context.today);
+    return [
+      {
+        id: habit.id,
+        title: habit.title,
+        measure: habit.measure,
+        unit: habit.unit,
+        scheduleLabel: [
+          describeCadence(schedule, context.weekStart),
+          targetLabel,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        target: schedule.target,
+        log: log ? { status: log.status, value: log.value } : null,
+        progressLabel:
+          schedule.cadenceType === "times_per_week"
+            ? weekProgressLabel(weekProgress(input))
+            : null,
+      },
+    ];
+  });
+
+  return {
+    habits: shown,
+    hasActiveHabits: rows.some((row) => row.status === "active"),
+  };
 }

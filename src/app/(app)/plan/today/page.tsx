@@ -8,6 +8,7 @@ import { formatLocalDate } from "@/lib/dates";
 import { todayClock } from "@/lib/today";
 import { requireUser } from "@/server/auth/session";
 import { listTodayTimeline } from "@/server/modules/calendar-events/queries";
+import { getTodayHabits } from "@/server/modules/habits/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
 import {
   listTodaySuggestions,
@@ -35,10 +36,11 @@ async function Today() {
   const timeZone = preferences.timezone ?? "UTC";
   // Today is the user's date in their saved zone, never the server's.
   const clock = todayClock(timeZone);
-  const [timeline, sections, suggestions] = await Promise.all([
+  const [timeline, sections, suggestions, habits] = await Promise.all([
     listTodayTimeline(user.id, clock, timeZone),
     listTodayTasks(user.id, clock, timeZone),
     listTodaySuggestions(user.id, clock, timeZone),
+    getTodayHabits(user.id, clock.now),
   ]);
   return (
     <TodayView
@@ -49,6 +51,7 @@ async function Today() {
       timeline={timeline}
       sections={sections}
       suggestions={suggestions}
+      habits={habits}
       locale={preferences.locale}
       timeZone={timeZone}
     />

@@ -6,9 +6,11 @@ import { authedAction } from "@/server/auth/authed-action";
 
 import * as service from "./service";
 import {
+  clearHabitLogSchema,
   createHabitSchema,
   editHabitSchema,
   habitIdSchema,
+  setHabitLogSchema,
 } from "./validation";
 
 // Auth → validate → service (scoped to the user) → refresh the page's
@@ -74,5 +76,25 @@ export const deleteHabit = authedAction(
   async (input, { userId }) => {
     await service.deleteHabit(userId, input);
     refresh();
+  },
+);
+
+/** Creates or corrects one day's log (Today, the history strip, undo). */
+export const setHabitLog = authedAction(
+  setHabitLogSchema,
+  async (input, { userId }) => {
+    const result = await service.setHabitLog(userId, input);
+    refresh();
+    return result;
+  },
+);
+
+/** Removes one day's log (undo, or "no log" in the strip). */
+export const clearHabitLog = authedAction(
+  clearHabitLogSchema,
+  async (input, { userId }) => {
+    const result = await service.clearHabitLog(userId, input);
+    refresh();
+    return result;
   },
 );

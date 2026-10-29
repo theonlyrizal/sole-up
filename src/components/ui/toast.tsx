@@ -3,6 +3,7 @@
 import { Toast as ToastPrimitive } from "radix-ui";
 import { useSyncExternalStore } from "react";
 
+import { buttonClass } from "./button";
 import { cx, focusRing } from "./cx";
 
 export type ToastVariant = "info" | "success" | "error";
@@ -11,6 +12,11 @@ export type ToastOptions = {
   title: string;
   description?: string;
   variant?: ToastVariant;
+  /**
+   * One button in the toast, such as Undo. `altText` tells screen reader
+   * users how to do the same without the toast, which may have gone.
+   */
+  action?: { label: string; altText: string; onClick: () => void };
 };
 
 type ToastItem = ToastOptions & { id: number };
@@ -66,6 +72,8 @@ export function Toaster() {
         <ToastPrimitive.Root
           key={item.id}
           type={item.variant === "error" ? "foreground" : "background"}
+          // Longer with an action, so there is time to reach it.
+          duration={item.action ? 8000 : undefined}
           onOpenChange={(open) => {
             if (!open) remove(item.id);
           }}
@@ -90,6 +98,15 @@ export function Toaster() {
               </ToastPrimitive.Description>
             )}
           </div>
+          {item.action && (
+            <ToastPrimitive.Action
+              altText={item.action.altText}
+              onClick={item.action.onClick}
+              className={buttonClass({ variant: "secondary", size: "sm" })}
+            >
+              {item.action.label}
+            </ToastPrimitive.Action>
+          )}
           <ToastPrimitive.Close
             aria-label="Dismiss"
             className={cx(

@@ -260,6 +260,7 @@ describe("getTrackView", () => {
       goals: [],
       today: "2026-11-04",
       weekStart: 1,
+      locale: "en-US",
       thisWeekStartLabel: "Nov 2, 2026",
     });
   });

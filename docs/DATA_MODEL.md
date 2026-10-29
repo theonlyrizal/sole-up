@@ -244,6 +244,9 @@ Rules:
 - **"Missed" is never stored.** It is derived for display only: a past counted day (`daily`/`weekly_days`) with no log, labelled "Missed" in neutral styling. `times_per_week` has no per-day Missed.
 - A completed log on a non-scheduled weekday of a `weekly_days` habit is an "extra": shown, never counted.
 - Logs on days that later become inactive are kept and shown, never counted.
+- Writes (chunk 6.4) are "set" (create or correct) and "clear", with the habit row locked so two writes to one day can't race. Setting the same log again, or clearing a day with no log, changes nothing and records nothing. Clearing works on any day, so a log kept on a day that no longer counts can still be removed.
+- Every write records `habit.logged`, `habit.log_changed` or `habit.log_removed` on the habit: the local date, the status from and to, and the fields by name (`value` never as a number, the note never).
+- Undo restores the day's log as it was before the write: it deletes a new log, and puts back the previous status and value after a correction.
 
 **Consistency** is computed on read by the pure engine in `src/lib/habits/` (chunk 6.2), never stored. The exact definitions are in ADR 0014. In short:
 - **Daily or weekly days:** completed credit out of counted days over whole user weeks.

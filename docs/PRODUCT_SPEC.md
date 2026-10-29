@@ -173,6 +173,8 @@ Home v1 (chunk 3.2) has three cards: today's planned, due and needs-a-decision c
 
 Chunk 4.9 adds a "Next commitment" card above them: the first event or time block that hasn't ended (one under way counts), from today through the next 30 days, with what it is, when, and a link that opens it on the calendar's Day view. Today gains a "Schedule" timeline at the top: today's events and time blocks, all-day events first, then by start, each linking to the item the same way.
 
+Chunk 6.4 adds a "Habits" section at the bottom of Today, once the user has an active habit: the habits due today (every active day for daily habits, scheduled days for chosen-day habits, and while the week's target isn't met for N-times-a-week habits), plus any already logged today. Each is done or skipped in one tap, with Undo in the toast; a quantity habit's Done logs its full target, and "Change amount" takes another. N-times-a-week rows show "1 of 3 so far this week". On Track, each habit shows its last two weeks as a strip with the figure for them and how it is counted; any active day up to today can be logged or corrected there, and the figure follows at once.
+
 ## 9. Analytics and insight rules
 
 - Show the time range and definition for every metric.
