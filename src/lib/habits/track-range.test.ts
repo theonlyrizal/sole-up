@@ -7,6 +7,7 @@ import {
   formatDateSpan,
   parseTrackRange,
   shortDateLabel,
+  trackHabitAnchor,
   trackHref,
   trackRangeDates,
   TRACK_RANGE_LABELS,
@@ -52,6 +53,14 @@ describe("parseTrackRange and trackHref", () => {
       "Last 12 weeks",
       "This week",
     ]);
+  });
+});
+
+describe("trackHabitAnchor", () => {
+  it("names a habit's row on Track, for Home's links", () => {
+    expect(trackHabitAnchor("0b1c2d3e-0000-4000-8000-000000000001")).toBe(
+      "habit-0b1c2d3e-0000-4000-8000-000000000001",
+    );
   });
 });
 

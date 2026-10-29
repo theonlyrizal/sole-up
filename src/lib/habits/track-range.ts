@@ -40,6 +40,11 @@ export function trackHref(range: TrackRange): string {
   return range === DEFAULT_TRACK_RANGE ? "/track" : `/track?range=${range}`;
 }
 
+/** The id of a habit's row on Track, so Home (chunk 6.6) can link to it. */
+export function trackHabitAnchor(habitId: string): string {
+  return `habit-${habitId}`;
+}
+
 /**
  * The whole user weeks a range covers, the current week last: the last 4
  * or 12 weeks each include the week holding `today`, and "This week" is

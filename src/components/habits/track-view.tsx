@@ -8,6 +8,7 @@ import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/toast";
 import {
+  trackHabitAnchor,
   trackHref,
   TRACK_RANGE_LABELS,
   TRACK_RANGES,
@@ -213,7 +214,11 @@ function HabitSection({
       </div>
       <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
         {habits.map((habit) => (
-          <li key={habit.id} className="flex flex-col gap-3 p-4">
+          <li
+            key={habit.id}
+            id={trackHabitAnchor(habit.id)}
+            className="flex scroll-mt-4 flex-col gap-3 p-4"
+          >
             <HabitSummary habit={habit} />
             <HabitStrip
               habit={habit}

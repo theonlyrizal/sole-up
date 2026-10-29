@@ -8,6 +8,7 @@ import { requireUser } from "@/server/auth/session";
 import {
   deadlinesNextSevenDays,
   goalsWithoutNextAction,
+  habitsSummary,
   listGoalsWithoutNextAction,
   nextCommitment,
   todayTaskCounts,
@@ -23,7 +24,7 @@ export default function HomePage() {
         <h1 className="text-2xl font-semibold tracking-tight">Home</h1>
         <p className="text-muted">
           What matters now: what&apos;s next on your calendar, today, goals that
-          need a next step, and the week ahead.
+          need a next step, the week ahead, and how your habits are going.
         </p>
       </div>
       <Suspense fallback={<LoadingState label="Loading home" />}>
@@ -40,12 +41,13 @@ async function Home() {
   const timeZone = preferences.timezone ?? "UTC";
   // Every metric uses the user's today in their saved zone, at one instant.
   const clock = todayClock(timeZone);
-  const [next, today, goals, goalList, deadlines] = await Promise.all([
+  const [next, today, goals, goalList, deadlines, habits] = await Promise.all([
     nextCommitment(user.id, clock, timeZone),
     todayTaskCounts(user.id, clock, timeZone),
     goalsWithoutNextAction(user.id, clock, timeZone),
     listGoalsWithoutNextAction(user.id),
     deadlinesNextSevenDays(user.id, clock, timeZone),
+    habitsSummary(user.id, clock, timeZone, preferences.weekStart),
   ]);
   return (
     <HomeView
@@ -54,6 +56,7 @@ async function Home() {
       goals={goals}
       goalList={goalList}
       deadlines={deadlines}
+      habits={habits}
       todayDate={clock.today}
       nextDayStartsAt={clock.dayEnd.toISOString()}
       locale={preferences.locale}

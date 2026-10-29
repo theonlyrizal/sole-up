@@ -6,6 +6,19 @@ import { createCalendarEventSchema } from "@/server/modules/calendar-events/vali
 import { changeGoalStatus, createGoal } from "@/server/modules/goals/service";
 import { createGoalSchema } from "@/server/modules/goals/validation";
 import {
+  archiveHabit,
+  createHabit,
+  pauseHabit,
+  setHabitLog,
+} from "@/server/modules/habits/service";
+import {
+  createHabitSchema,
+  setHabitLogSchema,
+} from "@/server/modules/habits/validation";
+import { getTrackView } from "@/server/modules/habits/queries";
+import { db } from "@/server/db/client";
+import { userPreferences } from "@/server/db/schema";
+import {
   changeMilestoneStatus,
   createMilestone,
 } from "@/server/modules/milestones/service";
@@ -22,6 +35,7 @@ import { createTestUser } from "../../../../tests/integration/helpers/users";
 import {
   deadlinesNextSevenDays,
   goalsWithoutNextAction,
+  habitsSummary,
   listGoalsWithoutNextAction,
   nextCommitment,
   todayTaskCounts,
@@ -516,5 +530,173 @@ describe("nextCommitment", () => {
     expect(metric.hasData).toBe(false);
     expect(metric.value).toBeNull();
     expect(await titleOf(other.id)).toBe("Their block");
+  });
+});
+
+describe("habitsSummary", () => {
+  // Saturday 24 Oct in Tokyo (see NOW). With a Monday week start this week
+  // began 19 Oct, so the last 4 weeks are 28 Sep to 25 Oct.
+  async function tokyoUser(weekStart = 1) {
+    const user = await createTestUser();
+    await db
+      .insert(userPreferences)
+      .values({ userId: user.id, timezone: TOKYO, weekStart })
+      .onConflictDoUpdate({
+        target: userPreferences.userId,
+        set: { timezone: TOKYO, weekStart },
+      });
+    return user;
+  }
+
+  const newHabit = (userId: string, fields: Record<string, unknown> = {}) =>
+    createHabit(
+      userId,
+      createHabitSchema.parse({
+        title: "Stretch",
+        measure: "check",
+        startDate: "2026-09-01",
+        cadenceType: "daily",
+        ...fields,
+      }),
+    );
+
+  const log = (
+    userId: string,
+    habitId: string,
+    localDate: string,
+    status: "completed" | "skipped" = "completed",
+    value?: string,
+  ) =>
+    setHabitLog(
+      userId,
+      setHabitLogSchema.parse({ habitId, localDate, status, value }),
+      NOW,
+    );
+
+  it("has no data with no active habits", async () => {
+    const user = await tokyoUser();
+    expect(await habitsSummary(user.id, clock, TOKYO, 1)).toEqual({
+      value: [],
+      definition: expect.any(String),
+      range: {
+        from: "2026-09-28",
+        to: "2026-10-25",
+        timeZone: TOKYO,
+        asOf: NOW,
+      },
+      hasData: false,
+    });
+
+    // Paused and archived habits are not data for Home.
+    const paused = await newHabit(user.id, { title: "Paused" });
+    await pauseHabit(user.id, { id: paused.id }, NOW);
+    const archived = await newHabit(user.id, { title: "Archived" });
+    await archiveHabit(user.id, { id: archived.id }, NOW);
+    const metric = await habitsSummary(user.id, clock, TOKYO, 1);
+    expect(metric.hasData).toBe(false);
+    expect(metric.value).toEqual([]);
+  });
+
+  it("gives each active habit its last 4 weeks and this week, oldest first", async () => {
+    const user = await tokyoUser();
+    const daily = await newHabit(user.id, { title: "Stretch" });
+    const run = await newHabit(user.id, {
+      title: "Run",
+      cadenceType: "times_per_week",
+      cadenceConfig: { timesPerWeek: 3 },
+    });
+    const water = await newHabit(user.id, {
+      title: "Water",
+      measure: "quantity",
+      unit: "glasses",
+      target: "8",
+    });
+    // Before the range: not counted.
+    await log(user.id, daily.id, "2026-09-27");
+    await log(user.id, daily.id, "2026-09-28");
+    await log(user.id, daily.id, "2026-10-20");
+    await log(user.id, daily.id, "2026-10-21", "skipped");
+    // Today, Saturday 24th in Tokyo (still the 23rd in UTC).
+    await log(user.id, daily.id, "2026-10-24");
+    await log(user.id, run.id, "2026-10-12");
+    await log(user.id, run.id, "2026-10-22");
+    await log(user.id, water.id, "2026-10-22", "completed", "4");
+
+    const metric = await habitsSummary(user.id, clock, TOKYO, 1);
+    expect(metric.hasData).toBe(true);
+    expect(metric.value.map((habit) => habit.title)).toEqual([
+      "Stretch",
+      "Run",
+      "Water",
+    ]);
+    const [stretch, runs, glasses] = metric.value;
+
+    // 28 Sep to 24 Oct is 27 days, one skipped; today counts once logged.
+    expect(stretch).toMatchObject({
+      id: daily.id,
+      cadenceType: "daily",
+      measure: "check",
+      consistency: { completed: 3, expected: 26, skipped: 1 },
+      // Seven days this week, one skipped.
+      thisWeek: { from: "2026-10-19", done: 2, target: 6, skipped: 1 },
+    });
+    // Three past weeks of 3, and this week's 1 done.
+    expect(runs).toMatchObject({
+      cadenceType: "times_per_week",
+      consistency: { completed: 2, expected: 10, skipped: 0 },
+      thisWeek: { done: 1, target: 3 },
+    });
+    // Half the target on one day; today unlogged doesn't count yet.
+    expect(glasses).toMatchObject({
+      cadenceType: "daily",
+      measure: "quantity",
+      consistency: { completed: 0.5, expected: 26, atTarget: 0 },
+      thisWeek: { done: 0.5, target: 7, atTarget: 0 },
+    });
+  });
+
+  it("matches Track's default range for the same habit", async () => {
+    const user = await tokyoUser(0);
+    const habit = await newHabit(user.id, {
+      cadenceType: "weekly_days",
+      cadenceConfig: { days: [1, 3, 5] },
+    });
+    await log(user.id, habit.id, "2026-10-05");
+    await log(user.id, habit.id, "2026-10-07", "skipped");
+    await log(user.id, habit.id, "2026-10-21");
+
+    const metric = await habitsSummary(user.id, clock, TOKYO, 0);
+    // A Sunday week start: 27 Sep to 24 Oct.
+    expect(metric.range).toMatchObject({
+      from: "2026-09-27",
+      to: "2026-10-24",
+    });
+    const track = await getTrackView(user.id, NOW);
+    const [item] = track.habits;
+    expect(item!.history.figure).toBe("2 of 11 days · 1 skipped");
+    expect(metric.value[0]!.consistency).toMatchObject({
+      completed: 2,
+      expected: 11,
+      skipped: 1,
+    });
+    expect(metric.value[0]!.consistency.definition).toBe(
+      item!.history.definition,
+    );
+  });
+
+  it("only looks at the user's own habits", async () => {
+    const user = await tokyoUser();
+    const other = await tokyoUser();
+    const theirs = await newHabit(other.id, { title: "Theirs" });
+    await log(other.id, theirs.id, "2026-10-20");
+
+    const mine = await habitsSummary(user.id, clock, TOKYO, 1);
+    expect(mine.hasData).toBe(false);
+    expect(mine.value).toEqual([]);
+
+    const ours = await newHabit(user.id, { title: "Mine" });
+    const metric = await habitsSummary(user.id, clock, TOKYO, 1);
+    expect(metric.value.map((habit) => habit.id)).toEqual([ours.id]);
+    expect(metric.value[0]!.consistency.completed).toBe(0);
   });
 });

@@ -177,6 +177,8 @@ Chunk 6.4 adds a "Habits" section at the bottom of Today, once the user has an a
 
 Chunk 6.5 replaces Track's fixed two weeks with a range kept in the URL: the last 4 weeks (the default), the last 12, each including the current week, or this week alone, in whole weeks from the user's saved zone and week start. Each habit shows its strip week by week (oldest first, each row labelled with its first day), its figure for the range and, always visible beside it, how it is counted. "This week" shows the week in progress ("1 of 3 times so far this week", "2 of 5 days so far this week · 1 skipped"), never a consistency figure; the longer ranges add that line for N-times-a-week habits. Any active day in the range can be logged or corrected. There are no streak counters, percentages or totals across habits.
 
+Chunk 6.6 adds a "Habits" card at the bottom of Home: each active habit by name, linking to its row on Track, with its own figure for the last 4 weeks (Track's default, so the two always match) and this week's progress ("1 of 3 times so far this week"). Paused and archived habits are left out, there is no number combined across habits, and with no active habit the card says "Nothing yet" with a link to add one.
+
 ## 9. Analytics and insight rules
 
 - Show the time range and definition for every metric.
