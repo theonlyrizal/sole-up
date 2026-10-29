@@ -494,6 +494,7 @@ Rules:
 - Exactly one of `goal_id` and `task_id` (a CHECK). At most 10 per review, each goal or task at most once (unique per review), `sort_order` dense from 0.
 - Composite FKs to `weekly_reviews`, `goals` and `tasks` on `(…, user_id)`, all `ON DELETE CASCADE`: deleting a goal or task removes the priority. A completed, dropped or archived goal stays linked and shows its status.
 - The linked record's title is shown live and never copied.
+- Only active or paused goals and open tasks can be added. Saving the list again may keep one already linked whatever its status now (reordering a list holding a since-completed goal works), but one removed can be added back only while it is addable.
 
 Generated draft text (a later AI-assisted review) must be distinguishable from user-written content if both are retained.
 

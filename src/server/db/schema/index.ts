@@ -14,3 +14,4 @@ export * from "./reminder-sweeps";
 export * from "./reminders";
 export * from "./tasks";
 export * from "./time-blocks";
+export * from "./weekly-reviews";
