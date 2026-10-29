@@ -8,6 +8,9 @@ import {
 
 import {
   EXPECTED_UPDATED_AT_INVALID,
+  findLinkTargetsSchema,
+  findNotesToLinkSchema,
+  LINK_ON_CREATE_ONLY,
   LINK_TARGET_INVALID,
   noteLinkSchema,
   saveNoteSchema,
@@ -170,5 +173,65 @@ describe("noteLinkSchema", () => {
         LINK_TARGET_INVALID,
       ]);
     }
+  });
+});
+
+describe("saveNoteSchema linkTo (chunk 8.3)", () => {
+  const LINK_TO = { targetType: "goal", targetId: ID } as const;
+
+  it("takes a goal or task on a first save", () => {
+    expect(
+      saveNoteSchema.parse({
+        title: "Plan",
+        body: EMPTY_NOTE_DOCUMENT,
+        expectedUpdatedAt: null,
+        linkTo: LINK_TO,
+      }).linkTo,
+    ).toEqual(LINK_TO);
+  });
+
+  it("refuses it on a later save, and refuses a bad target", () => {
+    expect(
+      fieldErrors({
+        id: ID,
+        title: "Plan",
+        body: EMPTY_NOTE_DOCUMENT,
+        expectedUpdatedAt: UPDATED_AT,
+        linkTo: LINK_TO,
+      }),
+    ).toEqual([["linkTo", LINK_ON_CREATE_ONLY]]);
+    expect(
+      fieldErrors({
+        title: "Plan",
+        body: EMPTY_NOTE_DOCUMENT,
+        expectedUpdatedAt: null,
+        linkTo: { targetType: "habit", targetId: ID },
+      }),
+    ).toEqual([["linkTo.targetType", LINK_TARGET_INVALID]]);
+  });
+});
+
+describe("link picker searches", () => {
+  it("trim the query, allow an empty one, and refuse more than 200 characters", () => {
+    expect(findLinkTargetsSchema.parse({ query: "  run  " })).toEqual({
+      query: "run",
+    });
+    expect(findLinkTargetsSchema.parse({ query: "   " })).toEqual({
+      query: "",
+    });
+    expect(
+      findLinkTargetsSchema.safeParse({ query: "x".repeat(201) }).success,
+    ).toBe(false);
+    expect(
+      findNotesToLinkSchema.parse({
+        targetType: "task",
+        targetId: ID,
+        query: "x".repeat(200),
+      }).query,
+    ).toHaveLength(200);
+    expect(
+      findNotesToLinkSchema.safeParse({ targetType: "task", query: "x" })
+        .success,
+    ).toBe(false);
   });
 });

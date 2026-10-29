@@ -444,7 +444,8 @@ Rules:
 - Composite FKs `(note_id, user_id) → notes`, and `(goal_id, user_id) → goals` or `(task_id, user_id) → tasks`, all `ON DELETE CASCADE`.
 - Unique `(note_id, goal_id)` / `(note_id, task_id)`, plus an index on the target column.
 - A note has at most 50 links in all. Any of the user's goals and tasks can be linked, whatever its status. Linking an already linked target, or unlinking one that isn't linked, is a no-op with no event. Links don't move the note's `updated_at`.
-- Deleting a goal or task removes the link and keeps the note. Other targets (habits, life areas, events, reviews) are not linkable in v1. Each would be another join table.
+- A new note can be linked by its first save (`linkTo`, chunk 8.3: "New note" from a goal or task), in the same transaction as the insert, with its own `note.linked` event. A target that is gone or someone else's is skipped and the note is still created.
+- Deleting a goal or task removes the link (no `note.unlinked` event) and keeps the note. Other targets (habits, life areas, events, reviews) are not linkable in v1. Each would be another join table.
 
 ### Tag and NoteTag
 Labels for notes only ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Planned for chunk 8.5 as `tags` and `note_tags`.

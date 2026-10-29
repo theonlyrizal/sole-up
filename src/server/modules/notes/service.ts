@@ -26,7 +26,12 @@ import {
 } from "@/server/db/schema";
 import { ConflictError, NotFoundError } from "@/server/errors";
 
-import type { NoteIdInput, NoteLinkInput, SaveNoteInput } from "./validation";
+import type {
+  LinkTargetInput,
+  NoteIdInput,
+  NoteLinkInput,
+  SaveNoteInput,
+} from "./validation";
 
 // Every function takes the user's ID and scopes each query by it. A note,
 // goal or task that is missing or belongs to someone else is the same
@@ -113,6 +118,9 @@ async function lastUpdatedEventAt(
  *
  * Without an `id`, it creates the note, but only once there is a title or
  * some body text: an empty first save returns null and writes nothing.
+ * With `linkTo`, the new note is linked to that goal or task in the same
+ * transaction, when the user still has it; otherwise it is created without
+ * the link, so the text is never lost to a deleted target.
  *
  * With an `id`, it writes the title and body when either changed. A save
  * that changes nothing returns the note as it is, even from a stale
@@ -123,7 +131,7 @@ async function lastUpdatedEventAt(
  */
 export async function saveNote(
   userId: string,
-  { id, title, body, expectedUpdatedAt }: SaveNoteInput,
+  { id, linkTo, title, body, expectedUpdatedAt }: SaveNoteInput,
   now: Date = new Date(),
 ): Promise<Note | null> {
   const bodyText = toBodyText(body);
@@ -154,6 +162,12 @@ export async function saveNote(
         entityId: created.id,
         changes: { fields },
       });
+      if (
+        linkTo &&
+        (await ownsTarget(tx, userId, linkTo.targetType, linkTo.targetId))
+      ) {
+        await insertLink(tx, userId, created.id, linkTo);
+      }
       return toNote(created);
     });
   }
@@ -350,33 +364,41 @@ export async function linkNote(
     if ((await linkCount(tx, userId, id)) >= NOTE_LINKS_MAX) {
       throw new ConflictError(NOTE_LINKS_FULL);
     }
+    await insertLink(tx, userId, id, { targetType, targetId });
+  });
+}
 
-    try {
-      if (targetType === "goal") {
-        await tx
-          .insert(noteGoals)
-          .values({ userId, noteId: id, goalId: targetId });
-      } else {
-        await tx
-          .insert(noteTasks)
-          .values({ userId, noteId: id, taskId: targetId });
-      }
-    } catch (error: unknown) {
-      // The goal or task was deleted after the ownership check.
-      const constraint =
-        targetType === "goal"
-          ? "note_goals_goal_id_user_id_fk"
-          : "note_tasks_task_id_user_id_fk";
-      if (isForeignKeyViolation(error, constraint)) throw new NotFoundError();
-      throw error;
+/**
+ * Inserts one link and its `note.linked` event. The caller has checked the
+ * target belongs to the user, that it isn't linked yet, and the limit.
+ */
+async function insertLink(
+  tx: DbTransaction,
+  userId: string,
+  noteId: string,
+  { targetType, targetId }: LinkTargetInput,
+): Promise<void> {
+  try {
+    if (targetType === "goal") {
+      await tx.insert(noteGoals).values({ userId, noteId, goalId: targetId });
+    } else {
+      await tx.insert(noteTasks).values({ userId, noteId, taskId: targetId });
     }
+  } catch (error: unknown) {
+    // The goal or task was deleted after the ownership check.
+    const constraint =
+      targetType === "goal"
+        ? "note_goals_goal_id_user_id_fk"
+        : "note_tasks_task_id_user_id_fk";
+    if (isForeignKeyViolation(error, constraint)) throw new NotFoundError();
+    throw error;
+  }
 
-    await recordAudit(tx, {
-      type: "note.linked",
-      userId,
-      entityId: id,
-      changes: { targetType, targetId },
-    });
+  await recordAudit(tx, {
+    type: "note.linked",
+    userId,
+    entityId: noteId,
+    changes: { targetType, targetId },
   });
 }
 

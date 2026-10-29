@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ColorSwatch } from "@/components/life-areas/life-area-colors";
+import { LinkedNotesList } from "@/components/notes/linked-notes";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { toast } from "@/components/ui/toast";
@@ -24,7 +25,10 @@ import { GoalFormDialog } from "./goal-form";
 import { GoalTasks } from "./goal-tasks";
 import { MilestoneList } from "./milestone-list";
 
-/** The goal's own page: header, reason, milestones, tasks and history. */
+/**
+ * The goal's own page: header, reason, milestones, tasks, linked notes and
+ * history.
+ */
 export function GoalDetailView({ detail }: { detail: GoalDetail }) {
   const {
     goal,
@@ -37,6 +41,8 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
     nextAction,
     taskCounts,
     taskParentOptions,
+    notes,
+    noteLinkCount,
     locale,
     timeZone,
   } = detail;
@@ -143,6 +149,7 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
             goal={goal}
             milestoneCount={milestones.length}
             taskCounts={taskCounts}
+            noteLinkCount={noteLinkCount}
             // This page is gone; go where the goal was listed.
             onDeleted={() => router.replace(backHref)}
           />
@@ -180,6 +187,14 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
           parentOptions={taskParentOptions}
           locale={locale}
           timeZone={timeZone}
+        />
+      </Section>
+
+      <Section title="Notes">
+        <LinkedNotesList
+          owner={{ targetType: "goal", targetId: goal.id, title: goal.title }}
+          notes={notes}
+          onChanged={() => router.refresh()}
         />
       </Section>
 
