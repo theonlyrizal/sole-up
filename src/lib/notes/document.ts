@@ -53,6 +53,16 @@ export const NOTE_DOCUMENT_MAX_BYTES = 512 * 1024;
 /** `orderedList.attrs.type`: the list markers HTML's `<ol type>` takes. */
 export const NOTE_ORDERED_LIST_MARKERS = ["1", "a", "A", "i", "I"] as const;
 
+/** `orderedList.attrs.start` is a whole number from 0 up to this. */
+export const NOTE_ORDERED_LIST_START_MAX = 1_000_000;
+
+/** `codeBlock.attrs.language`: a short name such as `ts` or `c++`. */
+const CODE_LANGUAGE_PATTERN = /^[A-Za-z0-9+#._-]{1,32}$/;
+
+export function isAllowedCodeLanguage(language: string): boolean {
+  return CODE_LANGUAGE_PATTERN.test(language);
+}
+
 /** `link.attrs.rel` may only combine these tokens. */
 const LINK_REL_TOKENS = new Set(["noopener", "noreferrer", "nofollow"]);
 
@@ -212,7 +222,7 @@ const blockSchema: z.ZodType<NoteBlockNode> = z.lazy(() =>
         .strictObject({
           language: z
             .string()
-            .regex(/^[A-Za-z0-9+#._-]{1,32}$/)
+            .regex(CODE_LANGUAGE_PATTERN)
             .nullable()
             .optional(),
         })
@@ -234,7 +244,12 @@ const blockSchema: z.ZodType<NoteBlockNode> = z.lazy(() =>
       type: z.literal("orderedList"),
       attrs: z
         .strictObject({
-          start: z.number().int().min(0).max(1_000_000).optional(),
+          start: z
+            .number()
+            .int()
+            .min(0)
+            .max(NOTE_ORDERED_LIST_START_MAX)
+            .optional(),
           type: z.enum(NOTE_ORDERED_LIST_MARKERS).nullable().optional(),
         })
         .optional(),

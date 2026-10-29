@@ -121,3 +121,92 @@ body {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+
+/*
+ * A note body (chunk 8.2), shared by the editor and the read-only view.
+ * The view renders the editor's h1–h3 as h2–h4, under the page's own h1,
+ * so both spellings are styled alike.
+ */
+.note-content {
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.note-content > * + * {
+  margin-top: 0.75em;
+}
+.note-content :is(h1, .note-h1) {
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.note-content :is(h2, .note-h2) {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.note-content :is(h3, .note-h3) {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.note-content :is(ul, ol) {
+  padding-left: 1.5em;
+}
+.note-content ul {
+  list-style: disc;
+}
+.note-content ol {
+  list-style: decimal;
+}
+.note-content ol[type="a"] {
+  list-style: lower-alpha;
+}
+.note-content ol[type="A"] {
+  list-style: upper-alpha;
+}
+.note-content ol[type="i"] {
+  list-style: lower-roman;
+}
+.note-content ol[type="I"] {
+  list-style: upper-roman;
+}
+.note-content li + li,
+.note-content li > * + * {
+  margin-top: 0.25em;
+}
+.note-content blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  color: var(--fg-muted);
+}
+.note-content code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--surface-muted);
+  border-radius: var(--corner-sm);
+  padding: 0.1em 0.3em;
+}
+.note-content pre {
+  font-family: var(--font-mono);
+  background: var(--surface-muted);
+  border-radius: var(--corner-md);
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+.note-content pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.9em;
+}
+.note-content a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.note-content hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+.note-content strong {
+  font-weight: 600;
+}
