@@ -76,7 +76,7 @@ Build a useful personal management product first. Add AI when the product has re
 - Upcoming deadlines.
 - Recent goal activity.
 - Habit summary.
-- Weekly review template.
+- Weekly review: look back, reflect, adjust, choose next week's priorities; editable during its week and the next, then read-only ([ADR 0015](decisions/0015-weekly-review-period-structure-lock.md)).
 - Basic, explainable analytics.
 
 ### Phase 1 acceptance criteria

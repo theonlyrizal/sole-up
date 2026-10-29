@@ -245,10 +245,14 @@ Do not optimize for time spent in the app. A good personal management tool may h
   - Skips and paused days don't count, today counts only once logged, and editing a cadence or target applies from the current week on.
   - Consistency is a count such as "12 of 14 days", never a percentage or a score.
   - See [ADR 0014](decisions/0014-habit-cadence-logs-consistency.md).
+- **Weekly review (Phase 7 gate):**
+  - One review per user week, from the week-start day. It looks back at the week from actual records, then records wins, blockers and lessons, and links next week's priorities to goals and tasks. Every field is optional.
+  - A review can be written and edited during its week and the week after, then it is read-only. Skipped weeks are never flagged.
+  - An optional weekly reminder at a chosen day and time.
+  - See [ADR 0015](decisions/0015-weekly-review-period-structure-lock.md).
 
 ### Still open
 
 Resolve these at the phase decision gates in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), through prototyping or feedback rather than guessing:
 
-- What is the minimum useful weekly review? (Phase 7 gate)
 - Should notes be simple, or should they support backlinks and tags? (Phase 8 gate)

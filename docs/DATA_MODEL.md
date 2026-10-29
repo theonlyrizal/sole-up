@@ -452,21 +452,50 @@ Rules:
 - Account deletion removes all of the user's events.
 
 ### WeeklyReview
-A saved reflection for a period.
+A saved reflection for one user week ([ADR 0015](decisions/0015-weekly-review-period-structure-lock.md)).
 
-Suggested fields:
+Fields:
 - `id`
 - `user_id`
-- `period_start`
-- `period_end`
-- `wins` (structured or text)
-- `blockers` (structured or text)
-- `lessons` (optional)
-- `next_period_priorities` (structured or linked records)
+- `period_start` (local date: a week's first day under the week start in force at creation)
+- `period_end` (local date, exclusive: always `period_start + 7`)
+- `wins` (optional text)
+- `blockers` (optional text)
+- `lessons` (optional text)
+- `priorities_note` (optional text)
+- `completed_at` (optional UTC instant: set once, when the review is first finished)
 - `created_at`
 - `updated_at`
 
-A review should preserve what the user chose to record. Generated draft text should be distinguishable from user-edited final content if both are retained.
+Rules:
+- One review per period: `unique (user_id, period_start)`, and `unique (id, user_id)` for its priorities. A CHECK holds `period_end = period_start + 7`.
+- Every text field is optional, trimmed, null when empty, and up to 5,000 characters. Nothing is required to finish.
+- Saved periods never move: a time-zone or week-start change leaves them as they are, so a newer period may overlap an older one.
+- **Open window:** a review can be started, edited, finished and given priorities only while today (in the user's current zone) is before `period_end + 7`, so only last week and this week are open. After that it is read-only, enforced by the service. A closed week with no review can't be reviewed later, and nothing flags it.
+- An unfinished review whose period closes is kept as saved and shown as "Not finished". It is never counted.
+- The look-back summary is computed from records each time and **never stored**.
+- Delete is a confirmed hard delete, allowed when closed. It removes the priorities (cascade) and the review's audit events.
+- **Audit events** `weekly_review.started|updated|priorities_changed|finished`: period dates, changed field names, ordered priority IDs and `completed_at` only. Review text is never put in an event or a log.
+
+### WeeklyReviewPriority
+One of a review's priorities for the following period: a link to a goal or a task.
+
+Fields:
+- `id`
+- `user_id`
+- `review_id`
+- `goal_id` (optional)
+- `task_id` (optional)
+- `sort_order`
+- `created_at`
+- `updated_at`
+
+Rules:
+- Exactly one of `goal_id` and `task_id` (a CHECK). At most 10 per review, each goal or task at most once (unique per review), `sort_order` dense from 0.
+- Composite FKs to `weekly_reviews`, `goals` and `tasks` on `(…, user_id)`, all `ON DELETE CASCADE`: deleting a goal or task removes the priority. A completed, dropped or archived goal stays linked and shows its status.
+- The linked record's title is shown live and never copied.
+
+Generated draft text (a later AI-assisted review) must be distinguishable from user-written content if both are retained.
 
 ## 3. Later intelligence and memory entities
 
@@ -535,7 +564,7 @@ User
  ├── CalendarEvents ── CalendarEventExceptions
  ├── Notes ── NoteLinks
  ├── AuditEvents
- ├── WeeklyReviews
+ ├── WeeklyReviews ── WeeklyReviewPriorities (→ a Goal or a Task)
  └── PersonalMemories (later)
 ```
 
@@ -565,6 +594,7 @@ Exact indexes should follow real query patterns and query plans, not be added in
 - **Deleting a goal** deletes its milestones and takes all its tasks (direct and via milestones) off it, recording a `task.moved` event for each (chunk 2.7). Open tasks with no planned date land in the inbox; planned ones keep their date and closed ones their status, all without a parent. The confirmation states each count. Tasks are never deleted implicitly.
 - **Deleting a milestone** takes its tasks off it the same way, with a `task.moved` event each (to no parent, not to the goal).
 - **Deleting a task** deletes its time blocks and their exceptions ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)). Deleting a goal or life area clears the link on calendar events and keeps the events.
+- **Deleting a goal or task** also removes any weekly review priority that links to it. **Deleting a weekly review** (allowed even when closed) removes its priorities ([ADR 0015](decisions/0015-weekly-review-period-structure-lock.md)).
 - **Deleting the account** cascades every user-owned row from `users` in one transaction, and revokes sessions and push subscriptions.
 - Every hard delete also removes the entity's audit events in the same transaction.
 
@@ -592,6 +622,7 @@ Settled:
 8. Task statuses, derived inbox, overdue planned tasks, priority and estimates ([ADR 0011](decisions/0011-task-status-planning-priority-estimates.md)).
 9. Calendar event shapes, recurrence with exceptions, and time blocks ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)).
 10. Habit cadences, check and quantity measures, logs, versioned schedules, pauses and consistency denominators ([ADR 0014](decisions/0014-habit-cadence-logs-consistency.md)).
+11. Weekly reviews: user-week periods, optional text, linked priorities, the open window and the review reminder ([ADR 0015](decisions/0015-weekly-review-period-structure-lock.md)).
 
 Still open (decided at phase gates in the implementation plan):
 1. Supported note links (Phase 8).
