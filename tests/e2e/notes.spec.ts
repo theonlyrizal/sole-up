@@ -21,7 +21,7 @@ function noteTitle(page: Page) {
 function saveStatus(page: Page) {
   return page
     .getByRole("status")
-    .filter({ hasText: /^(Saving…|Saved|Not saved)?$/ });
+    .filter({ hasText: /^(Saving…|Saved|Not saved)$/ });
 }
 
 async function expectSaved(page: Page) {
@@ -74,7 +74,7 @@ test("a note is written with every kind of formatting, saved and listed", async 
   await expect(page).toHaveURL(/\/notes\/new$/);
   await expect(noteBody(page)).toBeVisible();
   // Nothing is stored for an empty note.
-  await expect(saveStatus(page)).toHaveText("");
+  await expect(saveStatus(page)).toHaveCount(0);
 
   await noteTitle(page).fill("Reading list");
   await noteBody(page).click();
