@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { addDays, todayFor, type LocalDate, type WeekStart } from "@/lib/dates";
 import type { GoalStatus } from "@/lib/goals";
@@ -32,8 +32,8 @@ import {
 
 import { toWeeklyReview } from "./service";
 
-// Read models for the review flow (chunk 7.3). Every query is scoped to the
-// user. Priorities are read with their goal's or task's current title and
+// Read models for the review flow (chunk 7.3) and its history (7.4). Every
+// query is scoped to the user. Priorities are read with their goal's or task's current title and
 // status, so a renamed or completed one shows as it is now.
 
 /** One priority as the flow shows it. */
@@ -221,6 +221,100 @@ export async function getReviewPage(
         : periodStart === lastWeek
           ? thisWeek
           : null,
+  };
+}
+
+/** One review in the history list (chunk 7.4). */
+export type ReviewHistoryItem = {
+  id: string;
+  periodStart: LocalDate;
+  periodEnd: LocalDate;
+  completedAt: Date | null;
+  /** The first day the review is read-only. */
+  closesOn: LocalDate;
+  open: boolean;
+};
+
+export type ReviewHistory = {
+  today: LocalDate;
+  timeZone: string;
+  locale: string;
+  thisWeek: LocalDate;
+  lastWeek: LocalDate;
+  /** Every review the user has, newest period first. */
+  reviews: ReviewHistoryItem[];
+};
+
+/**
+ * The user's reviews, newest first. Weeks with no review are simply not
+ * there: nothing counts or flags them (ADR 0015).
+ */
+export async function getReviewHistory(
+  userId: string,
+  now: Date = new Date(),
+): Promise<ReviewHistory> {
+  const preferences = await getUserPreferences(userId);
+  const timeZone = preferences.timezone ?? "UTC";
+  const today = todayFor(timeZone, now);
+  const rows = await db
+    .select({
+      id: weeklyReviews.id,
+      periodStart: weeklyReviews.periodStart,
+      periodEnd: weeklyReviews.periodEnd,
+      completedAt: weeklyReviews.completedAt,
+    })
+    .from(weeklyReviews)
+    .where(eq(weeklyReviews.userId, userId))
+    .orderBy(desc(weeklyReviews.periodStart), desc(weeklyReviews.id));
+
+  return {
+    today,
+    timeZone,
+    locale: preferences.locale,
+    ...openPeriodStarts(today, preferences.weekStart),
+    reviews: rows.map((row) => ({
+      ...row,
+      closesOn: reviewClosesOn(row.periodEnd),
+      open: isReviewOpen(row.periodEnd, today),
+    })),
+  };
+}
+
+/**
+ * One review by ID for its read-only view (chunk 7.4), shaped like the
+ * flow's page so the same header can name it. Null when the user has no
+ * review with that ID.
+ */
+export async function getReviewView(
+  userId: string,
+  reviewId: string,
+  now: Date = new Date(),
+): Promise<(ReviewPage & { review: ReviewDetail }) | null> {
+  const [row] = await db
+    .select({ periodStart: weeklyReviews.periodStart })
+    .from(weeklyReviews)
+    .where(
+      and(eq(weeklyReviews.userId, userId), eq(weeklyReviews.id, reviewId)),
+    );
+  if (!row) return null;
+  const [preferences, review] = await Promise.all([
+    getUserPreferences(userId),
+    getReviewForWeek(userId, row.periodStart),
+  ]);
+  if (!review) return null;
+  const timeZone = preferences.timezone ?? "UTC";
+  const today = todayFor(timeZone, now);
+  return {
+    today,
+    timeZone,
+    weekStart: preferences.weekStart,
+    locale: preferences.locale,
+    ...openPeriodStarts(today, preferences.weekStart),
+    periodStart: review.periodStart,
+    periodEnd: review.periodEnd,
+    review,
+    open: isReviewOpen(review.periodEnd, today),
+    otherWeek: null,
   };
 }
 

@@ -207,7 +207,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 7.1 | Weekly summary queries | done | chunk/7.1-weekly-summary | 2026-10-29 | `src/server/modules/metrics/review.ts`: `weeklySummary` with six `Metric`s (tasks completed, planned vs completed, rescheduled, goals without activity, habits, deadlines next period), each with definition, range, `hasData`; computed live; no UI |
 | 7.2 | Reviews: schema and service | done | chunk/7.2-review-schema-service | 2026-10-29 | `weekly_reviews` + `weekly_review_priorities` (migration 0016: period/length/exactly-one CHECKs, composite cascading FKs, unique period and targets), service (start, save text, set priorities, finish, delete) refusing writes once closed, `weekly_review.*` events with no text; no UI |
 | 7.3 | Review flow UI | done | chunk/7.3-review-flow-ui | 2026-10-29 | Review in the nav (`/review?week=&step=`), opens last week unless finished, started client-side on opening; Look back / Reflect / Adjust (pause/resume/drop goals, reschedule/cancel stalled tasks, plan next week) / Choose priorities, each saved on leaving; Finish with nothing filled; closed review read-only |
-| 7.4 | Review history | todo | | | |
+| 7.4 | Review history | done | chunk/7.4-review-history | 2026-10-29 | Past reviews at `/review/history` (newest first, Finished on / Not finished, open until / closed on, no skipped-week counts), read-only `/review/history/[id]` (text, current priorities, summary as of now), Edit only while open, confirmed delete action |
 | 7.5 | Review reminder | todo | | | |
 | 7.✓ | Phase 7 checkpoint (user) | todo | | | |
 | 8.0 | Decision gate: notes | todo | | | |
@@ -3029,3 +3029,27 @@ Template:
   - Leaving a step through the main navigation (or closing the tab) loses that step's unsaved text; consider saving on blur or warning before leaving.
   - The goal and task delete confirmations still don't mention that review priorities linking to them go (from 7.0).
   - Earlier follow-ups still open: Phase 10 export must include reviews; the unused `_omitted` in `habits/validation.test.ts`; primary button hover contrast.
+
+### 7.4: Review history (2026-10-29)
+- **Built:**
+  - Routes `/review/history` (list) and `/review/history/[reviewId]` (read-only view, with `not-found.tsx`); a "Past reviews" link under the review page's intro. Both sit under the existing `/review/error.tsx` and the Review nav item (prefix match).
+  - `queries.ts`: `getReviewHistory` (every review newest first, with `closesOn` and `open`, plus this/last week for naming) and `getReviewView` (a `ReviewPage`-shaped read of one review by ID, `otherWeek` null, so `ReviewHeader` names it). `actions.ts`: `deleteWeeklyReview` (no `refresh()`; the dialog leaves the page).
+  - `src/components/reviews/`: `review-history.tsx` (`ReviewHistoryList`, empty state "No reviews yet" → Review a week) and `delete-review-dialog.tsx` (`ConfirmDialog`, toast "Review deleted", replaces to `/review/history`). The view reuses `ReviewHeader`, `ReadOnlyReview` and `LookBack`.
+  - Tests: integration `review-history.integration.test.ts` (9: empty, newest first with open/closed/finished, closing on the user's day in Tokyo, cross-user list and view, unknown ID, the action signed out / refusing a closed write with the conflict message / deleting a closed review and its events / NotFound for another user's / a non-UUID). e2e `review-history.spec.ts` (empty list, edit an open review through Edit, a stale Reflect tab refused by the server once the week closes, the closed view with no Edit and the text as saved, Cancel then confirmed delete, axe on list, view and dialog; unknown and non-UUID IDs not found).
+  - `tests/e2e/helpers.ts`: `signInAndConfirm` now returns the user ID. `tests/e2e/test-database.ts`: `moveReviewsTwoWeeksBack(userId)` on the e2e test database (same `_test` URL guard as global setup).
+  - Docs: PRODUCT_SPEC Journey D.
+- **Deviations:**
+  1. **Closing a review in e2e goes through the test database**, moving the user's review periods back 14 days, because the app server's clock can't be moved from a test. It is the first e2e that writes to the database directly.
+  2. **Delete and Edit are on the review's view only**, not on each list row.
+- **Decisions:**
+  - The list shows every review, this week's included, under the title "Past reviews"; "This week:"/"Last week:" prefix the open ones. Each row reads "Finished on … · Closed on …" or "Not finished · Open until …" (the last open day). Nothing counts reviews or gaps.
+  - The view's page title is fixed ("Weekly review · SoleUp"), as the goal page's is, so no review text reaches tab titles or history.
+  - The delete confirmation names the week and says the goals and tasks stay.
+- **Next chunk should know:**
+  - Locators: list "Past reviews" (a link per review named by its week), link "Edit review", button "Delete review" → alertdialog "Delete the review of <week>?".
+  - Opening `/review` starts a review of the default week. An e2e that wants an empty history or a closed last week must go to `/review/history` directly.
+  - Next.js keeps the previous page's tree hidden after client navigation, so a page-wide `getByText` can match twice; scope to a region.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint (the 6.1 warning, below), typecheck, 997 unit and 694 integration tests. `pnpm build` passes. `pnpm test:e2e`: 82 passed. No schema change, so no migration. No manual screenshot, screen-reader or dark-mode pass of the new pages.
+- **Follow-ups:**
+  - The goal and task delete confirmations still don't mention that review priorities linking to them go (from 7.0).
+  - Earlier follow-ups still open: saving a step left through the main navigation (7.3); Phase 10 export must include reviews; the unused `_omitted` in `habits/validation.test.ts`; primary button hover contrast.

@@ -45,6 +45,17 @@ export const setWeeklyReviewPriorities = authedAction(
   },
 );
 
+/**
+ * A confirmed hard delete, open or closed (ADR 0015). The caller leaves
+ * the review's page, so nothing is refreshed here.
+ */
+export const deleteWeeklyReview = authedAction(
+  weeklyReviewIdSchema,
+  async (input, { userId }) => {
+    await service.deleteWeeklyReview(userId, input);
+  },
+);
+
 /** "Finish review". Nothing has to be filled first. */
 export const finishWeeklyReview = authedAction(
   weeklyReviewIdSchema,

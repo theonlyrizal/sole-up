@@ -2,9 +2,10 @@ import { GOAL_STATUS_LABELS } from "@/lib/goals";
 import { TASK_STATUS_LABELS } from "@/lib/task-list";
 import type { ReviewDetail } from "@/server/modules/weekly-reviews/queries";
 
-// A closed review (ADR 0015): its text and priorities as written, and the
-// look-back summary as computed now. No adjust actions and no editing.
-// Chunk 7.4's history view builds on this.
+// A review read-only (ADR 0015): its text and priorities as written, and
+// the look-back summary as computed now. No adjust actions and no editing.
+// Shown for a closed week in the flow, and for any review in its history
+// view (chunk 7.4).
 
 const TEXT_SECTIONS = [
   { field: "wins", label: "Wins" },

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { AdjustStepView } from "@/components/reviews/adjust-step";
@@ -9,6 +10,7 @@ import { ReflectStep } from "@/components/reviews/reflect-step";
 import { ReviewFlow } from "@/components/reviews/review-flow";
 import { ReviewHeader } from "@/components/reviews/review-header";
 import { StartReview } from "@/components/reviews/start-review";
+import { cx, focusRing } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
 import { addDays, formatLocalDate } from "@/lib/dates";
 import { formatDateSpan } from "@/lib/habits/track-range";
@@ -39,6 +41,15 @@ export default function ReviewPage({ searchParams }: PageProps<"/review">) {
           Look back on a week, note what you learned, make a few changes, and
           choose what matters next week. Every step is optional.
         </p>
+        <Link
+          href="/review/history"
+          className={cx(
+            "self-start rounded-sm text-sm font-medium underline underline-offset-2",
+            focusRing,
+          )}
+        >
+          Past reviews
+        </Link>
       </div>
       <Suspense fallback={<LoadingState label="Loading your review" />}>
         <Review searchParams={searchParams} />
