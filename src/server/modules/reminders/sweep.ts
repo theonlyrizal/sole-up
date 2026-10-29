@@ -6,6 +6,7 @@ import { addDays, localDateOf, startOfLocalDay } from "@/lib/dates";
 import type { PushPayload } from "@/lib/push";
 import { quietHoursEndAt, quietHoursOf } from "@/lib/quiet-hours";
 import {
+  isUserReminderKind,
   REMINDER_MAX_ATTEMPTS,
   REMINDER_SKIP_REASONS,
   type ReminderSkipReason,
@@ -59,6 +60,8 @@ type DeliveryPreferences = Pick<
   | "timezone"
   | "locale"
   | "dailyNudgeTime"
+  | "weeklyReviewDay"
+  | "weeklyReviewTime"
   | "remindersEnabled"
   | "remindersPrivate"
   | "quietHoursStart"
@@ -69,6 +72,8 @@ const DEFAULT_PREFERENCES: DeliveryPreferences = {
   timezone: null,
   locale: "en-US",
   dailyNudgeTime: null,
+  weeklyReviewDay: null,
+  weeklyReviewTime: null,
   remindersEnabled: true,
   remindersPrivate: false,
   quietHoursStart: null,
@@ -86,9 +91,9 @@ const DEFAULT_PREFERENCES: DeliveryPreferences = {
  * log lines hold counts, durations and error names, never a reminder, a
  * payload or a subscription.
  *
- * After missed sweeps, rolling a series or the nudge past a stale row can
- * schedule a row that is already due (the next occurrence starts within
- * the interval). A second claim picks those up, so they aren't left for a
+ * After missed sweeps, rolling a series, the nudge or the weekly review
+ * past a stale row can schedule a row that is already due (the next
+ * occurrence starts within the interval). A second claim picks those up, so they aren't left for a
  * sweep that comes too late. It skips the rows the first pass handled, so a
  * failed send still waits for the next sweep, and it doesn't run when the
  * first pass filled its batch (the rest waits, as ever). One more pass is
@@ -180,6 +185,8 @@ async function preferencesOf(userId: string): Promise<DeliveryPreferences> {
       timezone: userPreferences.timezone,
       locale: userPreferences.locale,
       dailyNudgeTime: userPreferences.dailyNudgeTime,
+      weeklyReviewDay: userPreferences.weeklyReviewDay,
+      weeklyReviewTime: userPreferences.weeklyReviewTime,
       remindersEnabled: userPreferences.remindersEnabled,
       remindersPrivate: userPreferences.remindersPrivate,
       quietHoursStart: userPreferences.quietHoursStart,
@@ -230,10 +237,11 @@ async function itemsOf(userId: string, rows: ClaimedReminder[]) {
 
 /**
  * When a reminder stops being useful: its target (the deadline, the
- * occurrence's start), or for the nudge the end of its local day.
+ * occurrence's start), or for the nudge and the weekly review the end of
+ * its local day.
  */
 function staleAt(row: ClaimedReminder, timeZone: string): Date {
-  if (row.kind !== "daily_nudge") return row.targetAt;
+  if (!isUserReminderKind(row.kind)) return row.targetAt;
   const day = localDateOf(row.targetAt, timeZone);
   return startOfLocalDay(addDays(day, 1), timeZone);
 }
@@ -256,6 +264,7 @@ function isStale(
     case "event":
       return !items.events.has(row.eventId!) || now >= row.targetAt;
     case "daily_nudge":
+    case "weekly_review":
       return timeZone === null || now >= staleAt(row, timeZone);
   }
 }
@@ -286,6 +295,8 @@ function subjectOf(
       };
     case "daily_nudge":
       return { kind: "daily_nudge", reminderId: row.id };
+    case "weekly_review":
+      return { kind: "weekly_review", reminderId: row.id };
   }
 }
 

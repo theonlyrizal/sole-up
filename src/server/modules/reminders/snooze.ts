@@ -16,6 +16,8 @@ import type { SnoozeReminderInput } from "./validation";
 // reminders are off.
 
 export const SNOOZE_NUDGE = "The daily nudge can't be snoozed.";
+export const SNOOZE_WEEKLY_REVIEW =
+  "The weekly review reminder can't be snoozed.";
 export const SNOOZE_NOT_SENT = "This reminder hasn't gone out yet.";
 export const SNOOZE_TOO_LATE =
   "It's already time, so there's nothing to snooze.";
@@ -39,6 +41,9 @@ export async function snoozeReminder(
       .for("update");
     if (!row) throw new NotFoundError();
     if (row.kind === "daily_nudge") throw new ConflictError(SNOOZE_NUDGE);
+    if (row.kind === "weekly_review") {
+      throw new ConflictError(SNOOZE_WEEKLY_REVIEW);
+    }
     if (row.status !== "sent" && row.status !== "sending") {
       throw new ConflictError(SNOOZE_NOT_SENT);
     }

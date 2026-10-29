@@ -226,6 +226,8 @@ export const AUDIT_EVENTS = defineAuditEvents({
       remindersPrivate: auditChange(z.boolean()).optional(),
       quietHoursStart: auditChange(nudgeTime).optional(),
       quietHoursEnd: auditChange(nudgeTime).optional(),
+      weeklyReviewDay: auditChange(z.number().int().min(0).max(6)).optional(),
+      weeklyReviewTime: auditChange(nudgeTime).optional(),
     }),
   },
 

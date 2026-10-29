@@ -7,7 +7,11 @@ import { type QuietHours, quietHoursOf } from "@/lib/quiet-hours";
 import { recordAudit } from "@/server/audit/record";
 import { db, type Db, type DbTransaction } from "@/server/db/client";
 import { reminders, userPreferences } from "@/server/db/schema";
-import { syncNudgeReminderInTx } from "@/server/modules/reminders/schedule";
+import {
+  syncNudgeReminderInTx,
+  syncUserRemindersInTx,
+  syncWeeklyReviewReminderInTx,
+} from "@/server/modules/reminders/schedule";
 
 import type {
   SavePreferencesInput,
@@ -86,10 +90,11 @@ async function releaseHeldRemindersInTx(
 /**
  * Saves the user's preferences and records which fields changed. Changing
  * the time zone never rewrites stored local dates (ADR 0004), and of the
- * reminders it moves only the daily nudge, which follows the user's zone;
- * task and event reminders follow their instants (ADR 0013). Reminders held
- * for quiet hours in the old zone are released, so the next sweep sends
- * them or holds them again by the new zone's clock.
+ * reminders it moves only the daily nudge and the weekly review reminder,
+ * which follow the user's zone; task and event reminders follow their
+ * instants (ADR 0013, ADR 0015). Reminders held for quiet hours in the old
+ * zone are released, so the next sweep sends them or holds them again by
+ * the new zone's clock.
  */
 export async function savePreferences(
   userId: string,
@@ -138,7 +143,7 @@ export async function savePreferences(
       changes,
     });
     if (changes.timezone) {
-      await syncNudgeReminderInTx(tx, userId, updated);
+      await syncUserRemindersInTx(tx, userId, updated);
       await releaseHeldRemindersInTx(tx, userId);
     }
     return toPreferences(updated);
@@ -192,6 +197,8 @@ export type ReminderSettings = {
   quietHours: QuietHours | null;
   /** The daily nudge's local "HH:MM", or null while it is off. */
   dailyNudgeTime: string | null;
+  /** The weekly review reminder's local weekday and "HH:MM", or null while off. */
+  weeklyReview: { day: WeekStart; time: string } | null;
 };
 
 function toReminderSettings(
@@ -202,6 +209,10 @@ function toReminderSettings(
     remindersPrivate: row.remindersPrivate,
     quietHours: quietHoursOf(row.quietHoursStart, row.quietHoursEnd),
     dailyNudgeTime: row.dailyNudgeTime,
+    weeklyReview:
+      row.weeklyReviewDay !== null && row.weeklyReviewTime !== null
+        ? { day: row.weeklyReviewDay as WeekStart, time: row.weeklyReviewTime }
+        : null,
   };
 }
 
@@ -224,13 +235,16 @@ const REMINDER_SETTING_FIELDS = [
   "quietHoursStart",
   "quietHoursEnd",
   "dailyNudgeTime",
+  "weeklyReviewDay",
+  "weeklyReviewTime",
 ] as const;
 
 /**
  * Saves Settings' Reminders form and records which settings changed in one
  * `user_preferences.updated` event; saving it unchanged is a no-op.
  *
- * - The nudge time reschedules or removes the nudge's reminder.
+ * - The nudge time reschedules or removes the nudge's reminder, and the
+ *   weekly review day or time the weekly review's (ADR 0015).
  * - Changing quiet hours releases reminders held for the old ones (5.5's
  *   `held_until`): the next sweep sends them, or holds them again for the
  *   new hours.
@@ -275,6 +289,12 @@ export async function saveReminderSettings(
     });
     if (changed.includes("dailyNudgeTime")) {
       await syncNudgeReminderInTx(tx, userId, updated);
+    }
+    if (
+      changed.includes("weeklyReviewDay") ||
+      changed.includes("weeklyReviewTime")
+    ) {
+      await syncWeeklyReviewReminderInTx(tx, userId, updated);
     }
     if (
       changed.includes("quietHoursStart") ||

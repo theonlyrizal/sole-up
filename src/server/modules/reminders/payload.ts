@@ -5,9 +5,11 @@
 // - A task: "Due 17:00 · Submit visa form"; an event: "Dentist · 14:00 (in
 //   10 min)". Never a description, location, reason or note.
 // - Private mode: "You have a reminder · 14:00".
-// - The nudge and a quiet-hours bundle never carry titles in either mode.
+// - The nudge, the weekly review reminder (ADR 0015) and a quiet-hours
+//   bundle never carry titles in either mode.
 // - The link holds IDs and instants only: the item's dialog on the Day view
-//   (4.9's `?item=`), or Today for the nudge and a bundle.
+//   (4.9's `?item=`), Today for the nudge and a bundle, or the review flow
+//   for the weekly review.
 
 import { calendarItemHref } from "@/lib/calendar-views";
 import {
@@ -19,8 +21,10 @@ import {
 import type { PushPayload } from "@/lib/push";
 
 const TODAY_PATH = "/plan/today";
+const REVIEW_PATH = "/review";
 
 export const NUDGE_TEXT = "Time to plan your day";
+export const WEEKLY_REVIEW_TEXT = "Time for your weekly review";
 
 /** One reminder's subject, as the sweep loaded it. */
 export type ReminderSubject =
@@ -42,7 +46,8 @@ export type ReminderSubject =
       /** Null in private mode. */
       title: string | null;
     }
-  | { kind: "daily_nudge"; reminderId: string };
+  | { kind: "daily_nudge"; reminderId: string }
+  | { kind: "weekly_review"; reminderId: string };
 
 /** The user's clock and formatting at the sweep. */
 export type MessageContext = {
@@ -98,6 +103,8 @@ function linkFor(subject: ReminderSubject, context: MessageContext): string {
     }
     case "daily_nudge":
       return TODAY_PATH;
+    case "weekly_review":
+      return REVIEW_PATH;
   }
 }
 
@@ -109,7 +116,11 @@ export function reminderPayload(
   const url = linkFor(subject, context);
   // A resend of the same reminder replaces it rather than stacking.
   const tag = `reminder-${subject.reminderId}`;
+  // Fixed text, never snoozed.
   if (subject.kind === "daily_nudge") return { title: NUDGE_TEXT, url, tag };
+  if (subject.kind === "weekly_review") {
+    return { title: WEEKLY_REVIEW_TEXT, url, tag };
+  }
 
   // The worker offers snooze on task and event reminders.
   const { reminderId } = subject;

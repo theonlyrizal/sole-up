@@ -38,14 +38,17 @@ const inList = (values: readonly string[]) =>
 //   composite foreign keys that cascade, so a reminder never points at
 //   another user's item and goes with it, record included.
 // - Each kind has exactly its own link: a task for `task_deadline`, an event
-//   for `event`, neither for the user's `daily_nudge`. Only an event row has
+//   for `event`, neither for the user's `daily_nudge` and `weekly_review`
+//   (ADR 0015). Only an event row has
 //   `occurrence_start`, and only for a repeating event (ADR 0012's key).
 // - `target_at` is what the reminder is about (the deadline, the
-//   occurrence's actual start, the nudge's local time as an instant);
+//   occurrence's actual start, the nudge's or weekly review's local time
+//   as an instant);
 //   `fire_at` is when it is due, an offset before.
-// - At most one `scheduled`, non-snoozed row per task, per event and per
-//   user's nudge (the partial unique index; IDs are UUIDs, so one key
-//   covers all three). A snoozed row (5.6) sits outside it.
+// - At most one `scheduled`, non-snoozed row per task, per event, and per
+//   user for each of the nudge and the weekly review (the partial unique
+//   index; IDs are UUIDs, so the coalesced ID with the kind covers all
+//   four). A snoozed row (5.6) sits outside it.
 export const reminders = pgTable(
   "reminders",
   {
@@ -92,7 +95,10 @@ export const reminders = pgTable(
       foreignColumns: [calendarEvents.id, calendarEvents.userId],
     }).onDelete("cascade"),
     uniqueIndex("reminders_one_scheduled_key")
-      .on(sql`coalesce(${table.taskId}, ${table.eventId}, ${table.userId})`)
+      .on(
+        sql`coalesce(${table.taskId}, ${table.eventId}, ${table.userId})`,
+        table.kind,
+      )
       .where(sql`${table.status} = 'scheduled' and not ${table.snoozed}`),
     // The sweep's claim: scheduled rows by fire time.
     index("reminders_status_fire_at_idx").on(table.status, table.fireAt),

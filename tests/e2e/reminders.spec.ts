@@ -94,6 +94,8 @@ test("turning reminders off in Settings stops their delivery", async ({
   await expect(dialog).toHaveCount(0);
   await expect(toast(page, "Task saved")).toBeVisible();
 
+  // Reloaded, so the dialog opens on what was saved (as below for events).
+  await page.reload();
   dialog = await openTask(page, "Call the bank");
   await expect(reminderField(dialog)).toHaveValue("0");
   await expect(dialog.getByRole("region", { name: "Reminder" })).toContainText(
@@ -191,6 +193,9 @@ test("new events remind 10 minutes before; a series' reminder applies to every e
   await expect(edit).toHaveCount(0);
   await expect(toast(page, "Event saved")).toBeVisible();
 
+  // Reloaded, so the dialog opens on what was saved rather than on the
+  // list as it was before the save's refresh landed (flaky under load).
+  await page.reload();
   await openWith(standup, edit);
   await expect(reminderField(edit)).toHaveValue("60");
   await expect(edit.getByRole("region", { name: "Reminder" })).toContainText(
@@ -254,4 +259,56 @@ test("quiet hours and the daily nudge, with field errors and a warning", async (
   await expect(reloaded.getByLabel("Daily planning nudge")).toHaveValue("");
   await reloaded.getByRole("button", { name: "Save reminders" }).click();
   await expect(reloaded.getByRole("status")).toHaveText("Saved.");
+});
+
+test("the weekly review reminder: set with a day and time, warned in quiet hours, then cleared", async ({
+  page,
+}) => {
+  await signInAndConfirm(page);
+  const form = await openSettings(page);
+
+  // Off by default, with no time until a day is chosen.
+  const day = form.getByLabel("Weekly review reminder");
+  await expect(day).toHaveValue("");
+  await expect(form.getByLabel("Weekly review time")).toHaveCount(0);
+  await day.selectOption("Sunday");
+
+  // A day needs a time, refused next to the field, which gets focus.
+  const time = form.getByLabel("Weekly review time");
+  await expect(time).toHaveValue("");
+  await form.getByRole("button", { name: "Save reminders" }).click();
+  await expect(time).toHaveAttribute("aria-invalid", "true");
+  await expect(time).toHaveAccessibleDescription(
+    "Enter a time for the weekly review reminder.",
+  );
+  await expect(time).toBeFocused();
+
+  // Inside quiet hours it waits for their end, and says so.
+  await form.getByLabel("Quiet hours").check();
+  await time.fill("06:30");
+  await expect(
+    form.getByText(
+      "This time is inside your quiet hours, so the weekly review reminder will wait until they end at 07:00.",
+    ),
+  ).toBeVisible();
+  await time.fill("18:00");
+  await expect(form.getByText(/inside your quiet hours/)).toHaveCount(0);
+
+  await expectNoSeriousViolations(page);
+  await form.getByRole("button", { name: "Save reminders" }).click();
+  await expect(form.getByRole("status")).toHaveText("Saved.");
+
+  const reloaded = await openSettings(page);
+  await expect(reloaded.getByLabel("Weekly review reminder")).toHaveValue("0");
+  await expect(reloaded.getByLabel("Weekly review time")).toHaveValue("18:00");
+
+  // Off again: the time goes, and stays gone after saving.
+  await reloaded.getByLabel("Weekly review reminder").selectOption("Off");
+  await expect(reloaded.getByLabel("Weekly review time")).toHaveCount(0);
+  await reloaded.getByRole("button", { name: "Save reminders" }).click();
+  await expect(reloaded.getByRole("status")).toHaveText("Saved.");
+
+  const cleared = await openSettings(page);
+  await expect(cleared.getByLabel("Weekly review reminder")).toHaveValue("");
+  await expect(cleared.getByLabel("Weekly review time")).toHaveCount(0);
 });

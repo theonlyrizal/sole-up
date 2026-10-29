@@ -51,8 +51,8 @@ export type PushPayload = {
   tag?: string;
   /**
    * A task or event reminder's row ID: the notification then offers
-   * "Snooze 15 min" and "Snooze 1 hour" (5.6). Never on the nudge or a
-   * bundle.
+   * "Snooze 15 min" and "Snooze 1 hour" (5.6). Never on the nudge, the
+   * weekly review reminder or a bundle.
    */
   reminderId?: string;
 };

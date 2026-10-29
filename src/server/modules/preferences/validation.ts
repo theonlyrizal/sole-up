@@ -74,10 +74,23 @@ const quietTimeSchema = z
     QUIET_TIME_MESSAGE,
   );
 
+const WEEKLY_REVIEW_DAY_MESSAGE = "Choose a day from the list.";
+
+/** The weekly review reminder's weekday, 0 = Sunday … 6; null while off. */
+const weeklyReviewDaySchema = z
+  .number({ error: WEEKLY_REVIEW_DAY_MESSAGE })
+  .int(WEEKLY_REVIEW_DAY_MESSAGE)
+  .min(0, WEEKLY_REVIEW_DAY_MESSAGE)
+  .max(6, WEEKLY_REVIEW_DAY_MESSAGE)
+  .transform((value) => value as WeekStart)
+  .nullable();
+
 /**
  * Settings' Reminders form (ADR 0013), saved together: the global switch,
  * private mode, quiet hours (off unless `quietHours` is true, with a start
- * and an end that differ) and the daily nudge time (blank turns it off).
+ * and an end that differ), the daily nudge time (blank turns it off) and
+ * the weekly review reminder (ADR 0015: off while no day is chosen, and a
+ * chosen day needs a time).
  */
 export const saveReminderSettingsSchema = z
   .strictObject({
@@ -87,8 +100,17 @@ export const saveReminderSettingsSchema = z
     quietHoursStart: quietTimeSchema,
     quietHoursEnd: quietTimeSchema,
     dailyNudgeTime: nudgeTimeSchema,
+    weeklyReviewDay: weeklyReviewDaySchema,
+    weeklyReviewTime: quietTimeSchema,
   })
   .superRefine((input, context) => {
+    if (input.weeklyReviewDay !== null && input.weeklyReviewTime === "") {
+      context.addIssue({
+        code: "custom",
+        path: ["weeklyReviewTime"],
+        message: "Enter a time for the weekly review reminder.",
+      });
+    }
     if (!input.quietHours) return;
     if (input.quietHoursStart === "") {
       context.addIssue({
@@ -115,11 +137,22 @@ export const saveReminderSettingsSchema = z
       });
     }
   })
-  .transform(({ quietHours, quietHoursStart, quietHoursEnd, ...input }) => ({
-    ...input,
-    quietHoursStart: quietHours ? quietHoursStart : null,
-    quietHoursEnd: quietHours ? quietHoursEnd : null,
-  }));
+  .transform(
+    ({
+      quietHours,
+      quietHoursStart,
+      quietHoursEnd,
+      weeklyReviewDay,
+      weeklyReviewTime,
+      ...input
+    }) => ({
+      ...input,
+      quietHoursStart: quietHours ? quietHoursStart : null,
+      quietHoursEnd: quietHours ? quietHoursEnd : null,
+      weeklyReviewDay,
+      weeklyReviewTime: weeklyReviewDay === null ? null : weeklyReviewTime,
+    }),
+  );
 
 export type SaveReminderSettingsInput = z.output<
   typeof saveReminderSettingsSchema
