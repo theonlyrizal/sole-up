@@ -204,7 +204,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 6.6 | Home integration | done | chunk/6.6-home-habits | 2026-10-29 | `habitsSummary` in `metrics/home.ts` (engine via exported `engineData`/`engineInput`, Track's 4-week range), Home "Habits" card: each active habit's own figure + this week's progress, title linking to its Track row (`#habit-<id>`); no combined number |
 | 6.✓ | Phase 6 checkpoint (user) | done | | 2026-10-29 | User marked done at the start of 7.0, without the planned two weeks of tracking real habits |
 | 7.0 | Decision gate: weekly review | done | chunk/7.0-review-decisions | 2026-10-29 | ADR 0015: user-week periods, optional wins/blockers/lessons + up to 10 linked priorities, open during its week and the next then read-only, nothing required to finish, live summary, `weekly_review` reminder kind; 7.1–7.5 and DATA_MODEL synced |
-| 7.1 | Weekly summary queries | todo | | | |
+| 7.1 | Weekly summary queries | done | chunk/7.1-weekly-summary | 2026-10-29 | `src/server/modules/metrics/review.ts`: `weeklySummary` with six `Metric`s (tasks completed, planned vs completed, rescheduled, goals without activity, habits, deadlines next period), each with definition, range, `hasData`; computed live; no UI |
 | 7.2 | Reviews: schema and service | todo | | | |
 | 7.3 | Review flow UI | todo | | | |
 | 7.4 | Review history | todo | | | |
@@ -2955,3 +2955,24 @@ Template:
   - Phase 10 export (10.1) must include reviews, their priorities and the reminder setting.
   - If the reminder proves redundant after reviewing early, consider skipping it when the week's review is finished (ADR 0015 alternatives).
   - A correction path for closed reviews, if the lock turns out too strict at the Phase 7 checkpoint.
+
+### 7.1: Weekly summary queries (2026-10-29)
+- **Built:**
+  - `src/server/modules/metrics/review.ts`: `weeklySummary(userId, { periodStart, clock, timeZone, weekStart })` returns six metrics, each a `Metric` with definition, range and `hasData`; `reviewPeriod(start)` gives `{ start, end }` with `end = start + 7`.
+  - `src/server/modules/metrics/review.integration.test.ts` (16 tests): sparse data, week boundaries in Tokyo and for week starts 0/1/6, plan moved out of the week, deadline moved earlier, activity via milestone/task/habit, misaligned habits, cross-user.
+  - Progress log row and this note. No UI, no schema, no new events.
+- **Deviations:** None against the chunk text. Two choices the text left open:
+  1. `hasData` per metric means "the user has records this metric reads, at any time" (for tasks, any task; for habits, any active or paused habit; for goals, any active goal created before the week ended). A quiet week then reads 0 with data, and a user with nothing reads "nothing yet".
+  2. A habit that began on or after the period's end is left out of the habits metric (not shown as "Nothing expected"). A habit that began inside the period is included.
+- **Decisions:**
+  - Rescheduled compares deadlines as instants. A day deadline counts as due at the end of that day in the user's zone, so moving it to a timed deadline on the same day is not "later". Recorded in code comments; the chunk text didn't say.
+  - Planned uses `task.created` and `task.planned` `to` values with no time filter (a plan set any time that names a day in the week counts), per 7.1.
+- **Next chunk should know:**
+  - `reviewPeriod`, `weeklySummary` and the individual metric functions are the reuse points for 7.3 (the Adjust/summary step) and 7.4 (the "as of" view).
+  - The habits metric returns `value: null` (not an empty list) for a period that doesn't start on the week start. The UI must show that as "not available", not zero.
+  - `habits` figures are already worded (`formatConsistency` / `weekProgressFigure`); the UI should show them as they are.
+  - Audit `changes` are re-parsed with `AUDIT_EVENTS[...].changes.parse` in the metric, so a malformed event throws rather than being silently skipped.
+- **Unverified:** None. `pnpm verify` passed on this branch (format:check, lint, typecheck, unit and integration: 45 test files, 636 tests, including this chunk's 16). Not run: `pnpm build` and `pnpm test:e2e`, which the chunk doesn't need (no UI or routes).
+- **Follow-ups:**
+  - The "Deadline window" in the metric is the next 7 days after the period, not `dateWindowBounds("next7")`; if the Plan page's window ever changes, both should move together.
+  - If a habit with no schedule for the period ever shows up, the metric throws. Home (3.2 / 6.6) has the same guard; check the schedule-backfill path if it fires.
