@@ -43,6 +43,7 @@ import {
   TIME_BLOCK_SCOPES,
   TIME_BLOCK_STATUSES,
 } from "@/lib/time-blocks";
+import { REVIEW_TEXT_FIELDS } from "@/lib/weekly-reviews";
 
 // The audit event allowlist (ADR 0005). An event type that is not a key of
 // AUDIT_EVENTS cannot be recorded.
@@ -191,6 +192,11 @@ const habitLogChange = z.strictObject({
   fields: z.array(z.enum(["status", "value"])).min(1),
   status: auditChange(z.enum(HABIT_LOG_STATUSES)),
 });
+/** One weekly review priority: the goal or task it links to, by ID. */
+const reviewPriority = z.union([
+  z.strictObject({ goalId: z.uuid() }),
+  z.strictObject({ taskId: z.uuid() }),
+]);
 
 /**
  * The allowlist. Add each new event here with its entity type and a strict
@@ -609,6 +615,34 @@ export const AUDIT_EVENTS = defineAuditEvents({
     entityType: "habit",
     changes: habitLogChange,
   },
+
+  // Weekly reviews (ADR 0015). Wins, blockers, lessons and the priorities
+  // note are reflections: `weekly_review.updated` names the changed fields
+  // only. Priorities are ordered goal and task IDs, never their titles.
+  "weekly_review.started": {
+    entityType: "weekly_review",
+    changes: z.strictObject({
+      periodStart: auditChange(localDate),
+      periodEnd: auditChange(localDate),
+    }),
+  },
+  "weekly_review.updated": {
+    entityType: "weekly_review",
+    changes: z.strictObject({
+      fields: z.array(z.enum(REVIEW_TEXT_FIELDS)).min(1),
+    }),
+  },
+  "weekly_review.priorities_changed": {
+    entityType: "weekly_review",
+    changes: z.strictObject({
+      priorities: auditChange(z.array(reviewPriority)),
+    }),
+  },
+  "weekly_review.finished": {
+    entityType: "weekly_review",
+    changes: z.strictObject({ completedAt: auditChange(instant) }),
+  },
+  // No `weekly_review.deleted`: a deleted review's events go with it.
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;

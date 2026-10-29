@@ -205,7 +205,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 6.✓ | Phase 6 checkpoint (user) | done | | 2026-10-29 | User marked done at the start of 7.0, without the planned two weeks of tracking real habits |
 | 7.0 | Decision gate: weekly review | done | chunk/7.0-review-decisions | 2026-10-29 | ADR 0015: user-week periods, optional wins/blockers/lessons + up to 10 linked priorities, open during its week and the next then read-only, nothing required to finish, live summary, `weekly_review` reminder kind; 7.1–7.5 and DATA_MODEL synced |
 | 7.1 | Weekly summary queries | done | chunk/7.1-weekly-summary | 2026-10-29 | `src/server/modules/metrics/review.ts`: `weeklySummary` with six `Metric`s (tasks completed, planned vs completed, rescheduled, goals without activity, habits, deadlines next period), each with definition, range, `hasData`; computed live; no UI |
-| 7.2 | Reviews: schema and service | todo | | | |
+| 7.2 | Reviews: schema and service | done | chunk/7.2-review-schema-service | 2026-10-29 | `weekly_reviews` + `weekly_review_priorities` (migration 0016: period/length/exactly-one CHECKs, composite cascading FKs, unique period and targets), service (start, save text, set priorities, finish, delete) refusing writes once closed, `weekly_review.*` events with no text; no UI |
 | 7.3 | Review flow UI | todo | | | |
 | 7.4 | Review history | todo | | | |
 | 7.5 | Review reminder | todo | | | |
@@ -2976,3 +2976,28 @@ Template:
 - **Follow-ups:**
   - The "Deadline window" in the metric is the next 7 days after the period, not `dateWindowBounds("next7")`; if the Plan page's window ever changes, both should move together.
   - If a habit with no schedule for the period ever shows up, the metric throws. Home (3.2 / 6.6) has the same guard; check the schedule-backfill path if it fires.
+
+### 7.2: Reviews: schema and service (2026-10-29)
+- **Built:**
+  - `src/lib/weekly-reviews.ts` (pure): `REVIEW_TEXT_MAX` (5,000), `REVIEW_PRIORITIES_MAX` (10), `REVIEW_TEXT_FIELDS`, `REVIEW_CLOSED` ("This review is closed for editing."), `REVIEW_PERIOD_NOT_OPEN`, `reviewClosesOn`, `isReviewOpen(periodEnd, today)`, `openPeriodStarts(today, weekStart)`, `priorityKey`, the `WeeklyReview` and `ReviewPriority` types.
+  - Schema `src/server/db/schema/weekly-reviews.ts` + migration `0016_weekly_reviews.sql` (generated, no hand edits): `weekly_reviews` (`unique (id, user_id)`, `unique (user_id, period_start)`, `period_end = period_start + 7` CHECK, four 1–5,000-character CHECKs) and `weekly_review_priorities` (composite FKs to the review, goal and task, all cascading; `num_nonnulls(goal_id, task_id) = 1`; `sort_order >= 0`; unique `(review_id, goal_id)`, `(review_id, task_id)`, `(review_id, sort_order)`; indexes `(goal_id, user_id)` and `(task_id, user_id)` for the delete cascades).
+  - Audit events `weekly_review.started` (period dates), `.updated` (field names), `.priorities_changed` (ordered `{ goalId } | { taskId }` from/to), `.finished` (`completedAt`).
+  - `src/server/modules/weekly-reviews/`: `validation.ts` (`startWeeklyReviewSchema`, `saveWeeklyReviewTextSchema`, `setWeeklyReviewPrioritiesSchema`, `weeklyReviewIdSchema`), `service.ts` (`startWeeklyReview`, `saveWeeklyReviewText`, `setWeeklyReviewPriorities`, `finishWeeklyReview`, `deleteWeeklyReview`, `toWeeklyReview`).
+  - Tests: unit `src/lib/weekly-reviews.test.ts` and `weekly-reviews/validation.test.ts`; integration `weekly-reviews.integration.test.ts` (37: every CHECK and unique incl. a duplicate period and a second link to the same goal, the exactly-one CHECK, cross-user composite FKs, goal/task delete cascades, account cascade, start for this/last week only (future, older, misaligned refused, racing starts, a week-start change, the user's zone), text save/no-op, priorities replace/no-op/refusals/kept completed goal, finish once with nothing filled, every write refused from the closing day in Auckland while UTC is still open, delete when closed, cross-user NotFound for every write and foreign goal/task IDs, no text or titles in audit).
+  - Docs: one DATA_MODEL rule (WeeklyReviewPriority) on keeping already-linked items.
+- **Deviations:** none against the chunk text.
+- **Decisions:**
+  1. **Start** returns the existing review with no event; a racing start inserts with `ON CONFLICT DO NOTHING` and reads the other's row, so it never surfaces a unique violation. A refused period is a `ValidationError` on `periodStart` (not a conflict), since it's a bad choice of week rather than a locked record.
+  2. **Save text** takes each field as optional: absent keeps it, blank or null clears it. Only fields that differ after trimming are written and named in the event.
+  3. **Set priorities** checks status only for newly added targets: an already-linked goal or task stays allowed whatever its status, so a reordered list can keep a since-completed goal (ADR 0015 "stays linked"). Another user's or a not-addable ID is a `ValidationError` on `priorities`, with one fixed message for both so it can't probe IDs. The list is replaced by delete + insert, so `sort_order` is always dense.
+  4. **The closed check runs before any no-op test**, so a closed review refuses even a write that would change nothing, and finishing an already-finished closed review is a conflict too.
+  5. `completed_at` is the injected `now` (as other services' `now`); the event stores it as ISO.
+- **Next chunk should know:**
+  - 7.3: wire the five functions through `authedAction` with the exported schemas. Default period: `openPeriodStarts(today, weekStart)` gives `thisWeek`/`lastWeek`; pick last week unless its review has `completedAt`. Field errors come back on `periodStart`, `wins`, `blockers`, `lessons`, `prioritiesNote` and `priorities`.
+  - 7.3/7.4: there is no read query yet (no UI in this chunk); add `queries.ts` with the review, its priorities joined to current goal/task titles and statuses, and the closing date (`reviewClosesOn`).
+  - Every write takes `now` (default `new Date()`), so tests can pin the closing day; `isReviewOpen` is the same rule the UI should use to hide Edit.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint (the 6.1 warning, below), typecheck, 973 unit and 673 integration tests. `pnpm db:generate` reports no schema changes after the migration; dev DB migrated. No UI or routes, so `pnpm build` and `pnpm test:e2e` were not run.
+- **Follow-ups:**
+  - The goal and task delete confirmations don't mention that review priorities linking to them go (from 7.0; 7.3).
+  - Phase 10 export (10.1) must include reviews and their priorities (from 7.0).
+  - Lint warns about the unused `_omitted` in `src/server/modules/habits/validation.test.ts` (from 6.1).
