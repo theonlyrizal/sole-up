@@ -143,6 +143,8 @@ Not every object must be linked to every other object. Relationships should be e
 
 **Success condition:** the review produces a useful adjustment, not merely a dashboard of numbers.
 
+Chunk 7.3 builds this as Review in the navigation (`/review`). It opens last week, or this week once last week's review is finished, names the week's dates and offers the other open week. Opening a week starts its review. Four steps follow, each saved as the user leaves it so a review can be resumed while its week is open: **Look back** (the 7.1 summary, each figure with its definition and range, "Nothing yet" without data), **Reflect** (wins, blockers and lessons, all optional), **Adjust** (pause, resume or drop active and paused goals; reschedule or cancel stalled tasks, those Today shows as "Needs a decision" or "Earlier, not done"; plan open tasks on a day of the week after the reviewed one, from today on, through the ordinary goal and task actions) and **Choose priorities** (up to 10 active or paused goals and open tasks, ordered with Up/Down, plus an optional note). "Finish review" needs nothing filled, and a finished review stays editable until its week closes. A closed review opens read-only, with no adjust actions.
+
 ## 7. Navigation and information architecture
 
 Initial destinations:
@@ -152,7 +154,7 @@ Initial destinations:
 - **Goals:** goals, milestones, and life areas.
 - **Track:** habits and recurring activity.
 - **Notes:** personal reference and contextual notes.
-- **Reviews / Insights:** weekly review and analytics.
+- **Reviews / Insights:** weekly review and analytics. Review is a top-level destination from chunk 7.3; insights join it later.
 - **Settings:** account, preferences, privacy, data export, and integrations as they are added.
 
 Navigation can change after usability testing. Avoid making every domain a top-level destination if it creates clutter.

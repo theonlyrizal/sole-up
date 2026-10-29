@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 
-const NAV_LABELS = ["Home", "Goals", "Plan", "Track", "Settings"];
+const NAV_LABELS = ["Home", "Goals", "Plan", "Track", "Review", "Settings"];
 /** The sidebar also lists Today, Upcoming, Calendar and Inbox under Plan. */
 const SIDEBAR_LABELS = [
   "Home",
@@ -15,6 +15,7 @@ const SIDEBAR_LABELS = [
   "Calendar",
   "Inbox",
   "Track",
+  "Review",
   "Settings",
 ];
 
@@ -23,7 +24,7 @@ function mainNav(page: Page) {
 }
 
 test.describe("desktop", () => {
-  test("the sidebar shows only Home, Goals, Plan (with its sub-pages), Track and Settings", async ({
+  test("the sidebar shows only Home, Goals, Plan (with its sub-pages), Track, Review and Settings", async ({
     page,
   }) => {
     await signInAndConfirm(page);
@@ -40,10 +41,16 @@ test.describe("desktop", () => {
     const mainBox = (await page.locator("main").boundingBox())!;
     expect(navBox.x + navBox.width).toBeLessThanOrEqual(mainBox.x);
 
-    for (const label of ["Goals", "Plan", "Track", "Settings"]) {
+    for (const [label, heading] of [
+      ["Goals", "Goals"],
+      ["Plan", "Plan"],
+      ["Track", "Track"],
+      ["Review", "Weekly review"],
+      ["Settings", "Settings"],
+    ]) {
       await nav.getByRole("link", { name: label }).click();
       await expect(
-        page.getByRole("heading", { level: 1, name: label }),
+        page.getByRole("heading", { level: 1, name: heading }),
       ).toBeVisible();
       await expect(nav.getByRole("link", { name: label })).toHaveAttribute(
         "aria-current",
@@ -81,6 +88,7 @@ test.describe("desktop", () => {
       "/plan/inbox",
       "/track",
       "/track/archived",
+      "/review",
       "/settings",
     ]) {
       await page.goto(path);
@@ -105,7 +113,8 @@ test.describe("desktop", () => {
     await expect(page.locator("main")).toBeFocused();
 
     // From the top: skip link, brand, Add task, the destinations (with
-    // Today, Upcoming, Calendar and Inbox under Plan, then Track), sign out.
+    // Today, Upcoming, Calendar and Inbox under Plan, then Track and
+    // Review), sign out.
     await page.goto("/home");
     await expect(
       page.getByRole("heading", { level: 1, name: "Home" }),
@@ -129,9 +138,9 @@ test.describe("desktop", () => {
       expect(outline).not.toBe("none");
     }
 
-    // Shift+Tab back to Plan (past Settings, Track, Inbox, Calendar,
-    // Upcoming and Today) and follow it with Enter.
-    for (let step = 0; step < 7; step += 1) {
+    // Shift+Tab back to Plan (past Settings, Review, Track, Inbox,
+    // Calendar, Upcoming and Today) and follow it with Enter.
+    for (let step = 0; step < 8; step += 1) {
       await page.keyboard.press("Shift+Tab");
     }
     const plan = mainNav(page).getByRole("link", { name: "Plan" });

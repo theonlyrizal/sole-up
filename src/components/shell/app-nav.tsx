@@ -26,7 +26,7 @@ export function AppNav() {
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:static md:border-t-0 md:bg-transparent md:pb-0"
     >
-      <ul className="grid grid-cols-5 md:flex md:flex-col md:gap-1">
+      <ul className="grid grid-cols-6 md:flex md:flex-col md:gap-1">
         {NAV_ITEMS.map((item) => {
           const subItems = NAV_SUB_ITEMS[item.href] ?? [];
           const activeSub = subItems.find((sub) => pathname === sub.href);
@@ -104,6 +104,13 @@ const iconPaths: Record<NavIcon, React.ReactNode> = {
   track: (
     <>
       <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </>
+  ),
+  review: (
+    <>
+      <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+      <path d="M20 4v4h-4" />
+      <path d="M12 8v4l2.5 2.5" />
     </>
   ),
   settings: (
