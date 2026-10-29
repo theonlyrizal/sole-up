@@ -127,6 +127,13 @@
       "when": 1793283017606,
       "tag": "0017_weekly_review_reminder",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793296932159,
+      "tag": "0018_notes",
+      "breakpoints": true
     }
   ]
 }

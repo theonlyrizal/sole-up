@@ -8,6 +8,7 @@ export * from "./goals";
 export * from "./habits";
 export * from "./life-areas";
 export * from "./milestones";
+export * from "./notes";
 export * from "./preferences";
 export * from "./push-subscriptions";
 export * from "./reminder-sweeps";

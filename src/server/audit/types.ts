@@ -26,6 +26,7 @@ import {
   MILESTONE_EDITABLE_FIELDS,
   MILESTONE_STATUSES,
 } from "@/lib/milestones";
+import { NOTE_CONTENT_FIELDS, NOTE_LINK_TARGET_TYPES } from "@/lib/notes/note";
 import { canonicalLocale, canonicalTimeZone } from "@/lib/preferences";
 import { PRIORITIES } from "@/lib/priorities";
 import { rruleSchema } from "@/lib/recurrence";
@@ -193,6 +194,11 @@ const habitLogChange = z.strictObject({
   status: auditChange(z.enum(HABIT_LOG_STATUSES)),
 });
 /** One weekly review priority: the goal or task it links to, by ID. */
+const noteLink = z.strictObject({
+  targetType: z.enum(NOTE_LINK_TARGET_TYPES),
+  targetId: z.uuid(),
+});
+
 const reviewPriority = z.union([
   z.strictObject({ goalId: z.uuid() }),
   z.strictObject({ taskId: z.uuid() }),
@@ -645,6 +651,41 @@ export const AUDIT_EVENTS = defineAuditEvents({
     changes: z.strictObject({ completedAt: auditChange(instant) }),
   },
   // No `weekly_review.deleted`: a deleted review's events go with it.
+
+  // Notes (ADR 0016). The title, body and body text are user content:
+  // `note.created` and `note.updated` name the content fields only.
+  // `note.updated` marks an editing session: the service records none
+  // within 10 minutes of the note's latest one. Links are a target type and
+  // ID, never a goal or task title.
+  "note.created": {
+    entityType: "note",
+    changes: z.strictObject({
+      fields: z.array(z.enum(NOTE_CONTENT_FIELDS)).min(1),
+    }),
+  },
+  "note.updated": {
+    entityType: "note",
+    changes: z.strictObject({
+      fields: z.array(z.enum(NOTE_CONTENT_FIELDS)).min(1),
+    }),
+  },
+  "note.archived": {
+    entityType: "note",
+    changes: z.strictObject({ archivedAt: auditChange(instant) }),
+  },
+  "note.restored": {
+    entityType: "note",
+    changes: z.strictObject({ archivedAt: auditChange(instant) }),
+  },
+  "note.linked": {
+    entityType: "note",
+    changes: noteLink,
+  },
+  "note.unlinked": {
+    entityType: "note",
+    changes: noteLink,
+  },
+  // No `note.deleted`: a deleted note's events go with it.
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;
