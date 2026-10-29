@@ -13,13 +13,30 @@ export function isReminderOffset(value: unknown): value is ReminderOffset {
   return REMINDER_OFFSETS.includes(value as ReminderOffset);
 }
 
-/** What a reminder is about: a timed task deadline, a timed event, or the daily nudge. */
+/**
+ * What a reminder is about: a timed task deadline, a timed event, the daily
+ * nudge, or the weekly review reminder (ADR 0015).
+ */
 export const REMINDER_KINDS = [
   "task_deadline",
   "event",
   "daily_nudge",
+  "weekly_review",
 ] as const;
 export type ReminderKind = (typeof REMINDER_KINDS)[number];
+
+/**
+ * The user's own reminders, linked to no task or event: one each per user,
+ * at a local time in the user's zone, stale once that local day ends.
+ */
+export const USER_REMINDER_KINDS = ["daily_nudge", "weekly_review"] as const;
+export type UserReminderKind = (typeof USER_REMINDER_KINDS)[number];
+
+export function isUserReminderKind(
+  kind: ReminderKind,
+): kind is UserReminderKind {
+  return USER_REMINDER_KINDS.includes(kind as UserReminderKind);
+}
 
 /**
  * A delivery's state. `scheduled` waits for its sweep; `sending` is claimed

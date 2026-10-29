@@ -104,6 +104,8 @@ const SETTINGS: Form = {
   quietHoursStart: "",
   quietHoursEnd: "",
   dailyNudgeTime: "",
+  weeklyReviewDay: null,
+  weeklyReviewTime: "",
 };
 
 const saveSettings = (userId: string, fields: Form = {}) =>
@@ -193,13 +195,14 @@ const preferenceEvents = (userId: string) =>
 // --- Settings ------------------------------------------------------------------
 
 describe("reminder settings", () => {
-  it("start with reminders on, titles shown, no quiet hours and no nudge", async () => {
+  it("start with reminders on, titles shown, no quiet hours, no nudge and no weekly review", async () => {
     const user = await setUp();
     expect(await getReminderSettings(user.id)).toEqual({
       remindersEnabled: true,
       remindersPrivate: false,
       quietHours: null,
       dailyNudgeTime: null,
+      weeklyReview: null,
     });
   });
 
@@ -219,6 +222,7 @@ describe("reminder settings", () => {
       remindersPrivate: true,
       quietHours: { start: "22:00", end: "07:00" },
       dailyNudgeTime: null,
+      weeklyReview: null,
     });
     const events = await preferenceEvents(user.id);
     expect(events).toHaveLength(before + 1);

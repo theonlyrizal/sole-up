@@ -9,6 +9,8 @@ const form = {
   quietHoursStart: "22:00",
   quietHoursEnd: "07:00",
   dailyNudgeTime: "08:30",
+  weeklyReviewDay: 0,
+  weeklyReviewTime: "18:00",
 };
 
 const fieldErrorsOf = (input: unknown) => {
@@ -25,6 +27,8 @@ describe("saveReminderSettingsSchema", () => {
       quietHoursStart: "22:00",
       quietHoursEnd: "07:00",
       dailyNudgeTime: "08:30",
+      weeklyReviewDay: 0,
+      weeklyReviewTime: "18:00",
     });
   });
 
@@ -69,6 +73,30 @@ describe("saveReminderSettingsSchema", () => {
     expect(
       Object.keys(fieldErrorsOf({ ...form, remindersPrivate: undefined })),
     ).toEqual(["remindersPrivate"]);
+  });
+
+  it("stores no weekly review time while no day is chosen", () => {
+    expect(
+      saveReminderSettingsSchema.parse({
+        ...form,
+        weeklyReviewDay: null,
+        weeklyReviewTime: "18:00",
+      }),
+    ).toMatchObject({ weeklyReviewDay: null, weeklyReviewTime: null });
+  });
+
+  it("asks for a time once a weekly review day is chosen, and a day from the list", () => {
+    expect(fieldErrorsOf({ ...form, weeklyReviewTime: "" })).toEqual({
+      weeklyReviewTime: ["Enter a time for the weekly review reminder."],
+    });
+    expect(fieldErrorsOf({ ...form, weeklyReviewTime: "6pm" })).toEqual({
+      weeklyReviewTime: ["Enter a valid time."],
+    });
+    for (const weeklyReviewDay of [7, -1, 1.5, "1", undefined]) {
+      expect(fieldErrorsOf({ ...form, weeklyReviewDay })).toEqual({
+        weeklyReviewDay: ["Choose a day from the list."],
+      });
+    }
   });
 
   it("refuses unknown fields", () => {

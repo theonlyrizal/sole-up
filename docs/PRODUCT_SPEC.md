@@ -147,6 +147,8 @@ Chunk 7.3 builds this as Review in the navigation (`/review`). It opens last wee
 
 Chunk 7.4 adds **Past reviews** (`/review/history`, linked from the review page): every review, newest first, with its week's dates, "Finished on …" or a neutral "Not finished", and until when it can change or the day it closed. Weeks without a review aren't listed or counted. Each opens a read-only view (`/review/history/<id>`) with its text, its priorities with their current titles and statuses, and the summary as of now. **Edit review** reopens the flow only while the week is open; **Delete review** is always offered, behind a confirmation, and leaves the linked goals and tasks as they are.
 
+Chunk 7.5 adds an optional **weekly review reminder** in Settings → Reminders: a weekday and a local time, off by default. It says "Time for your weekly review" (never a title, in either mode) and opens `/review`. It follows the same rules as every reminder (the on/off switch, quiet hours, a subscribed device, up to 15 minutes early) and is skipped once its day has ended. It comes even when that week's review is already finished: the user chose the time.
+
 ## 7. Navigation and information architecture
 
 Initial destinations:

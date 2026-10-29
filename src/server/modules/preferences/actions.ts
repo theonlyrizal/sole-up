@@ -21,7 +21,10 @@ export const savePreferences = authedAction(
   },
 );
 
-/** Settings' Reminders form: on/off, private mode, quiet hours, the nudge. */
+/**
+ * Settings' Reminders form: on/off, private mode, quiet hours, the nudge,
+ * the weekly review reminder.
+ */
 export const saveReminderSettings = authedAction(
   saveReminderSettingsSchema,
   async (input, { userId }) => {

@@ -7,7 +7,11 @@ import { db, type DbTransaction } from "@/server/db/client";
 import { reminders, type userPreferences } from "@/server/db/schema";
 
 import type { ClaimedReminder } from "./claim";
-import { syncEventReminderInTx, syncNudgeReminderInTx } from "./schedule";
+import {
+  syncEventReminderInTx,
+  syncNudgeReminderInTx,
+  syncWeeklyReviewReminderInTx,
+} from "./schedule";
 
 /** What the sweep decided for one claimed reminder. */
 export type DeliveryOutcome =
@@ -20,9 +24,10 @@ export type DeliveryOutcome =
   /** Quiet hours: back to `scheduled`, unclaimed until `until`. */
   | { status: "held"; until: Date };
 
-type NudgePreferences = Pick<
+/** What rolling the user's own reminders (nudge, weekly review) reads. */
+type UserReminderPreferences = Pick<
   typeof userPreferences.$inferSelect,
-  "timezone" | "dailyNudgeTime"
+  "timezone" | "dailyNudgeTime" | "weeklyReviewDay" | "weeklyReviewTime"
 >;
 
 /**
@@ -40,7 +45,7 @@ async function hasOtherScheduled(
       ? eq(reminders.taskId, row.taskId!)
       : row.kind === "event"
         ? eq(reminders.eventId, row.eventId!)
-        : eq(reminders.kind, "daily_nudge");
+        : eq(reminders.kind, row.kind);
   const [other] = await tx
     .select({ id: reminders.id })
     .from(reminders)
@@ -92,16 +97,17 @@ function changesFor(outcome: DeliveryOutcome, now: Date) {
  * deleted with its item, or claimed again by a later sweep, is left alone.
  *
  * Once a row is done (sent, skipped or failed), the same transaction
- * schedules what comes next: a repeating event's next occurrence, or
- * tomorrow's nudge. A row that would go back to `scheduled` while an edit
- * has written a newer one is skipped as stale instead.
+ * schedules what comes next: a repeating event's next occurrence,
+ * tomorrow's nudge, or next week's weekly review reminder. A row that would
+ * go back to `scheduled` while an edit has written a newer one is skipped as
+ * stale instead.
  *
  * Returns the outcome recorded, or null when the row was no longer ours.
  */
 export async function recordDelivery(
   row: ClaimedReminder,
   outcome: DeliveryOutcome,
-  preferences: NudgePreferences,
+  preferences: UserReminderPreferences,
   now: Date,
 ): Promise<DeliveryOutcome | null> {
   return db.transaction(async (tx) => {
@@ -134,6 +140,8 @@ export async function recordDelivery(
       await syncEventReminderInTx(tx, row.userId, row.eventId!, now);
     } else if (row.kind === "daily_nudge") {
       await syncNudgeReminderInTx(tx, row.userId, preferences, now);
+    } else if (row.kind === "weekly_review") {
+      await syncWeeklyReviewReminderInTx(tx, row.userId, preferences, now);
     }
     return recorded;
   });

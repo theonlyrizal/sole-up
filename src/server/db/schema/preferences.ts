@@ -52,6 +52,12 @@ export const userPreferences = pgTable(
      */
     quietHoursStart: text(),
     quietHoursEnd: text(),
+    /**
+     * The weekly review reminder (ADR 0015): a local weekday (0 = Sunday …
+     * 6 = Saturday) and "HH:MM" in `timezone`, both null while it is off.
+     */
+    weeklyReviewDay: smallint(),
+    weeklyReviewTime: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
       .notNull()
@@ -85,6 +91,16 @@ export const userPreferences = pgTable(
         or (${table.quietHoursStart} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
           and ${table.quietHoursEnd} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
           and ${table.quietHoursStart} <> ${table.quietHoursEnd})`,
+    ),
+    check(
+      "user_preferences_weekly_review_check",
+      // Explicit "is not null": with only one set, the pattern test alone
+      // would be null, which a CHECK lets through.
+      sql`(${table.weeklyReviewDay} is null and ${table.weeklyReviewTime} is null)
+        or (${table.weeklyReviewDay} is not null
+          and ${table.weeklyReviewTime} is not null
+          and ${table.weeklyReviewDay} between 0 and 6
+          and ${table.weeklyReviewTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')`,
     ),
   ],
 );

@@ -6,6 +6,7 @@ import {
   bundlePayload,
   NUDGE_TEXT,
   reminderPayload,
+  WEEKLY_REVIEW_TEXT,
   type MessageContext,
 } from "./payload";
 
@@ -114,6 +115,17 @@ describe("reminderPayload", () => {
     expect(
       reminderPayload({ kind: "daily_nudge", reminderId: "r6" }, context),
     ).toEqual({ title: NUDGE_TEXT, url: "/plan/today", tag: "reminder-r6" });
+  });
+
+  it("sends the weekly review reminder with fixed text and no snooze, opening the review", () => {
+    expect(WEEKLY_REVIEW_TEXT).toBe("Time for your weekly review");
+    expect(
+      reminderPayload({ kind: "weekly_review", reminderId: "r7" }, context),
+    ).toEqual({
+      title: WEEKLY_REVIEW_TEXT,
+      url: "/review",
+      tag: "reminder-r7",
+    });
   });
 });
 

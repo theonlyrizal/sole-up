@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import type { WeekStart } from "@/lib/dates";
+import { WEEK_DAYS } from "@/lib/preferences";
 import {
   isInQuietHours,
   type QuietHours,
@@ -29,8 +32,9 @@ type Props = {
 
 /**
  * Settings' "Reminders" section (chunk 5.6, ADR 0013): the global switch,
- * private mode, quiet hours (off by default, suggesting 22:00–07:00) and
- * the daily planning nudge (off until a time is chosen). Saved together.
+ * private mode, quiet hours (off by default, suggesting 22:00–07:00), the
+ * daily planning nudge (off until a time is chosen) and the weekly review
+ * reminder (chunk 7.5, ADR 0015: off until a day is chosen). Saved together.
  */
 export function ReminderSettingsForm({
   initial,
@@ -46,6 +50,12 @@ export function ReminderSettingsForm({
     initial.quietHours ?? SUGGESTED_QUIET_HOURS,
   );
   const [nudge, setNudge] = useState(initial.dailyNudgeTime ?? "");
+  const [reviewDay, setReviewDay] = useState<WeekStart | null>(
+    initial.weeklyReview?.day ?? null,
+  );
+  const [reviewTime, setReviewTime] = useState(
+    initial.weeklyReview?.time ?? "",
+  );
   const [error, setError] = useState<ActionError | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -76,6 +86,8 @@ export function ReminderSettingsForm({
         quietHoursStart: quietHours.start,
         quietHoursEnd: quietHours.end,
         dailyNudgeTime: nudge,
+        weeklyReviewDay: reviewDay,
+        weeklyReviewTime: reviewTime,
       });
       if (result.ok) {
         setSaved(true);
@@ -87,12 +99,14 @@ export function ReminderSettingsForm({
   }
 
   const fieldErrors = error?.code === "VALIDATION" ? error.fieldErrors : {};
-  const nudgeInQuietHours =
+  const inQuietHours = (time: string) =>
     quiet &&
-    NUDGE_TIME_PATTERN.test(nudge) &&
+    NUDGE_TIME_PATTERN.test(time) &&
     quietHours.start !== quietHours.end &&
     NUDGE_TIME_PATTERN.test(quietHours.end) &&
-    isInQuietHours(nudge, quietHours);
+    isInQuietHours(time, quietHours);
+  const nudgeInQuietHours = inQuietHours(nudge);
+  const reviewInQuietHours = reviewDay !== null && inQuietHours(reviewTime);
 
   return (
     <form
@@ -121,7 +135,7 @@ export function ReminderSettingsForm({
         label="Send reminders"
         hint={
           enabled
-            ? "Task deadlines, events and the daily nudge, as you set them."
+            ? "Task deadlines, events, the daily nudge and the weekly review, as you set them."
             : "Off: nothing is sent, and reminders that come due are skipped, not saved for later."
         }
         checked={enabled}
@@ -237,6 +251,64 @@ export function ReminderSettingsForm({
           <p className="text-sm font-medium">
             This time is inside your quiet hours, so the nudge will wait until
             they end at {quietHours.end}.
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <FormField
+          id={`${ids}-review-day`}
+          label="Weekly review reminder"
+          hint="“Time for your weekly review”, once a week on this day, opening your review. It comes even when that week’s review is finished."
+          errors={fieldErrors.weeklyReviewDay}
+        >
+          {(control) => (
+            <Select
+              {...control}
+              name="weeklyReviewDay"
+              value={reviewDay ?? ""}
+              onChange={(event) => {
+                const { value } = event.target;
+                setReviewDay(
+                  value === "" ? null : (Number(value) as WeekStart),
+                );
+                edited();
+              }}
+            >
+              <option value="">Off</option>
+              {WEEK_DAYS.map((day, index) => (
+                <option key={day} value={index}>
+                  {day}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        {reviewDay !== null && (
+          <FormField
+            id={`${ids}-review-time`}
+            label="Weekly review time"
+            errors={fieldErrors.weeklyReviewTime}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                type="time"
+                name="weeklyReviewTime"
+                value={reviewTime}
+                className="w-auto"
+                onChange={(event) => {
+                  setReviewTime(event.target.value);
+                  edited();
+                }}
+              />
+            )}
+          </FormField>
+        )}
+        {reviewInQuietHours && (
+          <p className="text-sm font-medium">
+            This time is inside your quiet hours, so the weekly review reminder
+            will wait until they end at {quietHours.end}.
           </p>
         )}
       </div>

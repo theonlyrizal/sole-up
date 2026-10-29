@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, eq, ne } from "drizzle-orm";
 
-import { addDays, instantFromLocal, todayFor } from "@/lib/dates";
+import { addDays, dayOfWeek, instantFromLocal, todayFor } from "@/lib/dates";
 import type { TimedException } from "@/lib/recurrence";
 import { fireAtFor, type ReminderKind } from "@/lib/reminders";
 import type { DbTransaction } from "@/server/db/client";
@@ -28,12 +28,14 @@ import { nextTimedOccurrence } from "./next-occurrence";
 // - Only the non-snoozed scheduled row is touched; snoozed rows (5.6) and
 //   the delivery record stay as they are.
 // - Task and event reminders follow their instants, so a time-zone change
-//   never moves them; the nudge follows the user's zone.
+//   never moves them; the nudge and the weekly review follow the user's
+//   zone.
 
 type ItemKey =
   | { kind: "task_deadline"; taskId: string }
   | { kind: "event"; eventId: string }
-  | { kind: "daily_nudge" };
+  | { kind: "daily_nudge" }
+  | { kind: "weekly_review" };
 
 /** What one scheduled row reminds about and when it fires. */
 export type ReminderTarget = {
@@ -54,7 +56,8 @@ function keyFilter(userId: string, key: ItemKey) {
     case "event":
       return and(owner, eq(reminders.eventId, key.eventId));
     case "daily_nudge":
-      return and(owner, eq(reminders.kind, "daily_nudge"));
+    case "weekly_review":
+      return and(owner, eq(reminders.kind, key.kind));
   }
 }
 
@@ -313,4 +316,65 @@ export async function syncNudgeReminderInTx(
     }
   }
   await writeScheduled(tx, userId, key, target);
+}
+
+type WeeklyReviewPreferences = Pick<
+  typeof userPreferences.$inferSelect,
+  "timezone" | "weeklyReviewDay" | "weeklyReviewTime"
+>;
+
+/**
+ * Days ahead the weekly review reminder looks for its weekday and time
+ * still to come: two weeks, so the next one is found even when this
+ * week's has passed or was already reminded about.
+ */
+const WEEKLY_REVIEW_SEARCH_DAYS = 15;
+
+/**
+ * The weekly review reminder (ADR 0015) has one row, for the next local
+ * `weekly_review_time` on `weekly_review_day` in the user's zone that
+ * hasn't been reminded about. It fires at that time (no offset), whether
+ * or not that week's review is finished. No day and time, or no confirmed
+ * zone, removes it.
+ */
+export async function syncWeeklyReviewReminderInTx(
+  tx: DbTransaction,
+  userId: string,
+  preferences: WeeklyReviewPreferences,
+  now: Date = new Date(),
+): Promise<void> {
+  const key: ItemKey = { kind: "weekly_review" };
+  const { timezone, weeklyReviewDay, weeklyReviewTime } = preferences;
+  if (!timezone || weeklyReviewDay === null || !weeklyReviewTime) {
+    await writeScheduled(tx, userId, key, null);
+    return;
+  }
+
+  const delivered = await deliveredFor(tx, userId, key);
+  const today = todayFor(timezone, now);
+  let target: ReminderTarget | null = null;
+  for (let day = 0; day < WEEKLY_REVIEW_SEARCH_DAYS && !target; day++) {
+    const date = addDays(today, day);
+    if (dayOfWeek(date) !== weeklyReviewDay) continue;
+    const targetAt = instantFromLocal(date, weeklyReviewTime, timezone);
+    const candidate = { targetAt, occurrenceStart: null };
+    if (targetAt > now && !isDelivered(delivered, candidate)) {
+      target = { ...candidate, fireAt: targetAt };
+    }
+  }
+  await writeScheduled(tx, userId, key, target);
+}
+
+/**
+ * Recomputes both of the user's own reminders (the nudge and the weekly
+ * review), for a change that moves them both: the user's zone.
+ */
+export async function syncUserRemindersInTx(
+  tx: DbTransaction,
+  userId: string,
+  preferences: NudgePreferences & WeeklyReviewPreferences,
+  now: Date = new Date(),
+): Promise<void> {
+  await syncNudgeReminderInTx(tx, userId, preferences, now);
+  await syncWeeklyReviewReminderInTx(tx, userId, preferences, now);
 }
