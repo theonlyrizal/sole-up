@@ -157,7 +157,7 @@ Initial destinations:
 - **Plan:** tasks (inbox, Today, Upcoming) and calendar.
 - **Goals:** goals, milestones, and life areas.
 - **Track:** habits and recurring activity.
-- **Notes:** personal reference and contextual notes.
+- **Notes:** personal reference and contextual notes. A top-level destination from chunk 8.2 (`/notes`, after Track): the notes most recently updated first, each with its title (or "Untitled"), its first line and the date; a rich-text editor that saves about a second after typing stops (and before leaving), shows "Saving…", "Saved" or "Not saved" with Retry, and keeps the text on screen when the note changed somewhere else; and **Archived notes**, read-only until restored. Deleting a note asks first.
 - **Reviews / Insights:** weekly review and analytics. Review is a top-level destination from chunk 7.3; insights join it later.
 - **Settings:** account, preferences, privacy, data export, and integrations as they are added.
 

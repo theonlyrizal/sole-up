@@ -1,12 +1,10 @@
-/**
- * Destinations in the main navigation. Only list pages that exist; add the
- * others (Notes) as their phases land.
- */
+/** Destinations in the main navigation. Only list pages that exist. */
 export const NAV_ITEMS = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/goals", label: "Goals", icon: "goals" },
   { href: "/plan", label: "Plan", icon: "plan" },
   { href: "/track", label: "Track", icon: "track" },
+  { href: "/notes", label: "Notes", icon: "notes" },
   { href: "/review", label: "Review", icon: "review" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ] as const;

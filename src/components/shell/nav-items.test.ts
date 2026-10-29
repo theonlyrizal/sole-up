@@ -28,12 +28,13 @@ describe("isNavItemActive", () => {
 });
 
 describe("NAV_ITEMS", () => {
-  it("shows exactly Home, Goals, Plan, Track, Review and Settings, in that order", () => {
+  it("shows exactly Home, Goals, Plan, Track, Notes, Review and Settings, in that order", () => {
     expect(NAV_ITEMS.map((item) => item.label)).toEqual([
       "Home",
       "Goals",
       "Plan",
       "Track",
+      "Notes",
       "Review",
       "Settings",
     ]);
