@@ -206,7 +206,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 7.0 | Decision gate: weekly review | done | chunk/7.0-review-decisions | 2026-10-29 | ADR 0015: user-week periods, optional wins/blockers/lessons + up to 10 linked priorities, open during its week and the next then read-only, nothing required to finish, live summary, `weekly_review` reminder kind; 7.1–7.5 and DATA_MODEL synced |
 | 7.1 | Weekly summary queries | done | chunk/7.1-weekly-summary | 2026-10-29 | `src/server/modules/metrics/review.ts`: `weeklySummary` with six `Metric`s (tasks completed, planned vs completed, rescheduled, goals without activity, habits, deadlines next period), each with definition, range, `hasData`; computed live; no UI |
 | 7.2 | Reviews: schema and service | done | chunk/7.2-review-schema-service | 2026-10-29 | `weekly_reviews` + `weekly_review_priorities` (migration 0016: period/length/exactly-one CHECKs, composite cascading FKs, unique period and targets), service (start, save text, set priorities, finish, delete) refusing writes once closed, `weekly_review.*` events with no text; no UI |
-| 7.3 | Review flow UI | todo | | | |
+| 7.3 | Review flow UI | done | chunk/7.3-review-flow-ui | 2026-10-29 | Review in the nav (`/review?week=&step=`), opens last week unless finished, started client-side on opening; Look back / Reflect / Adjust (pause/resume/drop goals, reschedule/cancel stalled tasks, plan next week) / Choose priorities, each saved on leaving; Finish with nothing filled; closed review read-only |
 | 7.4 | Review history | todo | | | |
 | 7.5 | Review reminder | todo | | | |
 | 7.✓ | Phase 7 checkpoint (user) | todo | | | |
@@ -3001,3 +3001,31 @@ Template:
   - The goal and task delete confirmations don't mention that review priorities linking to them go (from 7.0; 7.3).
   - Phase 10 export (10.1) must include reviews and their priorities (from 7.0).
   - Lint warns about the unused `_omitted` in `src/server/modules/habits/validation.test.ts` (from 6.1).
+
+### 7.3: Review flow UI (2026-10-29)
+- **Built:**
+  - Navigation: Review after Track in `NAV_ITEMS` (a clock-arrow icon; the phone bar is now 6 columns) and `APP_ROUTE_SEGMENTS`; `shell.spec.ts` and the nav unit test updated.
+  - Route `/review?week=<first day>&step=look-back|reflect|adjust|priorities` with `error.tsx`. No `week` opens the default (last week unless its review is finished); a `week` is honoured when it is this week, last week, or a week the user has a review of; anything else falls back.
+  - `src/lib/review-flow.ts` (pure): `REVIEW_STEPS`, `REVIEW_STEP_LABELS`, `parseReviewStep`, `parseReviewWeek`, `adjacentReviewStep`, `reviewHref`, `defaultReviewWeek`, `nextReviewWeek` (the week after the reviewed one, with the days from today on).
+  - `src/server/modules/weekly-reviews/queries.ts`: `getReviewForWeek` (review + priorities with current titles/statuses + `closesOn`), `getReviewPage`, `getAdjustStep` (active/paused goals, stalled = Today's "decide" + "earlier", next week's planned tasks, the other open tasks), `getPriorityOptions`. `actions.ts`: `startWeeklyReview`, `saveWeeklyReviewText`, `setWeeklyReviewPriorities`, `finishWeeklyReview` (no delete action yet; 7.4).
+  - `src/components/reviews/`: `review-header.tsx` (week dates, Not finished / Finished on, until when it can change, the other open week), `start-review.tsx`, `review-flow.tsx` (`ReviewFlow` stepper + Back/Next/Finish, `useStepSave`), `look-back.tsx`, `reflect-step.tsx`, `adjust-step.tsx`, `priorities-step.tsx`, `read-only-review.tsx`. `TodayDateEditor` is now exported from `today-view.tsx` and reused for Reschedule.
+  - Tests: unit `review-flow.test.ts`; integration `review-flow.integration.test.ts` (12: default week before/after finishing, a closed review read-only, fallbacks, the closing day in Tokyo, cross-user, priorities with renamed/paused/completed targets, the Adjust read model for this week and last week, priority options, actions signed out / full flow / field errors / NotFound); e2e `review.spec.ts` (pause a goal and plan two tasks for next week, then priorities reordered with a note, Finish, reload to check every step saved, default moves to this week; an empty review finished with the keyboard alone; axe on every step).
+  - Docs: PRODUCT_SPEC Journey D and §7.
+- **Deviations:**
+  1. **The review is started by the client on opening**, not while the server renders: the page renders `StartReview`, which calls the action once and the refresh shows the first step. A render never writes.
+  2. **The closed read-only view is minimal** (summary as of now, text, priorities with current statuses). 7.4 owns history, edit and delete, and can build on `ReadOnlyReview`.
+- **Decisions:**
+  - "Stalled" = open tasks whose deadline has passed or that were planned for an earlier day (Today's "Needs a decision" and "Earlier, not done"). Reschedule changes the deadline for the first, the plan date for the second.
+  - Adjust offers Pause and Drop for active goals and Resume and Drop for paused ones, with the goal page's toasts. No confirmation (all reversible, as on the goal page).
+  - "Plan next week" offers the days of the week after the reviewed one from today on, so reviewing last week offers only the rest of this week.
+  - Steps save when left through the step links, Back, Next or Finish; only changed fields are sent. Leaving through the main navigation doesn't save the step being edited.
+  - "Finish review" sits on the last step; a finished review shows "Save review" there instead.
+  - Dates that Node and Chrome word differently (`formatDateSpan`) are formatted on the server and passed to client components; the first version had a hydration mismatch.
+- **Next chunk should know:**
+  - Locators: nav "Review steps" (links with `aria-current="step"`), h2 = step label, region "Reviewed week", list "Summary of the week", list "Active and paused goals" with "Pause: <title>"/"Resume: …"/"Drop: …", list "Stalled tasks" with "Reschedule: …"/"Cancel task: …", form "Plan a task for next week" (Task, Day, Plan), list "Planned for next week", form "Add a priority" ("Goal or task", Add), ordered list "Priorities for next week" with "Move up/Move down/Remove: <title>", "Note (optional)".
+  - 7.4: `getReviewForWeek` and `ReadOnlyReview` are the reuse points; `reviewHref(week, step)` reopens the flow on a week for Edit.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint (the 6.1 warning, below), typecheck, 997 unit and 685 integration tests. `pnpm build` passes. `pnpm test:e2e`: 80 passed on the first full run. No schema change, so no migration. Desktop and 375 px screenshots checked; no screen-reader or manual dark-mode pass.
+- **Follow-ups:**
+  - Leaving a step through the main navigation (or closing the tab) loses that step's unsaved text; consider saving on blur or warning before leaving.
+  - The goal and task delete confirmations still don't mention that review priorities linking to them go (from 7.0).
+  - Earlier follow-ups still open: Phase 10 export must include reviews; the unused `_omitted` in `habits/validation.test.ts`; primary button hover contrast.

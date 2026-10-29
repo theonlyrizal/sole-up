@@ -403,7 +403,7 @@ function todayTaskDetails(
  * Picks a new planned date ("plan") or a new deadline ("due") for one task.
  * A timed deadline keeps its time of day in its own zone. Escape cancels.
  */
-function TodayDateEditor({
+export function TodayDateEditor({
   task,
   kind,
   locale,
