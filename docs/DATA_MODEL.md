@@ -408,31 +408,62 @@ Rules:
 Implemented in chunk 5.7 as `reminder_sweep_status`: one row for the whole app (`id` smallint, always 1 by CHECK), `last_sweep_at` (timestamptz, the `now` of the latest finished sweep; an overlapping earlier sweep never moves it back). No user data, so no `user_id`. Settings → Reminders warns when it is null or more than 60 minutes old (`isSweepOverdue`), so a stopped cron-job.org job is noticed.
 
 ### Note
-A piece of personal information the user wants to keep.
+A piece of personal information the user wants to keep, written in a rich-text editor ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Planned for chunk 8.1 as `notes`, with `unique (id, user_id)`.
 
-Suggested fields:
+Fields:
 - `id`
 - `user_id`
-- `title`
-- `body`
-- `created_at`
-- `updated_at`
+- `title` (optional; trimmed, empty → null, up to 200 characters; shown as "Untitled" when null)
+- `body` (`jsonb`, required): the editor's (TipTap/ProseMirror) JSON document, the source of truth. Never HTML.
+- `body_text` (text, required): plain text the server derives from `body`, up to 100,000 characters. The client never sends it.
+- `search_vector` (generated, stored `tsvector`): title weighted A, `body_text` weighted B, `english` configuration, with a GIN index
 - `archived_at` (optional)
+- `created_at`
+- `updated_at` (moves on title and body changes only, not on links or tags)
 
-If notes can link to multiple entity types, use an explicit linking table rather than arbitrary unvalidated references.
+Rules:
+- **The body is validated server-side** against one allowlist shared with the editor (`src/lib/notes/`): paragraphs, headings 1–3, bullet and ordered lists, blockquotes, code blocks, horizontal rules, hard breaks; bold, italic, strike, inline code and links (`http:`, `https:`, `mailto:` only). No images, tables, task lists or raw HTML. Unknown types or attributes, nesting deeper than 20 levels, or more than 512 KB of JSON are refused, never silently fixed.
+- Rendered as React elements through the same allowlist, never as an HTML string.
+- A note row is created on the first save with a title or a non-empty body. Saves carry the `updated_at` they started from, and a stale one is refused as a conflict.
+- **Archive** hides a note from the Notes list, search and the linked-note lists, and makes it read-only until restored. **Delete** is a confirmed hard delete that removes its links and tags.
+- Audit events are on the note: `note.created|updated|archived|restored|linked|unlinked|tags_changed`. `note.updated` holds changed field names only and is skipped within 10 minutes of the note's previous one. Never the title, body, `body_text` or a tag name.
+- Search covers notes that are not archived, plus goal and task titles through expression GIN indexes on `to_tsvector('english', title)` (chunk 8.4). Search terms are never put in a URL or logged.
 
-### NoteLink (optional)
-Links a note to a goal, task, or other supported entity. Supported targets are decided at the Phase 8 decision gate.
+### NoteGoal and NoteTask
+Link a note to goals and tasks ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Typed join tables, not a polymorphic `entity_type`/`entity_id`, so the database enforces existence and ownership. Planned for chunk 8.1 as `note_goals` and `note_tasks`.
 
-Suggested fields:
-- `id`
+Fields:
 - `user_id`
 - `note_id`
-- `entity_type`
-- `entity_id`
+- `goal_id` (`note_goals`) or `task_id` (`note_tasks`)
 - `created_at`
 
-Validate that the referenced entity exists and belongs to the same user. Consider a more strongly typed design if cross-entity links become important.
+Rules:
+- Composite FKs `(note_id, user_id) → notes`, and `(goal_id, user_id) → goals` or `(task_id, user_id) → tasks`, all `ON DELETE CASCADE`.
+- Unique `(note_id, goal_id)` / `(note_id, task_id)`, plus an index on the target column.
+- A note has at most 50 links in all. Any of the user's goals and tasks can be linked, whatever its status.
+- Deleting a goal or task removes the link and keeps the note. Other targets (habits, life areas, events, reviews) are not linkable in v1. Each would be another join table.
+
+### Tag and NoteTag
+Labels for notes only ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Planned for chunk 8.5 as `tags` and `note_tags`.
+
+`tags` fields:
+- `id`
+- `user_id`
+- `name` (trimmed, 1–40 characters; `unique (user_id, lower(name))`)
+- `created_at`
+- `updated_at`
+
+`note_tags` fields:
+- `user_id`
+- `note_id`
+- `tag_id`
+- `created_at`
+
+Rules:
+- `tags` has `unique (id, user_id)`. `note_tags` has composite FKs to the note and the tag, both `ON DELETE CASCADE`, unique `(note_id, tag_id)` and an index on `tag_id`.
+- A note has at most 20 tags. Tags are created inline while tagging (a name matches an existing tag ignoring case), renamed (a taken name is a conflict) and deleted (only untags its notes). An unused tag stays until deleted.
+- Audit events: `tag.created`, `tag.renamed` on the tag, `note.tags_changed` (tag IDs from and to) on the note. Never a tag name.
 
 ### AuditEvent
 A record of a meaningful change, used for history and analytics. Replaces the earlier activity-event concept ([ADR 0005](decisions/0005-history-and-audit-log.md)). State tables remain the source of truth; audit events describe how they changed.
@@ -564,7 +595,8 @@ User
  ├── Tasks (inbox: no parent) ── TimeBlocks ── TimeBlockExceptions
  ├── Habits ── HabitSchedules, HabitPauses, HabitLogs
  ├── CalendarEvents ── CalendarEventExceptions
- ├── Notes ── NoteLinks
+ ├── Notes ── NoteGoals (→ a Goal), NoteTasks (→ a Task), NoteTags (→ a Tag)
+ ├── Tags
  ├── AuditEvents
  ├── WeeklyReviews ── WeeklyReviewPriorities (→ a Goal or a Task)
  └── PersonalMemories (later)
@@ -597,6 +629,7 @@ Exact indexes should follow real query patterns and query plans, not be added in
 - **Deleting a milestone** takes its tasks off it the same way, with a `task.moved` event each (to no parent, not to the goal).
 - **Deleting a task** deletes its time blocks and their exceptions ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)). Deleting a goal or life area clears the link on calendar events and keeps the events.
 - **Deleting a goal or task** also removes any weekly review priority that links to it. **Deleting a weekly review** (allowed even when closed) removes its priorities ([ADR 0015](decisions/0015-weekly-review-period-structure-lock.md)).
+- **Deleting a goal or task** removes its note links and keeps the notes. **Deleting a note** removes its links and tags, and **deleting a tag** only untags its notes ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)).
 - **Deleting the account** cascades every user-owned row from `users` in one transaction, and revokes sessions and push subscriptions.
 - Every hard delete also removes the entity's audit events in the same transaction.
 
@@ -625,7 +658,7 @@ Settled:
 9. Calendar event shapes, recurrence with exceptions, and time blocks ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)).
 10. Habit cadences, check and quantity measures, logs, versioned schedules, pauses and consistency denominators ([ADR 0014](decisions/0014-habit-cadence-logs-consistency.md)).
 11. Weekly reviews: user-week periods, optional text, linked priorities, the open window and the review reminder ([ADR 0015](decisions/0015-weekly-review-period-structure-lock.md)).
+12. Notes: a rich-text JSON body with a derived plain-text copy, typed links to goals and tasks, English full-text search, and tags on notes ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)).
 
 Still open (decided at phase gates in the implementation plan):
-1. Supported note links (Phase 8).
-2. Backup and log retention (Phase 10 privacy notes).
+1. Backup and log retention (Phase 10 privacy notes).

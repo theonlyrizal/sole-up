@@ -209,12 +209,13 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 7.3 | Review flow UI | done | chunk/7.3-review-flow-ui | 2026-10-29 | Review in the nav (`/review?week=&step=`), opens last week unless finished, started client-side on opening; Look back / Reflect / Adjust (pause/resume/drop goals, reschedule/cancel stalled tasks, plan next week) / Choose priorities, each saved on leaving; Finish with nothing filled; closed review read-only |
 | 7.4 | Review history | done | chunk/7.4-review-history | 2026-10-29 | Past reviews at `/review/history` (newest first, Finished on / Not finished, open until / closed on, no skipped-week counts), read-only `/review/history/[id]` (text, current priorities, summary as of now), Edit only while open, confirmed delete action |
 | 7.5 | Review reminder | done | chunk/7.5-review-reminder | 2026-10-29 | `weekly_review` reminder kind (migration 0017: kind CHECK, `kind` added to the one-scheduled index, `weekly_review_day`/`_time` both-or-neither CHECK), scheduled and rolled like the nudge, "Time for your weekly review" → `/review`, Settings → Reminders day + time with the quiet-hours warning |
-| 7.✓ | Phase 7 checkpoint (user) | todo | | | |
-| 8.0 | Decision gate: notes | todo | | | |
+| 7.✓ | Phase 7 checkpoint (user) | done | | 2026-10-29 | User marked done at the start of 8.0, without the planned three real weekly reviews |
+| 8.0 | Decision gate: notes | done | chunk/8.0-notes-decisions | 2026-10-29 | ADR 0016: TipTap rich text stored as validated JSON + derived `body_text`, `note_goals`/`note_tasks` join tables, English FTS (generated `search_vector`, GIN), tags on notes; 8.1–8.4 rewritten, 8.5 Tags added, DATA_MODEL synced |
 | 8.1 | Notes: schema and service | todo | | | |
 | 8.2 | Notes UI | todo | | | |
 | 8.3 | Linking | todo | | | |
 | 8.4 | Search | todo | | | |
+| 8.5 | Tags | todo | | | |
 | 9.1 | Insight definitions and metrics | todo | | | |
 | 9.2 | Insights page | todo | | | |
 | 9.3 | Dismiss and correct | todo | | | |
@@ -1135,26 +1136,70 @@ Decided 2026-10-29 in [ADR 0015](decisions/0015-weekly-review-period-structure-l
 **Goal:** Keep information connected to the goals it supports.
 
 ### 8.0 Decision gate
-- **Format.** Recommended: Markdown text, rendered without raw HTML and sanitized.
-- **Links.** Recommended: typed join tables (`note_goals`, `note_tasks`) instead of polymorphic `entity_type`/`entity_id`, so foreign keys and ownership are enforced.
-- **Search.** Recommended: Postgres full-text search (a `tsvector` generated column with a GIN index).
-- **Deferred:** backlinks between notes, tags, attachments.
+Decided 2026-10-29 in [ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md). Later chunks follow it rather than this summary. The user chose a rich-text editor against the gate's recommendation of Markdown, and added tags, which the gate had deferred. Two questions were added beyond the gate's: how a rich-text body is stored, and what tags apply to. Phase 8 gains chunk 8.5 for tags.
+- **Format:** a TipTap (ProseMirror) WYSIWYG editor. The body is stored as the editor's JSON document (`jsonb`), validated server-side against one shared allowlist of nodes and marks (no images, tables, task lists or raw HTML; links `http:`/`https:`/`mailto:` only). The server derives a plain-text `body_text` for search, previews and limits. Rendered as React elements, never an HTML string.
+- **Links:** typed join tables `note_goals` and `note_tasks` with composite FKs cascading on both sides; many links per note (at most 50); goals and tasks only.
+- **Search:** Postgres full-text search with the `english` configuration: a generated `search_vector` on notes (title weighted above body) with a GIN index, expression GIN indexes on goal and task titles, `websearch_to_tsquery`, `ts_headline` highlights.
+- **Tags:** on notes only. User-owned tags, unique ignoring case, created inline, renamed and deleted from Notes (deleting only untags); filter the list and search by one tag.
+- **Deferred:** backlinks between notes and attachments.
+- **Derived in the ADR, not asked:** title optional (up to 200), body limits (512 KB of JSON, 100,000 characters of text, 20 levels deep); a row only on the first save with content; autosave with a stale-`updated_at` conflict; `updated_at` moves on content only; archive hides a note from the list, search and linked lists, read-only until restored; deleting a goal or task keeps the note; search as a Server Action so terms stay out of URLs and logs; `note.*` and `tag.*` events with `note.updated` at most once per 10 minutes, no content.
 
 ### 8.1 Notes: schema and service
-- Table `notes`: `title`, `body`, `archived_at?`, timestamps, `search_vector` generated, GIN index.
-- Link tables with composite FKs and cascade on both sides.
-- Audit events record created, updated and archived, **never the body or title**.
+- **Tables** (ADR 0016), each with `user_id`:
+  - `notes`:
+    - `title?`, `body` (`jsonb`, not null), `body_text` (text, not null, server-derived), `archived_at?`, timestamps
+    - `search_vector`: a generated, stored `tsvector`, `setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', body_text), 'B')`, with a GIN index. Drizzle needs a custom `tsvector` type; hand-edit the migration if the generated expression isn't expressible, and cover it with a test.
+    - `unique (id, user_id)`, an index on `(user_id, updated_at)`
+    - CHECKs: title 1–200 characters when set, `body_text` up to 100,000 characters
+  - `note_goals` and `note_tasks`:
+    - `note_id`, `goal_id` or `task_id`, `created_at`
+    - composite FKs `(note_id, user_id)` and `(goal_id, user_id)` / `(task_id, user_id)`, all `ON DELETE CASCADE`
+    - unique `(note_id, goal_id)` / `(note_id, task_id)`, and an index on the target column for the goal and task pages
+- **The document allowlist** in `src/lib/notes/` (no server-only imports, so 8.2's editor uses the same list):
+  - nodes `doc`, `paragraph`, `heading` (1–3), `bulletList`, `orderedList`, `listItem`, `blockquote`, `codeBlock`, `horizontalRule`, `hardBreak`, `text`; marks `bold`, `italic`, `strike`, `code`, `link`
+  - a recursive Zod schema refusing any other type or attribute, a link `href` that isn't `http:`/`https:`/`mailto:` or is over 2,048 characters, nesting deeper than 20, or more than 512 KB of JSON
+  - `toBodyText(doc)`: block nodes on separate lines, control characters removed
+- **Validation (Zod):** title trimmed, empty → null, up to 200; the body through the allowlist schema; `expectedUpdatedAt` on every save.
+- **Service:**
+  - **Save** creates a note on the first save with a title or a non-empty body (`note.created`), otherwise updates it. It derives `body_text`, refuses a stale `expectedUpdatedAt` with a `ConflictError` ("This note changed somewhere else") under a row lock, and moves `updated_at` only when the title or body changed.
+  - `note.updated` (changed field names only) is skipped when the note's latest `note.updated` event is under 10 minutes old.
+  - **Archive** / **restore** (`note.archived`, `note.restored`). An archived note refuses saves, links and tags until restored.
+  - **Link** / **unlink** a goal or task of the same user (`note.linked`, `note.unlinked`, `targetType` + `targetId`), at most 50 links per note. Linking an already linked target is a no-op with no event.
+  - **Delete** is a confirmed hard delete: links by cascade, the note's events in the same transaction.
+  - A no-op write records no event. No title, body or `body_text` ever goes into an event or a log.
+- **No UI.**
+- **Tests:** every CHECK and unique index, the generated `search_vector` (title outranks body), allowlist rejections (unknown node, `javascript:` link, an `on*` or `style` attribute, too deep, too large), `body_text` derivation, no row from an empty first save, the stale-save conflict, the 10-minute `note.updated` window, writes refused while archived, goal and task delete keeping the note, note delete removing links and events, cross-user (note, goal and task IDs), "no content in audit".
 
 ### 8.2 Notes UI
-- A Notes list sorted by updated date. An editor with an autosave indicator and a preview toggle. Archive and delete with confirmation.
-- **Done when:** a draft is not lost on navigation (autosave), and rendered Markdown cannot execute script (test).
+- **A Notes destination** in the navigation (`/notes`, `NAV_ITEMS`, `APP_ROUTE_SEGMENTS`, `shell.spec.ts`), with `/notes/[noteId]`, `/notes/new` and `/notes/archived`.
+- **List:** most recently updated first, each with its title (or "Untitled"), the first line of `body_text` and the updated date. A calm empty state with "New note".
+- **Editor:** TipTap, pinned at the current stable version, client-only (`immediatelyRender: false`), configured to exactly the 8.1 allowlist, so pasted content is reduced to it. A toolbar for the allowed marks and blocks, each reachable by keyboard with a label, plus the editor's keyboard shortcuts. A title field above the body.
+- **Autosave:** about a second after typing stops, and flushed on blur, route change and `pagehide`. An indicator shows "Saving…", "Saved" or "Not saved" with Retry. Leaving with an unsaved change asks first. A conflict keeps the unsaved text on screen and offers to load the saved version.
+- **Read-only renderer** (archived notes, and 8.3's lists if they preview): the stored JSON to React elements through the allowlist, never `dangerouslySetInnerHTML`; links with `rel="noopener noreferrer"`.
+- **Archive** (moves it to Archived, read-only, with Restore) and **delete** behind a confirmation.
+- **Done when:** the e2e shows a draft is not lost on navigation (autosave), and a test shows script never executes: a `javascript:` link and an `<img onerror>` / `<script>` paste are refused or stripped, and stored text containing markup renders as text. Keyboard-operable, axe passes.
 
 ### 8.3 Linking
-- Link a note from goal or task detail, and show linked notes on those pages.
+- **From a note:** a "Linked to" section in the editor to link goals and tasks (a picker searching all of the user's goals and tasks, showing their status) and unlink them.
+- **On goal detail and in the task dialog:** a "Notes" section listing linked, non-archived notes (title and updated date, linking to the note), "Link a note", "New note" (created already linked, on its first save), and unlink.
+- The goal and task delete confirmations say linked notes are kept and only unlinked, when there are any.
+- **Done when:** the e2e links a note from a goal and from a task, sees it on both, unlinks one, and deletes the goal with the note kept. Axe passes.
 
 ### 8.4 Search
-- Search across notes, plus goal and task titles, with highlighted results.
-- **Done when:** search returns only the current user's data (cross-user test).
+- **A search page** (`/notes/search`, reached from Notes and a search field in the shell) that searches notes, plus goal and task titles (ADR 0016).
+- **The query** runs through a Server Action, so terms never go into the URL or a log. Trimmed, 1–200 characters, `websearch_to_tsquery('english', …)`. A query of only stop words says there was nothing to search for.
+- **Indexes:** expression GIN indexes on `to_tsvector('english', title)` for `goals` and `tasks` (a migration).
+- **Results** in three groups: notes (not archived), goals and tasks (every status, shown). Each is ranked by `ts_rank_cd`, then most recently updated, up to 20 per group, and links to its item.
+- **Highlights:** `ts_headline` on the title and `body_text` with private delimiter characters, split into `<mark>` elements, never inserted as HTML.
+- **Done when:** search returns only the current user's data (a cross-user test for each group), stemming finds "running" for "run", archived notes don't appear, highlights render as text, and the e2e searches for a note and a task. Keyboard-operable, axe passes.
+
+### 8.5 Tags
+- **Tables** (ADR 0016), each with `user_id`:
+  - `tags`: `name`, timestamps; `unique (user_id, lower(name))`, `unique (id, user_id)`; CHECK name 1–40 characters
+  - `note_tags`: `note_id`, `tag_id`, `created_at`; composite FKs `(note_id, user_id)` and `(tag_id, user_id)`, both `ON DELETE CASCADE`; unique `(note_id, tag_id)`, an index on `tag_id`
+- **Service:** set a note's tags by name (an existing tag matched ignoring case, otherwise created: `tag.created`), at most 20 per note (`note.tags_changed`, tag IDs from and to); rename (`tag.renamed`, a taken name is a `ConflictError`); delete (a hard delete that untags its notes and removes its events). Tags on an archived note can't change. No tag name in an event or a log.
+- **UI:** a tag field in the editor (type to pick or create), tag chips in the Notes list, a tag filter on the list (`?tag=<id>`, an ID only) and on search's notes group, and a "Tags" manager on Notes to rename and delete, the delete confirmation naming the number of notes.
+- **Done when:** tests cover the case-insensitive unique name (create and rename), the 20-tag limit, delete untagging only, cross-user (tag and note IDs), "no tag names in audit"; the e2e tags a note, filters by the tag, renames it and deletes it. Axe passes.
 
 ---
 
@@ -1232,6 +1277,7 @@ Decided 2026-10-29 in [ADR 0015](decisions/0015-weekly-review-period-structure-l
 | Projects as a task parent | Dogfooding shows non-goal work needs grouping |
 | Minute-accurate reminders (a paid always-on host calling the sweep every minute, or a worker), time-block reminders, several reminders per item | The Phase 5 checkpoint shows 15-minute-early delivery or Neon's compute allowance is a real problem (ADR 0013) |
 | Calendar sync, a Month view, dragging events on the grid (time blocks and recurrence are in v1, ADR 0012) | A clear repeated need from real use, judged at the Phase 4 checkpoint |
+| Backlinks between notes, note attachments (images, files), more link targets for notes (ADR 0016) | Real use shows the need; attachments also need file storage the free hosts don't provide |
 | AI-assisted weekly review (roadmap Phase 3) | Phases 7 and 9 stable, a provider ToS review, a provider adapter, cost limits |
 | User-controlled memory (roadmap Phase 4) | The AI review is in use and trusted, and the memory policy is written |
 | Personalized and proactive planning | Memory is in place, plus user controls for frequency and tone |
@@ -3082,3 +3128,42 @@ Template:
   - Other e2e tests that save and reopen a dialog right away may flake under load the same way (`preferences.spec.ts` "first sign-in" failed once with the default workers).
   - Phase 10 export (10.1) must include `weekly_review_day`/`weekly_review_time` (from 7.0).
   - Earlier follow-ups still open: goal and task delete confirmations don't mention review priorities; saving a review step left through the main navigation (7.3); the unused `_omitted` in `habits/validation.test.ts`; primary button hover contrast.
+
+### 8.0: Decision gate: notes (2026-10-29)
+- **Built:**
+  - ADR 0016 (notes: rich text, links, search and tags) and its index row.
+  - Chunks 8.0–8.4 rewritten to match, and a new chunk 8.5 Tags (Progress log row, AGENT_PROMPTS prompt). Prompts for 8.1–8.4 updated.
+  - `DATA_MODEL.md`: Note rewritten, NoteLink replaced by NoteGoal and NoteTask, Tag and NoteTag added, plus §4, the §6 deletion rules and §7 (note links settled).
+  - `PRODUCT_SPEC.md` (MVP item 9, §12 notes settled, nothing left open), `ROADMAP.md` 1E, a "Later" row for backlinks, attachments and more link targets.
+  - Progress log: 7.✓ marked done at the user's request.
+  - No code.
+- **Deviations:**
+  1. **Rich text, against the recommendation of Markdown:** a TipTap editor, so 8.2's Markdown preview toggle is gone.
+  2. **Tags added, which the gate had deferred:** on notes only, in a new chunk 8.5.
+  3. **Two questions beyond the gate's:** how a rich-text body is stored, and what tags apply to.
+  4. Docs beyond the prompt's list (PRODUCT_SPEC, ROADMAP, AGENT_PROMPTS, the Later table), because they described Markdown notes or open note questions.
+- **Decisions:**
+  - **Asked and answered:**
+    - format: a rich-text editor (against the recommendation)
+    - storage: the editor's JSON as the source of truth, validated against a shared allowlist, plus a server-derived `body_text` (as recommended)
+    - links: typed join tables `note_goals`, `note_tasks` (as recommended)
+    - search: Postgres FTS with the `english` configuration (as recommended)
+    - deferred: tags added; backlinks and attachments stay deferred
+    - tags: notes only, created inline, delete only untags (as recommended)
+  - **Derived and recorded in ADR 0016, not asked separately:**
+    - the allowlist (headings 1–3, lists, quote, code, rule, break; bold/italic/strike/code/link; `http:`/`https:`/`mailto:`), refused rather than fixed; 512 KB JSON, 20 levels, `body_text` 100,000 characters
+    - title optional (up to 200, "Untitled"); a row only on the first save with content
+    - autosave with a stale-`updated_at` conflict; `updated_at` moves on content only
+    - archive hides from list, search and linked lists and makes the note read-only; delete removes links, tags and events
+    - at most 50 links per note, any status; goal/task delete keeps the note
+    - search as a Server Action (terms never in a URL or log), three groups of 20, every goal/task status, archived notes excluded, `ts_headline` with private delimiters rendered as `<mark>`
+    - tags 1–40 characters, unique ignoring case, at most 20 per note, one-tag filter
+    - events `note.created|updated|archived|restored|linked|unlinked|tags_changed`, `tag.created|renamed`, `note.updated` at most once per 10 minutes; no `*.deleted`; no content or tag names
+- **Next chunk should know:**
+  - 8.1: put the allowlist and `toBodyText` in `src/lib/notes/` with no server-only imports, since 8.2's editor config must match it. `search_vector` needs a Drizzle custom type; check the generated SQL, and hand-edit the migration if the expression comes out wrong. `to_tsvector` with an explicit `'english'` is immutable, so it works in a generated column.
+  - 8.1: the 10-minute `note.updated` window reads the note's latest event, so test it with a fixed clock.
+  - 8.3: tasks have no detail page; their "detail" is the task dialog.
+- **Unverified:** none (docs only). `docs/` is in `.prettierignore`, so `format:check` covers nothing here.
+- **Follow-ups:**
+  - Phase 10 export (10.1): convert each note's JSON to Markdown on the server, and include the JSON, links and tags. The 10.1 text ("Markdown for notes") still holds but now means a conversion.
+  - Privacy notes (10.3): note bodies are stored as JSON in the database and searched there.
