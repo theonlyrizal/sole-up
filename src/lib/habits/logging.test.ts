@@ -10,7 +10,6 @@ import {
   logValueProblem,
   showsOnToday,
   SKIP_HAS_NO_VALUE,
-  stripRange,
   VALUE_REQUIRED,
   weekProgressLabel,
 } from "./logging";
@@ -278,23 +277,5 @@ describe("isLoggableDay", () => {
     expect(
       isLoggableDay({ date: "2026-11-05", state: "future", log: null }, TODAY),
     ).toBe(false);
-  });
-});
-
-describe("stripRange", () => {
-  it("covers last week and this week, from the user's week start", () => {
-    expect(stripRange(TODAY, 1)).toEqual({
-      from: "2026-10-26",
-      to: "2026-11-08",
-    });
-    expect(stripRange(TODAY, 0)).toEqual({
-      from: "2026-10-25",
-      to: "2026-11-07",
-    });
-    // Today is the week's first day.
-    expect(stripRange(TODAY, 3)).toEqual({
-      from: "2026-10-28",
-      to: "2026-11-10",
-    });
   });
 });

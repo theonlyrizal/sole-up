@@ -200,7 +200,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 6.2 | Cadence engine | done | chunk/6.2-cadence-engine | 2026-10-29 | `src/lib/habits/consistency.ts`: `isActiveDay`, `weekTarget`, `habitDays`, `consistency`, `weekProgress`, `formatConsistency`, `cutToOneDecimal`, with definition text; exact credit sums; current week for quantity amended in ADR 0014 |
 | 6.3 | Habit CRUD UI | done | chunk/6.3-habit-crud-ui | 2026-10-29 | Track in the nav (`/track`, `/track/archived`), create/edit dialog (measure on create only, unit + target, daily/chosen days/N a week picker, seven days → daily, "applies from this week" note), pause/resume, archive/restore, delete naming the log count, optional goal link; edits save in one transaction |
 | 6.4 | Logging | done | chunk/6.4-habit-logging | 2026-10-29 | `setHabitLog`/`clearHabitLog` (active days up to today in the saved zone, value by measure, row lock, `habit.logged|log_changed|log_removed`), Today "Habits" section (one tap done/skip, full-target Done, Change amount, Undo toast), Track two-week strip with figure for backfills and corrections |
-| 6.5 | Track page and history | todo | | | |
+| 6.5 | Track page and history | done | chunk/6.5-track-history | 2026-10-29 | `/track?range=` (4w default, 12w, week) from the saved zone and week start, strip by week with row labels, figure + always-visible definition, "This week" as progress (`weekProgressFigure`), `src/lib/habits/track-range.ts`; no streaks, percentages or totals |
 | 6.6 | Home integration | todo | | | |
 | 6.✓ | Phase 6 checkpoint (user) | todo | | | |
 | 7.0 | Decision gate: weekly review | todo | | | |
@@ -2834,3 +2834,27 @@ Template:
   - Notes on habit logs (column exists, no UI).
   - Logging further back than two weeks waits for 6.5's ranges.
   - Earlier follow-ups still open: primary button hover contrast; the goal delete confirmation not mentioning linked habits; the unused `_omitted` in `habits/validation.test.ts`.
+
+### 6.5: Track page and history (2026-10-29)
+- **Built:**
+  - `src/lib/habits/track-range.ts` (pure): `TRACK_RANGES` (`4w` default, `12w`, `week`), `TRACK_RANGE_LABELS`, `parseTrackRange` (anything else → `4w`), `trackHref` (default stays `/track`), `trackRangeDates(today, weekStart, range)` (whole weeks, the week holding today last), `weekStartsOf`, `formatDateSpan` (`Intl` `formatRange`), `shortDateLabel`, `weekProgressFigure` ("1 of 3 times so far this week", days/times, "n at target" for quantity, skips; "Nothing expected this week" at 0).
+  - `habits/queries.ts`: `getTrackView(userId, now, range = "4w")` reads logs for the range only, and returns `range`, `rangeLabel`, `rangeDatesLabel`. `HabitHistory.weeks` has one entry per week of the range (with `shortLabel`), `figure` is null for "This week" (whose `definition` and `progressLabel` come from `weekProgress`), and the longer ranges keep the `times_per_week` progress line.
+  - `/track` reads `?range=`; `TrackView` has a "Range to show" nav (links with `aria-current`, like Upcoming) and the range's dates; `HabitStrip` shows the figure labelled by range, the definition always visible ("How this is counted: …", no longer behind `<details>`), and a date label on each week row (a subgrid, so the day cells line up).
+  - Removed `stripRange` from `logging.ts` (replaced by `trackRangeDates`).
+  - Tests: unit `track-range.test.ts` (parse/href round trip, all seven week starts × three ranges, year boundary, formatting, progress wording); integration `history.integration.test.ts` (7: default 4 weeks, 12 weeks reaching a backfill 10 weeks back, "This week" as progress for daily and N a week, the longer ranges' progress line, days before the start, Auckland + Sunday week start, cross-user in every range); 6.3/6.4 integration and `habit-logging.spec.ts` updated for the new shape and "Last 4 weeks"; e2e `track-history.spec.ts` (switch ranges in the URL, backfill in the oldest of 12 weeks, the 4 weeks unaffected, "This week" progress without a figure, fallback for an unknown range, definition visible, no "%" or "streak", axe).
+  - Docs: PRODUCT_SPEC §8 (Track's ranges).
+- **Deviations:**
+  1. **The progress line now says "times"/"days"** ("1 of 3 times so far this week") on Track, with "n at target" for quantity and the skips, so it stands alone without 6.4's "This week:" prefix. Today keeps 6.4's `weekProgressLabel` ("1 of 3 so far this week") unchanged.
+- **Decisions:**
+  - Range param values `4w`, `12w`, `week`, with labels "Last 4 weeks", "Last 12 weeks", "This week"; the default is the plain `/track`.
+  - Weeks oldest first, so the strip reads like a calendar and today's week is at the bottom.
+  - The definition is shown in full under each figure; for "This week" it is `weekProgress`'s week-scope definition.
+- **Next chunk should know:**
+  - 6.6: the last-4-weeks range is `trackRangeDates(today, weekStart, "4w")`; reuse it and `weekProgressFigure` with `engineData`/`engineInput` rather than computing dates again.
+  - Locators: the nav "Range to show" with links by label; week lists are still "<title>: Week of <date>"; the figure is a `<p>` starting "Last 4 weeks:" / "Last 12 weeks:".
+  - `formatDateSpan` output contains thin spaces around the dash; compare with `formatDateSpan` itself or normalise whitespace in tests.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint (the 6.1 warning, below), typecheck, 943 unit and 616 integration tests. `pnpm build` passes. `pnpm test:e2e`: 77 passed on the first full run. No schema change, so no migration. Desktop and 375 px screenshots checked; no screen-reader or manual dark-mode pass.
+- **Follow-ups:**
+  - The strip legend's "Partly done" and "Extra" marks render as wide pills rather than squares (`HabitStripLegend` combines `dayClass`'s `w-full` with `size-6`; from 6.4).
+  - With many habits on "Last 12 weeks", each strip is 84 day buttons; fine for now, revisit in 10.7 if Track gets slow.
+  - Earlier follow-ups still open: `reminders.spec.ts:138` reading the old reminder under load; notes on habit logs; primary button hover contrast; the goal delete confirmation not mentioning linked habits; the unused `_omitted` in `habits/validation.test.ts`.

@@ -44,7 +44,7 @@ beforeEach(() => {
 
 // Wednesday 4 Nov 2026, midday UTC. With no confirmed zone the user's today
 // is 2026-11-04; with the default Monday week start the week began 11-02,
-// and the Track strip covers 26 Oct to 8 Nov.
+// and Track's default range (the last 4 weeks) covers 12 Oct to 8 Nov.
 const NOW = new Date("2026-11-04T12:00:00Z");
 const TODAY = "2026-11-04";
 
@@ -435,7 +435,9 @@ describe("corrections reach the figures at once", () => {
     let track = await trackHabit(user.id, habit.id);
     // Last week: 0.5 of 2. This week so far: nothing done, nothing lost.
     expect(track.history.figure).toBe("0.5 of 2 times · 0 at target");
-    expect(track.history.progressLabel).toBe("0 of 2 so far this week");
+    expect(track.history.progressLabel).toBe(
+      "0 of 2 times so far this week · 0 at target",
+    );
     expect(dayOf(track, "2026-10-27")).toMatchObject({
       state: "completed",
       credit: 0.5,
@@ -448,7 +450,9 @@ describe("corrections reach the figures at once", () => {
     await log(user.id, habit.id, "2026-11-03", "completed", 6);
     track = await trackHabit(user.id, habit.id);
     expect(track.history.figure).toBe("1.7 of 3 times · 1 at target");
-    expect(track.history.progressLabel).toBe("0.7 of 2 so far this week");
+    expect(track.history.progressLabel).toBe(
+      "0.7 of 2 times so far this week · 0 at target",
+    );
   });
 });
 

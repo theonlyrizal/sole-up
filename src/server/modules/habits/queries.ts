@@ -30,10 +30,19 @@ import {
   habitDayLabel,
   isLoggableDay,
   showsOnToday,
-  stripRange,
   weekProgressLabel,
   type HabitLogValue,
 } from "@/lib/habits/logging";
+import {
+  DEFAULT_TRACK_RANGE,
+  formatDateSpan,
+  shortDateLabel,
+  TRACK_RANGE_LABELS,
+  trackRangeDates,
+  weekProgressFigure,
+  weekStartsOf,
+  type TrackRange,
+} from "@/lib/habits/track-range";
 import { db } from "@/server/db/client";
 import {
   goals,
@@ -46,8 +55,9 @@ import { getUserPreferences } from "@/server/modules/preferences/service";
 
 import { toHabit, toHabitLogValue, toHabitSchedule } from "./service";
 
-// Read models for the Track pages (chunk 6.3), their history strips and
-// Today's Habits section (chunk 6.4). Every query is scoped to the user.
+// Read models for the Track pages (chunk 6.3), their history over the
+// selected range (chunks 6.4 and 6.5) and Today's Habits section (chunk
+// 6.4). Every query is scoped to the user.
 // Every count comes from the 6.2 engine; nothing here recounts.
 
 /** A habit as Track lists it, with this week's schedule and its labels. */
@@ -88,19 +98,39 @@ export type HabitHistoryDay = {
   target: number | null;
 };
 
-/** A habit's last two weeks, with the figure for them. */
+/** A habit over the selected range, week by week, with its figure. */
 export type HabitHistory = {
-  weeks: { from: LocalDate; label: string; days: HabitHistoryDay[] }[];
-  /** "9 of 10 days · 1 skipped", or "Nothing expected in this range". */
-  figure: string;
+  /** Oldest first; the week holding today is last. */
+  weeks: {
+    from: LocalDate;
+    /** "Week of Oct 26, 2026". */
+    label: string;
+    /** "Oct 26". */
+    shortLabel: string;
+    days: HabitHistoryDay[];
+  }[];
+  /**
+   * "9 of 10 days · 1 skipped", or "Nothing expected in this range". Null
+   * for "This week", which shows the week's progress instead.
+   */
+  figure: string | null;
+  /** How the figure (or, for "This week", the progress) is counted. */
   definition: string;
-  /** "1 of 3 so far this week", for a `times_per_week` habit only. */
+  /**
+   * "1 of 3 times so far this week": always for "This week", and with the
+   * longer ranges for a `times_per_week` habit only.
+   */
   progressLabel: string | null;
 };
 
 export type TrackHabit = HabitListItem & { history: HabitHistory };
 
 export type TrackView = {
+  range: TrackRange;
+  /** "Last 4 weeks". */
+  rangeLabel: string;
+  /** "Oct 12 – Nov 8, 2026": the range's whole weeks. */
+  rangeDatesLabel: string;
   /** Active habits, then paused ones, oldest first within each. */
   habits: TrackHabit[];
   archivedCount: number;
@@ -268,20 +298,22 @@ function engineInput(
   };
 }
 
-/** The last two weeks of a habit as the Track strip shows them. */
+/** A habit over the selected range as Track shows it. */
 function habitHistory(
   habit: HabitListItem,
   input: HabitWeekInput,
+  selected: TrackRange,
+  range: HabitRange,
   context: UserContext,
 ): HabitHistory {
-  const range = stripRange(context.today, context.weekStart);
   const days = habitDays({ ...input, range });
-  const weeks = [range.from, addDays(range.from, 7)].map((from) => {
+  const weeks = weekStartsOf(range).map((from) => {
     const to = addDays(from, 6);
     const target = scheduleForWeek(input.schedules, to)?.target ?? null;
     return {
       from,
       label: `Week of ${formatLocalDate(from, context.locale)}`,
+      shortLabel: shortDateLabel(from, context.locale),
       days: days
         .filter((day) => day.date >= from && day.date <= to)
         .map((day): HabitHistoryDay => ({
@@ -299,16 +331,28 @@ function habitHistory(
     };
   });
 
-  const result = consistency({ ...input, range });
   const cadence = habit.schedule.cadenceType;
+  const progressOf = (progress: ReturnType<typeof weekProgress>) =>
+    weekProgressFigure(progress, cadence, habit.measure);
+
+  // "This week" is the week in progress, never a consistency figure.
+  if (selected === "week") {
+    const progress = weekProgress(input);
+    return {
+      weeks,
+      figure: null,
+      definition: progress.definition,
+      progressLabel: progressOf(progress),
+    };
+  }
+
+  const result = consistency({ ...input, range });
   return {
     weeks,
     figure: formatConsistency(result, cadence, habit.measure),
     definition: result.definition,
     progressLabel:
-      cadence === "times_per_week"
-        ? weekProgressLabel(weekProgress(input))
-        : null,
+      cadence === "times_per_week" ? progressOf(weekProgress(input)) : null,
   };
 }
 
@@ -324,12 +368,18 @@ async function userContext(userId: string, now: Date) {
   };
 }
 
-/** The Track page: active and paused habits, and what the form needs. */
+/**
+ * The Track page: active and paused habits over the selected range, and
+ * what the form needs. The range's dates come from the user's saved zone
+ * and week start, never the browser's.
+ */
 export async function getTrackView(
   userId: string,
   now: Date = new Date(),
+  selected: TrackRange = DEFAULT_TRACK_RANGE,
 ): Promise<TrackView> {
   const context = await userContext(userId, now);
+  const range = trackRangeDates(context.today, context.weekStart, selected);
   const [habitRows, [archived], goalRows] = await Promise.all([
     db
       .select()
@@ -351,14 +401,19 @@ export async function getTrackView(
   const data = await engineData(
     userId,
     items.map((item) => item.id),
-    stripRange(context.today, context.weekStart),
+    range,
   );
   return {
+    range: selected,
+    rangeLabel: TRACK_RANGE_LABELS[selected],
+    rangeDatesLabel: formatDateSpan(range, context.locale),
     habits: items.map((item) => ({
       ...item,
       history: habitHistory(
         item,
         engineInput(item, data.get(item.id), context),
+        selected,
+        range,
         context,
       ),
     })),

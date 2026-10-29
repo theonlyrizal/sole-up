@@ -175,6 +175,8 @@ Chunk 4.9 adds a "Next commitment" card above them: the first event or time bloc
 
 Chunk 6.4 adds a "Habits" section at the bottom of Today, once the user has an active habit: the habits due today (every active day for daily habits, scheduled days for chosen-day habits, and while the week's target isn't met for N-times-a-week habits), plus any already logged today. Each is done or skipped in one tap, with Undo in the toast; a quantity habit's Done logs its full target, and "Change amount" takes another. N-times-a-week rows show "1 of 3 so far this week". On Track, each habit shows its last two weeks as a strip with the figure for them and how it is counted; any active day up to today can be logged or corrected there, and the figure follows at once.
 
+Chunk 6.5 replaces Track's fixed two weeks with a range kept in the URL: the last 4 weeks (the default), the last 12, each including the current week, or this week alone, in whole weeks from the user's saved zone and week start. Each habit shows its strip week by week (oldest first, each row labelled with its first day), its figure for the range and, always visible beside it, how it is counted. "This week" shows the week in progress ("1 of 3 times so far this week", "2 of 5 days so far this week · 1 skipped"), never a consistency figure; the longer ranges add that line for N-times-a-week habits. Any active day in the range can be logged or corrected. There are no streak counters, percentages or totals across habits.
+
 ## 9. Analytics and insight rules
 
 - Show the time range and definition for every metric.
