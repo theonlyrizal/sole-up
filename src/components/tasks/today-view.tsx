@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useId, useOptimistic, useRef, useState, useTransition } from "react";
 
 import { BlockTimeDialog } from "@/components/calendar/block-form";
+import { TodayHabits } from "@/components/habits/today-habits";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -29,6 +30,7 @@ import {
   type TodaySection,
   todaySectionAnchor,
 } from "@/lib/today";
+import type { TodayHabits as TodayHabitsData } from "@/server/modules/habits/queries";
 import {
   changeTaskStatus,
   planTask,
@@ -56,6 +58,7 @@ type TodayViewProps = {
   timeline: ScheduleEntry[];
   sections: TodayTasks;
   suggestions: TodaySuggestions;
+  habits: TodayHabitsData;
   locale: string;
   timeZone: string;
 };
@@ -65,7 +68,7 @@ type TodayViewProps = {
  * decision, and earlier plans not done. Each open task shows in one section
  * (see `todaySection`). Planned for today always shows; the others only
  * when they have tasks. Today's events and time blocks sit above them, as a
- * timeline (chunk 4.9).
+ * timeline (chunk 4.9), and the day's habits below them (chunk 6.4).
  */
 export function TodayView({
   dateLabel,
@@ -75,6 +78,7 @@ export function TodayView({
   timeline,
   sections,
   suggestions,
+  habits,
   locale,
   timeZone,
 }: TodayViewProps) {
@@ -110,6 +114,7 @@ export function TodayView({
           timeZone={timeZone}
         />
       ))}
+      <TodayHabits data={habits} locale={locale} />
     </div>
   );
 }

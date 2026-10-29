@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { SKIP_HAS_NO_VALUE } from "@/lib/habits/logging";
+
 import {
   AMOUNT_MESSAGE,
   changeHabitScheduleSchema,
   CHECK_HAS_NO_TARGET,
   CHECK_HAS_NO_UNIT,
+  clearHabitLogSchema,
   createHabitSchema,
   editHabitSchema,
   END_BEFORE_START,
   habitIdSchema,
+  setHabitLogSchema,
   TARGET_REQUIRED,
   UNIT_REQUIRED,
   updateHabitSchema,
@@ -394,5 +398,59 @@ describe("habitIdSchema", () => {
   it("needs a UUID", () => {
     expect(habitIdSchema.safeParse({ id: "nope" }).success).toBe(false);
     expect(habitIdSchema.parse({ id: ID })).toEqual({ id: ID });
+  });
+});
+
+describe("setHabitLogSchema", () => {
+  const entry = { habitId: ID, localDate: "2026-11-02", status: "completed" };
+
+  it("takes a local date or today, and an optional amount", () => {
+    expect(setHabitLogSchema.parse(entry)).toEqual({ ...entry, value: null });
+    expect(
+      setHabitLogSchema.parse({ ...entry, localDate: " today ", value: "2.5" }),
+    ).toEqual({ ...entry, localDate: "today", value: 2.5 });
+    expect(
+      setHabitLogSchema.parse({ ...entry, status: "skipped", value: "" }),
+    ).toEqual({ ...entry, status: "skipped", value: null });
+  });
+
+  it("reports every problem at once", () => {
+    expect(
+      issues(
+        setHabitLogSchema.safeParse({
+          habitId: "nope",
+          localDate: "2026-02-30",
+          status: "done",
+          value: "0",
+        }),
+      ),
+    ).toEqual([
+      "habitId: Choose a habit.",
+      "localDate: Pick a day.",
+      "status: Choose done or skipped.",
+      `value: ${AMOUNT_MESSAGE}`,
+    ]);
+  });
+
+  it("refuses an amount on a skip, and a note", () => {
+    expect(
+      issues(
+        setHabitLogSchema.safeParse({ ...entry, status: "skipped", value: 3 }),
+      ),
+    ).toEqual([`value: ${SKIP_HAS_NO_VALUE}`]);
+    expect(
+      issues(setHabitLogSchema.safeParse({ ...entry, note: "Felt good" })),
+    ).toEqual([': Unrecognized key: "note"']);
+  });
+});
+
+describe("clearHabitLogSchema", () => {
+  it("needs a habit and a day", () => {
+    expect(
+      clearHabitLogSchema.parse({ habitId: ID, localDate: "today" }),
+    ).toEqual({ habitId: ID, localDate: "today" });
+    expect(
+      issues(clearHabitLogSchema.safeParse({ habitId: ID, localDate: "" })),
+    ).toEqual(["localDate: Pick a day."]);
   });
 });

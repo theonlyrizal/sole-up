@@ -15,11 +15,13 @@ import {
 } from "@/server/modules/habits/actions";
 import type {
   HabitListItem,
+  TrackHabit,
   TrackView as TrackViewData,
 } from "@/server/modules/habits/queries";
 
 import { DeleteHabitDialog } from "./delete-habit-dialog";
 import { HabitFormDialog, type HabitFormContext } from "./habit-form";
+import { HabitStrip, HabitStripLegend } from "./habit-strip";
 
 type StatusAction = {
   label: string;
@@ -43,7 +45,10 @@ const ARCHIVE: StatusAction = {
   run: archiveHabit,
 };
 
-/** Track: active habits, then paused ones, with their status actions. */
+/**
+ * Track: active habits, then paused ones, with their status actions and
+ * their last two weeks, where past days are logged or corrected.
+ */
 export function TrackView({ view }: { view: TrackViewData }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -97,11 +102,13 @@ export function TrackView({ view }: { view: TrackViewData }) {
         />
       ) : (
         <>
+          <HabitStripLegend />
           {active.length > 0 && (
             <HabitSection
               title="Active"
               habits={active}
               context={context}
+              locale={view.locale}
               pending={pending}
               onChangeStatus={changeStatus}
             />
@@ -112,6 +119,7 @@ export function TrackView({ view }: { view: TrackViewData }) {
               description="Paused days don't count. Resume a habit when you're ready."
               habits={paused}
               context={context}
+              locale={view.locale}
               pending={pending}
               onChangeStatus={changeStatus}
             />
@@ -125,8 +133,9 @@ export function TrackView({ view }: { view: TrackViewData }) {
 type SectionProps = {
   title: string;
   description?: string;
-  habits: HabitListItem[];
+  habits: TrackHabit[];
   context: HabitFormContext;
+  locale: string;
   pending: boolean;
   onChangeStatus: (habit: HabitListItem, action: StatusAction) => void;
 };
@@ -136,6 +145,7 @@ function HabitSection({
   description,
   habits,
   context,
+  locale,
   pending,
   onChangeStatus,
 }: SectionProps) {
@@ -152,6 +162,11 @@ function HabitSection({
         {habits.map((habit) => (
           <li key={habit.id} className="flex flex-col gap-3 p-4">
             <HabitSummary habit={habit} />
+            <HabitStrip
+              habit={habit}
+              weekStart={context.weekStart}
+              locale={locale}
+            />
             <div className="flex flex-wrap items-center gap-1">
               {[habit.status === "paused" ? RESUME : PAUSE, ARCHIVE].map(
                 (action) => (

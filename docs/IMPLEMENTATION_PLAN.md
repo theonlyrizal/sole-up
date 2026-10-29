@@ -199,7 +199,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 6.1 | Habits: schema and service | done | chunk/6.1-habits-schema-service | 2026-10-29 | `habits`, `habit_schedules`, `habit_pauses`, `habit_logs` (migration 0015, hand-edited `SET NULL (goal_id)`, one-open-pause index), per-type cadence Zod schemas, service with versioned schedules, pause/archive rows and `habit.*` events; no UI, logs or consistency |
 | 6.2 | Cadence engine | done | chunk/6.2-cadence-engine | 2026-10-29 | `src/lib/habits/consistency.ts`: `isActiveDay`, `weekTarget`, `habitDays`, `consistency`, `weekProgress`, `formatConsistency`, `cutToOneDecimal`, with definition text; exact credit sums; current week for quantity amended in ADR 0014 |
 | 6.3 | Habit CRUD UI | done | chunk/6.3-habit-crud-ui | 2026-10-29 | Track in the nav (`/track`, `/track/archived`), create/edit dialog (measure on create only, unit + target, daily/chosen days/N a week picker, seven days → daily, "applies from this week" note), pause/resume, archive/restore, delete naming the log count, optional goal link; edits save in one transaction |
-| 6.4 | Logging | todo | | | |
+| 6.4 | Logging | done | chunk/6.4-habit-logging | 2026-10-29 | `setHabitLog`/`clearHabitLog` (active days up to today in the saved zone, value by measure, row lock, `habit.logged|log_changed|log_removed`), Today "Habits" section (one tap done/skip, full-target Done, Change amount, Undo toast), Track two-week strip with figure for backfills and corrections |
 | 6.5 | Track page and history | todo | | | |
 | 6.6 | Home integration | todo | | | |
 | 6.✓ | Phase 6 checkpoint (user) | todo | | | |
@@ -2803,3 +2803,34 @@ Template:
   - Primary button hover contrast below 4.5:1 (design tokens, all primary buttons).
   - The goal delete confirmation still doesn't say linked habits lose their goal (from 6.1).
   - Lint warns about the unused `_omitted` in `src/server/modules/habits/validation.test.ts` (from 6.1).
+
+### 6.4: Logging (2026-10-29)
+- **Built:**
+  - `src/lib/habits/logging.ts` (pure): `logValueProblem` (value by measure and status), `changedLogFields`, `showsOnToday` (Today's row rule), `weekProgressLabel`, `formatAmount`, `describeLog` ("Done", "Skipped", "5 of 8 glasses"), `habitDayLabel`, `isLoggableDay`, `stripRange` (last week and this week), and the fixed messages.
+  - Audit events `habit.logged|log_changed|log_removed` (`localDate`, `fields` by name: `status`/`value`, `status` from/to), sharing one strict schema in `audit/types.ts`.
+  - `habits/validation.ts`: `setHabitLogSchema` (`habitId`, `localDate` as a date or `"today"`, `status`, optional amount; a skip with a value refused) and `clearHabitLogSchema`. `habits/service.ts`: `setHabitLog`, `clearHabitLog` (return `{ habitId, localDate, log, previous }` for undo), `toHabitLogValue`. `habits/actions.ts`: `setHabitLog`, `clearHabitLog`.
+  - `habits/queries.ts`: `engineData` / `engineInput` (schedules, pauses and a range of logs per habit for the 6.2 engine), `getTodayHabits(userId, now)`, and `getTrackView` items now carry `history` (`habitDays` for the strip, `consistency` + `formatConsistency` for "Last 2 weeks", `weekProgress` for `times_per_week`) plus the view's `locale`.
+  - UI: `src/components/habits/today-habits.tsx` (the "Habits" section at the bottom of `TodayView`), `habit-strip.tsx` (`HabitStrip`, `HabitStripLegend`, the day dialog), `use-habit-log.ts` (write + toast with Undo). `Toast` takes an optional `action` (Radix `Toast.Action` with `altText`), shown 8 s instead of 5.
+  - Tests: unit `logging.test.ts` (18) and the log schemas in `validation.test.ts`; integration `logs.integration.test.ts` (11: log/correct/clear with exact events and no-ops, value vs measure, future days in Auckland vs UTC, before start/after end/paused, clearing a kept log on an inactive day, cross-user NotFound, a past correction moving the strip and figure at once with its audit trail, quantity credit and this-week progress, Today's row rule, actions signed out and from form input); e2e `habit-logging.spec.ts` (2, Tokyo: one tap done/skip with Undo, quantity full target, Change amount with focus return and Escape, a reload; backfill on Track, correction to a skip, Undo, Escape, "No log", today from Today, axe on both pages and the dialog). The 6.3 `getTrackView` shape test now expects `locale`.
+  - Docs: DATA_MODEL HabitLog rules (writes, events, undo), PRODUCT_SPEC §8 (Today's Habits and the Track strip).
+- **Deviations:**
+  1. **The strip lives on Track with a "Last 2 weeks" figure**, its definition behind "How this is counted", and "This week: n of N so far" for `times_per_week`. The chunk didn't say where the strip goes, and its "done when" needs a figure to update. 6.5 replaces the fixed two weeks with its range selector and can reuse `habitHistory`/`HabitStrip`.
+  2. **Undo restores the day as it was**, not only deleting: a new log is deleted, a correction puts back the previous status and value (ADR 0014 says "Undo deletes the log", written for a new log). Recorded in DATA_MODEL.
+  3. **The toast primitive gained an action** (Undo), the first toast with a button.
+- **Decisions:**
+  - Today's day is `"today"` worked out on the server (as 2.5's rule), so a stale page can't log a wrong day; the result carries the real date, which undo uses.
+  - Today shows a habit when it is logged today (any status but archived, so a habit paused after logging today can still be undone), or when it is active on an active day and: daily; today scheduled (`weekly_days`); or `weekProgress.done < target` (`times_per_week`). The section shows once the user has an active habit ("No habits are due today." when none is due), at the bottom of Today, so existing heading lists are unchanged with no habits.
+  - Unlogged rows offer Done and Skip (and Change amount for quantity); logged rows offer the other status, Change amount and Clear. Rows update optimistically.
+  - The NotFound check comes first, so a foreign habit is NotFound whatever the date. Value, future and inactive-day errors are field errors whose message is also the action's message.
+  - No note in the API or UI yet (the column exists); a correction keeps whatever note a row has.
+  - Strip cells: shape and mark first, colour second (✓ done, ◐ partly, – skipped, + extra, dashed outline for Missed, struck-through grey for not active); every day's accessible name is "<full date>: <state>", with the amount where it matters.
+- **Next chunk should know:**
+  - Locators: Today's region "Habits" with one listitem per habit; buttons "Done: <title>", "Skip: <title>", "Change amount: <title>", "Clear: <title>"; the form "Amount today: <title>". On Track, each week is a list named "<title>: Week of <date>", day buttons are named "<full date>: <state label>" (e.g. `/: Missed$/`), and the day dialog is titled with the full date.
+  - Toasts are listitems in the region "Notifications (F8)"; `role="status"` is only Radix's announcer and holds no buttons. Rows change optimistically, so wait for the toast before navigating away (the first full e2e run failed on exactly that).
+  - 6.5/6.6: get engine input with `engineData(userId, ids, logRange)` and `engineInput(habit, data, context)` rather than new queries.
+- **Unverified:** `pnpm verify` passes: format, lint (the 6.1 warning, below), typecheck, 933 unit and 609 integration tests. `pnpm build` passes. `pnpm test:e2e`: 76 passed on the final full run. Of four full runs, three failed only on `reminders.spec.ts` "new events remind 10 minutes before…" (5.6's spec; the first also had my own wait bug, since fixed); it passed alone 3 of 3, and the same stress (`today.spec` + `reminders.spec`, `--repeat-each=6`) failed it 1 of 18 on `main` without this chunk, so it predates 6.4. `habit-logging`, `habits` and `today` specs passed 21 of 21 with `--repeat-each=3`. No schema change, so no migration. No screen-reader, phone or manual dark-mode pass.
+- **Follow-ups:**
+  - `reminders.spec.ts:138` reopens the event dialog as soon as "Event saved" shows, before the refresh brings the new reminder, so it reads the old value under load. Wait for the refreshed value (or retry the reopen) there.
+  - Notes on habit logs (column exists, no UI).
+  - Logging further back than two weeks waits for 6.5's ranges.
+  - Earlier follow-ups still open: primary button hover contrast; the goal delete confirmation not mentioning linked habits; the unused `_omitted` in `habits/validation.test.ts`.

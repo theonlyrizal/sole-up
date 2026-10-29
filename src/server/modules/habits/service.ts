@@ -14,6 +14,7 @@ import {
   scheduleForWeek,
   type HabitSchedule,
 } from "@/lib/habits/cadence";
+import { isActiveDay } from "@/lib/habits/consistency";
 import {
   closePause,
   HABIT_EDITABLE_FIELDS,
@@ -23,6 +24,13 @@ import {
   type Habit,
   type HabitStatusAction,
 } from "@/lib/habits/habit";
+import {
+  changedLogFields,
+  FUTURE_DAY,
+  INACTIVE_DAY,
+  logValueProblem,
+  type HabitLogValue,
+} from "@/lib/habits/logging";
 import { deleteAuditEventsForEntity, recordAudit } from "@/server/audit/record";
 import { db, type DbTransaction } from "@/server/db/client";
 import { isForeignKeyViolation } from "@/server/db/errors";
@@ -39,21 +47,24 @@ import {
   CHECK_HAS_NO_TARGET,
   TARGET_REQUIRED,
   type ChangeHabitScheduleInput,
+  type ClearHabitLogInput,
   type CreateHabitInput,
   type EditHabitInput,
   type HabitIdInput,
+  type SetHabitLogInput,
   type UpdateHabitInput,
 } from "./validation";
 
 // Every function takes the user's ID and scopes each query by it. A habit
 // that is missing or belongs to someone else is the same NotFoundError.
 // Each mutation writes its audit event in the same transaction.
-// Rules: ADR 0014. Log writes are chunk 6.4's; consistency is 6.2's.
+// Rules: ADR 0014. Consistency is the 6.2 engine's; nothing here counts.
 
 const GOAL_KEY = "habits_goal_id_user_id_fk";
 
 type HabitRow = typeof habits.$inferSelect;
 type ScheduleRow = typeof habitSchedules.$inferSelect;
+type LogRow = typeof habitLogs.$inferSelect;
 
 export function toHabit(row: HabitRow): Habit {
   return {
@@ -83,6 +94,10 @@ export function toHabitSchedule(row: ScheduleRow): HabitSchedule {
     ...parseCadence(row),
     target: amountFromRow(row.target),
   };
+}
+
+export function toHabitLogValue(row: LogRow): HabitLogValue {
+  return { status: row.status, value: amountFromRow(row.value) };
 }
 
 /** The user's local today and week start, as every date rule here uses. */
@@ -567,4 +582,154 @@ export async function detachHabitsFromGoalInTx(
       changes: { fields: ["goalId"], goalId: { from: goalId, to: null } },
     });
   }
+}
+
+/** What a log write did: the log now and before, for the UI's undo. */
+export type HabitLogResult = {
+  habitId: string;
+  localDate: LocalDate;
+  /** The day's log after the change; null when it has none. */
+  log: HabitLogValue | null;
+  /** The day's log before the change; null when it had none. */
+  previous: HabitLogValue | null;
+};
+
+/** The fields a log holds, by name, for its events. */
+const logFields = (log: HabitLogValue): ("status" | "value")[] =>
+  log.value === null ? ["status"] : ["status", "value"];
+
+const logOfDay = (userId: string, habitId: string, date: LocalDate) =>
+  and(
+    eq(habitLogs.habitId, habitId),
+    eq(habitLogs.userId, userId),
+    eq(habitLogs.localDate, date),
+  );
+
+/**
+ * Creates or corrects a habit's log for one day (ADR 0014 "Logs"): only on
+ * an active day, on or before the user's today. `value` is required on a
+ * completed quantity log and refused otherwise. The same log again is a
+ * no-op with no event. The habit row is locked, so two writes to one day
+ * can't race.
+ */
+export async function setHabitLog(
+  userId: string,
+  { habitId, localDate, status, value }: SetHabitLogInput,
+  now: Date = new Date(),
+): Promise<HabitLogResult> {
+  const { today } = await userCalendar(userId, now);
+  const date = localDate === "today" ? today : localDate;
+  const next: HabitLogValue = { status, value };
+
+  return db.transaction(async (tx) => {
+    const habit = await findForUpdate(tx, userId, habitId);
+    if (date > today) {
+      throw new ValidationError({ localDate: [FUTURE_DAY] }, FUTURE_DAY);
+    }
+    const problem = logValueProblem(habit.measure, next);
+    if (problem) throw new ValidationError({ value: [problem] }, problem);
+
+    const pauses = await tx
+      .select({
+        startDate: habitPauses.startDate,
+        endDate: habitPauses.endDate,
+      })
+      .from(habitPauses)
+      .where(
+        and(eq(habitPauses.habitId, habitId), eq(habitPauses.userId, userId)),
+      );
+    if (!isActiveDay(habit, pauses, date)) {
+      throw new ValidationError({ localDate: [INACTIVE_DAY] }, INACTIVE_DAY);
+    }
+
+    const [existing] = await tx
+      .select()
+      .from(habitLogs)
+      .where(logOfDay(userId, habitId, date));
+    const result = (previous: HabitLogValue | null): HabitLogResult => ({
+      habitId,
+      localDate: date,
+      log: next,
+      previous,
+    });
+
+    if (!existing) {
+      await tx.insert(habitLogs).values({
+        userId,
+        habitId,
+        localDate: date,
+        status,
+        value: amountToRow(value),
+      });
+      await recordAudit(tx, {
+        type: "habit.logged",
+        userId,
+        entityId: habitId,
+        changes: {
+          localDate: date,
+          fields: logFields(next),
+          status: { from: null, to: status },
+        },
+      });
+      return result(null);
+    }
+
+    const previous = toHabitLogValue(existing);
+    const fields = changedLogFields(previous, next);
+    if (fields.length === 0) return result(previous);
+
+    await tx
+      .update(habitLogs)
+      .set({ status, value: amountToRow(value) })
+      .where(logOfDay(userId, habitId, date));
+    await recordAudit(tx, {
+      type: "habit.log_changed",
+      userId,
+      entityId: habitId,
+      changes: {
+        localDate: date,
+        fields,
+        status: { from: previous.status, to: status },
+      },
+    });
+    return result(previous);
+  });
+}
+
+/**
+ * Removes a habit's log for one day: undo, or a correction to "no log".
+ * Allowed on any day, so a log kept on a day that no longer counts can
+ * still go. A day with no log is a no-op with no event.
+ */
+export async function clearHabitLog(
+  userId: string,
+  { habitId, localDate }: ClearHabitLogInput,
+  now: Date = new Date(),
+): Promise<HabitLogResult> {
+  const { today } = await userCalendar(userId, now);
+  const date = localDate === "today" ? today : localDate;
+
+  return db.transaction(async (tx) => {
+    await findForUpdate(tx, userId, habitId);
+    const [removed] = await tx
+      .delete(habitLogs)
+      .where(logOfDay(userId, habitId, date))
+      .returning();
+    if (!removed) {
+      return { habitId, localDate: date, log: null, previous: null };
+    }
+
+    const previous = toHabitLogValue(removed);
+    await recordAudit(tx, {
+      type: "habit.log_removed",
+      userId,
+      entityId: habitId,
+      changes: {
+        localDate: date,
+        fields: logFields(previous),
+        status: { from: previous.status, to: null },
+      },
+    });
+    return { habitId, localDate: date, log: null, previous };
+  });
 }

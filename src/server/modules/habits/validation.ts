@@ -5,9 +5,11 @@ import {
   CADENCE_CONFIG_SCHEMAS,
   type HabitCadence,
 } from "@/lib/habits/cadence";
+import { SKIP_HAS_NO_VALUE } from "@/lib/habits/logging";
 import {
   HABIT_CADENCE_TYPES,
   HABIT_DESCRIPTION_MAX,
+  HABIT_LOG_STATUSES,
   HABIT_MEASURES,
   HABIT_TITLE_MAX,
   HABIT_UNIT_MAX,
@@ -259,3 +261,55 @@ export type EditHabitInput = z.output<typeof editHabitSchema>;
 
 export const habitIdSchema = z.strictObject({ id: idSchema });
 export type HabitIdInput = z.output<typeof habitIdSchema>;
+
+/**
+ * The day a log is for: a local date, or "today", which the server works
+ * out from the saved zone (the client never sends its own today).
+ */
+const logDaySchema = z
+  .string({ error: "Pick a day." })
+  .trim()
+  .refine(
+    (value): value is LocalDate | "today" =>
+      value === "today" || isLocalDate(value),
+    "Pick a day.",
+  );
+
+/**
+ * Sets a habit's log for one day, creating or correcting it. A `value` is
+ * refused on a skip here; whether it is required (a completed quantity
+ * log) or refused (a check habit) is the service's rule, which knows the
+ * measure.
+ */
+export const setHabitLogSchema = z
+  .strictObject({
+    habitId: idSchema,
+    localDate: logDaySchema,
+    status: z.enum(HABIT_LOG_STATUSES, { error: "Choose done or skipped." }),
+    value: optionalAmountSchema,
+  })
+  .check(
+    acrossFields(
+      {
+        status: z.enum(HABIT_LOG_STATUSES),
+        value: optionalAmountSchema,
+      },
+      (input, context) => {
+        if (input.status === "skipped" && input.value !== null) {
+          context.addIssue({
+            code: "custom",
+            path: ["value"],
+            message: SKIP_HAS_NO_VALUE,
+          });
+        }
+      },
+    ),
+  );
+export type SetHabitLogInput = z.output<typeof setHabitLogSchema>;
+
+/** Removes a habit's log for one day (undo, or "no log"). */
+export const clearHabitLogSchema = z.strictObject({
+  habitId: idSchema,
+  localDate: logDaySchema,
+});
+export type ClearHabitLogInput = z.output<typeof clearHabitLogSchema>;
