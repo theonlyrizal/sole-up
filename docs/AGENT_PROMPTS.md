@@ -535,10 +535,10 @@ Finish line: Stop immediately once pnpm verify passes, including sparse-data and
 
 ### 7.2: Reviews, schema and service
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 7.2 only. Create the weekly_reviews and weekly_review_priorities tables (exactly-one-target CHECK, composite FKs, unique period per user) and a service with create/update/complete. Review text is never written to audit payloads. No UI.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 7.2 only. Create the weekly_reviews and weekly_review_priorities tables (exactly-one-target CHECK, composite FKs, unique period per user) and a service with start, save text, set priorities, finish and delete, refusing every write but delete once the period is closed (ADR 0015). Review text is never written to audit payloads. No UI.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify passes, including cross-user, duplicate-period and "no text in audit" tests, and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify passes, including cross-user, duplicate-period, closed-period and "no text in audit" tests, and the protocol close-out is complete.
 ```
 
 ### 7.3: Review flow UI
@@ -551,7 +551,7 @@ Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pas
 
 ### 7.4: Review history
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 7.4 only. Build the past-reviews list, a read-only review view, and an edit option.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 7.4 only. Build the past-reviews list, a read-only review view, an edit option only while the review's period is open (ADR 0015), and a confirmed delete.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, and the protocol close-out is complete.
@@ -559,7 +559,7 @@ Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pas
 
 ### 7.5: Review reminder
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 7.5 only. Add an optional weekly review reminder at a chosen local day and time, reusing the Phase 5 reminder machinery (no new delivery path), configurable in Settings.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 7.5 only. Add an optional weekly review reminder at a chosen local day and time, as a new reminder kind on the Phase 5 machinery (no new delivery path, ADR 0015), configurable in Settings.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including a DST-week scheduling test, and the protocol close-out is complete.

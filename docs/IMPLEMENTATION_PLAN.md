@@ -202,8 +202,8 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 6.4 | Logging | done | chunk/6.4-habit-logging | 2026-10-29 | `setHabitLog`/`clearHabitLog` (active days up to today in the saved zone, value by measure, row lock, `habit.logged|log_changed|log_removed`), Today "Habits" section (one tap done/skip, full-target Done, Change amount, Undo toast), Track two-week strip with figure for backfills and corrections |
 | 6.5 | Track page and history | done | chunk/6.5-track-history | 2026-10-29 | `/track?range=` (4w default, 12w, week) from the saved zone and week start, strip by week with row labels, figure + always-visible definition, "This week" as progress (`weekProgressFigure`), `src/lib/habits/track-range.ts`; no streaks, percentages or totals |
 | 6.6 | Home integration | done | chunk/6.6-home-habits | 2026-10-29 | `habitsSummary` in `metrics/home.ts` (engine via exported `engineData`/`engineInput`, Track's 4-week range), Home "Habits" card: each active habit's own figure + this week's progress, title linking to its Track row (`#habit-<id>`); no combined number |
-| 6.✓ | Phase 6 checkpoint (user) | todo | | | |
-| 7.0 | Decision gate: weekly review | todo | | | |
+| 6.✓ | Phase 6 checkpoint (user) | done | | 2026-10-29 | User marked done at the start of 7.0, without the planned two weeks of tracking real habits |
+| 7.0 | Decision gate: weekly review | done | chunk/7.0-review-decisions | 2026-10-29 | ADR 0015: user-week periods, optional wins/blockers/lessons + up to 10 linked priorities, open during its week and the next then read-only, nothing required to finish, live summary, `weekly_review` reminder kind; 7.1–7.5 and DATA_MODEL synced |
 | 7.1 | Weekly summary queries | todo | | | |
 | 7.2 | Reviews: schema and service | todo | | | |
 | 7.3 | Review flow UI | todo | | | |
@@ -1055,40 +1055,76 @@ Decided 2026-10-29 in [ADR 0014](decisions/0014-habit-cadence-logs-consistency.m
 **Goal:** A short reflection that produces an adjustment, not a dashboard (Journey D).
 
 ### 7.0 Decision gate
-- **Period.** Recommended: the user's week, from the week-start day to the following week-start day, in local dates.
-- **Structure.** Recommended:
-  - wins (text)
-  - blockers (text)
-  - lessons (text, optional)
-  - priorities for next week (links to goals and tasks, plus optional free text)
-- **Rules.** Recommended: one review per period, editable afterward. Skipping a week is fine and never flagged.
+Decided 2026-10-29 in [ADR 0015](decisions/0015-weekly-review-period-structure-lock.md). Later chunks follow it rather than this summary. The user chose a lock a week after the period ends, against the gate's recommendation of "editable afterward". Two questions were added beyond the gate's three: the exact lock rule, and what finishing requires.
+- **Period:** the user's week. `period_start` is a week's first day under the week start at creation, `period_end = period_start + 7` (exclusive), both local dates. One review per period. Saved periods never move with a zone or week-start change.
+- **Structure:** wins, blockers, lessons (text, each optional, up to 5,000 characters), and priorities for next week: up to 10 ordered links to goals or tasks, plus an optional priorities note. "Next week" is the period after the reviewed one.
+- **Open window:** a period is open while today (current zone) is before `period_end + 7`, so only last week and this week are open. A review can be started, edited, finished and given priorities only while open, then it is read-only, with no correction path. Closed, never-reviewed weeks can't be reviewed later, and that is never flagged.
+- **Finishing:** nothing is required. "Finish review" sets `completed_at`. A finished review stays editable while open. An unfinished review that closes shows as "Not finished", neutrally, and is never counted.
+- **Default period** for the flow: last week if it has no finished review, otherwise this week.
+- **Derived in the ADR, not asked:** the summary is computed live and never stored; adjustments are ordinary goal/task changes, not locked; delete is allowed at any time, behind a confirmation; deleting a linked goal or task removes the priority; the `weekly_review.*` events; the reminder's settings and rules (7.5).
 
 ### 7.1 Weekly summary queries
-- Using the metrics module, for a period:
-  - tasks completed, planned versus completed, rescheduled count (from audit events)
-  - goals with no activity in the period
-  - habit consistency
-  - upcoming deadlines next week
-- Each metric carries its definition and a `hasData` flag.
+- **In `src/server/modules/metrics/review.ts`**, for a period `[period_start, period_end)`, each a `Metric<V>` with `definition`, `range` (the period), `asOf` and `hasData`. Computed from records every time, never stored (ADR 0015).
+- **Instants** (completion times, audit `occurred_at`) are placed on local dates in the user's current zone.
+- **Metrics and their definitions** (the definition text says the same in plain words):
+  - **Tasks completed:** tasks now `completed` whose `completed_at` falls in the period.
+  - **Planned versus completed:** "planned" = tasks that, at any time, had a plan date in the period (from `task.created` and `task.planned` events, so a plan moved out of the week still counts as planned); "completed" = those of them counted in "Tasks completed".
+  - **Rescheduled:** tasks with at least one `task.planned` or `task.due_changed` event in the period that moved an existing plan date or deadline later. Counted per task, not per move.
+  - **Goals with no activity:** goals now `active`, created before `period_end`, with no audit event in the period on the goal, its milestones or its current tasks, and no completed log of its linked habits in the period. Named, as Home's "Goals without a next action" are.
+  - **Habits:** each habit active or paused now, via the 6.2 engine (`engineData`/`engineInput`) over the period as a one-week range. The current week uses `weekProgress`, a past week `consistency`, worded with `formatConsistency`/`weekProgressFigure`. If the period isn't a whole week under the current week start (the week start changed since), the habits metric says it isn't available for that week instead of counting.
+  - **Deadlines next period:** open tasks with a deadline in `[period_end, period_end + 7)`.
+- **No UI.**
+- **Tests:** sparse data (`hasData` false per metric), week boundaries for several week starts and a zone ahead of UTC, a plan moved out of the week, a deadline moved earlier (not rescheduled), activity only through a milestone, a task or a linked habit, the misaligned-period habits case, cross-user.
 
 ### 7.2 Reviews: schema and service
-- Table `weekly_reviews`: `period_start`, `period_end`, `wins?`, `blockers?`, `lessons?`, `priorities_note?`, `completed_at?`, timestamps, unique `(user_id, period_start)`.
-- Table `weekly_review_priorities`: `review_id`, `goal_id?` or `task_id?` (exactly one), `sort_order`, with composite FKs.
+- **Tables** (ADR 0015), each with `user_id`, and `unique (id, user_id)` on `weekly_reviews`:
+  - `weekly_reviews`:
+    - `period_start`, `period_end`, `wins?`, `blockers?`, `lessons?`, `priorities_note?`, `completed_at?`, timestamps
+    - `unique (user_id, period_start)`
+    - CHECKs: `period_end = period_start + 7`, each text up to 5,000 characters
+  - `weekly_review_priorities`:
+    - `review_id`, `goal_id?` or `task_id?` (exactly one, a CHECK), `sort_order`, timestamps
+    - composite FKs `(review_id, user_id)`, `(goal_id, user_id)`, `(task_id, user_id)`, all `ON DELETE CASCADE`
+    - unique `(review_id, goal_id)` and `(review_id, task_id)`, unique `(review_id, sort_order)`
+- **Validation (Zod):** text trimmed, empty → null, up to 5,000 characters; priorities a list of at most 10 distinct `{ goalId } | { taskId }`.
+- **Service** (start, save text, set priorities, finish, delete), with the ADR's rules:
+  - **Start** takes a period start, which must be this week's or last week's first day under the current week start. It returns the existing review for that period if there is one, or creates it (`weekly_review.started`).
+  - **Every write except delete** locks the review row and refuses a closed period (today in the current zone ≥ `period_end + 7`) with a `ConflictError` ("This review is closed for editing").
+  - **Save text** writes any of the four fields (`weekly_review.updated` with the changed field names only).
+  - **Set priorities** replaces the list in order (dense `sort_order` from 0) with active or paused goals and open tasks of the same user (`weekly_review.priorities_changed`, ordered IDs from/to).
+  - **Finish** sets `completed_at` once (`weekly_review.finished`). Finishing again is a no-op with no event.
+  - **Delete** is a confirmed hard delete, allowed when closed, removing the priorities (cascade) and the review's events.
+  - A no-op write records no event. No review text ever goes into an event or a log.
+- **No UI.**
+- **Tests:** every CHECK and unique index (including a duplicate period and a second link to the same goal), the exactly-one CHECK, the goal and task delete cascades, start for this/last week only (future, older, misaligned refused), every write refused once closed (the boundary day in a zone ahead of UTC), delete allowed when closed, nothing required to finish, cross-user (review, goal and task IDs), "no text in audit".
 
 ### 7.3 Review flow UI
-- Four steps:
-  1. **Look back:** the summary from 7.1.
-  2. **Reflect:** wins, blockers, lessons.
-  3. **Adjust:** inline actions to pause or drop a goal, reschedule or cancel stalled tasks, plan next week.
-  4. **Choose priorities:** pick goals and tasks for next week.
-- Progress is saved per step, so the flow can be resumed.
-- **Done when:** an end-to-end test completes a review that pauses one goal and plans two tasks for next week.
+- **A Review destination** in the navigation (`/review`, `NAV_ITEMS`, `APP_ROUTE_SEGMENTS`, `shell.spec.ts`). It opens the default period's review (last week if it has no finished review, otherwise this week), names the period's dates, and offers the other open week.
+- **Four steps:**
+  1. **Look back:** the summary from 7.1, each metric with its definition.
+  2. **Reflect:** wins, blockers, lessons, all optional.
+  3. **Adjust:** inline actions through the existing goal and task actions: pause or drop a goal, reschedule or cancel a stalled task, plan a task on a day of next week (the period after the reviewed one).
+  4. **Choose priorities:** pick up to 10 goals and tasks for next week, order them, and add an optional note.
+- **Saving:** the review is started on opening the flow, and each step saves as the user leaves it, so the flow can be resumed while the period is open. "Finish review" needs nothing filled.
+- A closed period opens read-only (7.4's view), with no adjust actions.
+- **Done when:** an end-to-end test completes a review that pauses one goal and plans two tasks for next week, and a review with every field empty can be finished. Keyboard-operable, axe passes.
 
 ### 7.4 Review history
-- A list of past reviews, a read-only view, and an edit option.
+- A list of past reviews, newest first: the period's dates, "Not finished" (neutral) for an unfinished one, and nothing that counts or flags skipped weeks.
+- A read-only view of each review: its text, its priorities with their current titles and statuses, and the look-back summary as computed now (labelled "as of").
+- **Edit** is offered only while the period is open (it reopens the flow). A closed review shows the date it closed, with no edit.
+- **Delete** on every review, behind a confirmation.
+- **Done when:** the e2e covers a closed review being read-only (the server refuses the write, not only the UI), editing an open one, and delete; axe passes.
 
 ### 7.5 Review reminder
-- An optional weekly push reminder at a chosen local day and time, built on the Phase 5 machinery.
+- **An optional weekly reminder** at a chosen local weekday and time, off by default, on the Phase 5 machinery (ADR 0015, no new delivery path):
+  - `user_preferences.weekly_review_day` (0–6) and `weekly_review_time` ("HH:MM"), both set or both null (a CHECK)
+  - reminder kind `weekly_review` (the kind and link CHECKs extended): at most one `scheduled` row per user, rolled to the next week when sent or skipped, and recomputed in the same transaction as a zone or setting change, as the daily nudge is
+  - quiet hours, the global switch, the device rules and staleness (its local day has ended) apply unchanged
+  - the notification is always "Time for your weekly review", with no titles in either mode, and opens `/review`
+  - not suppressed when the week's review is already finished
+- **Settings → Reminders:** a "Weekly review" day and time, with the quiet-hours warning the nudge has.
+- **Done when:** tests cover a DST week, a zone change, quiet hours, the roll to the next week, and the setting turned off; the e2e sets and clears it.
 
 **Phase 7 checkpoint:** do three real weekly reviews, and cut any step that feels like ceremony.
 
@@ -2879,3 +2915,43 @@ Template:
 - **Follow-ups:**
   - `reminders.spec.ts` flakes under full-suite load: `:138` (old reminder value, noted in 6.4) and `:79` (empty reminder select right after save, noted in 6.3) each failed once here. Both reopen the dialog before the refresh lands; wait for the refreshed value.
   - Earlier follow-ups still open: the strip legend's wide pills; notes on habit logs; primary button hover contrast; the goal delete confirmation not mentioning linked habits; the unused `_omitted` in `habits/validation.test.ts`.
+
+### 7.0: Decision gate: weekly review (2026-10-29)
+- **Built:**
+  - ADR 0015 (weekly review: period, structure, editing window and reminder) and its index row.
+  - Chunks 7.0–7.5 rewritten to match, with the 7.1 metric definitions spelled out.
+  - `DATA_MODEL.md`: WeeklyReview rewritten, WeeklyReviewPriority added, plus §4, the §6 deletion rules and §7.
+  - `PRODUCT_SPEC.md` §12 (weekly review settled), `ROADMAP.md` 1G, and the `AGENT_PROMPTS.md` prompts for 7.2, 7.4 and 7.5.
+  - Progress log: 6.✓ marked done at the user's request.
+  - No code.
+- **Deviations:**
+  1. **Two questions beyond the gate's three,** both following from the lock: the exact open window, and what finishing requires.
+  2. **A lock, against the recommendation of "editable afterward":** a review is open during its week and the week after, then read-only with no correction path.
+  3. **Delete added to 7.4** (confirmed, allowed when closed). The old 7.4 text had only list, view and edit.
+- **Decisions:**
+  - **Asked and answered:**
+    - the period is the user's week, `period_end = period_start + 7` exclusive (as recommended)
+    - wins, blockers, lessons and linked priorities with a note (as recommended)
+    - one review per period, locked a week after the period ends (against the recommendation)
+    - open = before `period_end + 7`; start/edit only while open; drafts kept as "Not finished"; the flow defaults to last week unless it is finished (as recommended)
+    - nothing is required to finish (as recommended)
+  - **Derived and recorded in ADR 0015, not asked separately:**
+    - saved periods never move with a zone or week-start change, and overlaps after a week-start change are allowed
+    - text up to 5,000 characters each, empty → null; at most 10 priorities, active/paused goals and open tasks only, unique per review
+    - "next week" = the period after the reviewed one
+    - the summary is computed live, never stored; the habits part says "not available" for a period misaligned with the current week start
+    - adjustments are ordinary goal/task changes, not locked; a closed review offers none
+    - goal/task delete cascades the priority (the exactly-one CHECK rules out `SET NULL`)
+    - events `weekly_review.started|updated|priorities_changed|finished`, no text
+    - reminder: `weekly_review_day` + `weekly_review_time` (both or neither), kind `weekly_review`, rolling row like the nudge, fixed text, opens `/review`, not suppressed after a finished review
+  - **7.1 definitions** (in the chunk text, not the ADR): planned = had a plan date in the period at any time (from events); rescheduled = per task, a plan date or deadline moved later; goals with no activity include milestone, task and linked-habit activity.
+- **Next chunk should know:**
+  - 7.1: reuse `engineData`/`engineInput` (6.6 exported them) with the period as a one-week range; the engine throws on a misaligned range, so check alignment first. Task events: `task.created` (`plannedDate`), `task.planned`, `task.due_changed` (all three deadline columns), `task.completed`.
+  - 7.2: the open check is on every write except delete, under a row lock; the boundary is today in the current zone, so test a zone ahead of UTC on the closing day.
+  - 7.5: the `reminders` kind and link CHECKs need extending (`weekly_review` links to neither a task nor an event, like `daily_nudge`).
+- **Unverified:** none (docs only). `docs/` is in `.prettierignore`, so `format:check` covers nothing here.
+- **Follow-ups:**
+  - The goal and task delete confirmations don't mention that review priorities linking to them go (7.2 or 7.3).
+  - Phase 10 export (10.1) must include reviews, their priorities and the reminder setting.
+  - If the reminder proves redundant after reviewing early, consider skipping it when the week's review is finished (ADR 0015 alternatives).
+  - A correction path for closed reviews, if the lock turns out too strict at the Phase 7 checkpoint.
