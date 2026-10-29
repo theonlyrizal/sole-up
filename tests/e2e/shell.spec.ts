@@ -101,6 +101,7 @@ test.describe("desktop", () => {
       "/notes",
       "/notes/archived",
       "/notes/new",
+      "/notes/search",
       "/review",
       "/settings",
     ]) {
@@ -125,7 +126,7 @@ test.describe("desktop", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator("main")).toBeFocused();
 
-    // From the top: skip link, brand, Add task, the destinations (with
+    // From the top: skip link, brand, Add task, search, the destinations (with
     // Today, Upcoming, Calendar and Inbox under Plan, then Track, Notes
     // and Review), sign out.
     await page.goto("/home");
@@ -136,6 +137,7 @@ test.describe("desktop", () => {
       skipLink,
       page.getByRole("link", { name: "SoleUp" }),
       page.getByRole("button", { name: "Add task" }),
+      page.getByRole("searchbox", { name: "Search notes, goals and tasks" }),
       ...SIDEBAR_LABELS.map((label) =>
         mainNav(page).getByRole("link", { name: label }),
       ),
@@ -207,6 +209,16 @@ test.describe("mobile", () => {
     await nav.getByRole("link", { name: "Goals" }).tap();
     await expect(
       page.getByRole("heading", { level: 1, name: "Goals" }),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page);
+
+    // The top bar links to search; the sidebar's field is hidden.
+    await expect(
+      page.getByRole("searchbox", { name: "Search notes, goals and tasks" }),
+    ).toHaveCount(0);
+    await page.getByRole("link", { name: "Search", exact: true }).tap();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Search" }),
     ).toBeVisible();
     await expectNoSeriousViolations(page);
   });

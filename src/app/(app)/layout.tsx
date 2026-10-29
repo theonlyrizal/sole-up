@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { PreferencesForm } from "@/components/preferences/preferences-form";
+import { ShellSearch } from "@/components/search/shell-search";
 import { AppNav } from "@/components/shell/app-nav";
 import { QuickAdd } from "@/components/tasks/quick-add";
 import { cx, focusRing } from "@/components/ui/cx";
@@ -65,13 +66,14 @@ async function SignedInShell({ children }: { children: React.ReactNode }) {
         </Link>
         {confirmed && (
           <>
-            <div className="md:px-3 md:[&>button]:w-full">
+            <div className="shrink-0 md:px-3 md:[&>button]:w-full">
               <QuickAdd />
             </div>
+            <ShellSearch />
             <AppNav />
           </>
         )}
-        <div className="flex min-w-0 items-center gap-3 md:mt-auto md:flex-col md:items-start md:px-3">
+        <div className="flex min-w-0 items-center gap-3 md:mt-auto md:flex-col md:items-start md:px-3 [&>div]:shrink-0">
           <span className="truncate text-sm text-muted">{user.name}</span>
           <SignOutButton />
         </div>

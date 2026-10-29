@@ -1,0 +1,2 @@
+CREATE INDEX "goals_title_search_idx" ON "goals" USING gin (to_tsvector('english', "title"));--> statement-breakpoint
+CREATE INDEX "tasks_title_search_idx" ON "tasks" USING gin (to_tsvector('english', "title"));

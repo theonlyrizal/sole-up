@@ -428,7 +428,7 @@ Rules:
 - An archived note refuses saves and link changes (and, from 8.5, tag changes) until restored.
 - **Archive** hides a note from the Notes list, search and the linked-note lists, and makes it read-only until restored. **Delete** is a confirmed hard delete that removes its links and tags.
 - Audit events are on the note: `note.created|updated|archived|restored|linked|unlinked|tags_changed`. `note.updated` holds changed field names only and is skipped within 10 minutes of the note's previous one. Never the title, body, `body_text` or a tag name.
-- Search covers notes that are not archived, plus goal and task titles through expression GIN indexes on `to_tsvector('english', title)` (chunk 8.4). Search terms are never put in a URL or logged.
+- Search covers notes that are not archived, plus goal and task titles of every status through expression GIN indexes on `to_tsvector('english', title)` (`goals_title_search_idx`, `tasks_title_search_idx`, built in chunk 8.4, migration 0019). Search terms are never put in a URL or logged.
 
 ### NoteGoal and NoteTask
 Link a note to goals and tasks ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Typed join tables, not a polymorphic `entity_type`/`entity_id`, so the database enforces existence and ownership. Built in chunk 8.1 as `note_goals` and `note_tasks`.

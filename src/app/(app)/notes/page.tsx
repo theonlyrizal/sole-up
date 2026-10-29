@@ -21,6 +21,15 @@ export default function NotesPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link
+            href="/notes/search"
+            className={cx(
+              "rounded-sm text-sm text-muted hover:text-fg",
+              focusRing,
+            )}
+          >
+            Search notes
+          </Link>
+          <Link
             href="/notes/archived"
             className={cx(
               "rounded-sm text-sm text-muted hover:text-fg",
