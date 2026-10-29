@@ -105,6 +105,11 @@ export const tasks = pgTable(
     ),
     index("tasks_user_id_milestone_id_idx").on(table.userId, table.milestoneId),
     index("tasks_user_id_goal_id_idx").on(table.userId, table.goalId),
+    // Search (chunk 8.4, ADR 0016): queries must use this exact expression.
+    index("tasks_title_search_idx").using(
+      "gin",
+      sql`to_tsvector('english', ${table.title})`,
+    ),
     check(
       "tasks_parent_check",
       sql`num_nonnulls(${table.goalId}, ${table.milestoneId}) <= 1`,

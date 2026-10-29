@@ -134,6 +134,13 @@
       "when": 1793296932159,
       "tag": "0018_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793306375187,
+      "tag": "0019_search_title_indexes",
+      "breakpoints": true
     }
   ]
 }

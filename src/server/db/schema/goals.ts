@@ -76,6 +76,11 @@ export const goals = pgTable(
     index("goals_user_id_status_idx").on(table.userId, table.status),
     // Lets deleting a life area find its goals without a scan.
     index("goals_life_area_id_user_id_idx").on(table.lifeAreaId, table.userId),
+    // Search (chunk 8.4, ADR 0016): queries must use this exact expression.
+    index("goals_title_search_idx").using(
+      "gin",
+      sql`to_tsvector('english', ${table.title})`,
+    ),
     check(
       "goals_status_check",
       sql`${table.status} in ${inList(GOAL_STATUSES)}`,
