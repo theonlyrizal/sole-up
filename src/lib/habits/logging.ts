@@ -2,13 +2,7 @@
 // (chunk 6.4). Pure: no server-only imports. The rules come from
 // docs/decisions/0014-habit-cadence-logs-consistency.md ("Logs").
 
-import {
-  addDays,
-  dayOfWeek,
-  startOfWeek,
-  type LocalDate,
-  type WeekStart,
-} from "../dates";
+import { addDays, dayOfWeek, startOfWeek, type LocalDate } from "../dates";
 
 import { scheduleForWeek } from "./cadence";
 import {
@@ -165,13 +159,4 @@ export function isLoggableDay(
 ): boolean {
   if (day.date > today) return false;
   return day.state !== "inactive" || day.log !== null;
-}
-
-/** The two weeks the Track strip shows: last week and this one. */
-export function stripRange(
-  today: LocalDate,
-  weekStart: WeekStart,
-): { from: LocalDate; to: LocalDate } {
-  const from = addDays(startOfWeek(today, weekStart), -7);
-  return { from, to: addDays(from, 13) };
 }

@@ -7,6 +7,12 @@ import { Button, buttonClass } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/toast";
+import {
+  trackHref,
+  TRACK_RANGE_LABELS,
+  TRACK_RANGES,
+  type TrackRange,
+} from "@/lib/habits/track-range";
 import type { ActionResult } from "@/lib/result";
 import {
   archiveHabit,
@@ -47,7 +53,8 @@ const ARCHIVE: StatusAction = {
 
 /**
  * Track: active habits, then paused ones, with their status actions and
- * their last two weeks, where past days are logged or corrected.
+ * their history over the selected range (chunk 6.5), where past days are
+ * logged or corrected.
  */
 export function TrackView({ view }: { view: TrackViewData }) {
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +109,7 @@ export function TrackView({ view }: { view: TrackViewData }) {
         />
       ) : (
         <>
+          <RangeNav range={view.range} datesLabel={view.rangeDatesLabel} />
           <HabitStripLegend />
           {active.length > 0 && (
             <HabitSection
@@ -109,6 +117,7 @@ export function TrackView({ view }: { view: TrackViewData }) {
               habits={active}
               context={context}
               locale={view.locale}
+              rangeLabel={view.rangeLabel}
               pending={pending}
               onChangeStatus={changeStatus}
             />
@@ -120,6 +129,7 @@ export function TrackView({ view }: { view: TrackViewData }) {
               habits={paused}
               context={context}
               locale={view.locale}
+              rangeLabel={view.rangeLabel}
               pending={pending}
               onChangeStatus={changeStatus}
             />
@@ -130,12 +140,54 @@ export function TrackView({ view }: { view: TrackViewData }) {
   );
 }
 
+/** The range the history and figures cover, kept in the URL. */
+function RangeNav({
+  range,
+  datesLabel,
+}: {
+  range: TrackRange;
+  datesLabel: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <nav aria-label="Range to show">
+        <ul className="flex flex-wrap gap-1">
+          {TRACK_RANGES.map((option) => {
+            const current = option === range;
+            return (
+              <li key={option}>
+                <Link
+                  href={trackHref(option)}
+                  aria-current={current ? "page" : undefined}
+                  className={cx(
+                    "inline-flex rounded-md border px-3 py-1.5 text-sm",
+                    current
+                      ? "border-accent font-medium text-fg"
+                      : "border-border text-muted hover:text-fg",
+                    focusRing,
+                  )}
+                >
+                  {TRACK_RANGE_LABELS[option]}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      <p className="text-sm text-muted">
+        {TRACK_RANGE_LABELS[range]}: {datesLabel}
+      </p>
+    </div>
+  );
+}
+
 type SectionProps = {
   title: string;
   description?: string;
   habits: TrackHabit[];
   context: HabitFormContext;
   locale: string;
+  rangeLabel: string;
   pending: boolean;
   onChangeStatus: (habit: HabitListItem, action: StatusAction) => void;
 };
@@ -146,6 +198,7 @@ function HabitSection({
   habits,
   context,
   locale,
+  rangeLabel,
   pending,
   onChangeStatus,
 }: SectionProps) {
@@ -166,6 +219,7 @@ function HabitSection({
               habit={habit}
               weekStart={context.weekStart}
               locale={locale}
+              rangeLabel={rangeLabel}
             />
             <div className="flex flex-wrap items-center gap-1">
               {[habit.status === "paused" ? RESUME : PAUSE, ARCHIVE].map(

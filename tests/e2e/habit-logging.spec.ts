@@ -167,7 +167,7 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await createHabit(page, "Read", { startDate: tokyoDate(-7) });
 
   const read = habitItem(page, "Read");
-  await expect(read).toContainText("Last 2 weeks: 0 of 7 days");
+  await expect(read).toContainText("Last 4 weeks: 0 of 7 days");
   const missed = read.getByRole("button", { name: /: Missed$/ });
   await expect(missed).toHaveCount(7);
   await expectNoSeriousViolations(page);
@@ -180,7 +180,7 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await expectNoSeriousViolations(page);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(read).toContainText("Last 2 weeks: 1 of 7 days");
+  await expect(read).toContainText("Last 4 weeks: 1 of 7 days");
   const yesterday = read.getByRole("button", { name: /: Done$/ });
   await expect(yesterday).toHaveCount(1);
   await expect(yesterday).toBeFocused();
@@ -192,12 +192,12 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await dialog.getByRole("radio", { name: "Skipped" }).check();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(read).toContainText("Last 2 weeks: 0 of 6 days · 1 skipped");
+  await expect(read).toContainText("Last 4 weeks: 0 of 6 days · 1 skipped");
   await expect(read.getByRole("button", { name: /: Skipped$/ })).toHaveCount(1);
 
   // Undo puts the correction back.
   await undoIn(page, "Day saved").click();
-  await expect(read).toContainText("Last 2 weeks: 1 of 7 days");
+  await expect(read).toContainText("Last 4 weeks: 1 of 7 days");
 
   // Escape closes the dialog without saving, and focus returns to the day.
   const day = read.getByRole("button", { name: /: Done$/ });
@@ -207,7 +207,7 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(day).toBeFocused();
-  await expect(read).toContainText("Last 2 weeks: 1 of 7 days");
+  await expect(read).toContainText("Last 4 weeks: 1 of 7 days");
 
   // "No log" removes it: the day is missed again.
   await day.click();
@@ -215,7 +215,7 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await dialog.getByRole("radio", { name: "No log" }).check();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(read).toContainText("Last 2 weeks: 0 of 7 days");
+  await expect(read).toContainText("Last 4 weeks: 0 of 7 days");
   await expect(missed).toHaveCount(7);
 
   // Today, logged on Today, shows on the strip and counts from then on.
@@ -225,6 +225,6 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   // The row changes at once; the toast confirms the save.
   await expect(toastSaying(page, "Marked done")).toBeVisible();
   await page.goto("/track");
-  await expect(read).toContainText("Last 2 weeks: 1 of 8 days");
+  await expect(read).toContainText("Last 4 weeks: 1 of 8 days");
   await expect(read.getByRole("button", { name: /: Done$/ })).toHaveCount(1);
 });

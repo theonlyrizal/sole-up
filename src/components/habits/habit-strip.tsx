@@ -21,43 +21,43 @@ import type {
 import { useHabitLog } from "./use-habit-log";
 
 /**
- * A habit's last two weeks, one row per week (chunk 6.4), with the figure
- * for them and how it is counted. Each day up to today that counts, or
- * that has a log, opens a dialog to log, correct or clear it. "Missed" is
- * neutral: a dashed outline, never a warning colour.
+ * A habit over the selected range, one row per week, oldest first (chunks
+ * 6.4 and 6.5), with the figure for the range (or this week's progress)
+ * and, always visible beside it, how it is counted. Each day up to today
+ * that counts, or that has a log, opens a dialog to log, correct or clear
+ * it. "Missed" is neutral: a dashed outline, never a warning colour.
  */
 export function HabitStrip({
   habit,
   weekStart,
   locale,
+  rangeLabel,
 }: {
   habit: TrackHabit;
   weekStart: WeekStart;
   locale: string;
+  /** "Last 4 weeks", the figure's label. */
+  rangeLabel: string;
 }) {
   const { history } = habit;
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-        <p>
-          <span className="text-muted">Last 2 weeks: </span>
-          {history.figure}
-        </p>
-        {history.progressLabel && (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1 text-sm">
+        {history.figure !== null && (
           <p>
-            <span className="text-muted">This week: </span>
-            {history.progressLabel}
+            <span className="text-muted">{rangeLabel}: </span>
+            {history.figure}
           </p>
         )}
+        {history.progressLabel && <p>{history.progressLabel}</p>}
+        <p className="text-muted">
+          <span className="font-medium">How this is counted: </span>
+          {history.definition}
+        </p>
       </div>
-      <details className="text-sm">
-        <summary className={cx("w-fit cursor-pointer rounded-sm", focusRing)}>
-          How this is counted
-        </summary>
-        <p className="mt-1 text-muted">{history.definition}</p>
-      </details>
       <div className="flex w-full max-w-sm flex-col gap-1">
-        <div aria-hidden="true" className="grid grid-cols-7 gap-1">
+        <div aria-hidden="true" className={WEEK_ROW}>
+          <span />
           {weekdaysFrom(weekStart).map((day) => (
             <span key={day} className="text-center text-xs text-muted">
               {WEEKDAY_NAMES[day]![0]}
@@ -65,33 +65,41 @@ export function HabitStrip({
           ))}
         </div>
         {history.weeks.map((week) => (
-          <ol
-            key={week.from}
-            aria-label={`${habit.title}: ${week.label}`}
-            className="grid grid-cols-7 gap-1"
-          >
-            {week.days.map((day) => (
-              <li key={day.date}>
-                {day.loggable ? (
-                  <DayLogDialog habit={habit} day={day} locale={locale} />
-                ) : (
-                  <span
-                    role="img"
-                    aria-label={`${day.dateLabel}: ${day.stateLabel}`}
-                    title={day.stateLabel}
-                    className={dayClass(day)}
-                  >
-                    <DayFace day={day} />
-                  </span>
-                )}
-              </li>
-            ))}
-          </ol>
+          <div key={week.from} className={WEEK_ROW}>
+            <span aria-hidden="true" className="text-xs text-muted">
+              {week.shortLabel}
+            </span>
+            <ol
+              aria-label={`${habit.title}: ${week.label}`}
+              className="col-span-7 grid grid-cols-subgrid"
+            >
+              {week.days.map((day) => (
+                <li key={day.date}>
+                  {day.loggable ? (
+                    <DayLogDialog habit={habit} day={day} locale={locale} />
+                  ) : (
+                    <span
+                      role="img"
+                      aria-label={`${day.dateLabel}: ${day.stateLabel}`}
+                      title={day.stateLabel}
+                      className={dayClass(day)}
+                    >
+                      <DayFace day={day} />
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
         ))}
       </div>
     </div>
   );
 }
+
+/** A week's row: its first day's date, then its seven days. */
+const WEEK_ROW =
+  "grid grid-cols-[3rem_repeat(7,minmax(0,1fr))] items-center gap-1";
 
 /** What the strip's marks mean, shown once above the habits. */
 export function HabitStripLegend() {

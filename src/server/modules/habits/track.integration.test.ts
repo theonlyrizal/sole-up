@@ -1,6 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { formatDateSpan } from "@/lib/habits/track-range";
 import { db } from "@/server/db/client";
 import {
   auditEvents,
@@ -255,6 +256,12 @@ describe("getTrackView", () => {
     const user = await createTestUser();
 
     expect(await getTrackView(user.id, NOW)).toEqual({
+      range: "4w",
+      rangeLabel: "Last 4 weeks",
+      rangeDatesLabel: formatDateSpan(
+        { from: "2026-10-12", to: "2026-11-08" },
+        "en-US",
+      ),
       habits: [],
       archivedCount: 0,
       goals: [],
