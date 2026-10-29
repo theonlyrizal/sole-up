@@ -21,3 +21,4 @@ To change a decision, add a new ADR that supersedes the old one and update the o
 | [0013](0013-reminders-sweep-and-delivery.md) | Reminders: free-hosting sweep, what reminds, quiet hours and content | Accepted |
 | [0014](0014-habit-cadence-logs-consistency.md) | Habits: cadences, logs, quantities and consistency | Accepted |
 | [0015](0015-weekly-review-period-structure-lock.md) | Weekly review: period, structure, editing window and reminder | Accepted |
+| [0016](0016-notes-rich-text-links-search-tags.md) | Notes: rich text, links, search and tags | Accepted |

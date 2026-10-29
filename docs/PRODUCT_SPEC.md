@@ -76,7 +76,7 @@ Not every object must be linked to every other object. Relationships should be e
 6. Tasks with status, priority, a deadline (`due_date` or `due_at` + time zone), an optional planned date, and at most one parent (a milestone, a goal, or the inbox). No Projects in v1.
 7. Today and Upcoming views.
 8. Habit definitions and dated completion logs.
-9. Notes with title, body, timestamps, and optional links to supported entities (decided at the notes decision gate).
+9. Rich-text notes with optional links to goals and tasks, tags, and search ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)).
 10. Home with a small set of actionable summaries.
 11. Basic analytics based on stored records and the audit log.
 12. Weekly review workflow.
@@ -256,9 +256,15 @@ Do not optimize for time spent in the app. A good personal management tool may h
   - A review can be written and edited during its week and the week after, then it is read-only. Skipped weeks are never flagged.
   - An optional weekly reminder at a chosen day and time.
   - See [ADR 0015](decisions/0015-weekly-review-period-structure-lock.md).
+- **Notes (Phase 8 gate):**
+  - Written in a rich-text editor (headings, lists, quotes, code, links; no images or tables) and saved automatically.
+  - A note can link to any number of goals and tasks and carry tags. Deleting a goal or task keeps its notes.
+  - Search covers notes and goal and task titles, with highlighted matches. Search terms are never kept in URLs or logs.
+  - Backlinks between notes and attachments are deferred.
+  - See [ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md).
 
 ### Still open
 
 Resolve these at the phase decision gates in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), through prototyping or feedback rather than guessing:
 
-- Should notes be simple, or should they support backlinks and tags? (Phase 8 gate)
+- None at present. Later questions are raised at each phase's decision gate.

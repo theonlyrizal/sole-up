@@ -579,23 +579,23 @@ Finish line: Stop immediately once the ADR is written, the plan and DATA_MODEL.m
 
 ### 8.1: Notes, schema and service
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 8.1 only. Create the notes table with the generated search_vector and GIN index, the typed link tables with composite FKs, and a service with audit events that never include title or body. No UI.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 8.1 only. Create the notes table (JSON body, server-derived body_text, generated search_vector with a GIN index), the note_goals and note_tasks link tables with composite FKs, the shared document allowlist and its Zod schema, and a service with the stale-save conflict and audit events that never include title, body or body_text. No UI.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify passes, including cross-user link rejection and "no content in audit" tests, and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify passes, including allowlist rejection, cross-user link rejection and "no content in audit" tests, and the protocol close-out is complete.
 ```
 
 ### 8.2: Notes UI
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 8.2 only. Build the Notes list and editor with autosave and indicator, a Markdown preview without raw HTML and sanitized, and archive and delete with confirmation. Add Notes to navigation.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 8.2 only. Build the Notes list and the TipTap rich-text editor limited to the 8.1 allowlist, with autosave, its indicator and the conflict prompt, an allowlisted read-only renderer with no HTML strings, and archive and delete with confirmation. Add Notes to navigation. Justify the TipTap version you pin.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including autosave-on-navigation and a test that script in Markdown never executes, and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including autosave-on-navigation and a test that script in a note never executes, and the protocol close-out is complete.
 ```
 
 ### 8.3: Linking
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 8.3 only. Link notes from goal and task detail pages and show linked notes there.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 8.3 only. Link notes to goals and tasks from the note editor, goal detail and the task dialog, show linked notes there, and say in the goal and task delete confirmations that linked notes are kept.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, and the protocol close-out is complete.
@@ -603,10 +603,18 @@ Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pas
 
 ### 8.4: Search
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 8.4 only. Add search across notes (full-text) and goal and task titles, with highlighted results, scoped to the current user.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 8.4 only. Add English full-text search across notes and goal and task titles (expression GIN indexes on the titles), run as a Server Action so terms never reach a URL or a log, with highlights rendered as text, scoped to the current user.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
 Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including the cross-user search test, and the protocol close-out is complete.
+```
+
+### 8.5: Tags
+```text
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 8.5 only. Add tags on notes: the tags and note_tags tables with composite FKs, case-insensitive unique names, inline create while tagging, rename and delete from Notes, and a tag filter on the Notes list and search's notes group. No tag name in any audit event or log.
+
+Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
+Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including the cross-user and "no tag names in audit" tests, and the protocol close-out is complete.
 ```
 
 ---

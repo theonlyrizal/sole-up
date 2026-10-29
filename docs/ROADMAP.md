@@ -58,9 +58,9 @@ Build a useful personal management product first. Add AI when the product has re
 - Show history and transparent consistency calculations.
 
 ### 1E. Notes
-- Create and edit notes.
-- Search and basic organization.
-- Optional links to goals and other supported entities, decided at the notes decision gate.
+- Create and edit rich-text notes with autosave.
+- Search notes and goal and task titles; organize notes with tags.
+- Optional links to goals and tasks ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)).
 
 ### 1F. Calendar and reminders
 - In the MVP, sequenced after the core loop (Goals → Today) ([ADR 0007](decisions/0007-platform-and-push.md)).
