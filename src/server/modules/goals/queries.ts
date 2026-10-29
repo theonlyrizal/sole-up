@@ -21,6 +21,11 @@ import {
   getMilestoneProgress,
   listMilestones,
 } from "@/server/modules/milestones/queries";
+import {
+  countLinkedNotes,
+  type LinkedNoteItem,
+  listLinkedNotes,
+} from "@/server/modules/notes/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
 import {
   countGoalTasks,
@@ -142,6 +147,8 @@ export type ArchivedGoalItem = Goal & {
   milestoneCount: number;
   /** The goal's tasks by where a delete would leave them. */
   taskCounts: GoalTaskCounts;
+  /** Notes linked to the goal, archived too: a delete only unlinks them. */
+  noteLinkCount: number;
 };
 
 /** The user's archived goals, most recently archived first. */
@@ -158,9 +165,10 @@ export async function getArchivedGoals(
     getUserPreferences(userId),
   ]);
   const goalIds = goalRows.map((row) => row.id);
-  const [milestoneCounts, taskCounts] = await Promise.all([
+  const [milestoneCounts, taskCounts, noteCounts] = await Promise.all([
     countMilestones(userId, goalIds),
     countGoalTasks(userId, goalIds),
+    countLinkedNotes(userId, "goal", goalIds),
   ]);
 
   const { locale } = preferences;
@@ -179,6 +187,7 @@ export async function getArchivedGoals(
       archivedAtLabel: dayOf(goal.statusChangedAt),
       milestoneCount: milestoneCounts.get(goal.id) ?? 0,
       taskCounts: taskCounts.get(goal.id) ?? NO_GOAL_TASKS,
+      noteLinkCount: noteCounts.get(goal.id) ?? 0,
     };
   });
 }
@@ -203,6 +212,10 @@ export type GoalDetail = {
   taskCounts: GoalTaskCounts;
   /** Where the task rows' editor can move a task. */
   taskParentOptions: TaskParentOption[];
+  /** Linked notes that aren't archived, most recently updated first. */
+  notes: LinkedNoteItem[];
+  /** Every linked note, archived too: a delete only unlinks them. */
+  noteLinkCount: number;
   locale: string;
   /** The user's zone, for the tasks' local days and deadline times. */
   timeZone: string;
@@ -226,6 +239,7 @@ export async function getGoalDetail(
     taskItems,
     taskCounts,
     taskParentOptions,
+    linkedNotes,
   ] = await Promise.all([
     db
       .select()
@@ -258,6 +272,7 @@ export async function getGoalDetail(
     listGoalTasks(userId, goalId),
     countGoalTasks(userId, [goalId]),
     listTaskParentOptions(userId),
+    listLinkedNotes(userId, { targetType: "goal", targetId: goalId }),
   ]);
   const [row] = goalRows;
   if (!row) return null;
@@ -297,6 +312,8 @@ export async function getGoalDetail(
     nextAction: nextActionOf(taskItems, timeZone),
     taskCounts: taskCounts.get(goalId) ?? NO_GOAL_TASKS,
     taskParentOptions,
+    notes: linkedNotes.notes,
+    noteLinkCount: linkedNotes.linkCount,
     locale,
     timeZone,
   };

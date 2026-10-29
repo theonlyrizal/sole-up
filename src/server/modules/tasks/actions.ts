@@ -18,6 +18,7 @@ import {
   planTaskSchema,
   rescheduleTaskDueSchema,
   scheduleTaskSchema,
+  taskIdSchema,
   taskIdsSchema,
   updateTaskSchema,
 } from "./validation";
@@ -132,5 +133,17 @@ export const scheduleTask = authedAction(
     const task = await service.scheduleTask(userId, input);
     refresh();
     return task;
+  },
+);
+
+/**
+ * A confirmed hard delete (ADR 0006, chunk 8.3): with its time blocks,
+ * reminders and history; linked notes are kept, only unlinked.
+ */
+export const deleteTask = authedAction(
+  taskIdSchema,
+  async (input, { userId }) => {
+    await service.deleteTask(userId, input);
+    refresh();
   },
 );

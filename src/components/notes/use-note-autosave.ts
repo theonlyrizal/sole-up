@@ -13,6 +13,7 @@ import type { ActionError } from "@/lib/result";
 import { noteDocumentProblem, type NoteDocument } from "@/lib/notes/document";
 import { NOTE_CHANGED_ELSEWHERE, NOTE_TITLE_MAX } from "@/lib/notes/note";
 import { saveNote } from "@/server/modules/notes/actions";
+import type { LinkTargetInput } from "@/server/modules/notes/validation";
 
 // Autosave for the note editor (ADR 0016): about a second after the last
 // change, and at once on blur, on leaving the page and on `pagehide`. One
@@ -49,11 +50,14 @@ function errorMessage(error: ActionError): string {
 export function useNoteAutosave({
   noteId,
   updatedAt,
+  linkTo,
   read,
   onCreated,
 }: {
   noteId: string | null;
   updatedAt: Date | null;
+  /** A new note's goal or task, linked by its first save (chunk 8.3). */
+  linkTo?: LinkTargetInput | null;
   /** The editor's title and body as they are now. */
   read: () => NoteContentSnapshot;
   /** After the first save that created the note. */
@@ -73,6 +77,7 @@ export function useNoteAutosave({
   const conflictRef = useRef(false);
   const stoppedRef = useRef(false);
   const readRef = useRef(read);
+  const linkToRef = useRef(linkTo);
   const onCreatedRef = useRef(onCreated);
   useLayoutEffect(() => {
     readRef.current = read;
@@ -107,6 +112,7 @@ export function useNoteAutosave({
     try {
       result = await saveNote({
         id: idRef.current ?? undefined,
+        linkTo: (!idRef.current && linkToRef.current) || undefined,
         title,
         body,
         expectedUpdatedAt: tokenRef.current,

@@ -213,7 +213,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 8.0 | Decision gate: notes | done | chunk/8.0-notes-decisions | 2026-10-29 | ADR 0016: TipTap rich text stored as validated JSON + derived `body_text`, `note_goals`/`note_tasks` join tables, English FTS (generated `search_vector`, GIN), tags on notes; 8.1–8.4 rewritten, 8.5 Tags added, DATA_MODEL synced |
 | 8.1 | Notes: schema and service | done | chunk/8.1-notes-schema-service | 2026-10-30 | `notes` (generated English `search_vector` + GIN, title/body_text CHECKs) and `note_goals`/`note_tasks` (composite cascading FKs), migration 0018; shared allowlist, Zod schema and `toBodyText` in `src/lib/notes/`; save with the stale-`updated_at` conflict, archive/restore, link/unlink (50 max), delete; `note.*` events with no content; no UI |
 | 8.2 | Notes UI | done | chunk/8.2-notes-ui | 2026-10-30 | Notes in the nav (`/notes`, `/notes/new`, `/notes/[id]`, `/notes/archived`), TipTap 3.32.0 editor cut to the 8.1 allowlist (pasted attributes re-parsed), autosave (1 s, blur, leaving, `pagehide`) with Saving…/Saved/Not saved + Retry, conflict prompt, leave guard, React-only read-only renderer, archive/restore, confirmed delete |
-| 8.3 | Linking | todo | | | |
+| 8.3 | Linking | done | chunk/8.3-note-linking | 2026-10-30 | Editor "Linked to" (goal/task picker with status, unlink), goal "Notes" and task dialog "Linked notes" (Link a note, New note linked on first save via `saveNote` `linkTo`, unlink), goal/task delete confirmations name kept notes; task delete added (action + confirmed dialog) with the user's approval |
 | 8.4 | Search | todo | | | |
 | 8.5 | Tags | todo | | | |
 | 9.1 | Insight definitions and metrics | todo | | | |
@@ -1183,6 +1183,7 @@ Decided 2026-10-29 in [ADR 0016](decisions/0016-notes-rich-text-links-search-tag
 - **From a note:** a "Linked to" section in the editor to link goals and tasks (a picker searching all of the user's goals and tasks, showing their status) and unlink them.
 - **On goal detail and in the task dialog:** a "Notes" section listing linked, non-archived notes (title and updated date, linking to the note), "Link a note", "New note" (created already linked, on its first save), and unlink.
 - The goal and task delete confirmations say linked notes are kept and only unlinked, when there are any.
+- **Task delete** (added with the user's approval on 2026-10-30, since tasks had no delete in the UI and so no confirmation to change): a `deleteTask` action and a confirmed "Delete task" in the task dialog, naming its time blocks, reminders and linked notes, and pointing a task that isn't cancelled at cancelling instead.
 - **Done when:** the e2e links a note from a goal and from a task, sees it on both, unlinks one, and deletes the goal with the note kept. Axe passes.
 
 ### 8.4 Search
@@ -3229,3 +3230,35 @@ Template:
   - A bare domain (`example.com`) isn't autolinked, because links must carry a protocol; consider prefixing `https://` for autolinks only.
   - The leave guard intercepts link clicks only; a programmatic `router.push` from elsewhere (none today) would bypass it.
   - Earlier follow-ups still open: control characters in titles vs 8.4's `ts_headline` delimiters; Phase 10 export must include notes (JSON, links); the unused `_omitted` in `habits/validation.test.ts`; goal and task delete confirmations don't mention review priorities (and, from 8.3, linked notes); the 5.5 quiet-hours CHECK null hole.
+
+### 8.3: Linking (2026-10-30)
+- **Built:**
+  - Service: `saveNote` takes `linkTo` (`{ targetType, targetId }`, a first save only; refused on a later save with `LINK_ON_CREATE_ONLY`) and links the new note in the same transaction with its own `note.linked` event; a target that is gone or someone else's is skipped and the note is still created. The insert and event moved into a shared `insertLink`.
+  - Validation: `linkTargetSchema`, `noteLinkSchema` built on it, `findLinkTargetsSchema` and `findNotesToLinkSchema` (query trimmed, empty allowed, up to `NOTE_LINK_QUERY_MAX` = 200).
+  - `src/server/modules/notes/queries.ts`: `listNoteLinks` (goals then tasks, link order, status labels), `findLinkTargets` (goal and task titles, any status, `ILIKE` with `%`/`_`/`\` escaped, 20 per group by `updated_at`), `getLinkTarget`, `listLinkedNotes` (non-archived notes by `updated_at` + `linkCount` of every link, archived too), `countLinkedNotes`, `findNotesToLink` (non-archived notes not linked to the target, title or `body_text`), `LINK_PICKER_LIMIT`; the preview SQL is shared as `notePreview`.
+  - Actions: notes `linkNote`, `unlinkNote`, `getNoteLinks`, `findLinkTargets`, `getLinkedNotes`, `findNotesToLink` (none refresh); tasks `deleteTask` (refreshes).
+  - `getGoalDetail` adds `notes` and `noteLinkCount`; `getArchivedGoals` adds `noteLinkCount`. `linkedNotesKept(count)` in `src/lib/notes/note.ts` is the delete sentence.
+  - UI: `src/components/notes/note-links.tsx` (the editor's "Linked to" section and "Link a goal or task" picker), `linked-notes.tsx` (`LinkedNotesList` with "Link a note" and "New note", `useLinkedNotes`), `use-picker-search.ts` (debounced Server Action search). Goal detail has a "Notes" section between Tasks and History. The task dialog has "Linked notes" and a confirmed "Delete task" (`src/components/tasks/task-notes.tsx`, `delete-task-dialog.tsx`); its sections now sit in `TaskDialogBody`. `DeleteGoalDialog` takes `noteLinkCount`. `/notes/new?goal=<id>|?task=<id>` passes the user's own target to `NoteEditor` as `linkTo`.
+  - Tests: unit `src/lib/notes/note.test.ts`, `notes/validation.test.ts` (`linkTo`, picker queries); integration `notes/note-links.integration.test.ts` (20: first-save linking incl. empty, foreign and deleted targets; link order and statuses; picker matching with literal `%`/`_`/`\`, limits and order; `getLinkTarget` cross-user; linked lists and counts with archived notes; goal detail and archive counts; goal and task delete keeping the note; every action signed out; cross-user link/unlink; the 200-character limit; `deleteTask` own task only); e2e `note-links.spec.ts` (3: link from a goal and a task, both shown on the note with status, unlink, goal delete names and keeps the note; the editor's picker with a paused goal and a task; "New note" from a task linked on its first save, then task delete naming and keeping it), with axe throughout.
+  - Docs: PRODUCT_SPEC §7 Notes, DATA_MODEL NoteGoal/NoteTask, this chunk's text.
+- **Deviations:**
+  1. **Task delete added** (user's choice when asked): tasks had no delete in the UI, so there was no task delete confirmation to change. The chunk text now says so.
+  2. The task dialog's section is titled **"Linked notes"**, not "Notes", since the task's own Notes field sits above it. Goal detail uses "Notes".
+- **Decisions:**
+  - Pickers match substrings with `ILIKE` rather than 8.4's full-text search: partial words match as you type, and personal-scale data keeps it cheap. Queries go through Server Actions, never the URL.
+  - Link and unlink actions refresh nothing. A `refresh()` under the editor on `/notes/new` (its URL already replaced by `history.replaceState`) could remount it, so the editor and task dialog read their lists again, and goal detail calls `router.refresh()` itself.
+  - A new note's link travels with its first save (atomic), rather than a second call after it.
+  - Pickers stay open and mark rows "Linked", moving focus back to the search. They show no success toast: Radix gives Escape to the topmost layer, so a toast would swallow the Escape meant to close the picker.
+  - Delete counts include links from archived notes (they are unlinked too); the lists hide archived notes (ADR 0016). Unlinking by delete writes no `note.unlinked` event (cascade).
+  - The task delete confirmation mentions time blocks and reminders generically. When the dialog hasn't read the links yet, it says "Any linked notes will be kept, only unlinked."
+  - Task links in "Linked to" are plain text: tasks have no page of their own.
+- **Next chunk should know:**
+  - Locators: region "Linked to" (list "Linked goals and tasks", "Unlink <title>", "Link a goal or task" → dialog "Link a goal or task" with searchbox "Search goals and tasks", regions "Goals"/"Tasks", "Link <title>"); goal region "Notes" and task dialog region "Linked notes" (list "Linked notes", "Unlink <title>", "Link a note" → dialog "Link a note" with searchbox "Search notes", "Link <title>"; link "New note"); task dialog "Delete task" → alertdialog `Delete “<title>”?`.
+  - 8.4: the archived note view shows no links; search could reuse `LinkTarget`.
+  - Escape closes the topmost Radix layer, which can be a toast; close dialogs by their Close button in e2e after an action that toasts.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint (only the 6.1 warning), typecheck, 1089 unit and 778 integration tests. `pnpm build` passes. `pnpm test:e2e`: 94 passed. The first full run had the 3 new tests' journeys exceed 30 s under load and found a test bug (a confirmation's `aria-hidden` let the next checks pass before the delete ran), fixed with `test.slow()` and waiting for the confirmation to close; the note-links spec then passed 12/12 with `--repeat-each 4`. `review-history.spec.ts` failed once in that run ("Reflect" heading not shown) and passed on its own and in the next full run. No schema change, so no migration. No screen-reader or manual dark-mode pass.
+- **Follow-ups:**
+  - Review priorities: the goal and task delete confirmations (now including the new task delete) still don't say a linked weekly-review priority goes.
+  - The archived (read-only) note view doesn't list its links.
+  - Flaky under load: `goals.spec.ts` "create with every field, and edit" (PR 71's CI, the "Edit goal" dialog still open after 5 s) and `review-history.spec.ts` (once locally).
+  - Earlier follow-ups still open: control characters in titles vs 8.4's `ts_headline` delimiters; Phase 10 export must include notes (JSON, links); the unused `_omitted` in `habits/validation.test.ts`; the 5.5 quiet-hours CHECK null hole; bare-domain autolinks.

@@ -45,3 +45,18 @@ export type Note = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+/** A search in a link picker holds at most this many characters. */
+export const NOTE_LINK_QUERY_MAX = 200;
+
+/**
+ * The sentence a goal or task delete confirmation adds when notes link to
+ * it (chunk 8.3): deleting the target only removes the links. Empty with
+ * none.
+ */
+export function linkedNotesKept(count: number): string {
+  if (count === 0) return "";
+  return count === 1
+    ? "1 linked note will be kept, only unlinked."
+    : `${count} linked notes will be kept, only unlinked.`;
+}

@@ -8,6 +8,7 @@ import {
   type GoalStatus,
   type GoalTaskCounts,
 } from "@/lib/goals";
+import { linkedNotesKept } from "@/lib/notes/note";
 import { deleteGoal } from "@/server/modules/goals/actions";
 
 type DeleteGoalDialogProps = {
@@ -16,6 +17,8 @@ type DeleteGoalDialogProps = {
   milestoneCount: number;
   /** The goal's tasks, direct or under a milestone, by where they end up. */
   taskCounts: GoalTaskCounts;
+  /** Notes linked to the goal, archived too: the delete only unlinks them. */
+  noteLinkCount: number;
   /** Accessible name for the trigger, when the page lists several goals. */
   triggerLabel?: string;
   /** Runs after the goal is gone: refresh the list or leave its page. */
@@ -30,6 +33,7 @@ export function DeleteGoalDialog({
   goal,
   milestoneCount,
   taskCounts,
+  noteLinkCount,
   triggerLabel,
   onDeleted,
 }: DeleteGoalDialogProps) {
@@ -46,6 +50,7 @@ export function DeleteGoalDialog({
           This permanently deletes the goal and its history.{" "}
           <strong className="font-medium text-fg">
             {goalDeleteConsequences(milestoneCount, taskCounts)}
+            {noteLinkCount > 0 && ` ${linkedNotesKept(noteLinkCount)}`}
           </strong>{" "}
           It can&apos;t be undone.
           {goal.status !== "archived" &&

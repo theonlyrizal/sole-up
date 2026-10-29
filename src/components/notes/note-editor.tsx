@@ -14,9 +14,11 @@ import { toast } from "@/components/ui/toast";
 import { EMPTY_NOTE_DOCUMENT, type NoteDocument } from "@/lib/notes/document";
 import { NOTE_TITLE_MAX } from "@/lib/notes/note";
 import { archiveNote, loadNote } from "@/server/modules/notes/actions";
+import type { LinkTarget } from "@/server/modules/notes/queries";
 
 import { DeleteNoteDialog } from "./delete-note-dialog";
 import { noteEditorExtensions } from "./note-extensions";
+import { NoteLinks } from "./note-links";
 import { NoteToolbar } from "./note-toolbar";
 import {
   useNoteAutosave,
@@ -34,10 +36,18 @@ export type EditableNote = {
 
 /**
  * The note editor (chunk 8.2): a title and a TipTap body limited to the
- * 8.1 allowlist, saved as you go. Client-only rendering of the body
- * (`immediatelyRender: false`), so the server never renders the editor.
+ * 8.1 allowlist, saved as you go, and the goals and tasks it links to
+ * (chunk 8.3). Client-only rendering of the body (`immediatelyRender:
+ * false`), so the server never renders the editor. A new note opened from
+ * a goal or task gets `linkTo`, and its first save links it.
  */
-export function NoteEditor({ note }: { note: EditableNote | null }) {
+export function NoteEditor({
+  note,
+  linkTo = null,
+}: {
+  note: EditableNote | null;
+  linkTo?: LinkTarget | null;
+}) {
   const router = useRouter();
   const titleId = useId();
   const [title, setTitle] = useState(note?.title ?? "");
@@ -49,6 +59,10 @@ export function NoteEditor({ note }: { note: EditableNote | null }) {
   const autosave = useNoteAutosave({
     noteId: note?.id ?? null,
     updatedAt: note?.updatedAt ?? null,
+    linkTo: linkTo && {
+      targetType: linkTo.targetType,
+      targetId: linkTo.targetId,
+    },
     read: () => ({
       title: titleRef.current,
       body: plainDocument(editorRef.current),
@@ -193,6 +207,8 @@ export function NoteEditor({ note }: { note: EditableNote | null }) {
           />
         )}
       </div>
+
+      <NoteLinks noteId={savedId} pendingLink={linkTo} />
 
       <LeaveWithoutSavingDialog
         target={leaving.leaveTarget}

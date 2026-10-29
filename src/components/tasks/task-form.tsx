@@ -2,6 +2,7 @@
 
 import { useId, useState, useTransition } from "react";
 
+import { useLinkedNotes } from "@/components/notes/linked-notes";
 import { ReminderSelect } from "@/components/reminders/reminder-select";
 import { ReminderStatus } from "@/components/reminders/reminder-status";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,9 @@ import {
 } from "@/lib/tasks";
 import { changeTaskStatus, updateTask } from "@/server/modules/tasks/actions";
 
+import { DeleteTaskDialog } from "./delete-task-dialog";
 import { TaskBlocks } from "./task-blocks";
+import { TaskNotes } from "./task-notes";
 
 const PRIORITY_OPTION_LABELS: Record<Priority, string> = {
   low: "Low",
@@ -53,8 +56,9 @@ type TaskFormDialogProps = { task: Task } & (
  * Edits a task's title, notes, priority, estimate and reminder in a dialog.
  * Dates and parent are edited inline on the list; the dialog can also
  * cancel or reopen the task. Below the form it shows the task's reminder
- * with snooze (chunk 5.6) and lists its upcoming time blocks, with "Block
- * time" (chunk 4.8).
+ * with snooze (chunk 5.6), lists its upcoming time blocks, with "Block
+ * time" (chunk 4.8), and its linked notes, and offers a confirmed delete
+ * (chunk 8.3).
  */
 export function TaskFormDialog({
   trigger,
@@ -74,13 +78,39 @@ export function TaskFormDialog({
         className="max-w-lg"
         onCloseAutoFocus={onCloseAutoFocus}
       >
-        <TaskForm task={task} onDone={() => setOpen(false)} />
-        {/* Outside the form: their buttons and the block dialog's own form
-            must not submit it. */}
-        <ReminderStatus item={{ kind: "task", id: task.id }} />
-        <TaskBlocks task={task} />
+        <TaskDialogBody task={task} onDone={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Mounted only while the dialog is open, so its sections read then. */
+function TaskDialogBody({ task, onDone }: { task: Task; onDone: () => void }) {
+  const linkedNotes = useLinkedNotes({
+    targetType: "task",
+    targetId: task.id,
+  });
+  return (
+    <>
+      <TaskForm task={task} onDone={onDone} />
+      {/* Outside the form: their buttons and the block dialog's own form
+          must not submit it. */}
+      <ReminderStatus item={{ kind: "task", id: task.id }} />
+      <TaskBlocks task={task} />
+      <TaskNotes
+        task={task}
+        data={linkedNotes.data}
+        failed={linkedNotes.failed}
+        onChanged={linkedNotes.reload}
+      />
+      <div className="flex justify-end border-t border-border pt-4">
+        <DeleteTaskDialog
+          task={task}
+          noteLinkCount={linkedNotes.data?.linkCount ?? null}
+          onDeleted={onDone}
+        />
+      </div>
+    </>
   );
 }
 
