@@ -408,14 +408,14 @@ Rules:
 Implemented in chunk 5.7 as `reminder_sweep_status`: one row for the whole app (`id` smallint, always 1 by CHECK), `last_sweep_at` (timestamptz, the `now` of the latest finished sweep; an overlapping earlier sweep never moves it back). No user data, so no `user_id`. Settings → Reminders warns when it is null or more than 60 minutes old (`isSweepOverdue`), so a stopped cron-job.org job is noticed.
 
 ### Note
-A piece of personal information the user wants to keep, written in a rich-text editor ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Planned for chunk 8.1 as `notes`, with `unique (id, user_id)`.
+A piece of personal information the user wants to keep, written in a rich-text editor ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Built in chunk 8.1 as `notes` (migration 0018), with `unique (id, user_id)` and an index on `(user_id, updated_at)`.
 
 Fields:
 - `id`
 - `user_id`
 - `title` (optional; trimmed, empty → null, up to 200 characters; shown as "Untitled" when null)
 - `body` (`jsonb`, required): the editor's (TipTap/ProseMirror) JSON document, the source of truth. Never HTML.
-- `body_text` (text, required): plain text the server derives from `body`, up to 100,000 characters. The client never sends it.
+- `body_text` (text, required): plain text the server derives from `body` (each paragraph, heading and code block on its own line, hard breaks as line breaks, blank lines left out, control characters other than tab and newline removed), up to 100,000 characters (a CHECK). The client never sends it.
 - `search_vector` (generated, stored `tsvector`): title weighted A, `body_text` weighted B, `english` configuration, with a GIN index
 - `archived_at` (optional)
 - `created_at`
@@ -424,15 +424,17 @@ Fields:
 Rules:
 - **The body is validated server-side** against one allowlist shared with the editor (`src/lib/notes/`): paragraphs, headings 1–3, bullet and ordered lists, blockquotes, code blocks, horizontal rules, hard breaks; bold, italic, strike, inline code and links (`http:`, `https:`, `mailto:` only). No images, tables, task lists or raw HTML. Unknown types or attributes, nesting deeper than 20 levels, or more than 512 KB of JSON are refused, never silently fixed.
 - Rendered as React elements through the same allowlist, never as an HTML string.
-- A note row is created on the first save with a title or a non-empty body. Saves carry the `updated_at` they started from, and a stale one is refused as a conflict.
+- A note row is created on the first save with a title or non-empty `body_text`. Saves carry the `updated_at` they started from, and a stale one that changes the title or body is refused as a conflict (a save that changes nothing is a no-op, stale or not). `updated_at` always moves forward on a change, so an older token can't match again.
+- An archived note refuses saves and link changes (and, from 8.5, tag changes) until restored.
 - **Archive** hides a note from the Notes list, search and the linked-note lists, and makes it read-only until restored. **Delete** is a confirmed hard delete that removes its links and tags.
 - Audit events are on the note: `note.created|updated|archived|restored|linked|unlinked|tags_changed`. `note.updated` holds changed field names only and is skipped within 10 minutes of the note's previous one. Never the title, body, `body_text` or a tag name.
 - Search covers notes that are not archived, plus goal and task titles through expression GIN indexes on `to_tsvector('english', title)` (chunk 8.4). Search terms are never put in a URL or logged.
 
 ### NoteGoal and NoteTask
-Link a note to goals and tasks ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Typed join tables, not a polymorphic `entity_type`/`entity_id`, so the database enforces existence and ownership. Planned for chunk 8.1 as `note_goals` and `note_tasks`.
+Link a note to goals and tasks ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Typed join tables, not a polymorphic `entity_type`/`entity_id`, so the database enforces existence and ownership. Built in chunk 8.1 as `note_goals` and `note_tasks`.
 
 Fields:
+- `id`
 - `user_id`
 - `note_id`
 - `goal_id` (`note_goals`) or `task_id` (`note_tasks`)
@@ -441,7 +443,7 @@ Fields:
 Rules:
 - Composite FKs `(note_id, user_id) → notes`, and `(goal_id, user_id) → goals` or `(task_id, user_id) → tasks`, all `ON DELETE CASCADE`.
 - Unique `(note_id, goal_id)` / `(note_id, task_id)`, plus an index on the target column.
-- A note has at most 50 links in all. Any of the user's goals and tasks can be linked, whatever its status.
+- A note has at most 50 links in all. Any of the user's goals and tasks can be linked, whatever its status. Linking an already linked target, or unlinking one that isn't linked, is a no-op with no event. Links don't move the note's `updated_at`.
 - Deleting a goal or task removes the link and keeps the note. Other targets (habits, life areas, events, reviews) are not linkable in v1. Each would be another join table.
 
 ### Tag and NoteTag
