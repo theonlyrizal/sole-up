@@ -201,7 +201,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 6.3 | Habit CRUD UI | done | chunk/6.3-habit-crud-ui | 2026-10-29 | Track in the nav (`/track`, `/track/archived`), create/edit dialog (measure on create only, unit + target, daily/chosen days/N a week picker, seven days → daily, "applies from this week" note), pause/resume, archive/restore, delete naming the log count, optional goal link; edits save in one transaction |
 | 6.4 | Logging | done | chunk/6.4-habit-logging | 2026-10-29 | `setHabitLog`/`clearHabitLog` (active days up to today in the saved zone, value by measure, row lock, `habit.logged|log_changed|log_removed`), Today "Habits" section (one tap done/skip, full-target Done, Change amount, Undo toast), Track two-week strip with figure for backfills and corrections |
 | 6.5 | Track page and history | done | chunk/6.5-track-history | 2026-10-29 | `/track?range=` (4w default, 12w, week) from the saved zone and week start, strip by week with row labels, figure + always-visible definition, "This week" as progress (`weekProgressFigure`), `src/lib/habits/track-range.ts`; no streaks, percentages or totals |
-| 6.6 | Home integration | todo | | | |
+| 6.6 | Home integration | done | chunk/6.6-home-habits | 2026-10-29 | `habitsSummary` in `metrics/home.ts` (engine via exported `engineData`/`engineInput`, Track's 4-week range), Home "Habits" card: each active habit's own figure + this week's progress, title linking to its Track row (`#habit-<id>`); no combined number |
 | 6.✓ | Phase 6 checkpoint (user) | todo | | | |
 | 7.0 | Decision gate: weekly review | todo | | | |
 | 7.1 | Weekly summary queries | todo | | | |
@@ -2858,3 +2858,24 @@ Template:
   - The strip legend's "Partly done" and "Extra" marks render as wide pills rather than squares (`HabitStripLegend` combines `dayClass`'s `w-full` with `size-6`; from 6.4).
   - With many habits on "Last 12 weeks", each strip is 84 day buttons; fine for now, revisit in 10.7 if Track gets slow.
   - Earlier follow-ups still open: `reminders.spec.ts:138` reading the old reminder under load; notes on habit logs; primary button hover contrast; the goal delete confirmation not mentioning linked habits; the unused `_omitted` in `habits/validation.test.ts`.
+
+### 6.6: Home integration (2026-10-29)
+- **Built:**
+  - `habitsSummary(userId, clock, timeZone, weekStart)` in `metrics/home.ts` → `Metric<HabitSummaryItem[]>`: active habits oldest first, each with `cadenceType` (this week's schedule), `measure`, `consistency` over `trackRangeDates(today, weekStart, "4w")` and `thisWeek` (`weekProgress`). Range = those 4 whole weeks; `hasData` = any active habit. It calls the 6.2 engine through `engineData`/`engineInput`, now exported from `habits/queries.ts` (`engineInput` takes only `today` and `weekStart`).
+  - Home: a "Habits" `<MetricCard>` (last, after Deadlines) with the list "Active habits": each title links to `/track#habit-<id>`, then "Last 4 weeks: <formatConsistency>" and the `weekProgressFigure` line. Empty: "Nothing yet" with an "Add a habit" link to `/track`. The page intro mentions habits.
+  - `trackHabitAnchor(id)` in `src/lib/habits/track-range.ts`; Track's habit rows carry that id (`scroll-mt-4`).
+  - Tests: unit `trackHabitAnchor`; integration `habitsSummary` in `home.integration.test.ts` (4, Tokyo while UTC is a day behind: no data with the exact range and with paused/archived habits only; daily/times-a-week/quantity figures and this-week progress incl. a skip, a log before the range and today logged; equal to Track's default figure and definition with a Sunday week start; cross-user); e2e `home-habits.spec.ts` (empty card and link, two habits in order with their figures, no `%`/score/streak/combined figure, axe, the link landing on the Track row in view, pausing both returns "Nothing yet"); `home.spec.ts` expects the fifth heading.
+  - Docs: PRODUCT_SPEC §8 (the Habits card).
+- **Deviations:** none. The metric takes `weekStart` as a fourth argument (the other Home metrics need only the zone); the page already has the preferences.
+- **Decisions:**
+  1. **The value holds the engine's results, not strings.** The card words them with `formatConsistency` and `weekProgressFigure`, the same functions Track uses, so 7.1 can reuse the numbers.
+  2. **Every cadence shows this week's progress** on Home (Track's longer ranges show it only for times a week), as the chunk asks for "this week's progress" per habit.
+  3. **The card's definition is general** and points to Track for each habit's own definition, rather than repeating one per habit.
+  4. **No "See all on Track" link:** link names containing "Track" would match non-exact nav locators (see the 3.2 note); the titles link to Track instead.
+- **Next chunk should know:**
+  - Locators: Home's region "Habits" (`exact: true`; Today also has a "Habits" region), the list "Active habits" with one title link per habit. Track rows have `id="habit-<id>"`.
+  - 7.1 can call `habitsSummary`, or `engineData`/`engineInput` with its own range, rather than recount.
+- **Unverified:** none for the automated checks. `pnpm verify` passes: format, lint (the 6.1 warning, below), typecheck, 944 unit and 620 integration tests. `pnpm build` passes. `pnpm test:e2e`: 78 passed on the final full run. Two earlier full runs each failed one known `reminders.spec.ts` flake (`:138` reading the old reminder, then `:79` reading an empty reminder select after save), each passing alone (3 of 3); one more run never started because Docker Desktop had stopped. `home-habits.spec.ts` and `home.spec.ts` passed together. No schema change, so no migration. No screen-reader, phone or manual dark-mode pass.
+- **Follow-ups:**
+  - `reminders.spec.ts` flakes under full-suite load: `:138` (old reminder value, noted in 6.4) and `:79` (empty reminder select right after save, noted in 6.3) each failed once here. Both reopen the dialog before the refresh lands; wait for the refreshed value.
+  - Earlier follow-ups still open: the strip legend's wide pills; notes on habit logs; primary button hover contrast; the goal delete confirmation not mentioning linked habits; the unused `_omitted` in `habits/validation.test.ts`.

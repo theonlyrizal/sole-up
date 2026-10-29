@@ -2,7 +2,16 @@ import "server-only";
 
 import { and, asc, eq, gte, isNotNull, lt, lte, or, sql } from "drizzle-orm";
 
-import { addDays } from "@/lib/dates";
+import { addDays, type WeekStart } from "@/lib/dates";
+import { scheduleForWeek } from "@/lib/habits/cadence";
+import {
+  consistency,
+  weekProgress,
+  type HabitConsistency,
+  type HabitWeekProgress,
+} from "@/lib/habits/consistency";
+import type { HabitCadenceType, HabitMeasure } from "@/lib/habits/habit";
+import { trackRangeDates } from "@/lib/habits/track-range";
 import {
   NEXT_COMMITMENT_DAYS,
   nextCommitmentOf,
@@ -14,11 +23,14 @@ import { db } from "@/server/db/client";
 import {
   calendarEvents,
   goals,
+  habits,
   milestones,
   tasks,
   timeBlocks,
 } from "@/server/db/schema";
 import { eventsBetween } from "@/server/modules/calendar-events/service";
+import { engineData, engineInput } from "@/server/modules/habits/queries";
+import { toHabit } from "@/server/modules/habits/service";
 import { listTodayTasks } from "@/server/modules/tasks/queries";
 import { blocksBetween } from "@/server/modules/time-blocks/service";
 
@@ -236,5 +248,67 @@ export async function nextCommitment(
       asOf: clock.now,
     },
     hasData,
+  };
+}
+
+/** One active habit on Home, with the 6.2 engine's results. */
+export type HabitSummaryItem = {
+  id: string;
+  title: string;
+  /** This week's cadence and the habit's measure, for the figure's words. */
+  cadenceType: HabitCadenceType;
+  measure: HabitMeasure;
+  /** The last 4 weeks, this week included: Track's default figure. */
+  consistency: HabitConsistency;
+  /** The week in progress, as Track's "This week" shows it. */
+  thisWeek: HabitWeekProgress;
+};
+
+/**
+ * Each active habit with its consistency over the last 4 weeks (the whole
+ * user weeks Track's default range covers) and this week's progress, both
+ * from the 6.2 engine, so Home always matches Track. Oldest first, as
+ * Track lists them. There is deliberately no figure across habits. No
+ * data: the user has no active habits.
+ */
+export async function habitsSummary(
+  userId: string,
+  clock: TodayClock,
+  timeZone: string,
+  weekStart: WeekStart,
+): Promise<Metric<HabitSummaryItem[]>> {
+  const context = { today: clock.today, weekStart };
+  const range = trackRangeDates(clock.today, weekStart, "4w");
+  const rows = await db
+    .select()
+    .from(habits)
+    .where(and(eq(habits.userId, userId), eq(habits.status, "active")))
+    .orderBy(asc(habits.createdAt), asc(habits.id));
+  const data = await engineData(
+    userId,
+    rows.map((row) => row.id),
+    range,
+  );
+
+  const value = rows.map((row): HabitSummaryItem => {
+    const habit = toHabit(row);
+    const input = engineInput(habit, data.get(row.id), context);
+    const schedule = scheduleForWeek(input.schedules, range.to);
+    if (!schedule) throw new Error("Habit has no schedule");
+    return {
+      id: habit.id,
+      title: habit.title,
+      cadenceType: schedule.cadenceType,
+      measure: habit.measure,
+      consistency: consistency({ ...input, range }),
+      thisWeek: weekProgress(input),
+    };
+  });
+  return {
+    value,
+    definition:
+      "Each active habit on its own: what was done of what was expected over the last 4 weeks, this week included, and this week so far. Skipped days are left out and always shown, today counts once it is logged, and this week never lowers the figure. Paused and archived habits are not shown. Track has each habit's full definition.",
+    range: { from: range.from, to: range.to, timeZone, asOf: clock.now },
+    hasData: value.length > 0,
   };
 }

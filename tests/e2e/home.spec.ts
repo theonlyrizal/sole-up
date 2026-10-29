@@ -77,12 +77,14 @@ test("a new user's Home says nothing yet, with each card's definition and range"
     "Today",
     "Goals without a next action",
     "Deadlines in the next 7 days",
+    "Habits",
   ]);
   for (const name of [
     "Next commitment",
     "Today",
     "Goals without a next action",
     "Deadlines in the next 7 days",
+    "Habits",
   ]) {
     const region = card(page, name);
     await expect(

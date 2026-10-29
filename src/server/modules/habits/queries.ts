@@ -57,7 +57,8 @@ import { toHabit, toHabitLogValue, toHabitSchedule } from "./service";
 
 // Read models for the Track pages (chunk 6.3), their history over the
 // selected range (chunks 6.4 and 6.5) and Today's Habits section (chunk
-// 6.4). Every query is scoped to the user.
+// 6.4); Home's habit summary (chunk 6.6) reuses `engineData` and
+// `engineInput`. Every query is scoped to the user.
 // Every count comes from the 6.2 engine; nothing here recounts.
 
 /** A habit as Track lists it, with this week's schedule and its labels. */
@@ -219,7 +220,7 @@ async function listItems(
 type UserContext = Awaited<ReturnType<typeof userContext>>;
 
 /** What the engine needs for one habit. */
-type EngineData = {
+export type EngineData = {
   schedules: HabitSchedule[];
   pauses: EnginePause[];
   logs: EngineLog[];
@@ -229,7 +230,7 @@ type EngineData = {
  * The schedules, pauses and the logs in `logRange` of some of the user's
  * habits, for the 6.2 engine, by habit ID.
  */
-async function engineData(
+export async function engineData(
   userId: string,
   ids: string[],
   logRange: HabitRange,
@@ -283,10 +284,11 @@ async function engineData(
   return data;
 }
 
-function engineInput(
+/** One habit's engine input, for the user's today and week start. */
+export function engineInput(
   habit: Habit,
   data: EngineData | undefined,
-  context: UserContext,
+  context: Pick<UserContext, "today" | "weekStart">,
 ): HabitWeekInput {
   return {
     habit,

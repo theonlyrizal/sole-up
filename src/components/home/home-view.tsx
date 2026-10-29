@@ -5,10 +5,17 @@ import { cx, focusRing } from "@/components/ui/cx";
 import { agendaEntryKind } from "@/lib/agenda";
 import { calendarItemHref } from "@/lib/calendar-views";
 import type { LocalDate } from "@/lib/dates";
+import { formatConsistency } from "@/lib/habits/consistency";
+import {
+  TRACK_RANGE_LABELS,
+  trackHabitAnchor,
+  weekProgressFigure,
+} from "@/lib/habits/track-range";
 import { commitmentWhenLabel, type ScheduleEntry } from "@/lib/schedule";
 import { TODAY_SECTION_LABELS, todaySectionAnchor } from "@/lib/today";
 import type {
   GoalWithoutNextAction,
+  HabitSummaryItem,
   TodayTaskCounts,
 } from "@/server/modules/metrics/home";
 import type { Metric } from "@/server/modules/metrics/metric";
@@ -19,7 +26,8 @@ import { RefreshOnNewDay } from "./refresh-on-new-day";
 // Home's summaries (chunk 3.2). Every number comes from the metrics module
 // with its definition and range, and links to the list it counts. A card
 // with nothing to look at says "Nothing yet" instead of a zero. There is
-// deliberately no overall score.
+// deliberately no overall score, and habits (chunk 6.6) each keep their own
+// figure, with no number across them.
 
 const GOALS_LIST_ID = "goals-without-next-action";
 
@@ -29,6 +37,7 @@ type HomeViewProps = {
   goals: Metric<number>;
   goalList: GoalWithoutNextAction[];
   deadlines: Metric<number>;
+  habits: Metric<HabitSummaryItem[]>;
   todayDate: LocalDate;
   nextDayStartsAt: string;
   locale: string;
@@ -43,6 +52,7 @@ export function HomeView({
   goals,
   goalList,
   deadlines,
+  habits,
   todayDate,
   nextDayStartsAt,
   locale,
@@ -154,6 +164,52 @@ export function HomeView({
           count={deadlines.value}
           label={deadlines.value === 1 ? "deadline" : "deadlines"}
         />
+      </MetricCard>
+
+      <MetricCard
+        id="home-habits"
+        title="Habits"
+        metric={habits}
+        empty={{
+          description:
+            "Once you track an active habit, each one shows here with how it's going. There's no combined number.",
+          link: { href: "/track", label: "Add a habit" },
+        }}
+        {...context}
+      >
+        <ul
+          aria-label="Active habits"
+          className="flex flex-col divide-y divide-border rounded-md border border-border"
+        >
+          {habits.value.map((habit) => (
+            <li key={habit.id} className="flex flex-col gap-1 px-3 py-2">
+              <Link
+                href={`/track#${trackHabitAnchor(habit.id)}`}
+                className={cx(
+                  "self-start rounded-sm font-medium hover:underline",
+                  focusRing,
+                )}
+              >
+                {habit.title}
+              </Link>
+              <p className="text-sm">
+                {TRACK_RANGE_LABELS["4w"]}:{" "}
+                {formatConsistency(
+                  habit.consistency,
+                  habit.cadenceType,
+                  habit.measure,
+                )}
+              </p>
+              <p className="text-sm text-muted">
+                {weekProgressFigure(
+                  habit.thisWeek,
+                  habit.cadenceType,
+                  habit.measure,
+                )}
+              </p>
+            </li>
+          ))}
+        </ul>
       </MetricCard>
     </div>
   );
