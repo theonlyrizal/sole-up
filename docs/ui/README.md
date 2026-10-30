@@ -1,36 +1,61 @@
 # SoleUp UI redesign
 
-This folder defines the product and visual decisions for a full SoleUp UI/UX redesign. It considers both the original blue/aqua reference set and the later screenshots of SoleUp's current Home, Track, Review, and Settings screens. The current screenshots expose content hierarchy, repeated explanations, density, and navigation problems; the earlier reference set defines the intended modern visual direction. Read the documents in this order:
+**Status:** Approved plan, not yet built. Revision 2, 2026-10-30. It replaces the first draft from commit `c76c3a5`.
+**Track:** A separate delivery track, UI-0 to UI-13, run alongside the product chunks in [`../IMPLEMENTATION_PLAN.md`](../IMPLEMENTATION_PLAN.md).
 
-1. [Design decisions](DESIGN_DECISIONS.md) — product interpretation, visual direction, information architecture, and constraints.
-2. [Design system](DESIGN_SYSTEM.md) — tokens, component behavior, layout rules, accessibility, and responsive behavior.
-3. [Implementation plan](UI_IMPLEMENTATION_PLAN.md) — phased, reviewable delivery plan grounded in the current app.
-4. [Agent prompts](UI_AGENT_PROMPTS.md) — ready-to-use prompts for implementing one phase at a time.
+SoleUp gets a full frontend redesign. It follows **Google Material 3 Expressive**, adapted for an accessible, responsive Next.js PWA, and takes its visual direction from five reference images (described below). The backend stays as it is: the tables, services, Server Actions, queries, URL contracts and domain rules don't change. Pages, layouts and presentation components can be rebuilt from scratch.
 
-These are design and implementation planning documents, not a record that the redesign has already shipped. The existing feature behavior, routes, domain rules, server actions, and data model remain the source of truth while the UI changes.
+## Reading order
 
-## Context reviewed
+| # | Document | What it settles | Who reads it |
+|---|---|---|---|
+| 1 | [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) | Numbered decisions (D-01 …), each with its reason and the alternatives turned down: what we take from each reference, what we refuse, navigation, theme, fonts, icons and the product-rule boundaries | Everyone, before any phase |
+| 2 | [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) | Exact tokens: colour roles (hex values, light and dark, with measured contrast), life-area palette, type scale, shape scale, spacing, elevation, state layers, motion springs as CSS `linear()`, breakpoints, icon and shape library, content style | UI-1 onwards |
+| 3 | [COMPONENTS.md](COMPONENTS.md) | Each shared component's anatomy, sizes, variants, states, props and accessibility contract | UI-2 onwards |
+| 4 | [SCREENS.md](SCREENS.md) | Every route, screen by screen: wireframes for compact and expanded widths, which existing query field fills each element, states, interactions, and what must stay unchanged | The phase that owns the screen |
+| 5 | [UI_AUDIT.md](UI_AUDIT.md) | The current routes, data sources, URL contracts, states, tests, and which components to reuse or replace | Before touching a route |
+| 6 | [UI_IMPLEMENTATION_PLAN.md](UI_IMPLEMENTATION_PLAN.md) | Phases UI-0 to UI-13: scope, files, tasks, tests, done criteria, tracker and handoff notes | The agent running a phase |
+| 7 | [UI_AGENT_PROMPTS.md](UI_AGENT_PROMPTS.md) | One prompt to paste per phase | The user |
 
-The plan reflects `docs/PRODUCT_SPEC.md`, `docs/ROADMAP.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, and ADRs 0010–0016. As of 2026-10-30, the progress log records implementation through 8.3 as done; 8.4–8.5 and phases 9–10 are still todo. The current app uses Next.js 16.4 App Router, React 19, Tailwind CSS 4, Radix UI, and FullCalendar 7.1, with an authenticated desktop sidebar/mobile bottom bar, CSS-variable tokens, and feature-specific pages.
+If two docs disagree, the more specific one wins: SCREENS beats COMPONENTS, COMPONENTS beats DESIGN_SYSTEM, and DESIGN_SYSTEM beats DESIGN_DECISIONS. The exceptions are the product rules in DESIGN_DECISIONS §2, which always win. `CLAUDE.md`, `PRODUCT_SPEC.md`, the ADRs and `DATA_MODEL.md` outrank everything in this folder. When a design here conflicts with one of them, stop and ask the user. Don't quietly pick one.
 
-## Visual references
+## The reference images
 
-The five images supplied in the request are inspiration, not product specifications. Their shared cues are soft blue/aqua atmosphere, white elevated surfaces, rounded containers, bold readable metrics, compact weekly calendars, clear navigation, and friendly activity illustrations. One image uses a separate orange streak aesthetic; SoleUp will use a restrained warm accent for habit activity and positive feedback while retaining one coherent blue/aqua product palette. Avoid copying invented sample user names, sample metrics, fitness-only labels, or streak pressure.
+The user supplied five images, saved locally at `C:\Users\salma\AppData\Local\Temp\claude\E--WebDev-sole-up\5fabdf84-8ecd-4f65-87f1-0e637b42ff72\images\1.webp` … `5.webp`. They are third-party portfolio shots, so **they are not committed to the repository**. The descriptions below are written so an agent doesn't need to see them.
 
-The references remain at the user-provided paths:
+1. **Blue "habit" app, three phones, tilted grid (primary reference).**
+   - **Background and surfaces:** a pale sky-blue background with soft clouds; white rounded cards (about 28–32 px corners) floating above it.
+   - **Header:** a monogram/avatar with "Today's Habit" and a circular menu button.
+   - **Week strip:** a horizontal strip of seven day chips (weekday letter above the date) inside tall pill capsules. Today is a filled deep-blue capsule with a white inner circle around the date.
+   - **Activities carousel:** square white tiles, each with a 3D illustration and a label.
+   - **"Activity Steps" card:** a big number ("4.256 / Steps"), a 0…target scale, and a row of about 26 thin vertical pills, deep blue up to the progress point and pale steel-blue after it. Three pills below: two filled (time, energy) and one outlined.
+   - **Navigation and calendar:** a four-item bottom bar (Home, Progress, Calendar, Profile) with filled icons for the active item. A month chip row (Feb, Mar, **Apr**, May) above a month grid of circular day cells; selected days are filled, ranges are joined by a tinted band, and out-of-month days are hatched.
+2. **Same app, hero composition.**
+   - The home screen in hand against a misty mountain lake, plus close-ups of the "Activity Steps" card and the "Progress Goal 78 %" card.
+   - The goal card shows a thick semicircle gauge in three parts: a filled deep-blue arc, a pale arc, and a diagonally hatched arc for the remainder. A large light-weight numeral sits in the middle with a muted caption.
+3. **Same app, three screens straight on.**
+   - **Progress screen:** a "Favorite Habits" card with a Monthly dropdown and five tall rounded bars for Mon–Fri. The other days are hatched pale blue; Thursday is solid deep blue with the activity icon at its foot and a rotated "+83 %" label.
+   - **Calendar screen:** a "Habit List" of rows, each with an icon tile, a title, metadata (a clock icon with "45 minute", a pin icon with "City Park"), and a filled "Start" pill button.
+4. **Orange "streak" app.**
+   - **Header and texture:** a warm orange gradient header, "Good Morning J.Snow / Keep the streak alive", a flame-count chip, and a dot-matrix heatmap texture (rows of small rounded squares in three orange intensities).
+   - **Celebration:** a white bottom sheet with a drag handle, a large outlined flame, "Congrats!".
+   - **Streak detail:** a week row of filled flame circles, a "60 Days Streaks Goal | 27 Days Completed" split stat, and "12 Hours Well Spent".
+   - **Edit form:** labelled field containers (a small coloured label above the value), a start/end date pair joined by a dotted connector, a reminder switch row, and a bottom action row with a wide gradient "Save" button and square icon buttons for refresh and delete.
+5. **Blue/pink glass app.**
+   - **Onboarding:** "Maintain Daily Habit" with a product photo.
+   - **Home:** "Good Day 👋" with a segmented donut ring showing 78 % beside a legend (Sleep, Walking, Cycling). Below it, a wavy-edged gradient panel holds "Todays Habits" cards with a check status and time, and a bottom bar with a raised centre "+" button.
+   - **Add Habit form:** a grid of activity icons in circles (the selected one filled), a goal slider with a value bubble ("5 km"), and a glossy "Add Habit" button.
 
-- `C:/Users/salma/OneDrive/Pictures/f3f347e3364375fcb6f45914e2a47f5b.webp`
-- `C:/Users/salma/OneDrive/Pictures/0fcc227f93ff5dc63057479f2dcf6d42.webp`
-- `C:/Users/salma/OneDrive/Pictures/ba921a8a6090d5cd34f2f425b313f78b.webp`
-- `C:/Users/salma/OneDrive/Pictures/91ea10867b5993f1b84acae438dca09e.webp`
-- `C:/Users/salma/OneDrive/Pictures/original-ab2beaa32cff35b3e6601ff36741fac4.webp`
+DESIGN_DECISIONS §3 turns these into a pattern catalogue: what we take, how it maps onto SoleUp's real data, and what we refuse (fake fitness metrics, life scores, streaks, trophies, glossy gradients on controls).
 
-They are not copied into the repository. The first, second, and third are the primary direction; the fourth contributes only the warm, celebratory accent; the fifth contributes the compact progress visualization and colorful activity identity, interpreted in SoleUp's calmer tone.
+## Material 3 Expressive sources
 
-## Material references
+Token values in DESIGN_SYSTEM.md were checked on 2026-10-30 against Google's own Jetpack Compose Material 3 token sources (`androidx/compose/material3/tokens/*.kt`): motion springs (`ExpressiveMotionTokens`, `StandardMotionTokens`), corner scale (`ShapeTokens`), navigation bar and rail sizes (`NavigationBarTokens`, `NavigationRail*Tokens`). The guideline site is <https://m3.material.io/>. SoleUp builds its **own** React components on these tokens with Tailwind CSS 4 and Radix. It does not use `@material/web`, MUI, or any Android library (D-03).
 
-- [Material 3 Expressive overview](https://m3.material.io/): Google's overview of expressive color, typography, motion, shape, and components.
-- [Material 3 getting started](https://m3.material.io/get-started): design foundations and platform availability.
-- [Material 3 lists](https://m3.material.io/components/lists/overview): component guidance and current expressive/web support status.
+## What changed from revision 1
 
-Material 3 Expressive is adapted to an accessible responsive web application. Use Material concepts and roles; do not imply that SoleUp uses Google's Android Compose implementation.
+- Concrete values everywhere: colours, contrast ratios, sizes, motion curves and wireframes, instead of directions to "tune later".
+- Facts corrected: chunk 8.4 (Search, `/notes/search`) **has shipped**; revision 1 called it unbuilt.
+- Tests are back in scope. Revision 1 told agents not to add or run tests. That conflicts with `CLAUDE.md` ("Definition of done" and "Never fake completion"), so every phase now updates and runs the relevant checks.
+- New documents: COMPONENTS.md and SCREENS.md.
+- The phases are split smaller: Plan is now Today plus the task lists, and public and system pages have a phase of their own.

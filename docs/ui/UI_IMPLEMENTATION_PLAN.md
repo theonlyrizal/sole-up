@@ -1,230 +1,366 @@
 # SoleUp UI implementation plan
 
-**Status:** Detailed, phased implementation brief grounded in the repository and current UI screenshots.
-**Scope:** Full responsive frontend redesign using Material 3 Expressive ideas and the visual references.
-**Contract:** [Design decisions](DESIGN_DECISIONS.md) and [design system](DESIGN_SYSTEM.md) are the visual/product guardrails. Frontend structure may be rebuilt; existing backend behavior, routes, privacy, and data ownership remain authoritative.
+**Status:** Revision 2, 2026-10-30. Replaces revision 1 (commit `c76c3a5`).
+**Scope:** A full frontend redesign in Material 3 Expressive, delivered as phases UI-0 to UI-13.
+**Source of truth for design:**
+- [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) (the D-xx decisions and the product rules in §2);
+- [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) (tokens);
+- [COMPONENTS.md](COMPONENTS.md);
+- [SCREENS.md](SCREENS.md);
+- [UI_AUDIT.md](UI_AUDIT.md) (current routes and contracts).
 
-## 1. Outcome
+---
 
-Redesign every public and authenticated screen so SoleUp feels like one polished product. The interface should help a user see the next useful thing, act quickly, and understand progress without reading repeated technical explanations. Use the images 1–3 from the original inspiration as the visual anchor: blue/aqua atmosphere, opaque white or tonal surfaces, clear selected states, spacious cards, readable compact charts, and friendly activity identity. Images of SoleUp's current pages identify pain points, especially overlong metric explanation, repeated same-weight panels, dense habit grids, and report-like review pages.
+## 1. How this track works
 
-The redesign is allowed to replace the frontend presentation. Agents can add/remove/consolidate components, change composition, introduce a shared component system, and rebuild page layouts. Data still comes from SoleUp's existing authenticated query/service/action paths and existing backend tables. Do not access the database from the browser or recreate domain rules as client-only logic.
+- **One phase = one branch = one PR.** A phase takes roughly half a day to two days. If one grows beyond that, split it (UI-2 is already split into 2a and 2b) and record the split in the tracker.
+- **The agent session protocol in [`../IMPLEMENTATION_PLAN.md`](../IMPLEMENTATION_PLAN.md#agent-session-protocol) applies in full**: read, preconditions, waiting for the previous PR (2a), start, scope, the subagent rule, verify, close-out and the "Never" list. The only differences are:
+  - **Branch:** `chunk/ui-<n>-<slug>` (for example `chunk/ui-4-home`).
+  - **Previous PR:** the previous **UI phase's** PR. UI-1's predecessor is the PR for `ui-0.0-planning` (this document set).
+  - **Progress and handoff:** recorded in **this file** (§4 tracker, §7 handoff notes), not in the product progress log. If a phase changes product docs (`PRODUCT_SPEC.md`, README), say so in its handoff.
+  - **Commits:** `chunk ui-<n>: <imperative summary>`, at most 72 characters, with a body covering what changed and why, the decisions, the **checks run with their real results**, and what's unverified or left as a follow-up. **No `Co-Authored-By` trailers and no Claude or Anthropic attribution** (`CLAUDE.md`).
+  - **PR body:** the same sections as the product chunks (Summary, Changes, Decisions and deviations, Checks run, Unverified and follow-ups, Manual steps), plus **Screenshots**: links or paths to the `@visual` captures at 390 × 844 and 1280 × 800 in light and dark for the routes the phase touched.
+- **Ordering with product chunks (D-35):** UI-1 to UI-3 run before chunk 8.5. After UI-3, product chunks may interleave, and any new UI they add uses the new components.
+- **Decision gates:** a phase that depends on a §5 amendment in DESIGN_DECISIONS (5-A to 5-E) **asks the user first**, with a recommendation. If the user declines, the phase uses the fallback written beside that amendment.
 
-## 2. Product and technical baseline
+## 2. Rules for every phase
 
-- Product: personal management workspace covering goals/life areas, tasks, calendar/time blocks, habits, notes, review/insights, settings and reminders.
-- App: Next.js 16.4 App Router, React 19, Tailwind CSS 4, Radix UI, Geist, FullCalendar 7.1, domain-specific server modules.
-- Current shell: desktop sidebar and seven-column mobile navigation; current styles in `src/app/globals.css`; shared UI primitives under `src/components/ui`.
-- Routes in the current app include public landing/sign-in and authenticated `/home`, `/goals`, `/goals/[goalId]`, `/goals/areas`, `/goals/archived`, `/plan`, `/plan/today`, `/plan/upcoming`, `/plan/inbox`, `/plan/calendar`, `/track`, `/track/archived`, `/notes`, `/notes/new`, `/notes/[noteId]`, `/notes/archived`, `/review`, `/review/history`, `/review/history/[reviewId]`, and `/settings`.
-- The 2026-10-30 implementation log records chunks through 8.3 complete. Search/tags (8.4–8.5), Insights (9), and export/deletion/privacy/security/accessibility/performance work (10) are still todo. Redesign those only after the actual feature exists; do not invent a screen's data or claim planned work shipped.
-- Product docs, data model and ADRs govern feature semantics. Preserve date/time zone, recurrence, habit cadence/history, review period locking, note autosave/conflict, reminders, privacy, and user-scope behavior.
+1. **The backend is frozen** (D-32 and product rule 8). No changes to `src/server/db/schema/**`, migrations, `src/server/modules/**/{service,actions,queries,validation}.ts`, `src/server/auth/**`, route handlers, or the domain libraries `src/lib/{dates,task-list,calendar-views,agenda,area-columns,area-timeline,upcoming,review-flow,today,schedule,recurrence*,reminders,quiet-hours,search,priorities,goals,milestones,tasks,time-blocks,weekly-reviews}.ts` and `src/lib/habits/**`. **Additive pure helpers** with unit tests are allowed (for example `src/lib/week-strip.ts`, `src/lib/greeting.ts`, `isCommitmentUnderWay`). If a screen needs data no query returns, **stop and tell the user**.
+2. **URL contracts are frozen.** Every path, query parameter and hash anchor in [UI_AUDIT.md](UI_AUDIT.md) keeps its meaning, default and invalid-value fallback. Navigation that changes state still goes through the same URL builders (`trackHref`, `reviewHref`, `calendar-views.ts` and `task-list.ts` builders, …).
+3. **Product rules** (DESIGN_DECISIONS §2): no scores, no streaks, `hasData` separate from 0, definitions reachable, no shame, privacy.
+4. **Read the Next.js docs first.** `AGENTS.md` says this Next.js has breaking changes. Read the relevant guide in `node_modules/next/dist/docs/` before writing code: fonts, CSS, layouts, Server and Client Components, loading and error files, `cacheComponents`, and forms or Server Actions as relevant. Heed deprecations.
+5. **Tokens only.** No raw hex values, Tailwind palette colours or arbitrary values that duplicate a token in new or rewritten code. Use the role utilities and the type and shape tokens.
+6. **Component reuse.** Build on the `src/components/ui` and `src/components/data` components. Don't create page-local copies of a button, card, chip or list item. If a needed variant is missing, add it to the shared component, with a gallery entry and a unit test.
+7. **Deletion.** Remove a presentation component only after `rg` shows no imports and no test depends on it. Keep domain hooks (`use-habit-log.ts`, `use-note-autosave.ts`, `use-picker-search.ts`, `useStepSave`, `use-refresh-on-new-day.ts`, `search-handoff.ts`) unless the phase rewrites them with the same behaviour and tests.
+8. **Accessibility** (D-28): keyboard paths for every pointer interaction, visible focus, a label for every control, one `h1` per page, landmarks, live regions for async status, reduced motion, and 48 px targets.
+9. **Tests are part of done.** This replaces revision 1's "don't add tests", which conflicted with `CLAUDE.md`.
+   - **Unit tests** for new pure helpers and components (static markup, the existing pattern).
+   - **E2E tests:** update affected specs deliberately when visible names change. **Never delete an assertion of behaviour to get green.** If a behaviour assertion fails, the redesign broke something: fix the code.
+   - **Accessibility:** add `expectNoSeriousViolations` for each touched route in light **and** dark, at 390 × 844 **and** 1280 × 800.
+   - **Visual capture:** update the `@visual` capture list (§5) for the phase's routes.
+10. **Finish-line commands** (real results go in the commit, PR and handoff):
+    ```bash
+    pnpm verify          # format:check + lint + typecheck + test:unit + test:integration
+    pnpm build
+    pnpm test:e2e        # needs `docker compose up -d`
+    pnpm test:visual     # from UI-1 on: saves screenshots to test-results/visual/
+    ```
+    From UI-13 on, also run `pnpm lint:tokens`.
+11. **Manual checks the agent can't do** (a real phone, installed PWA, screen reader): list them under "Manual steps for the user" and mark them unverified unless the user confirms.
 
-## 3. Current screenshot diagnosis translated to requirements
+## 3. Shared engineering decisions
 
-| Current evidence | Redesign requirement |
-| --- | --- |
-| Home is a stack of same-weight outlined cards with repeated definitions/ranges. | Create clear hero and section hierarchy; put key actionable summaries first; use a responsive grid on wide screens and a purposeful vertical sequence on mobile. Keep one-line explanations and range/as-of context visible, with full counting rules in labelled disclosure. Empty summaries should be compact and useful, not large blank panels. |
-| Track legend, range selector and repeated calculation text dominate habit rows. | Let a compact range selector and concise status key support the content. Give each habit a scannable header, cadence, this-week status, compact history, and clear logging/correction actions. Explain the metric once per card through a details affordance; make days legible and touchable. |
-| Review shows all navigation and long metric definitions at once. | Make the review an approachable guided flow: clear selected week and progress, one step's content at a time, compact metric summaries, full definitions on demand, and stable Back/Continue/Finish actions. Maintain direct step links and resumability. |
-| Settings is an undifferentiated long form. | Group controls into named, spaced sections with a short purpose and obvious save boundary. Separate time/region, reminders, notifications/devices, appearance/accessibility when present, installation, account/privacy/data rights. Do not pretend settings exist before backend support. |
-| General use of dark outline surfaces lacks visual role or action hierarchy. | Define semantic color/surface roles, selected/primary/secondary/destructive treatments, spacing and elevation; make both light and dark polished. Give interactive rows and focus/hover/pressed states clear feedback. |
+- **Server and client split.** Pages stay Server Components that call the queries. Interactive pieces are client islands (`"use client"`) that receive serialisable props. Shell parts that need `usePathname` (`NavigationBar`, `NavigationRail`, `PlanTabs`) are client components inside the server layout.
+- **Theme script** (UI-1). `src/lib/theme.ts` exports:
+  - `THEME_STORAGE_KEY = "soleup.theme"`;
+  - `type ThemeChoice = "system" | "light" | "dark"`;
+  - `resolveTheme(choice, prefersDark)`;
+  - `themeInitScript()`, a string for an inline `<script>` that reads `localStorage` inside `try/catch`, sets `data-theme` only for `light` or `dark`, and does nothing for `system` (CSS media queries handle that).
 
-### Global hierarchy rule for explanation-heavy surfaces
+  `layout.tsx` renders it in `<head>` with `<html suppressHydrationWarning>`. Unit-test `resolveTheme` and that the script string has no template injection. The Settings toggle (UI-12) writes the key and sets `dataset.theme` straight away.
+- **Breakpoints in JS.** `src/lib/breakpoints.ts` exports `BREAKPOINTS = { medium: 600, expanded: 840, large: 1200, xlarge: 1600 }` and `mediaQuery(name)`. CSS `@theme` uses the same numbers. A unit test reads `globals.css` and checks they match.
+- **`useMediaQuery` / `useKeyboardOpen` / `useScrolled`** live in `src/components/hooks/`, as client-only hooks with `useSyncExternalStore` (copy the pattern in `time-grid-view.tsx`).
+- **Icons pipeline.** `pnpm icons:generate` runs `node scripts/generate-material-icons.mts` and writes `src/components/icons/icon-paths.generated.ts`, which is committed and starts with a "generated, do not edit" header. Adding an icon means editing the allowlist and regenerating. CI doesn't regenerate.
+- **Palette script.** `scripts/generate-palette.mts` (committed in UI-1) prints the token table and the contrast report in DESIGN_SYSTEM §1. It documents where the values came from; it isn't wired into the build.
+- **Legacy aliases** (DESIGN_SYSTEM §12) exist from UI-1 to UI-13 so pages not yet redesigned stay coherent.
 
-Never solve the current density problem by deleting product transparency. Show the label, actual value/status, short plain-language explanation, and applicable date range/as-of. Move long counting formula, exclusions, or methodology into a visible “How this is counted” disclosure or details affordance. Keep the disclosure keyboard-accessible and preserve names/definitions in the accessibility tree when needed. Show “Nothing yet” distinctly from 0. Avoid displaying a calculated-at timestamp when it adds no user decision value; if product rules require it, style it as quiet supporting context.
+## 4. UI phase tracker
 
-## 4. Cross-cutting frontend and data rules
-
-1. Before code changes, read the relevant local current-version guide from `node_modules/next/dist/docs/` (per repository `AGENTS.md`): App Router layouts, CSS, server/client boundaries, loading/error conventions, forms/actions, or caching as applicable. Follow local deprecation guidance.
-2. Keep existing `requireUser`, scoped server queries, Zod validation, Server Actions and service calls. A UI refresh does not weaken authorization or introduce client-to-DB access.
-3. Treat current paths, query keys, hashes, notification deep links, and shareable filters as contracts unless a separately approved product decision says otherwise. Preserve route behavior even if navigation placement changes.
-4. Keep server components and server data loading by default. Add client components only for interactions needing client state. Do not ship a large static mock layer in place of connected backend data.
-5. Preserve existing loading, empty, error, save, conflict, undo, disabled, and pending states. Upgrade their presentation but not their meaning.
-6. Delete/replace old visual components only after checking all imports and any tests that exercise their contracts. Keep focused domain logic separate from presentation.
-7. Do not introduce new product metrics, scores, streaks, sample numbers, fictional names, fitness-only concepts, or unimplemented Insights/privacy features.
-8. Preserve keyboard access, visible focus, screen-reader labels, contrast, reduced motion, mobile safe areas, and all FullCalendar keyboard behavior.
-9. Do not add or run tests unless the user asks for testing/verification. Do not claim checks were run if they were not.
-
-## 4a. Version control and delivery workflow
-
-Follow the established repository Git/PR practices in `docs/IMPLEMENTATION_PLAN.md` → **Agent session protocol** for every UI phase. One UI phase is one reviewable chunk, one branch, and one PR; finish/merge the current phase before starting the next.
-
-- Before starting a phase, check `gh auth status`, ensure the checkout is clean and based on the latest `main` (`git switch main`, then `git pull --ff-only origin main`), and confirm the preceding work is merged. UI-0 starts from the latest main containing the current product work; each later UI phase starts only after the previous UI phase PR is merged. If a precondition fails, stop and report it; don't work around it or include unrelated changes.
-- Create a phase branch using the existing repository convention, for example `chunk/ui-0-audit`, `chunk/ui-1-design-system`, through `chunk/ui-11-polish`. Never commit directly to `main`, force-push, bypass branch protection, or mix multiple UI phases in a branch/PR.
-- Keep the UI phase tracker and handoff notes in this document so the product-feature progress log stays accurate. Update only the current UI phase row and its handoff. Do not mark phases complete before their PR is merged and any requested finish criteria are met.
-- Commit with the repository's established format: `chunk ui-<n>: <imperative summary>` and a body covering changes, decisions, actual validation, unverified items, and follow-ups. Do not add attribution trailers.
-- Push the phase branch and open a PR to `main` with Summary, Changes, Decisions/deviations, Checks actually run, Unverified/follow-ups, and Manual user steps. Use the repository's configured merge policy and follow the existing auto-merge/check workflow in `docs/IMPLEMENTATION_PLAN.md`.
-- Do not copy the product implementation plan's domain-chunk status into this UI tracker. The UI phases are their own track, while still using the same branch, commit, review, and PR discipline.
-
-### UI phase tracker
-
-Statuses: `todo`, `in progress`, `done`, `blocked`. Update only the phase being worked on.
+Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Update only your own row.
 
 | Phase | Scope | Status | Branch | Date | Note |
-| --- | --- | --- | --- | --- | --- |
-| UI-0 | Route and behavior audit | todo | | | |
-| UI-1 | Expressive design system | todo | | | |
-| UI-2 | App shell and navigation | todo | | | |
-| UI-3 | Home | todo | | | |
-| UI-4 | Plan and task flows | todo | | | |
-| UI-5 | Goals and Life Areas | todo | | | |
-| UI-6 | Calendar | todo | | | |
-| UI-7 | Track and habits | todo | | | |
-| UI-8 | Review and history | todo | | | |
-| UI-9 | Notes | todo | | | |
-| UI-10 | Settings and account surfaces | todo | | | |
-| UI-11 | Whole-app consistency pass | todo | | | |
+|---|---|---|---|---|---|
+| UI-0 | Planning: decisions, system, components, screens, audit, plan, prompts | in progress | ui-0.0-planning | 2026-10-30 | Revision 2 docs. Set to done when its PR merges |
+| UI-1 | Foundations: tokens, type, theme, icons, shapes, motion, breakpoints | todo | | | |
+| UI-2a | Components: actions, selection, inputs, gallery | todo | | | |
+| UI-2b | Components: containment, navigation primitives, feedback, states | todo | | | |
+| UI-3 | App shell: nav bar, rail, app bar, FAB menu, More, page structure | todo | | | Needs sign-off 5-C |
+| UI-4 | Home | todo | | | Needs sign-off 5-A |
+| UI-5 | Plan: Today, task row, timeline, Today habits | todo | | | |
+| UI-6 | Plan: All tasks, Upcoming, Inbox, task dialog, Quick Add | todo | | | |
+| UI-7 | Calendar and event/block dialogs | todo | | | |
+| UI-8 | Goals, goal detail, life areas, archived goals | todo | | | |
+| UI-9 | Track, habit form, archived habits | todo | | | Needs sign-off 5-B |
+| UI-10 | Weekly review, history, detail | todo | | | Uses 5-A |
+| UI-11 | Notes, editor, search (and tags if 8.5 shipped) | todo | | | |
+| UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | todo | | | Needs sign-off 5-D |
+| UI-13 | Consistency, cleanup, token lint, accessibility sweep, docs | todo | | | |
 
-### UI phase handoff notes
+## 5. Visual capture harness (built in UI-1, extended by each phase)
 
-For each phase append one dated note after its PR is ready, following the handoff format in `docs/IMPLEMENTATION_PLAN.md`. Include the phase branch and PR, changed routes/components, preserved backend/URL contracts, actual checks, anything unverified, and follow-ups. Keep this log separate from the existing product chunk handoffs.
+- **Spec:** `tests/e2e/visual-capture.spec.ts`. Each test signs in through the existing test sign-in helper, seeds a **representative dataset** through the helpers in `tests/e2e/helpers.ts` (goals with milestones, tasks in every Today section, habits of all three cadences with mixed logs, notes, a started review), and then for each `{route, state}` × `{390x844, 1280x800}` × `{light, dark}` calls `page.emulateMedia({ colorScheme })`, sets the viewport, and runs `page.screenshot({ path: "test-results/visual/<phase>/<route>-<w>-<theme>.png", fullPage: true })`.
+- **No assertions on pixels** (D-29).
+- **It doesn't run by default.** The spec calls `test.skip(!process.env.SOLEUP_VISUAL, "visual capture only")`. `pnpm test:visual` runs `node scripts/run-visual.mts`, which sets `SOLEUP_VISUAL=1` and spawns `playwright test tests/e2e/visual-capture.spec.ts` so it works in both PowerShell and bash.
+- **Output:** `/test-results/` is in `.gitignore`, so the screenshots are never committed. Attach them to the PR or reference their paths in the handoff.
 
-## 5. Page-by-page target experience
+## 6. Phases
 
-### Public and account entry
+Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scope**. File paths are guides, not contracts.
 
-| Route | Target experience |
-| --- | --- |
-| `/` | A clear, lightweight SoleUp introduction consistent with the app's palette and product promise; one obvious sign-in/get-started action; no invented feature promises. |
-| `/sign-in` | Focused branded sign-in surface; simple provider choices, clear loading/error states, no marketing clutter. Preserve provider auth and error copy. |
+### UI-0: Planning (this document set)
+**Delivered:** README, DESIGN_DECISIONS, DESIGN_SYSTEM, COMPONENTS, SCREENS, the UI_AUDIT corrections, this plan, and UI_AGENT_PROMPTS. **Done when** the user has reviewed it and the PR has merged.
 
-### Shared authenticated shell
+### UI-1: Foundations
+**Read:** DESIGN_SYSTEM (all of it), DESIGN_DECISIONS D-01 to D-10, D-25 and D-28. Next docs on `next/font`, CSS and `layout.tsx` metadata/viewport. `globals.css`, `layout.tsx`, `calendar-theme.css`, `cx.ts`, `life-area-colors.tsx`, `time-grid-view.tsx`.
 
-- Desktop: persistent, compact navigation rail/sidebar; logo/wordmark; direct links for Home, Plan, Goals, Track, Notes, Review; Settings and account actions at the lower edge. Plan subnav is contextual. Current page and parent are distinct and accessible.
-- Mobile: top app bar with current title/context and a four-destination bottom bar: Home, Plan, Track, More. More opens a proper accessible destination sheet/menu containing Goals, Notes, Review, Settings. Keep Quick Add available without obscuring content. Respect safe-area insets and virtual keyboard.
-- All sizes: meaningful page title, optional concise description, one primary action, URL-aware subnav/filter toolbar, bounded content width, consistent page gutters. Avoid the current seven-icon squeeze.
+**Build:**
+1. **`globals.css`.**
+   - Add `--md-*` roles for light (`:root`) and dark (both the `prefers-color-scheme` block and the `[data-theme="dark"]` block, kept identical, as today), the area variables, `--md-progress-track`, `--md-focus` and `--md-canvas-mist`.
+   - In `@theme inline`, map them to `--color-<role>` (with `--color-canvas` for M3 surface).
+   - Add the type scale as `--text-<token>` with `--text-<token>--line-height`, `--letter-spacing` and `--font-weight` (Tailwind v4 font-size tuple variables), plus the emphasized variants as utilities.
+   - Add the radius scale (`--radius-xs` … `--radius-4xl`), the shadows (`--shadow-card`, `--shadow-1` … `--shadow-5`), and the easing and duration tokens. Tailwind v4 generates `ease-*` from `--ease-*`. If `duration-*` has no theme namespace, use `duration-(--duration-<token>)` and document that in the file.
+   - Add the breakpoints `--breakpoint-medium/expanded/large/xlarge`.
+   - Add `.state-layer`, `.morph-press`, `.morph-select`, `.bg-hatch`, the canvas mist layer (`body::before` or a layout element; fixed, `pointer-events: none`, `z-index: -1`), and the reduced-motion and `prefers-contrast: more` blocks.
+   - Turn the legacy variables into aliases (DESIGN_SYSTEM §12). Keep the `.note-content` rules, retuned to the new type tokens.
+2. **Fonts.** In `layout.tsx`, replace Geist with `Google_Sans_Flex` (variable, `axes: ["ROND", "opsz", "wdth", "GRAD"]` as the installed `next/font` supports, `subsets: ["latin", "latin-ext"]`, `display: "swap"`, `variable: "--font-sans"`). Keep `Geist_Mono` as `--font-mono`. Set `font-variation-settings` per type token for ROND. Check that the font is self-hosted at build time (no runtime Google request).
+3. **Theme.** Add `src/lib/theme.ts` and the init script in `<head>` (§3). Update `viewport.themeColor` to the `canvas` values (`#F5FAFF` / `#0F1419`).
+4. **Icons.**
+   - Add the devDependency `@material-symbols/svg-400` (check the version and Apache-2.0 licence with `pnpm view`, and pin it exactly, as the repo pins every dependency).
+   - Write `scripts/generate-material-icons.mts` using the allowlist in DESIGN_SYSTEM §9. Read the package's `rounded/<name>.svg` and `rounded/<name>-fill.svg` (check the folder layout first), extract the `d` attribute, and fail on a missing name.
+   - Add the `icons:generate` script, the generated file, `src/components/icons/icon.tsx`, and an `IconName` type.
+5. **Shapes.** Add `src/components/ui/shapes.ts` (DESIGN_SYSTEM §8 formulas, 120 points each) and `src/lib/identity.ts` (FNV-1a hash → `{ shape, palette }`).
+6. **Breakpoints and hooks.** Add `src/lib/breakpoints.ts`, move `time-grid-view.tsx`'s queries onto it (same pixel values for now, so behaviour doesn't change), and add `src/components/hooks/use-media-query.ts`.
+7. **Calendar and life areas.**
+   - `calendar-theme.css`: remap to M3 roles (§12).
+   - `life-area-colors.tsx`: swatches use `bg-area-<name>-dot`; remove the Tailwind palette classes.
+8. **Focus.** `cx.ts`: change `focusRing` to the 3 px `focus` outline.
+9. **Scripts.** Commit `scripts/generate-palette.mts` (the generator behind DESIGN_SYSTEM §1). Add the visual harness (§5): `scripts/run-visual.mts`, `tests/e2e/visual-capture.spec.ts` covering `/home`, `/plan/today`, `/track`, `/review` and `/settings`, and the `test:visual` script.
 
-### Home `/home`
+**Tests:**
+- **Unit:** `theme.test.ts` (`resolveTheme`, script string), `shapes.test.ts` (every shape has 120 points so they can morph; the paths are deterministic), `identity.test.ts` (stable output for fixed ids; the distribution covers every shape and palette over 1,000 random UUIDs), `icon.test.tsx` (`aria-hidden`, viewBox), `breakpoints.test.ts` (the CSS and JS values match).
+- **E2E:** new `theme.spec.ts`. With `localStorage["soleup.theme"] = "dark"` set by `addInitScript`, `<html data-theme="dark">` is present on the first response's DOM before hydration. `colorScheme: dark` with no stored value gives no `data-theme`. Every existing spec passes unchanged.
 
-- First screen answers “What is next?” Start with a compact welcome/date context and the next commitment or today's focus, depending on real data. Do not show an empty hero that occupies a large area.
-- Use a distinct primary “Today” module with planned, due, and needs-a-decision counts linked to their exact sections. A small timeline/next commitment cue can sit beside it on desktop and below on mobile.
-- Follow with goals needing a next action and deadlines in the next 7 days; show only enough list rows to support the next decision, with “View all” to the source page.
-- Habit summary shows each active habit separately with existing range figure plus this week's progress, no total across habits. Compact, recognizable habit rows; link directly to its Track anchor.
-- Reorder or collapse lower-priority sections responsively. Empty states use one sentence plus an actionable CTA. Use compact metric cards, not six tall panels.
-- Keep metric definition and date range accessible via short visible copy plus a “How this is counted” disclosure. Preserve `hasData`, links, and as-of semantics. No life score.
+**Done when:** the whole app renders in the new palette, font and radii in both themes, with no layout breakage on any route (check the capture set); the finish-line commands pass; and there are no raw hex values outside `globals.css`, `calendar-theme.css` and `theme.ts`.
 
-### Goals `/goals`, detail `/goals/[goalId]`, areas `/goals/areas`, archived `/goals/archived`
+**Out of scope:** changing component markup beyond class tokens, and any page layout.
 
-- Goals list: title + create action, active/pause/completed/dropped filtering that preserves `?status=`, readable grouped sections by life area, compact goal cards/rows with title, life area, status, target date if set, milestone-based progress and next action. Keep progress formula and its explanation available, without ranking goals by a fabricated score.
-- Goal detail: identity/status and “why this matters” as the visual anchor; clear next action; milestones and task groups with contextual create actions; linked notes section; activity/history in a secondary, collapsible area. Keep status transitions and confirmations in an overflow/actions area appropriate to risk.
-- Life Areas: clear list and create/edit/reorder/archive actions, show color accessibly (label + swatch, not color alone), starter-area offer as optional and dismissible; delete consequences before confirmation.
-- Archived goals: restore as primary action; closed history and delete remain secondary with explicit confirmation/counts.
-- Preserve goal status rules, date handling, task/milestone links, audit-backed history, note retention notices, and all existing routes.
+### UI-2a: Components, part 1 (actions, selection, inputs, gallery)
+**Read:** COMPONENTS Parts A–C, D-22, D-28 and D-30. Radix docs for ToggleGroup, Checkbox, Switch, RadioGroup and Tooltip (the installed `radix-ui` 1.7 entry points).
 
-### Plan task list `/plan`, Today `/plan/today`, Upcoming `/plan/upcoming`, Inbox `/plan/inbox`
+**Build:**
+- `Button` / `buttonClass` (with the legacy aliases), `IconButton` / `IconLink`, `Fab` / `FabMenu`, `ConnectedButtonGroup` (link and toggle modes), `Chip` (all five types), `Checkbox` (square and round), `Switch` + `SwitchRow`, `RadioGroup` + `RadioRow`, `NumberStepper`, `Tabs` (link and panel modes).
+- Restyle `Input`, `Textarea` and `Select` through `fieldClass` and `FormField` (the static inner label), and `ShapeAvatar`.
+- The `/dev/ui` gallery (`src/app/(dev)/dev/ui/page.tsx` and a `layout.tsx` with no app shell, a theme toggle and two side-by-side columns forced to `data-theme="light"` and `"dark"` with scoped wrappers). It returns `notFound()` in production. Document it in the README.
 
-- Plan overview: contextual Plan subnav (All tasks, Today, Upcoming, Calendar, Inbox); title and Quick Add; filters/sorts in a compact toolbar or responsive filter sheet; selected filter chips visible; preserve URL query state and closed-task toggle.
-- Task rows: title is dominant; parent goal/milestone, due/planned date, priority and estimate are secondary chips/metadata; quick complete and edit actions are easy to target. Do not draw nested bordered boxes around every title.
-- Today: schedule timeline first with all-day and timed items in their correct order. Then sections in existing precedence: planned, needs a decision, due, earlier. Each task offers the existing complete/plan/tomorrow/date/unplan/due-date actions without a maze of nested menus. Habit logging remains a separate, clearly named section lower on the page.
-- Upcoming: group tasks by local date, visually distinguish planned day from due date, keep 7/14/30-day range selector, and explain empty dates without rendering a long blank calendar.
-- Inbox: focused capture and triage. Make bulk plan and assign-to-goal actions visible when items are selected; avoid requiring users to open every task to route it.
-- Keep nonjudgmental language, the “Earlier, not done” meaning, task delete confirmation, quick-add keyboard shortcut, query filters and deep links.
+**Tests:**
+- **Unit** for each component: roles, names, `aria-pressed` / `aria-checked` / `aria-current`, `disabled`, `aria-busy` while pending, the legacy alias mapping, and the FormField label inside the container still linked through `htmlFor` and `aria-describedby`.
+- **E2E** `dev-gallery.spec.ts`: the gallery renders, axe passes in both themes, Tab reaches every control, the FAB menu opens with Enter and closes with Escape with focus returning, and the connected group in link mode marks `aria-current`. Also a test that `/dev/ui` returns 404 when `NODE_ENV=production`: assert the guard function in a unit test instead if E2E can't run production.
+- Existing specs still pass. If a form's accessible names changed through FormField, fix the component rather than the tests: labels must keep their text.
 
-### Calendar `/plan/calendar`
+**Done when:** the gallery shows every Part A–C component in every state in both themes; pages that use `Button` and fields pick up the new look without code changes; the finish-line commands pass.
 
-- Page header includes clear view switcher for Agenda, Week, Day, By area, Timeline, date navigation, and event/block creation. On narrow mobile, expose a compact view picker and default to a legible Agenda/Day presentation; never force a desktop week grid to shrink into illegible columns.
-- Agenda: group by local day, show all-day first, then chronological items. Differentiate event, deadline and time block with label/icon/style and readable time.
-- Week/Day: retain FullCalendar layout and keyboard operation, but theme axis, current time, selection, event cards, all-day row, overflow and dialogs. Ensure text contrast and touch behavior.
-- By area/Timeline: preserve row/column semantics, sticky labels and arrow-key navigation; use a controlled palette of life-area colors with non-color labels; handle “No area” and archived areas as already specified.
-- Event/block forms and dialogs: progressive disclosure (title/time first, repeat/reminder/association under clear secondary sections), preserve scope prompts, timezone, recurrence, task selection and reminders. Drag/resize must communicate scope and allow keyboard alternatives.
+### UI-2b: Components, part 2 (containment, navigation primitives, feedback, states)
+**Read:** COMPONENTS Parts D–F, D-23 to D-27.
 
-### Track `/track`, archived `/track/archived`, Today habit section
+**Build:**
+- `Card` + `CardHeader`, `ListGroup` / `ListItem`, `Disclosure`.
+- Rewrite `DialogContent`; add `FormDialog` (adapting by size class through `useMediaQuery("medium")`, server-safe: render the dialog variant until mounted); restyle `ConfirmDialog`.
+- `BottomSheet` / `ResponsiveSheet`, `Menu`, `Popover`, `Tooltip`.
+- Restyle `toast()` / `Toaster` as snackbars (placement per D-27, using the UI-3 bar height constant; until UI-3 lands, keep today's offsets).
+- `LoadingIndicator`, `Skeleton` / `LoadingState`, `EmptyState` (with `art` and `compact`), `ErrorState`, `InlineBanner`, `FormError` (on `InlineBanner`), `SaveStatus`, `Badge`, and the `PageContainer` and `PageHeader` shells (the shell wiring itself is UI-3).
+- Gallery entries for everything above.
 
-- Track page header: “Track” with concise copy, New habit primary action, Archived as a secondary link/action. Range selector (“This week”, “Last 4 weeks”, “Last 12 weeks”) belongs in a compact segmented control with range dates adjacent, not a full-width toolbar.
-- Keep status legend compact and explain each mark once. Do not make users decode tiny glyphs; use shape, label/tooltip, and accessible text.
-- Each active habit is a distinct card/row. Header: habit name, measure/unit, cadence, optional linked goal, overflow actions. Prominent weekly progress states the actual numerator/target or existing consistency figure. Do not use streaks or aggregate percentages.
-- Replace the current cramped date grid with a legible week-by-week strip: date number with weekday label available, sufficiently large interactive day cells, clear done/partly done/skipped/missed/not-active patterns, and a visible selected/focused day. On desktop show a clear 7-column grid; on small phones use horizontal weekly strips or a compact scrollable week with clear row labels. Never squeeze many labels into one tiny table.
-- Daily logging should be one tap for a check habit; quantity logging offers the target shortcut and amount editor; correction/skip/undo affordances stay discoverable. Put pause/archive/edit/delete in a labelled action menu, with destructive confirmation.
-- Replace repeated long “How this is counted” paragraphs with one concise status line and a per-habit disclosure containing the full existing definition. Backfill remains only on allowed active dates. Keep range URL and anchor links.
-- Archived habits use a simpler list and clear Restore; destructive delete explains retained/removed log consequences accurately.
-- Today habit rows: consistent compact design, done/skip actions, amount change, Undo toast. Respect cadence eligibility and user's zone.
+**Tests:**
+- **Unit:** `ListItem` corner classes by position; `EmptyState` heading level; `InlineBanner` roles; `LoadingIndicator` role and label; `SaveStatus` live region.
+- **E2E** (gallery): `FormDialog` is full screen at 390 px and centred at 1280 px; Escape closes it and focus returns; the sheet close button works and Escape closes it; the menu works by keyboard; a snackbar is announced (`role="status"`); axe passes in both themes.
+- Existing dialog and toast specs pass: `ConfirmDialog`'s behaviour of staying open until the action settles is covered in `goal-archive.spec.ts`, `life-areas.spec.ts` and others.
 
-### Notes `/notes`, `/notes/new`, `/notes/[noteId]`, `/notes/archived`
+**Done when:** every Part D–F component is in the gallery in every state, the existing dialogs re-skin without behaviour changes, and the finish-line commands pass.
 
-- Notes list: create action, search when phase 8.4 exists, tags when 8.5 exists, recent-first entries with title, short text preview and updated date. Search terms stay out of URL/logs per ADR.
-- Editor: content-first, calm page with title, unobtrusive save state, formatting toolbar that works on mobile, linked-to section, archive/delete in secondary actions. Keep TipTap allowlist and safe renderer. Do not make the editor a generic settings form.
-- Preserve autosave delay/blur/navigation/pagehide behavior, stale-save conflict recovery, Retry and unsaved content, links to goals/tasks, and no note content in logs/audit.
-- Archived notes: readable list, restore action, confirmed delete. Don't let archive/delete actions obscure the document.
+### UI-3: App shell and navigation
+**Read:** SCREENS §0, COMPONENTS Part E, D-11 to D-15, D-27. `(app)/layout.tsx`, `app-nav.tsx`, `nav-items.ts`, `quick-add.tsx`, `shell-search.tsx`, `search-handoff.ts`, `sign-out-button.tsx`, `plan-subnav.tsx`, `shell.spec.ts`, `nav-items.test.ts`.
+**Gate:** ask for sign-off on amendment **5-C** (the five-item bar plus More). Fallback if declined: a seven-item rail on every size class except compact, where the bar shows Home, Plan, Track, Notes and More, as revision 1 had it. Record the answer.
 
-### Weekly Review `/review`, history `/review/history`, detail `/review/history/[reviewId]`
+**Build:**
+- Rewrite `(app)/layout.tsx`:
+  - the skip link;
+  - `NavigationRail` (`hidden medium:flex`);
+  - a content column holding `<main id="main" tabIndex={-1}>`;
+  - `NavigationBar` and `Fab` (compact);
+  - `Toaster`;
+  - the mist layer;
+  - the time-zone gate (no nav, as before), restyled per SCREENS §0.
+- Rail collapse state per D-11 (`localStorage["soleup.rail"]`, read after mount; the default expanded at `large:` gives no layout shift, because CSS decides the first paint and the stored "collapsed" applies after hydration with no width animation on that first apply).
+- `nav-items.ts`:
+  - keep `NAV_ITEMS` (every destination) and `isNavItemActive`;
+  - add `BAR_ITEMS` (Home, Plan, Goals, Track) and `MORE_ITEMS` (Notes, Review, Search → `/notes/search`, Settings);
+  - add `PLAN_TAB_ITEMS` (D-15 order);
+  - replace the icon names with Material Symbol names.
+- `MoreSheet`, `TopAppBar`, `PageHeader` / `PageContainer` wired in as page building blocks; `PlanTabs` replaces `PlanSubnav` on the Plan pages (only the subnav, not the page bodies).
+- Move Quick Add's trigger into the FAB menu and the rail Create. The `Q` shortcut and the dialog stay unchanged.
+- Restyle `ShellSearch` for the expanded rail, and an icon button that links to `/notes/search` in the collapsed rail and the compact app bars. In-memory handoff unchanged.
+- `SignOutButton` placement in the rail account row and the More sheet.
+- Hide the FAB per D-12. Add `useKeyboardOpen` and hide the bar and FAB when the keyboard is open.
+- Every existing page gets at least a `TopAppBar` (compact) and a `PageHeader` (medium and wider) with its current title, so no page is left without a title bar. The page bodies keep their old markup until their phase. Apply `PageContainer` widths.
+- Update `PRODUCT_SPEC.md` §7 (5-C) and the README "UI shell and components" section.
 
-- Review entry: clear selected week and whether it can still change; switch to other open week; past reviews is secondary navigation. Avoid a large empty hero.
-- Show a compact stepper with current step strongly selected and completed/available state communicated without color only. On phones, use a “Step 2 of 4” progress/header plus one step at a time; desktop may show the four step labels in a compact rail.
-- **Look back:** compact evidence cards/rows for metrics with value and short explanation; allow full definition/range details on demand. Group by “Follow-through”, “Goals”, “Habits”, “Next week” if this improves scanning, preserving the actual summary metrics and hasData.
-- **Reflect:** three optional focused prompts for wins, blockers, lessons; generous text areas; reassure that nothing is required. Keep privacy promise and save-on-leaving behavior.
-- **Adjust:** grouped active/paused goal actions and stalled task decisions; make reschedule/cancel/plan consequences explicit and use existing actions. Avoid rendering every possible action as equal primary button.
-- **Choose priorities:** searchable/selectable eligible goals/tasks, ordered list with easy keyboard-accessible up/down controls, optional note. Communicate maximum of 10.
-- Persistent Back/Continue/Finish controls; save failures visible and retain user input. Finish can be empty; closed review is read-only.
-- History list: date range, finished/not finished, edit-until/closed date, newest first; no missing-week placeholders. Read-only detail preserves current priorities and live summary semantics; delete is confirmed.
+**Tests:**
+- **Unit:** `nav-items.test.ts` (`BAR_ITEMS ∪ MORE_ITEMS ⊇` every `NAV_ITEMS` href; active matching for More's group).
+- **E2E** `shell.spec.ts`:
+  - at 390 px, every destination is reachable (the bar and More), `aria-current` is right on a sub-page, More opens a dialog with a title, and Escape closes it with focus returning to More;
+  - at 1280 px, the rail shows every destination and Plan's children when on Plan, and collapse and expand persist across a reload;
+  - the FAB menu creates a task through Quick Add, and `Q` still works;
+  - the skip link focuses `main`;
+  - the time-zone gate shows no nav;
+  - axe on `/home` in both themes at both sizes.
+- Update any spec that clicked the old "Add task" header button or the seven-item bar.
 
-### Settings `/settings`
+**Done when:** every route is reachable on compact and large; no content sits under the bar, FAB or keyboard; the finish-line commands pass; the captures show the new shell.
 
-- Replace one long form with clear section headings and spaced surfaces. Each section has a concise purpose, labels and supporting guidance, and an explicit save affordance only when its data is saved as a group. Keep current timezone/locale/week start together.
-- Reminders: global toggle and private mode; daily nudge, weekly review day/time, quiet hours; concise delivery status banner; explain no-device state and recovery action. Make dependencies and quiet-hour behavior clear without repeating long prose under every checkbox.
-- Devices/notifications: device list with readable names, status, last-used where available, revoke/test actions and confirmations.
-- Install app: platform-appropriate install instruction/status, not a technical wall of text.
-- Future appearance/accessibility, privacy, export, delete account sections appear only after supported by actual code and phase 10. Group destructive account deletion distinctly and explain consequences.
-- Preserve all preference persistence, reminder scheduling constraints, device revocation, and truthful delivery warnings.
+### UI-4: Home
+**Read:** SCREENS §1, COMPONENTS Part G (MetricCard, MetricInfo, StatNumber, SegmentedPillBar, WeekStrip, Carousel, HabitWeekChart compact), D-16, D-17, D-21. PRODUCT_SPEC §8–9, `home/page.tsx`, `home-view.tsx`, `metric-range.ts`, `metrics/home.ts` (types only), `home.spec.ts`, `home-habits.spec.ts`.
+**Gate:** ask for sign-off on **5-A**. Fallback: MetricCard shows the definition as a visible `body-small` line under the value, plus the range caption, and puts only "As of" behind the info button.
 
-### Error, loading, not-found and modal states
+**Build:**
+- `src/components/data/*` for the listed components.
+- Pure helpers `src/lib/greeting.ts` (`greetingFor(now, timeZone)`) and `src/lib/week-strip.ts` (`weekDays`), plus `isCommitmentUnderWay` in `src/lib/schedule.ts` (additive).
+- Rebuild `home-view.tsx` (split it into `home/greeting.tsx`, `home/next-commitment-card.tsx`, `home/today-card.tsx`, `home/habit-carousel.tsx`, `home/goals-card.tsx`, `home/deadlines-card.tsx`) and `home/page.tsx` (pass `user.name` and `weekStart`).
+- `home/loading` skeleton and `error.tsx` restyle.
+- Keep `RefreshOnNewDay`.
+- Update PRODUCT_SPEC §8–9 per the 5-A answer.
 
-Redesign root/app and route error, not-found, loading, skeleton, dialog, toast, confirm, form validation and success states in the same visual system. Error states should explain what the user can do next, retain request reference when present, and avoid exposing content. Skeletons reflect the destination's layout. Modal actions are keyboard operable, retain focus, and fit on small screens.
+**Tests:**
+- **Unit:** `greeting.test.ts` (boundaries at 05:00, 12:00 and 18:00 in a non-UTC zone), `week-strip.test.ts` (each week start, DST weeks, locale letters), `schedule.test.ts` additions (under way vs `commitmentWhenLabel`), and component markup tests (StatNumber accessible name; SegmentedPillBar `role="img"` and label; MetricCard "Nothing yet" when `hasData` is false).
+- **E2E:** update `home.spec.ts` and `home-habits.spec.ts` (every count still links to the same href; "Nothing yet" states; the habit title links to `/track#habit-…`; the info sheet shows the definition, range and as-of; the week strip links to the Day view) plus axe in both themes and sizes.
 
-## 6. Delivery phases
+**Done when:** SCREENS §1 is met at 390 px and 1280 px in both themes; every link and anchor contract holds; there's no score; the finish-line commands pass.
 
-Each implementation phase should be a reviewable vertical slice and may rebuild the frontend components in its scope. Do not combine the whole app into one massive rewrite.
+### UI-5: Plan, Today
+**Read:** SCREENS §2, ADR 0011, `today-view.tsx`, `today-timeline.tsx`, `add-to-today.tsx`, `today-habits.tsx`, `use-habit-log.ts`, `src/lib/today.ts`, `today.spec.ts`, `schedule.spec.ts`, `habit-logging.spec.ts`.
 
-### UI-0 — Route and behavior audit
+**Build:**
+- `TaskRow` (in `src/components/tasks/task-row.tsx`), shared with UI-6: the round complete checkbox, the supporting line, the overflow menu with the existing per-section actions, and inline `xs` actions at medium and wider.
+- `Timeline` (data) replacing the presentation of `today-timeline.tsx`.
+- Rebuild `today-view.tsx`: sections, hints and anchors, "Add to today" as a `ResponsiveSheet`, the large supporting pane, and the `WeekStrip` (compact).
+- Restyle `today-habits.tsx` rows: `ShapeAvatar`, the one-tap Done (tonal xs) with the D-20 morph, and Skip and Change amount in the overflow, with Undo unchanged.
+- Restyle `task-schedule-editor` popovers into `ResponsiveSheet`.
+- Today's loading skeleton and error restyle.
 
-Inventory every route and its server query/action source, existing UI components, query/hash contract, key states, keyboard interactions, and screenshot baseline. Record a route map in `docs/ui/UI_AUDIT.md`. Identify current dark-mode setting and include light/dark before captures. No code changes.
+**Tests:** update `today.spec.ts`, `schedule.spec.ts` and `habit-logging.spec.ts` for names (behaviour assertions unchanged); add axe in both themes and sizes; check keyboard-only completion and rescheduling of a task.
 
-### UI-1 — Expressive design system
+**Done when:** SCREENS §2 holds; every Today action works by keyboard and pointer; the finish-line commands pass.
 
-Implement semantic light/dark tokens, surfaces, type roles, shape/spacing/elevation, focus and reduced-motion tokens; replace or consolidate shared controls, cards, chips, fields, tabs, disclosure, dialogs/sheets, toast, empty/error/loading patterns. No domain/page rewrite yet. Deliver a small visual reference page or component gallery route only if it can be dev-only and does not ship as a public feature.
+### UI-6: Plan, task lists, task dialog, Quick Add
+**Read:** SCREENS §3, `plan/page.tsx`, `plan-filters.tsx`, `plan-task-list.tsx`, `upcoming-view.tsx`, `inbox-view.tsx`, `task-form.tsx`, `task-parent-select.tsx`, `task-blocks.tsx`, `task-notes.tsx`, `delete-task-dialog.tsx`, `quick-add.tsx`, `reminder-select.tsx`, `reminder-status.tsx`, `src/lib/task-list.ts`, `src/lib/upcoming.ts`, and the plan, upcoming, inbox and journey specs.
 
-### UI-2 — App shell and navigation
+**Build:** filter chips with sheets (URL serialisation through `task-list.ts`); the list rebuild on `TaskRow`; Upcoming day groups with `DateBadge` and the days group in link mode; Inbox selection plus the contextual action bar; the task dialog on `FormDialog` (field order per SCREENS); `StatusChip`, `PriorityMark` and `DateBadge`; Quick Add as a sheet on compact.
 
-Redesign desktop sidebar, mobile top/bottom navigation and More surface, global Quick Add placement, page header/subnav, content widths, focus/current-page semantics, safe-area and keyboard handling. Make every current route reachable before page restyling.
+**Tests:** update the specs for names; add an E2E test that applies two filters through the chips, reloads, and finds the same URL and results; axe; keyboard multi-select in Inbox.
 
-### UI-3 — Home
+**Done when:** every URL filter round-trips, every task action is reachable, and the finish-line commands pass.
 
-Build Home as specified above with real existing metrics. Resolve current screenshots' repeated-card hierarchy and excessive explanatory text. This is the first complete application of the system and should set reusable overview-card patterns.
+### UI-7: Calendar
+**Read:** SCREENS §4, ADR 0012, ADR 0013 (reminder fields), `plan/calendar/page.tsx`, every file in `src/components/calendar/`, `src/lib/{calendar-views,agenda,area-columns,area-timeline,event-form,block-form}.ts`, and the calendar specs. The README's calendar paragraphs.
 
-### UI-4 — Plan and task flows
+**Build:**
+- The responsive calendar header (view group in link mode, date navigation, `DatePicker` "Go to date", action buttons).
+- The compact `WeekStrip`.
+- Restyle the FullCalendar wrapper and `calendar-theme.css` (item cards per SCREENS), `agenda-view`, `time-grid-view` and its task panel, `area-columns-view` and `area-timeline-view` (area colours and `AreaChip` headings), and `view-nav`.
+- Dialogs on `FormDialog`, with Repeat as a `Disclosure`, the scope chooser as `RadioRow`s, and warnings as `InlineBanner`.
+- Do not change the item-placement maths or any keyboard handler logic.
 
-Redesign `/plan`, Today, Upcoming, Inbox, task rows/forms/dialogs, quick add, task notes/linked-note presentation and confirmation states. Preserve every task action/filter/deep link and Today section anchor.
+**Tests:** every calendar spec passes, with names updated if needed; add axe for each view in both themes; check the date picker by keyboard (arrows, PageUp/PageDown, Enter navigates to `?date=`); check that at 390 px Week falls back to Day as before.
 
-### UI-5 — Goals and Life Areas
+**Done when:** all five views and every dialog match SCREENS §4 in both themes and the finish-line commands pass.
 
-Redesign goals list/detail, status filters, life areas manager, archived goals, goal/milestone/task grouping, progress, linked notes, and create/edit/status/delete flows.
+### UI-8: Goals and life areas
+**Read:** SCREENS §5, ADR 0010, `goals-view.tsx`, `goal-detail.tsx`, `goal-form.tsx`, `goal-tasks.tsx`, `milestone-list.tsx`, `delete-goal-dialog.tsx`, `archived-goals-view.tsx`, `life-areas-manager.tsx`, `life-area-form.tsx`, `starter-life-areas-offer.tsx`, `linked-notes.tsx`, and the goal, milestone and life-area specs.
 
-### UI-6 — Calendar
+**Build:** the status group in link mode, goal cards with a mini `MilestoneArc`, the detail page with its supporting pane and full-size `MilestoneArc`, `AreaChip`, history in a `Disclosure`, the milestone list on `ListGroup` (Up and Down buttons kept), the area manager with the swatch radio picker, and archived goals.
 
-Redesign Agenda/Week/Day/By-area/Timeline presentation and all event/block controls. Keep FullCalendar and custom resource logic unless an implementation need is proven; this phase is presentation and responsive interaction, not rewriting recurrence semantics.
+**Tests:** update the specs for names; add `MilestoneArc` unit tests (segments for 0, 1, 5 and 13 countable; label text); axe on the list and detail in both themes and sizes.
 
-### UI-7 — Track and habits
+**Done when:** SCREENS §5 holds, every status action, milestone action and delete-count confirmation behaves as before, and the finish-line commands pass.
 
-Redesign Track/history, habit cards/strips, range selection, habit CRUD, archived habits, Today logging and quantity/correction flows. Specifically resolve the current screenshot's crowded grid, overlong repeated definitions, weak card separation, and action density.
+### UI-9: Track and habits
+**Read:** SCREENS §6, ADR 0014, `track-view.tsx`, `habit-strip.tsx`, `habit-form.tsx`, `delete-habit-dialog.tsx`, `archived-habits-view.tsx`, `use-habit-log.ts`, `src/lib/habits/*` (read only), `habits/queries.ts` (types), and the habits, habit-logging and track-history specs.
+**Gate:** ask for sign-off on **5-B**. Fallback: the definition stays visible under the figure as `body-small`.
 
-### UI-8 — Review and history
+**Build:**
+- The range group in link mode, the compact legend, habit cards, `HabitWeekChart` (week), the 4-week grid of `HabitDayCell`, and `DotMatrix` (12 weeks).
+- `DayLogDialog` as a `ResponsiveSheet` with `RadioRow` and `NumberStepper`.
+- The habit form on `FormDialog` (cadence `RadioRow`, day chips, steppers).
+- The archived list.
+- `scroll-margin-top` on the `#habit-<id>` anchors.
+- Update PRODUCT_SPEC §8 (chunk 6.5 text) per the 5-B answer.
 
-Redesign review entry, week selection, four steps, metric look-back, reflect/adjust/priorities, finish/read-only states, past history and detail. Make it a guided flow, not a vertically stacked report.
+**Tests:** update the specs; add an E2E test that Home's habit link lands with the card visible below the app bar; a keyboard test that logs a past active day in each range layout; and checks that non-loggable days are not buttons. Unit-test the D-19 state → class and glyph mapping. Axe in both themes and sizes.
 
-### UI-9 — Notes
+**Done when:** SCREENS §6 holds, there are no streaks or percentages, and the finish-line commands pass.
 
-Redesign list/editor/new/archive and linked note components. Search/tags controls are included only if chunks 8.4/8.5 have shipped; otherwise preserve a clean extension point and do not show dead controls.
+### UI-10: Weekly review
+**Read:** SCREENS §7, ADR 0015, `review/page.tsx`, `review/history/**`, every file in `src/components/reviews/`, `src/lib/review-flow.ts`, `metrics/review.ts` (types), and the review and review-history specs.
 
-### UI-10 — Settings and account surfaces
+**Build:** `ReviewHeader` as a hero card, the stepper (compact progress plus the expanded step rail), Look back on `MetricCard` and `SplitStat`, Reflect cards with `SaveStatus`, Adjust lists, the Priorities picker and ordered list with its counter, the sticky action bar, the Finish celebration sheet, read-only and history pages, and the detail page with a delete confirmation.
 
-Redesign preferences, reminders, devices, install experience and any supported privacy/export/account controls. Include each only when the corresponding feature exists.
+**Tests:** update the specs; add an E2E test that changing steps through the stepper saves (the existing save-on-leave assertions) and focuses the step heading; the celebration sheet appears once after Finish and closes with Escape; axe in both themes and sizes.
 
-### UI-11 — Whole-app consistency pass
+**Done when:** SCREENS §7 holds, the lock and save semantics are unchanged, and the finish-line commands pass.
 
-Review public pages, all authenticated routes, dialogs, mobile/desktop, light/dark, keyboard focus, reduced motion, safe-area, content overflow and page states. Fix real discrepancies and prepare a route-by-route visual handoff. This is a visual/UX pass and does not authorize weakening existing checks.
+### UI-11: Notes and search
+**Read:** SCREENS §8, ADR 0016, every file in `src/components/notes/` and `src/components/search/`, `notes/**` routes, `globals.css` `.note-content`, and the notes, note-links and search specs. Check the product progress log for 8.5's status.
 
-## 7. Phase handoff and done criteria
+**Build:**
+- `notes/layout.tsx` list–detail (D-33, with `cache()`).
+- The list on `ListGroup`, and the editor page (borderless title, floating toolbar docking above the keyboard, `SaveStatus`, "Linked to" `input` chips and picker sheet, the conflict banner).
+- The archived note view and the archived list.
+- The search page (`SearchBar`, grouped results, `<mark>` styling).
+- Tag UI only if 8.5 has merged.
 
-Every phase handoff records: routes/files/components replaced, actual backend query/action paths used, preserved route and domain contracts, before/after screenshots at phone/tablet/desktop and light/dark as relevant, major decisions, accessibility observations, validation actually performed, and remaining follow-ups. No report may claim unrun checks. Keep tests unchanged unless a test needs a contract update; add/run tests only when the user explicitly asks for tests or verification.
+**Tests:** update the specs; add an E2E test of the list–detail layout at 1280 px (opening a note keeps the list pane and marks it selected); the toolbar is reachable by keyboard with correct `aria-pressed`; search terms are not in the URL after searching (already asserted; keep it); axe in both themes and sizes.
 
-The full redesign is complete when every existing route has been reviewed and implemented in the shared system; Home, Track, Review and Settings issues above are visibly resolved; no routes or data flows are lost; no mock data is substituted for backend data; light/dark and responsive states are coherent; and the final handoff covers all routes.
+**Done when:** SCREENS §8 holds, the autosave, conflict, leave guard and privacy contracts are intact, and the finish-line commands pass.
 
+### UI-12: Settings, appearance, public and system pages
+**Read:** SCREENS §9–10, ADRs 0007 and 0013, `settings/page.tsx`, `preferences-form.tsx`, `reminder-settings-form.tsx`, `push-notifications.tsx`, `install-help.tsx`, `src/app/page.tsx`, `sign-in/page.tsx`, `sign-in-buttons.tsx`, `src/app/{error,not-found,loading}.tsx`, every route `error.tsx` and `not-found.tsx`, and the preferences, reminders, push-devices, pwa, auth and errors specs.
+**Gate:** ask for sign-off on **5-D** (Appearance). Fallback: no Appearance section; theme follows the system only.
+
+**Build:** the Settings layout (index and sections), the Appearance toggle (`src/components/preferences/appearance-setting.tsx`, client, using `theme.ts`), the restyled forms (`SwitchRow`s, time fields, `InlineBanner`s), the devices `ListGroup`, the install `Disclosure`s, the landing page, the sign-in card, the error, not-found and loading screens, and the time-zone gate polish if not done in UI-3. Update PRODUCT_SPEC (5-D).
+
+**Tests:** update the specs; add an E2E test that choosing Dark sets `data-theme="dark"` immediately and after a reload, and System removes it; each Settings section saves independently (the existing assertions); axe on the landing page, sign-in, settings, not-found and error pages in both themes and sizes.
+
+**Done when:** SCREENS §9–10 hold and the finish-line commands pass.
+
+### UI-13: Consistency, cleanup and accessibility sweep
+**Read:** everything in `docs/ui/`, then the captures from every phase.
+
+**Build:**
+- Walk every route in UI_AUDIT at 360, 390, 768, 1024, 1280 and 1600 px wide in both themes (the capture spec widened for this phase), and fix inconsistencies using the shared components.
+- Remove the legacy aliases, legacy utilities, Tailwind default breakpoints, the `--fs-*` scale, dead components (`app-nav.tsx`, `plan-subnav.tsx`, the old metric card, and others found by `rg`), and Button and size alias values.
+- Add `pnpm lint:tokens` (`scripts/lint-tokens.mts`) and include it in `pnpm verify`.
+- Update the README "UI shell and components" section, `docs/ARCHITECTURE.md` if it describes the UI layer, and this plan's tracker.
+- Run a keyboard walkthrough of the core journeys: Goals → Today, log a habit, run a review, write a note, change a setting.
+- Spot-check with a screen reader if available, otherwise list it as a manual step.
+
+**Tests:** the full finish-line set plus `pnpm lint:tokens`, axe on **every** authenticated route in both themes at both sizes (one parametrised spec, `a11y-sweep.spec.ts`), and the journey spec passing.
+
+**Done when:** no legacy tokens remain, every route passes axe in both themes, and the final handoff lists anything still unverified (real-device PWA, screen reader).
+
+## 7. Handoff notes
+
+Append one note per phase, newest last. Template:
+
+```markdown
+### UI-<n>: <title> (<date>)
+- **Branch / PR:** chunk/ui-<n>-<slug>, #<pr>
+- **Routes and components:** created / rewritten / deleted (paths)
+- **Data paths consumed:** query and action functions used (unchanged)
+- **Contracts kept:** URLs, anchors, behaviours checked, and how
+- **Decisions and deviations:** D-xx followed or changed (and the DESIGN_DECISIONS edit), gate answers (5-x)
+- **Checks run:** each command with its real result
+- **Screenshots:** test-results/visual/ui-<n>/… (or PR attachments)
+- **Accessibility:** axe results, keyboard walkthrough notes, known issues
+- **Unverified:** for example real phone, screen reader
+- **Follow-ups:** for the next phases, or F-x
+```
+
+### UI-0: Planning (2026-10-30)
+- **Branch:** ui-0.0-planning. **PR:** not opened yet.
+- **Delivered:** revision 2 of `docs/ui/`: README, DESIGN_DECISIONS, DESIGN_SYSTEM, COMPONENTS, SCREENS, UI_AUDIT corrections (8.4 Search shipped; Notes error boundary; hash contracts), this plan, and UI_AGENT_PROMPTS.
+- **How values were checked:**
+  - M3 motion springs, corner scale, and navigation bar and rail sizes were checked against Google's `androidx` Compose Material 3 token sources.
+  - The colour roles were generated from the reference seeds, with WCAG contrast measured for every text and container pair (DESIGN_SYSTEM §1.4).
+  - Google Sans Flex's availability, with its ROND axis, was confirmed in the installed `next/font` data.
+  - `@material-symbols/svg-400` 0.48.2 (Apache-2.0) was confirmed on npm.
+- **Open for the user:** sign-off on amendments 5-A to 5-D (asked at UI-3, 4, 9 and 12); ordering with chunk 8.5 (D-35).
+- **Checks run:** docs only. No code changed, so no test suite was run.
