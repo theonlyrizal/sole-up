@@ -5,11 +5,13 @@ import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import type { NoteDocument } from "@/lib/notes/document";
+import type { TagSummary } from "@/lib/notes/tags";
 import { restoreNote } from "@/server/modules/notes/actions";
 
 import { DeleteNoteDialog } from "./delete-note-dialog";
 import { NoteContent } from "./note-content";
 import { noteTitle } from "./note-list";
+import { TagChips } from "./tag-chips";
 
 /**
  * An archived note, read-only (ADR 0016): Restore brings back the editor,
@@ -23,6 +25,7 @@ export function ArchivedNote({
     title: string | null;
     body: NoteDocument;
     archivedLabel: string | null;
+    tags: TagSummary[];
   };
 }) {
   const [pending, startTransition] = useTransition();
@@ -63,6 +66,7 @@ export function ArchivedNote({
       >
         {noteTitle(note.title)}
       </h2>
+      <TagChips tags={note.tags} label="Tags on this note" />
       <NoteContent document={note.body} />
     </div>
   );

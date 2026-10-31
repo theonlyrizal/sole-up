@@ -686,6 +686,24 @@ export const AUDIT_EVENTS = defineAuditEvents({
     changes: noteLink,
   },
   // No `note.deleted`: a deleted note's events go with it.
+  // A note's tags (chunk 8.5) as tag IDs, sorted, never names. Deleting a
+  // tag untags its notes by cascade and records no `note.tags_changed`.
+  "note.tags_changed": {
+    entityType: "note",
+    changes: z.strictObject({ tagIds: auditChange(z.array(z.uuid())) }),
+  },
+
+  // Tags (chunk 8.5, ADR 0016). A tag name is user content, so neither
+  // event holds one: they record only that the tag was created or renamed.
+  "tag.created": {
+    entityType: "tag",
+    changes: z.strictObject({}),
+  },
+  "tag.renamed": {
+    entityType: "tag",
+    changes: z.strictObject({}),
+  },
+  // No `tag.deleted`: a deleted tag's events go with it.
 });
 
 export type AuditEvents = typeof AUDIT_EVENTS;

@@ -19,6 +19,7 @@ import type { LinkTarget } from "@/server/modules/notes/queries";
 import { DeleteNoteDialog } from "./delete-note-dialog";
 import { noteEditorExtensions } from "./note-extensions";
 import { NoteLinks } from "./note-links";
+import { NoteTags } from "./note-tags";
 import { NoteToolbar } from "./note-toolbar";
 import {
   useNoteAutosave,
@@ -207,6 +208,8 @@ export function NoteEditor({
           />
         )}
       </div>
+
+      <NoteTags noteId={savedId} />
 
       <NoteLinks noteId={savedId} pendingLink={linkTo} />
 

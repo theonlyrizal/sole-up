@@ -24,3 +24,24 @@ export async function moveReviewsTwoWeeksBack(userId: string) {
     await pool.end();
   }
 }
+
+/**
+ * Every audit event of the user, as stored, for tests checking that no
+ * user content reached the log (chunk 8.5's tag names).
+ */
+export async function auditEventsOf(userId: string): Promise<unknown[]> {
+  const pool = new Pool({
+    connectionString: assertTestDatabaseUrl(testDatabaseUrl),
+  });
+  try {
+    const { rows } = await pool.query(
+      `select event_type, entity_type, entity_id, changes
+         from audit_events
+        where user_id = $1`,
+      [userId],
+    );
+    return rows;
+  } finally {
+    await pool.end();
+  }
+}

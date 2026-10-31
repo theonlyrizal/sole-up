@@ -81,7 +81,7 @@ async function findForUpdate(
 }
 
 /** As findForUpdate, refusing an archived note: it is read-only. */
-async function findWritableForUpdate(
+export async function findWritableForUpdate(
   tx: DbTransaction,
   userId: string,
   id: string,

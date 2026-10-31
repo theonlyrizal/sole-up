@@ -15,5 +15,7 @@ export const searchSchema = z.strictObject({
     .trim()
     .min(1, SEARCH_QUERY_EMPTY)
     .max(SEARCH_QUERY_MAX, SEARCH_QUERY_TOO_LONG),
+  /** Only notes with this tag (chunk 8.5). Never in a URL. */
+  tagId: z.uuid("Choose a tag.").optional(),
 });
 export type SearchInput = z.output<typeof searchSchema>;

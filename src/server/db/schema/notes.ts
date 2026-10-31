@@ -9,12 +9,14 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
 // Relative, not "@/": drizzle-kit loads this file without the path alias.
 import type { NoteDocument } from "../../../lib/notes/document";
 import { NOTE_BODY_TEXT_MAX, NOTE_TITLE_MAX } from "../../../lib/notes/note";
+import { TAG_NAME_MAX } from "../../../lib/notes/tags";
 
 import { users } from "./auth";
 import { goals } from "./goals";
@@ -137,5 +139,75 @@ export const noteTasks = pgTable(
     }).onDelete("cascade"),
     unique("note_tasks_note_id_task_id_key").on(table.noteId, table.taskId),
     index("note_tasks_task_id_user_id_idx").on(table.taskId, table.userId),
+  ],
+);
+
+// Tags on notes (chunk 8.5, ADR 0016 "Tags"). Written only through
+// src/server/modules/tags/service.ts.
+//
+// - A tag name is user content: never logged or put in an audit event.
+// - Names are trimmed and 1–TAG_NAME_MAX characters (CHECKs), and unique
+//   per user ignoring case: the expression index on (user_id, lower(name)).
+// - unique (id, user_id): note_tags' composite foreign key, so a note is
+//   never tagged with someone else's tag.
+// - `updated_at` moves on a rename only (the service sets it).
+export const tags = pgTable(
+  "tags",
+  {
+    id: uuid()
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("tags_id_user_id_key").on(table.id, table.userId),
+    uniqueIndex("tags_user_id_name_key").on(
+      table.userId,
+      sql`lower(${table.name})`,
+    ),
+    check(
+      "tags_name_length_check",
+      sql`char_length(${table.name}) between 1 and ${sql.raw(String(TAG_NAME_MAX))}`,
+    ),
+    check("tags_name_trimmed_check", sql`${table.name} = btrim(${table.name})`),
+  ],
+);
+
+// A note's tags. Composite foreign keys on (…, user_id) to the note and the
+// tag, both cascading: deleting either removes the row and keeps the other
+// side, so deleting a tag only untags its notes. Each pair at most once.
+// The tag index serves the tag filter, the notes count and the cascade. At
+// most NOTE_TAGS_MAX tags per note is the service's rule.
+export const noteTags = pgTable(
+  "note_tags",
+  {
+    id: uuid()
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    noteId: uuid().notNull(),
+    tagId: uuid().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: "note_tags_note_id_user_id_fk",
+      columns: [table.noteId, table.userId],
+      foreignColumns: [notes.id, notes.userId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "note_tags_tag_id_user_id_fk",
+      columns: [table.tagId, table.userId],
+      foreignColumns: [tags.id, tags.userId],
+    }).onDelete("cascade"),
+    unique("note_tags_note_id_tag_id_key").on(table.noteId, table.tagId),
+    index("note_tags_tag_id_user_id_idx").on(table.tagId, table.userId),
   ],
 );

@@ -9,8 +9,11 @@ import { searchSchema } from "./validation";
 // Action, a POST, so the terms never go into a URL, the browser's history
 // or the host's request logs (ADR 0016), and they are never logged here.
 
-/** The search page's query: notes, goals and tasks, grouped. */
+/**
+ * The search page's query: notes, goals and tasks, grouped, with the notes
+ * optionally filtered by one tag.
+ */
 export const search = authedAction(
   searchSchema,
-  async ({ query }, { userId }) => searchQuery(userId, query),
+  async ({ query, tagId }, { userId }) => searchQuery(userId, query, { tagId }),
 );

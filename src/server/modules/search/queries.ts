@@ -21,6 +21,7 @@ import { TASK_STATUS_LABELS } from "@/lib/task-list";
 import type { Task } from "@/lib/tasks";
 import { db } from "@/server/db/client";
 import { goals, notes, tasks } from "@/server/db/schema";
+import { hasTag } from "@/server/modules/notes/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
 import { toTask } from "@/server/modules/tasks/service";
 
@@ -95,11 +96,14 @@ function titleVector(title: SQLWrapper): SQL {
 /**
  * Searches the user's notes, goals and tasks for an already trimmed,
  * non-empty query, in `websearch_to_tsquery` syntax (quotes, `OR`,
- * `-word`).
+ * `-word`). With `tagId` (chunk 8.5), the notes group holds only notes with
+ * that tag of the user's; goals and tasks aren't tagged, so they are
+ * unchanged.
  */
 export async function search(
   userId: string,
   query: string,
+  { tagId }: { tagId?: string } = {},
 ): Promise<SearchResults> {
   const tsQuery = toTsQuery(query);
   const {
@@ -127,6 +131,7 @@ export async function search(
         and(
           eq(notes.userId, userId),
           isNull(notes.archivedAt),
+          tagId === undefined ? undefined : hasTag(userId, tagId),
           sql`${notes.searchVector} @@ ${tsQuery}`,
         ),
       )

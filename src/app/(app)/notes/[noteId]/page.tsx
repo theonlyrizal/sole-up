@@ -9,6 +9,7 @@ import { NotePageHeader } from "@/components/notes/note-page-header";
 import { LoadingState } from "@/components/ui/skeleton";
 import { requireUser } from "@/server/auth/session";
 import { getNote } from "@/server/modules/notes/queries";
+import { listNoteTags } from "@/server/modules/tags/queries";
 
 // A fixed title: a note's title is personal and would end up in browser
 // history and tab lists.
@@ -38,7 +39,10 @@ async function NoteView({
   const note = await getNote(user.id, noteId);
   if (!note) notFound();
 
-  if (note.archivedAt) return <ArchivedNote note={note} />;
+  if (note.archivedAt) {
+    const tags = await listNoteTags(user.id, note.id);
+    return <ArchivedNote note={{ ...note, tags }} />;
+  }
   return (
     <NoteEditor
       key={note.id}

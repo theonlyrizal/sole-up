@@ -448,25 +448,26 @@ Rules:
 - Deleting a goal or task removes the link (no `note.unlinked` event) and keeps the note. Other targets (habits, life areas, events, reviews) are not linkable in v1. Each would be another join table.
 
 ### Tag and NoteTag
-Labels for notes only ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Planned for chunk 8.5 as `tags` and `note_tags`.
+Labels for notes only ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)). Built in chunk 8.5 as `tags` and `note_tags` (migration 0020).
 
 `tags` fields:
 - `id`
 - `user_id`
-- `name` (trimmed, 1–40 characters; `unique (user_id, lower(name))`)
+- `name` (trimmed, 1–40 characters, CHECKs `tags_name_length_check` and `tags_name_trimmed_check`; unique index `tags_user_id_name_key` on `(user_id, lower(name))`). The server also joins runs of whitespace into one space and drops control characters before storing it.
 - `created_at`
-- `updated_at`
+- `updated_at` (moves on a rename only)
 
 `note_tags` fields:
+- `id`
 - `user_id`
 - `note_id`
 - `tag_id`
 - `created_at`
 
 Rules:
-- `tags` has `unique (id, user_id)`. `note_tags` has composite FKs to the note and the tag, both `ON DELETE CASCADE`, unique `(note_id, tag_id)` and an index on `tag_id`.
+- `tags` has `unique (id, user_id)`. `note_tags` has composite FKs to the note and the tag, both `ON DELETE CASCADE`, unique `(note_id, tag_id)` and an index on `(tag_id, user_id)`.
 - A note has at most 20 tags. Tags are created inline while tagging (a name matches an existing tag ignoring case), renamed (a taken name is a conflict) and deleted (only untags its notes). An unused tag stays until deleted.
-- Audit events: `tag.created`, `tag.renamed` on the tag, `note.tags_changed` (tag IDs from and to) on the note. Never a tag name.
+- Audit events: `tag.created`, `tag.renamed` on the tag (both with empty `changes`), `note.tags_changed` (tag IDs from and to, sorted) on the note. Never a tag name. Deleting a tag removes its own events and records nothing on its notes (as a goal delete records no `note.unlinked`). Tag changes don't move a note's `updated_at`.
 
 ### AuditEvent
 A record of a meaningful change, used for history and analytics. Replaces the earlier activity-event concept ([ADR 0005](decisions/0005-history-and-audit-log.md)). State tables remain the source of truth; audit events describe how they changed.
