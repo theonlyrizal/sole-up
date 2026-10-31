@@ -141,6 +141,13 @@
       "when": 1793306375187,
       "tag": "0019_search_title_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793479723736,
+      "tag": "0020_tags",
+      "breakpoints": true
     }
   ]
 }

@@ -102,6 +102,7 @@ test.describe("desktop", () => {
       "/notes/archived",
       "/notes/new",
       "/notes/search",
+      "/notes/tags",
       "/review",
       "/settings",
     ]) {

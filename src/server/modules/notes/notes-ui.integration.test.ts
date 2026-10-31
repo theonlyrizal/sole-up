@@ -103,6 +103,7 @@ describe("listNotes", () => {
         updatedAt: newer.updatedAt,
         updatedLabel: "3 Oct 2026",
         archivedLabel: null,
+        tags: [],
       },
       {
         id: older.id,
@@ -111,6 +112,7 @@ describe("listNotes", () => {
         updatedAt: older.updatedAt,
         updatedLabel: "1 Oct 2026",
         archivedLabel: null,
+        tags: [],
       },
     ]);
   });

@@ -5,6 +5,8 @@ import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { NoteListItem } from "@/server/modules/notes/queries";
 
+import { TagChips } from "./tag-chips";
+
 /** A note's title as lists show it. */
 export function noteTitle(title: string | null): string {
   return title ?? "Untitled";
@@ -12,17 +14,37 @@ export function noteTitle(title: string | null): string {
 
 /**
  * The user's notes (chunk 8.2): title (or "Untitled"), the first line of
- * the body and the date. Active notes show when they were updated,
- * archived ones when they were archived.
+ * the body, its tags (chunk 8.5; each opens the list filtered by it) and
+ * the date. Active notes show when they were updated, archived ones when
+ * they were archived.
  */
 export function NoteList({
   notes,
   archived = false,
+  filtered = false,
 }: {
   notes: NoteListItem[];
   archived?: boolean;
+  /** The list is filtered by a tag (chunk 8.5). */
+  filtered?: boolean;
 }) {
   if (notes.length === 0) {
+    if (filtered) {
+      return (
+        <EmptyState
+          title="No notes with this tag"
+          description="None of your notes has this tag. Archived notes aren't listed here."
+          action={
+            <Link
+              href="/notes"
+              className={buttonClass({ variant: "secondary" })}
+            >
+              Show all notes
+            </Link>
+          }
+        />
+      );
+    }
     return archived ? (
       <EmptyState
         title="Nothing archived"
@@ -68,6 +90,7 @@ export function NoteList({
           {note.preview && (
             <p className="truncate text-sm text-fg">{note.preview}</p>
           )}
+          <TagChips tags={note.tags} label="Tags" linked={!archived} />
           <p className="text-sm text-muted">
             {archived && note.archivedLabel
               ? `Archived on ${note.archivedLabel}`

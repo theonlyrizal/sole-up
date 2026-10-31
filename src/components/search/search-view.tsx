@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { FormError } from "@/components/ui/form-error";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import type { TagSummary } from "@/lib/notes/tags";
 import type { ActionError } from "@/lib/result";
 import { SEARCH_QUERY_EMPTY, SEARCH_QUERY_MAX } from "@/lib/search";
 import type { Task } from "@/lib/tasks";
@@ -31,11 +33,16 @@ type Found = Extract<SearchResults, { status: "results" }>;
  * task titles. Each search is a Server Action call, so the terms stay out
  * of the URL and the logs (ADR 0016). Results come in three groups with
  * their matches highlighted; a task opens its dialog, as tasks have no page.
+ * The notes group can be narrowed to one tag (chunk 8.5), also sent only
+ * as an action argument.
  */
-export function SearchView() {
+export function SearchView({ tags = [] }: { tags?: TagSummary[] }) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  // The notes group's tag filter (chunk 8.5): an ID, sent with the query.
+  const [tagId, setTagId] = useState("");
+  const tagRef = useRef("");
   const [searched, setSearched] = useState<SearchResults | null>(null);
   const [error, setError] = useState<ActionError | null>(null);
   const [pending, startTransition] = useTransition();
@@ -64,7 +71,10 @@ export function SearchView() {
     startTransition(async () => {
       let result;
       try {
-        result = await search({ query: trimmed });
+        const tag = tagRef.current;
+        result = await search(
+          tag ? { query: trimmed, tagId: tag } : { query: trimmed },
+        );
       } catch {
         if (call !== latest.current) return;
         setError({ code: "INTERNAL", message: SEARCH_UNREACHABLE });
@@ -139,6 +149,31 @@ export function SearchView() {
             {fieldError}
           </p>
         )}
+        {tags.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${id}-tag`} className="text-sm font-medium">
+              Notes with tag
+            </label>
+            <Select
+              id={`${id}-tag`}
+              value={tagId}
+              onChange={(event) => {
+                setTagId(event.target.value);
+                tagRef.current = event.target.value;
+                // Search again with the new filter, once there is a search.
+                if (lastQuery.current) run(lastQuery.current);
+              }}
+              className="max-w-xs"
+            >
+              <option value="">Any tag</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         {error?.code !== "VALIDATION" && <FormError error={error} />}
       </form>
 
@@ -158,6 +193,7 @@ export function SearchView() {
       {searched?.status === "results" && (
         <Results
           found={searched}
+          tagged={tagId !== ""}
           onOpenTask={(task, button) => {
             opener.current = button;
             setOpenTask(task);
@@ -212,9 +248,12 @@ const resultLink = cx(
 
 function Results({
   found,
+  tagged,
   onOpenTask,
 }: {
   found: Found;
+  /** The notes group is filtered by a tag. */
+  tagged: boolean;
   onOpenTask: (task: Task, button: HTMLElement) => void;
 }) {
   if (
@@ -236,7 +275,7 @@ function Results({
     <div className="flex flex-col gap-8">
       <ResultGroup
         title="Notes"
-        empty="No notes matched."
+        empty={tagged ? "No notes with this tag matched." : "No notes matched."}
         count={found.notes.length}
       >
         {found.notes.map((hit) => (

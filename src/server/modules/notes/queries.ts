@@ -6,6 +6,7 @@ import {
   count,
   desc,
   eq,
+  exists,
   ilike,
   inArray,
   isNotNull,
@@ -13,6 +14,7 @@ import {
   notExists,
   or,
   sql,
+  type SQL,
 } from "drizzle-orm";
 
 import { formatLocalDate, localDateOf } from "@/lib/dates";
@@ -21,8 +23,17 @@ import type { Note, NoteLinkTargetType } from "@/lib/notes/note";
 import { TASK_STATUS_LABELS } from "@/lib/task-list";
 import type { TaskStatus } from "@/lib/tasks";
 import { db } from "@/server/db/client";
-import { goals, noteGoals, notes, noteTasks, tasks } from "@/server/db/schema";
+import type { TagSummary } from "@/lib/notes/tags";
+import {
+  goals,
+  noteGoals,
+  notes,
+  noteTags,
+  noteTasks,
+  tasks,
+} from "@/server/db/schema";
 import { getUserPreferences } from "@/server/modules/preferences/service";
+import { tagsByNote } from "@/server/modules/tags/queries";
 
 import { toNote } from "./service";
 
@@ -45,16 +56,19 @@ export type NoteListItem = {
   updatedAt: Date;
   updatedLabel: string;
   archivedLabel: string | null;
+  /** The note's tags by name (chunk 8.5). */
+  tags: TagSummary[];
 };
 
 /**
  * The user's notes: active ones most recently updated first, or archived
  * ones most recently archived first. Only the start of the body text is
- * read, never the body itself.
+ * read, never the body itself. With `tagId`, only notes with that tag of
+ * the user's (none for someone else's tag).
  */
 export async function listNotes(
   userId: string,
-  { archived }: { archived: boolean },
+  { archived, tagId }: { archived: boolean; tagId?: string },
 ): Promise<NoteListItem[]> {
   const [preferences, rows] = await Promise.all([
     getUserPreferences(userId),
@@ -71,6 +85,7 @@ export async function listNotes(
         and(
           eq(notes.userId, userId),
           archived ? isNotNull(notes.archivedAt) : isNull(notes.archivedAt),
+          tagId === undefined ? undefined : hasTag(userId, tagId),
         ),
       )
       .orderBy(
@@ -79,6 +94,10 @@ export async function listNotes(
         desc(notes.id),
       ),
   ]);
+  const tagsOf = await tagsByNote(
+    userId,
+    rows.map((row) => row.id),
+  );
   const timeZone = preferences.timezone ?? "UTC";
   const dayOf = (instant: Date) =>
     formatLocalDate(localDateOf(instant, timeZone), preferences.locale);
@@ -89,7 +108,27 @@ export async function listNotes(
     updatedAt: row.updatedAt,
     updatedLabel: dayOf(row.updatedAt),
     archivedLabel: row.archivedAt ? dayOf(row.archivedAt) : null,
+    tags: tagsOf.get(row.id) ?? [],
   }));
+}
+
+/**
+ * True for a note carrying the user's tag `tagId` (chunk 8.5). Scoped by
+ * the user's ID, so someone else's tag matches nothing.
+ */
+export function hasTag(userId: string, tagId: string): SQL {
+  return exists(
+    db
+      .select({ id: noteTags.id })
+      .from(noteTags)
+      .where(
+        and(
+          eq(noteTags.noteId, notes.id),
+          eq(noteTags.userId, userId),
+          eq(noteTags.tagId, tagId),
+        ),
+      ),
+  );
 }
 
 /** One note for the editor or the read-only view, with its dates shown. */
@@ -353,7 +392,7 @@ export async function findNotesToLink(
     targetId,
     query,
   }: { targetType: NoteLinkTargetType; targetId: string; query: string },
-): Promise<NoteListItem[]> {
+): Promise<Omit<NoteListItem, "tags">[]> {
   const { table, target } = linkTable(targetType);
   const pattern = containing(query);
   const [preferences, rows] = await Promise.all([

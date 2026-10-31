@@ -6,6 +6,7 @@ import { SearchView } from "@/components/search/search-view";
 import { cx, focusRing } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
 import { requireUser } from "@/server/auth/session";
+import { listTags } from "@/server/modules/tags/queries";
 
 export const metadata: Metadata = { title: "Search · SoleUp" };
 
@@ -40,6 +41,9 @@ export default function SearchPage() {
 }
 
 async function Search() {
-  await requireUser();
-  return <SearchView />;
+  const user = await requireUser();
+  const tags = await listTags(user.id);
+  return (
+    <SearchView tags={tags.map((tag) => ({ id: tag.id, name: tag.name }))} />
+  );
 }
