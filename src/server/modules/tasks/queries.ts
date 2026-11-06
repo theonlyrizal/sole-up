@@ -13,6 +13,7 @@ import {
   or,
   type SQL,
   sql,
+  type SQLWrapper,
 } from "drizzle-orm";
 
 import { addDays, type LocalDate, startOfLocalDay } from "@/lib/dates";
@@ -289,6 +290,12 @@ async function selectPlanTaskItems(
     goal,
     milestone,
   }));
+}
+
+export async function listTaskItemsByIds(userId: string, ids: SQLWrapper) {
+  return selectPlanTaskItems(
+    and(eq(tasks.userId, userId), sql`${tasks.id} in (${ids})`),
+  );
 }
 
 /**

@@ -21,6 +21,7 @@ import {
   HABIT_MEASURES,
   HABIT_STATUSES,
 } from "@/lib/habits/habit";
+import { INSIGHT_KEYS } from "@/lib/insights";
 import { LIFE_AREA_COLORS, LIFE_AREA_STATUSES } from "@/lib/life-areas";
 import {
   MILESTONE_EDITABLE_FIELDS,
@@ -214,6 +215,14 @@ const reviewPriority = z.union([
  *   },
  */
 export const AUDIT_EVENTS = defineAuditEvents({
+  "insight_dismissal.created": {
+    entityType: "insight_dismissal",
+    changes: z.strictObject({
+      insightKey: auditChange(z.enum(INSIGHT_KEYS)),
+      periodStart: auditChange(localDate),
+      periodEnd: auditChange(localDate),
+    }),
+  },
   // A user's preferences changed. The entity ID is the user's ID (one row
   // per user). Only the fields that changed are present.
   "user_preferences.updated": {

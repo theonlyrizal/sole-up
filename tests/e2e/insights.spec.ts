@@ -59,6 +59,9 @@ test("Review Insights shows evidence and links to the relevant work", async ({
   await expect(
     insights.getByRole("cell", { name: "1 of 6 · 1 skipped" }),
   ).toBeVisible();
+  await expect(
+    insights.getByRole("link", { name: "Read a chapter" }),
+  ).toHaveAttribute("href", /\/track\?range=12w#habit-/);
   await expect(insights.getByText("45 estimated minutes")).toBeVisible();
   await expect(
     insights.getByText("1 with estimates · 1 without estimates"),
@@ -68,9 +71,45 @@ test("Review Insights shows evidence and links to the relevant work", async ({
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(375);
 
-  await insights.getByRole("link", { name: "Review upcoming tasks" }).click();
-  await expect(page).toHaveURL(/\/plan\/upcoming\?days=14$/);
-  await expect(page.getByText("Pick up a book", { exact: true })).toBeVisible();
+  for (const link of [
+    "Review tasks planned for this week",
+    "Review tasks counted as overdue",
+  ]) {
+    await insights.getByRole("link", { name: link }).click();
+    const tasks = page.getByRole("list", { name: "Tasks", exact: true });
+    await expect(tasks.getByRole("listitem")).toHaveCount(1);
+    await expect(
+      tasks.getByRole("button", { name: "Edit: Return a book" }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "← Insights" }).click();
+  }
+
+  await insights
+    .getByRole("link", { name: "Review tasks in next week’s workload" })
+    .click();
+  const tasks = page.getByRole("list", { name: "Tasks", exact: true });
+  await expect(tasks.getByRole("listitem")).toHaveCount(2);
+  await tasks.getByRole("button", { name: "Edit: Pick up a book" }).click();
+  const editor = page.getByRole("dialog", { name: "Edit task" });
+  await editor.getByLabel("Estimate (minutes)").fill("60");
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  await page.getByRole("link", { name: "← Insights" }).click();
+  await expect(insights.getByText("60 estimated minutes")).toBeVisible();
+
+  await insights
+    .getByRole("button", {
+      name: "Dismiss for this period: Next-week workload",
+    })
+    .click();
+  await expect(
+    insights.getByRole("heading", { name: "Next-week workload" }),
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(insights.getByRole("heading", { level: 2 })).toHaveCount(4);
+  await expect(
+    insights.getByRole("heading", { name: "Next-week workload" }),
+  ).toHaveCount(0);
 });
 
 async function seedInsightEvidence(userId: string) {
@@ -89,7 +128,7 @@ async function seedInsightEvidence(userId: string) {
     await pool.query(
       `with planned as (
          insert into tasks (user_id, title, created_at, planned_date, due_date)
-         values ($1, 'Return a book', $2, $3, $3) returning id
+         values ($1, 'Return a book', $2, null, $3::date) returning id
        )
        insert into audit_events (user_id, entity_id, entity_type, event_type, changes)
        select $1, id, 'task', 'task.created', jsonb_build_object(

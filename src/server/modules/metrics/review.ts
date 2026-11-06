@@ -157,10 +157,25 @@ export async function tasksCompletedMetric(
   };
 }
 
+/** Task IDs that had a plan date in the period, even if later moved. */
+export function plannedTaskIds(userId: string, period: ReviewPeriod) {
+  return db
+    .selectDistinct({ id: auditEvents.entityId })
+    .from(auditEvents)
+    .where(
+      and(
+        eq(auditEvents.userId, userId),
+        eq(auditEvents.entityType, "task"),
+        inArray(auditEvents.eventType, ["task.created", "task.planned"]),
+        sql`(${auditEvents.changes} -> 'plannedDate' ->> 'to') >= ${period.start}`,
+        sql`(${auditEvents.changes} -> 'plannedDate' ->> 'to') < ${period.end}`,
+      ),
+    );
+}
+
 /**
- * Tasks that had a plan date in the period at any point: from `task.created`
- * and `task.planned` events, so a plan moved out of the week still counts. Of
- * those, the ones completed in the period. No data: the user has no tasks.
+ * Tasks planned during the period and how many of those were completed
+ * in the period. No data when the user has no tasks.
  */
 export async function plannedVersusCompletedMetric(
   context: SummaryContext,
@@ -168,18 +183,7 @@ export async function plannedVersusCompletedMetric(
 ): Promise<Metric<PlannedVersusCompleted>> {
   const { userId, period } = context;
   const [planned, completedIds, hasData] = await Promise.all([
-    db
-      .selectDistinct({ id: auditEvents.entityId })
-      .from(auditEvents)
-      .where(
-        and(
-          eq(auditEvents.userId, userId),
-          eq(auditEvents.entityType, "task"),
-          inArray(auditEvents.eventType, ["task.created", "task.planned"]),
-          sql`(${auditEvents.changes} -> 'plannedDate' ->> 'to') >= ${period.start}`,
-          sql`(${auditEvents.changes} -> 'plannedDate' ->> 'to') < ${period.end}`,
-        ),
-      ),
+    plannedTaskIds(userId, period),
     completed ?? completedInPeriod(context),
     hasAnyTask(userId),
   ]);

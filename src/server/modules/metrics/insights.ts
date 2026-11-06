@@ -7,12 +7,16 @@ import {
   daysBetween,
   localDateOf,
   startOfLocalDay,
-  startOfWeek,
   type LocalDate,
   type WeekStart,
 } from "@/lib/dates";
 import { consistency, type HabitConsistency } from "@/lib/habits/consistency";
 import { weekStartsOf } from "@/lib/habits/track-range";
+import {
+  insightPeriod,
+  type InsightPeriod,
+  type TaskInsightKey,
+} from "@/lib/insights";
 import type { TodayClock } from "@/lib/today";
 import type { AuditEvents } from "@/server/audit/types";
 import { db } from "@/server/db/client";
@@ -27,6 +31,7 @@ import { engineData, engineInput } from "@/server/modules/habits/queries";
 import { toHabit } from "@/server/modules/habits/service";
 
 import type { Metric } from "./metric";
+import { plannedTaskIds } from "./review";
 
 type InsightContext = {
   userId: string;
@@ -132,8 +137,8 @@ export async function goalInactivityMetric({
 }
 
 function completedWeekRange({ clock, weekStart }: WeeklyInsightContext) {
-  const currentWeek = startOfWeek(clock.today, weekStart);
-  return { from: addDays(currentWeek, -28), to: addDays(currentWeek, -1) };
+  const { start, end } = insightPeriod("overdue_trend", clock.today, weekStart);
+  return { from: start, to: addDays(end, -1) };
 }
 
 export type OverdueWeek = { from: LocalDate; to: LocalDate; overdue: number };
@@ -143,14 +148,6 @@ export async function overdueTrendMetric(
 ): Promise<Metric<OverdueWeek[]>> {
   const { userId, clock, timeZone } = context;
   const range = completedWeekRange(context);
-  const weeks = weekStartsOf(range).map((from) => {
-    const cutoffDate = addDays(from, 7);
-    const cutoff = startOfLocalDay(cutoffDate, timeZone);
-    return sql`(${from}::date, ${cutoffDate}::date, ${cutoff.toISOString()}::timestamptz)`;
-  });
-  // The first change at or after the boundary gives the state just before
-  // it. Without a later change, use the surviving task row's current state.
-  // A recorded null old deadline means there really was no deadline.
   const { rows } = await db.execute<{
     from: LocalDate;
     to: LocalDate;
@@ -158,12 +155,43 @@ export async function overdueTrendMetric(
     hasDeadline: boolean;
   }>(sql`
     select week_start::text as "from", (cutoff_date - 1)::text as "to",
-      count(*) filter (where status = 'open' and
-        (due_date < cutoff_date or due_at < cutoff))::int as overdue,
+      count(*) filter (where ${OVERDUE_SNAPSHOT})::int as overdue,
       count(*) filter (where due_date is not null or due_at is not null) > 0
         as "hasDeadline"
-    from (
-      select week_start, cutoff_date, cutoff,
+    from (${taskSnapshots(userId, { start: range.from, end: addDays(range.to, 1) }, timeZone)}) as snapshots
+    group by week_start, cutoff_date
+    order by week_start
+  `);
+  return {
+    value: rows.map(({ from, to, overdue }) => ({ from, to, overdue })),
+    definition:
+      "Open tasks whose deadlines had passed at the close of each of the last four completed weeks. Each week is a separate count, so an overdue task can appear in several weeks.",
+    range: { ...range, timeZone, asOf: clock.now },
+    hasData: rows.some((row) => row.hasDeadline),
+  };
+}
+
+const OVERDUE_SNAPSHOT = sql`status = 'open' and
+  (due_date < cutoff_date or due_at < cutoff)`;
+
+function taskSnapshots(
+  userId: string,
+  period: InsightPeriod,
+  timeZone: string,
+) {
+  const weeks = weekStartsOf({
+    from: period.start,
+    to: addDays(period.end, -1),
+  }).map((from) => {
+    const cutoffDate = addDays(from, 7);
+    const cutoff = startOfLocalDay(cutoffDate, timeZone);
+    return sql`(${from}::date, ${cutoffDate}::date, ${cutoff.toISOString()}::timestamptz)`;
+  });
+  // The first change at or after the boundary gives the state just before
+  // it. Without a later change, use the surviving task row's current state.
+  // A recorded null old deadline means there really was no deadline.
+  return sql`
+      select ${tasks.id} as id, week_start, cutoff_date, cutoff,
         coalesce(status_change.changes -> 'status' ->> 'from', ${tasks.status}) as status,
         case when due_change.changes is null then ${tasks.dueDate}
           else (due_change.changes -> 'dueDate' ->> 'from')::date end as due_date,
@@ -191,17 +219,7 @@ export async function overdueTrendMetric(
         order by ${auditEvents.occurredAt}, ${auditEvents.id}
         limit 1
       ) as due_change on true
-    ) as snapshots
-    group by week_start, cutoff_date
-    order by week_start
-  `);
-  return {
-    value: rows.map(({ from, to, overdue }) => ({ from, to, overdue })),
-    definition:
-      "Open tasks whose deadlines had passed at the close of each of the last four completed weeks. Each week is a separate count, so an overdue task can appear in several weeks.",
-    range: { ...range, timeZone, asOf: clock.now },
-    hasData: rows.some((row) => row.hasDeadline),
-  };
+  `;
 }
 
 export type HabitConsistencyTrend = {
@@ -272,8 +290,9 @@ export async function nextWeekWorkloadMetric({
   timeZone,
   weekStart,
 }: WeeklyInsightContext): Promise<Metric<NextWeekWorkload>> {
-  const from = addDays(startOfWeek(clock.today, weekStart), 7);
-  const to = addDays(from, 6);
+  const period = insightPeriod("next_week_workload", clock.today, weekStart);
+  const from = period.start;
+  const to = addDays(period.end, -1);
   const [value] = await db
     .select({
       estimatedMinutes:
@@ -282,20 +301,7 @@ export async function nextWeekWorkloadMetric({
       unestimatedTasks: sql<number>`(count(*) - count(${tasks.estimatedMinutes}))::int`,
     })
     .from(tasks)
-    .where(
-      and(
-        eq(tasks.userId, userId),
-        eq(tasks.status, "open"),
-        or(
-          and(gte(tasks.plannedDate, from), lte(tasks.plannedDate, to)),
-          and(gte(tasks.dueDate, from), lte(tasks.dueDate, to)),
-          and(
-            gte(tasks.dueAt, startOfLocalDay(from, timeZone)),
-            lt(tasks.dueAt, startOfLocalDay(addDays(to, 1), timeZone)),
-          ),
-        ),
-      ),
-    );
+    .where(workloadTaskCondition(userId, period, timeZone));
   return {
     value,
     definition:
@@ -303,4 +309,46 @@ export async function nextWeekWorkloadMetric({
     range: { from, to, timeZone, asOf: clock.now },
     hasData: value.estimatedTasks + value.unestimatedTasks > 0,
   };
+}
+
+function workloadTaskCondition(
+  userId: string,
+  { start, end }: InsightPeriod,
+  timeZone: string,
+) {
+  return and(
+    eq(tasks.userId, userId),
+    eq(tasks.status, "open"),
+    or(
+      and(gte(tasks.plannedDate, start), lt(tasks.plannedDate, end)),
+      and(gte(tasks.dueDate, start), lt(tasks.dueDate, end)),
+      and(
+        gte(tasks.dueAt, startOfLocalDay(start, timeZone)),
+        lt(tasks.dueAt, startOfLocalDay(end, timeZone)),
+      ),
+    ),
+  );
+}
+
+export function insightTaskIds(
+  userId: string,
+  key: TaskInsightKey,
+  period: InsightPeriod,
+  timeZone: string,
+) {
+  switch (key) {
+    case "planned_vs_completed":
+      return plannedTaskIds(userId, period);
+    case "overdue_trend":
+      return sql`
+        select distinct id
+        from (${taskSnapshots(userId, period, timeZone)}) as snapshots
+        where ${OVERDUE_SNAPSHOT}
+      `;
+    case "next_week_workload":
+      return db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(workloadTaskCondition(userId, period, timeZone));
+  }
 }
