@@ -637,6 +637,7 @@ Exact indexes should follow real query patterns and query plans, not be added in
 ### Deletion rules ([ADR 0006](decisions/0006-deletion.md))
 - **Archive** is a reversible status. Archived records are hidden by default and can be restored.
 - **Delete** is a hard delete behind a clear confirmation. No soft deletion.
+- **Deleting an account** deletes its `users` row in one transaction. Foreign keys cascade to all owned rows, including audit events, sessions, push subscriptions, and reminders.
 - **Deleting a goal** deletes its milestones and takes all its tasks (direct and via milestones) off it, recording a `task.moved` event for each (chunk 2.7). Open tasks with no planned date land in the inbox; planned ones keep their date and closed ones their status, all without a parent. The confirmation states each count. Tasks are never deleted implicitly.
 - **Deleting a milestone** takes its tasks off it the same way, with a `task.moved` event each (to no parent, not to the goal).
 - **Deleting a task** deletes its time blocks and their exceptions ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)). Deleting a goal or life area clears the link on calendar events and keeps the events.

@@ -55,6 +55,12 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       NODE_ENV: "test",
+      NODE_OPTIONS: [
+        process.env.NODE_OPTIONS,
+        "--import=./tests/e2e/mock-github-oauth.mjs",
+      ]
+        .filter(Boolean)
+        .join(" "),
       SOLEUP_TEST_SIGN_IN: "1",
       // Its own build folder, so it can run next to `pnpm dev`.
       SOLEUP_NEXT_DIST_DIR: ".next-e2e",

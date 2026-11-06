@@ -1,11 +1,10 @@
 import { eq } from "drizzle-orm";
-import { handleOAuthUserInfo } from "better-auth/oauth2";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { auth } from "@/server/auth/auth";
 import { db } from "@/server/db/client";
 import { auditEvents, userPreferences, users } from "@/server/db/schema";
 
+import { signInWithOAuthProfile } from "../../../../tests/integration/helpers/oauth";
 import {
   asUser,
   createTestUser,
@@ -45,8 +44,7 @@ const berlin = {
 
 describe("creation", () => {
   it("creates defaults with no time zone on first OAuth sign-in", async () => {
-    const context = await auth.$context;
-    const result = await handleOAuthUserInfo({ context } as never, {
+    const result = await signInWithOAuthProfile({
       userInfo: {
         id: "gh-new",
         name: "New Person",
