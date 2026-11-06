@@ -645,11 +645,16 @@ Exact indexes should follow real query patterns and query plans, not be added in
 - **Deleting the account** cascades every user-owned row from `users` in one transaction, and revokes sessions and push subscriptions.
 - Every hard delete also removes the entity's audit events in the same transaction.
 
+### Export
+
+Settings → Export streams a JSON download of the signed-in user's records,
+including Markdown renderings of notes. See [Export format](EXPORT_FORMAT.md)
+for the archive structure and credential exclusions.
+
 ### Still to define before inviting other users
 - What account deletion removes immediately.
 - What must be removed from derived records and AI memories.
 - How backups expire and how deletion propagates to backups.
-- Whether users can export their records in a portable format.
 - How external integrations are disconnected.
 - What operational logs are retained and for how long.
 - Whether any third-party AI provider retains submitted content and under what terms.

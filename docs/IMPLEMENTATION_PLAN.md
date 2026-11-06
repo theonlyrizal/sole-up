@@ -220,7 +220,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 9.1 | Insight definitions and metrics | done | chunk/9.1-insight-metrics | 2026-11-06 | Documented all 15 metrics and added goal inactivity, overdue and habit trends, and next-week workload |
 | 9.2 | Insights page | done | chunk/9.2-insights-page | 2026-11-06 | Added five insights under Review with dated evidence, definitions and action links |
 | 9.3 | Dismiss and correct | done | chunk/9.3-dismiss-correct | 2026-11-06 | Added period dismissals and links to the editable records behind all five insights |
-| 10.1 | Export | todo | | | |
+| 10.1 | Export | done | chunk/10.1-export | 2026-11-06 | Settings streams a private JSON archive with note Markdown and schema-wide ownership coverage |
 | 10.2 | Account deletion | todo | | | |
 | 10.3 | Privacy notes | todo | | | |
 | 10.4 | Security review | todo | | | |
@@ -3341,4 +3341,13 @@ Template:
 - **Decisions.** Goal inactivity uses the current local week for dismissal. The other cards use their displayed reporting windows. Task correction links carry the period start and reuse the metric criteria.
 - **Next chunk should know.** The correction pages reuse Plan's task editors. The overdue list shows the current details of tasks counted in any of the four historical snapshots.
 - **Unverified.** Local verification used isolated PostgreSQL 18 databases in WSL. `pnpm verify` passed with 1,107 unit tests, 827 integration tests and the existing habit lint warning. `pnpm build` and all 99 browser tests passed in production mode.
+- **Follow-ups.** None.
+
+### 10.1: Export (2026-11-06)
+
+- **Built.** Settings → Export streams versioned JSON from `/api/export`, including original note JSON, Markdown, and all owned table rows. `docs/EXPORT_FORMAT.md` describes the format.
+- **Deviations.** None.
+- **Decisions.** Include the profile and metadata for authentication and devices. Select safe fields explicitly on credential-bearing tables. Read primary-key batches without holding a database connection across the download, so later batches can reflect edits made during export.
+- **Next chunk should know.** The export browser test discovers ownership through the Drizzle schema and compares the download with populated rows for two users. Add fixtures and review the export fields when adding an owned table.
+- **Unverified.** No manual checks required. `pnpm verify` passed with 1,107 unit and 827 integration tests and the existing habits lint warning. `pnpm build` and all 100 browser tests passed. Local integration verification used isolated PostgreSQL 18 in WSL after database and timeout failures on earlier runs.
 - **Follow-ups.** None.
