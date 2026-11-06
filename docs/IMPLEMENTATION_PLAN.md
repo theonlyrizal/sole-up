@@ -216,7 +216,8 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 8.3 | Linking | done | chunk/8.3-note-linking | 2026-10-30 | Editor "Linked to" (goal/task picker with status, unlink), goal "Notes" and task dialog "Linked notes" (Link a note, New note linked on first save via `saveNote` `linkTo`, unlink), goal/task delete confirmations name kept notes; task delete added (action + confirmed dialog) with the user's approval |
 | 8.4 | Search | done | chunk/8.4-search | 2026-10-30 | `/notes/search` (from Notes, a sidebar field handing terms over in memory, a phone Search link): `search` Server Action, `websearch_to_tsquery`, three ranked groups of 20, `ts_headline` with U+0002/U+0003 split into `<mark>`; migration 0019 title GIN indexes; task results open the task dialog |
 | 8.5 | Tags | done | claude/nifty-bell-iyggvb | 2026-10-31 | `tags` + `note_tags` (migration 0020: unique `(user_id, lower(name))`, composite cascading FKs), `tags` module (set by name with inline create, rename, delete untags only), editor Tags field, list chips + `?tag=<id>` filter, search's notes-group filter, `/notes/tags` manager; no tag names in events or logs |
-| 9.1 | Insight definitions and metrics | todo | | | |
+| 8.✓ | Phase 8 checkpoint (user) | done | | 2026-11-06 | User marked the checkpoint done at the start of 9.1 |
+| 9.1 | Insight definitions and metrics | done | chunk/9.1-insight-metrics | 2026-11-06 | Documented all 15 metrics and added goal inactivity, overdue and habit trends, and next-week workload |
 | 9.2 | Insights page | todo | | | |
 | 9.3 | Dismiss and correct | todo | | | |
 | 10.1 | Export | todo | | | |
@@ -3314,3 +3315,12 @@ Template:
   - The two dev-server-only mobile e2e timeouts above, if they show up on a developer machine.
   - The tag field's suggestions are a native `<datalist>`; a custom combobox could show counts and match mid-word.
   - Earlier follow-ups still open: review priorities in goal and task delete confirmations; the archived note view doesn't list its links; flaky-under-load `goals.spec.ts` and `review-history.spec.ts`; Phase 10 export must include notes (JSON, links, tags); the unused `_omitted` in `habits/validation.test.ts`; the 5.5 quiet-hours CHECK null hole; bare-domain autolinks.
+
+### 9.1: Insight definitions and metrics (2026-11-06)
+
+- **Built:** `docs/METRICS.md` covers all 15 metrics, including the approved meaningful-action audit events. `metrics/insights.ts` adds goal inactivity, overdue trend, habit consistency trend and next-week workload, with five integration tests.
+- **Deviations:** Branched from `origin/main` after the fast-forward pull because local `main` also pointed at the separate design commit. The previous chunk merged in PR #75 from the branch recorded in its progress row. The user marked the Phase 8 checkpoint done.
+- **Decisions:** Both trends cover the last four completed user weeks. Overdue history reconstructs the status and deadline of surviving tasks at each week boundary. Goal inactivity uses current links. Workload counts estimated minutes and reports tasks with missing estimates.
+- **Next chunk should know:** Use `metrics/review.ts` for planned versus completed. Insights goal inactivity and the existing Weekly Review activity count use separate definitions documented in `docs/METRICS.md`.
+- **Unverified:** No manual checks for this chunk. `pnpm verify` passed with 1,107 unit tests, 824 integration tests and the existing lint warning in `habits/validation.test.ts`. Local integration used isolated Postgres 18 in WSL because Docker was unavailable.
+- **Follow-ups:** The Insights page is chunk 9.2.
