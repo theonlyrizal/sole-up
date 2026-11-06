@@ -162,7 +162,7 @@ Every service mutation records a content-free audit event in the same transactio
 
 - Add the event type to `AUDIT_EVENTS` in `src/server/audit/types.ts`, named `<entity_type>.<verb>`, with its entity type and a `z.strictObject()` schema for `changes` (use `auditChange(...)` for `{ from, to }` pairs). Only structured fields: status, dates as ISO strings, parent IDs, priority, ordering. Never titles, descriptions, notes or reasons. Loose objects, records, `unknown` and `Date` are rejected when the module loads.
 - Call `recordAudit(tx, { type, userId, entityId, changes })` from `src/server/audit/record.ts` inside the transaction that makes the change. It only accepts a transaction handle; an unknown type or an extra key throws `InvalidAuditEventError`, which rolls the change back.
-- A hard delete calls `deleteAuditEventsForEntity(tx, { userId, entityType, entityId })` in the same transaction: `audit_events.entity_id` has no foreign key. Account deletion cascades through `user_id`.
+- A hard item delete calls `deleteAuditEventsForEntity(tx, { userId, entityType, entityId })` in the same transaction because `audit_events.entity_id` has no foreign key. Account closure retains owned rows and suspends access and delivery. [Deletion policy](docs/decisions/0006-deletion.md).
 
 **Dates and time zones**
 

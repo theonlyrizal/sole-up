@@ -120,7 +120,7 @@ export async function seedOwnedRows(
       allDay: true,
       startDate: day,
       endDate: end,
-      rrule: "FREQ=WEEKLY",
+      rrule: "FREQ=WEEKLY;BYDAY=MO",
     });
     await tx
       .insert(schema.calendarEventExceptions)

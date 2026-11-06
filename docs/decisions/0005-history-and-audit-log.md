@@ -12,7 +12,7 @@ Reviews and analytics need to know what changed and when (completed, rescheduled
 - An audit event stores `user_id`, `event_type` (from an allowlist), `entity_type`, `entity_id`, `occurred_at`, and `changes`.
 - `changes` is JSON with old and new values of **structured fields only**: status, dates, parent IDs, priority, ordering.
 - **No user content in events:** never titles, descriptions, note bodies, reasons or reflections.
-- When an entity is hard-deleted, its events are deleted in the same transaction (explicit, since there is no foreign key to cascade). Account deletion removes all of the user's events.
+- When an entity is hard-deleted, its events are deleted in the same transaction (explicit, since there is no foreign key to cascade). Account closure retains events under the access restrictions in [ADR 0006](0006-deletion.md).
 
 ## Alternatives considered
 - **Event sourcing (events as the source of truth):** events would have to carry content to rebuild state, which conflicts with the privacy rule, and hard deletion would mean rewriting the log.

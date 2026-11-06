@@ -3,10 +3,15 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { SignInButtons } from "@/components/auth/sign-in-buttons";
+import { SignOutButton } from "@/components/auth/sign-out-button";
+import { Button } from "@/components/ui/button";
+import { ACCOUNT_RECOVERY_DAYS } from "@/lib/account-deletion";
+import { formatInstant } from "@/lib/dates";
 import { signInErrorMessage } from "@/lib/sign-in-errors";
 import { configuredProviders } from "@/server/auth/providers";
-import { getCurrentUser } from "@/server/auth/session";
+import { getSignedInAccount } from "@/server/auth/session";
 import { env } from "@/server/env";
+import { confirmAccountReactivation } from "@/server/modules/account-deletion/actions";
 
 export const metadata: Metadata = { title: "Sign in · SoleUp" };
 
@@ -31,11 +36,40 @@ export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
 async function SignInOptions({
   searchParams,
 }: Pick<PageProps<"/sign-in">, "searchParams">) {
-  if (await getCurrentUser()) redirect("/home");
+  const account = await getSignedInAccount();
+  if (account?.status === "active") redirect("/home");
+  if (account?.status === "recoverable") {
+    const { recoverUntil } = account;
+    return (
+      <section
+        aria-labelledby="reactivate-heading"
+        className="flex flex-col gap-3"
+      >
+        <h2 id="reactivate-heading" className="text-lg font-semibold">
+          Reactivate your account
+        </h2>
+        <p className="text-sm text-muted">
+          You can restore access until{" "}
+          <time dateTime={recoverUntil.toISOString()}>
+            {formatInstant(recoverUntil, "en-US", "UTC")} UTC
+          </time>
+          .
+        </p>
+        <form action={confirmAccountReactivation}>
+          <Button type="submit">Reactivate account</Button>
+        </form>
+        <SignOutButton />
+      </section>
+    );
+  }
 
-  const { error, deleted } = await searchParams;
+  const { error, closure } = await searchParams;
   const errorMessage = signInErrorMessage(
-    typeof error === "string" ? error : undefined,
+    account?.status === "closed"
+      ? "account_closed"
+      : typeof error === "string"
+        ? error
+        : undefined,
   );
   // Only the label and ID reach the client, never the credentials.
   const providers = configuredProviders(env).map(({ id, label }) => ({
@@ -45,9 +79,10 @@ async function SignInOptions({
 
   return (
     <div className="flex flex-col gap-4">
-      {deleted === "1" && (
+      {closure === "scheduled" && (
         <p role="status" className="text-sm text-muted">
-          Your SoleUp account was deleted.
+          Your account is scheduled to close. Sign in within{" "}
+          {ACCOUNT_RECOVERY_DAYS} days to reactivate it.
         </p>
       )}
       {errorMessage && (

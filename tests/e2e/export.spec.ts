@@ -55,6 +55,9 @@ test("Settings downloads every owned table with only the signed-in user's rows",
 
     const expectedTables: string[] = [];
     for (const table of Object.values(schema)) {
+      // Closure state is internal and exists only while export is disabled.
+      if (table === schema.accountClosures || table === schema.cemetery)
+        continue;
       const name = getTableName(table);
       const fields = getTableColumns(table);
       const owner =

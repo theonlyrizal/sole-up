@@ -6,6 +6,7 @@ import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import type { NoteDocument } from "@/lib/notes/document";
 import { db } from "@/server/db/client";
 import * as schema from "@/server/db/schema";
+import { activeAccount } from "@/server/modules/account-deletion/status";
 
 import { noteMarkdown } from "./markdown";
 
@@ -104,7 +105,13 @@ export async function* archiveChunks(userId: string, exportedAt: Date) {
       const rows = await db
         .select(fields)
         .from(table)
-        .where(and(eq(owner, userId), after ? gt(key, after) : undefined))
+        .where(
+          and(
+            eq(owner, userId),
+            activeAccount(owner),
+            after ? gt(key, after) : undefined,
+          ),
+        )
         .orderBy(key)
         .limit(PAGE_SIZE);
       for (const row of rows) {

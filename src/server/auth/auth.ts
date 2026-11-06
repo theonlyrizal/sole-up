@@ -6,11 +6,12 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/server/db/client";
 import * as schema from "@/server/db/schema";
 import { env } from "@/server/env";
+import { accountStatus } from "@/server/modules/account-deletion/status";
 import { ensureUserPreferences } from "@/server/modules/preferences/service";
 
 import {
   deletionReauthHooks,
-  validateDeletionIdentity,
+  validateAccountIdentity,
 } from "./deletion-reauth";
 import { logAuth } from "./logger";
 import { configuredProviders, type ProviderId } from "./providers";
@@ -46,7 +47,7 @@ export const auth = betterAuth({
   }),
   socialProviders: socialProviders(),
   hooks: deletionReauthHooks,
-  user: { validateUserInfo: validateDeletionIdentity },
+  user: { validateUserInfo: validateAccountIdentity },
   account: {
     accountLinking: {
       enabled: true,
@@ -59,6 +60,14 @@ export const auth = betterAuth({
     },
   },
   databaseHooks: {
+    session: {
+      create: {
+        before: async (session) => {
+          if ((await accountStatus(session.userId)).status === "closed")
+            return false;
+        },
+      },
+    },
     user: {
       create: {
         // First sign-in: create the preferences row with defaults. The time

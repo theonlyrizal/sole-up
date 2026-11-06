@@ -2,6 +2,7 @@
 // Each domain module gets its own file in this folder; re-export it here so
 // drizzle-kit sees it and relational queries can use it.
 export * from "./auth";
+export * from "./account-closure";
 export * from "./audit";
 export * from "./calendar-events";
 export * from "./goals";

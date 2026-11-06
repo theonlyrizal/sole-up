@@ -105,5 +105,5 @@ This covers both held quiet-hours reminders and reminders delayed by missed swee
 - **New env vars:** `REMINDER_SWEEP_SECRET`, and the VAPID keys (5.3). They are added to Render before the deploy that needs them.
 - **New tables and columns:** `push_subscriptions` (5.3); `reminders`, `tasks.reminder_offset_minutes`, `calendar_events.reminder_offset_minutes`, and the nudge time, quiet hours, private mode and global switch on `user_preferences` (5.4 and 5.6).
 - **The task and event services schedule reminders** in their own transactions. Time-block code is untouched.
-- **Phase 7.5's weekly review reminder** is a further reminder kind on this machinery. **Phase 10's export** includes reminder settings and delivery records, and account deletion removes subscriptions and reminders.
+- **Phase 7.5's weekly review reminder** is a further reminder kind on this machinery. **Phase 10's export** includes reminder settings and delivery records. Account closure suspends delivery and retains subscriptions and reminders under [ADR 0006](0006-deletion.md).
 - `ARCHITECTURE.md` §8, ADR 0003's and 0009's status lines, `DEPLOY.md`, `ROADMAP.md`, `PRODUCT_SPEC.md` §12, and chunks 5.1–5.7 of the implementation plan reflect these rules.

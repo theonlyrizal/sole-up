@@ -34,7 +34,7 @@ async function referencingRows(db: ReturnType<typeof drizzle>, userId: string) {
   );
 }
 
-test("deletes a re-verified account and every reference without changing another account", async ({
+test("suspends, restores, and closes an account while retaining its data", async ({
   page,
   playwright,
   baseURL,
@@ -69,11 +69,12 @@ test("deletes a re-verified account and every reference without changing another
     const otherBefore = await referencingRows(db, otherId);
 
     let selectedIdentity = { id: otherId, email: otherEmail };
+    let expectedPrompt: string | null = "select_account";
     await page.route(
       "https://github.com/login/oauth/authorize?**",
       async (route) => {
         const authorization = new URL(route.request().url());
-        expect(authorization.searchParams.get("prompt")).toBe("select_account");
+        expect(authorization.searchParams.get("prompt")).toBe(expectedPrompt);
         const callback = new URL(
           authorization.searchParams.get("redirect_uri")!,
         );
@@ -114,7 +115,7 @@ test("deletes a re-verified account and every reference without changing another
     await expectNoSeriousViolations(page);
     await confirmation.fill("delete");
     const remove = page.getByRole("button", {
-      name: "Permanently delete account",
+      name: "Schedule account closure",
     });
     await remove.click();
     await expect(alert).toHaveText("Type DELETE exactly to confirm.");
@@ -133,7 +134,8 @@ test("deletes a re-verified account and every reference without changing another
 
     const before = await referencingRows(db, userId);
     for (const [index, { name, owned, rows }] of before.entries()) {
-      if (!owned) continue;
+      if (!owned || name === "account_closures" || name === "cemetery")
+        continue;
       expect(rows.length, `${name} has a deletion fixture`).toBeGreaterThan(0);
       expect(
         otherBefore[index].rows.length,
@@ -147,15 +149,66 @@ test("deletes a re-verified account and every reference without changing another
     await confirmation.fill("DELETE");
     await remove.click();
     await expect(page.getByRole("status")).toHaveText(
-      "Your SoleUp account was deleted.",
+      "Your account is scheduled to close. Sign in within 30 days to reactivate it.",
     );
-    for (const { name, rows } of await referencingRows(db, userId)) {
-      expect(rows, `no ${name} row references the deleted account`).toEqual([]);
+    const pending = await referencingRows(db, userId);
+    for (const [index, { name, rows }] of pending.entries()) {
+      if (name === "account_closures") expect(rows).toHaveLength(1);
+      else if (name === "sessions") expect(rows).toHaveLength(0);
+      else expect(rows, `${name} is retained`).toEqual(before[index].rows);
     }
     expect(await referencingRows(db, otherId)).toEqual(otherBefore);
     expect((await oldSession.get("/api/export")).status()).toBe(401);
     expect((await page.request.get("/api/export")).status()).toBe(401);
     expect((await other.get("/api/export")).ok()).toBe(true);
+
+    const signIn = page.getByRole("button", { name: "Continue with GitHub" });
+    expectedPrompt = null;
+    await signIn.click();
+    const reactivate = page.getByRole("button", { name: "Reactivate account" });
+    await expect(reactivate).toBeVisible();
+    expect((await page.request.get("/api/export")).status()).toBe(401);
+    expect((await page.request.get("/api/auth/get-session")).status()).toBe(
+      403,
+    );
+    await reactivate.click();
+    await expect(
+      page.getByRole("heading", { name: "Home", exact: true }),
+    ).toBeVisible();
+    expect((await page.request.get("/api/export")).ok()).toBe(true);
+
+    await page.goto("/settings/delete-account");
+    expectedPrompt = "select_account";
+    await verify.click();
+    await confirmation.fill("DELETE");
+    await remove.click();
+    await expect(signIn).toBeVisible();
+    const [scheduled] = await db
+      .update(schema.accountClosures)
+      .set({ recoverUntil: sql`clock_timestamp() - interval '1 second'` })
+      .where(eq(schema.accountClosures.userId, userId))
+      .returning();
+    expect(scheduled).toBeDefined();
+    expectedPrompt = null;
+    await signIn.click();
+    await expect(
+      page.getByRole("alert").filter({ hasText: "This account is closed." }),
+    ).toHaveText("This account is closed. Its reactivation period has ended.");
+    const closed = await referencingRows(db, userId);
+    expect(closed.find(({ name }) => name === "sessions")?.rows).toHaveLength(
+      0,
+    );
+    for (const [index, { name, rows }] of closed.entries()) {
+      if (
+        ["accounts", "account_closures", "cemetery", "sessions"].includes(name)
+      )
+        continue;
+      expect(rows, `${name} stays intact after expiry`).toEqual(
+        before[index].rows,
+      );
+    }
+    expect(await referencingRows(db, otherId)).toEqual(otherBefore);
+    expect((await page.request.get("/api/export")).status()).toBe(401);
   } finally {
     await Promise.all([pool.end(), other.dispose(), oldSession.dispose()]);
   }

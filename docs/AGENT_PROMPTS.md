@@ -659,10 +659,10 @@ Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pas
 
 ### 10.2: Account deletion
 ```text
-Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 10.2 only. Build Settings → Delete account: re-authentication, typed confirmation, a single transaction cascading from users, and revocation of sessions and push subscriptions.
+Read docs/IMPLEMENTATION_PLAN.md: the Agent session protocol, then chunk 10.2 only. Build Settings → Delete account with re-authentication, typed confirmation, a 30-day recovery window, and access and delivery suspension. Move expired requests to cemetery and retain their user-owned rows.
 
 Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
-Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including a schema-iterating test proving no row anywhere references the deleted user ID and that another user's data is untouched, and the protocol close-out is complete.
+Finish line: Stop immediately once pnpm verify, pnpm build and pnpm test:e2e pass, including schema-wide retention and cross-user tests and coverage for reactivation, expiry, and delivery suspension, and the protocol close-out is complete.
 ```
 
 ### 10.3: Privacy notes

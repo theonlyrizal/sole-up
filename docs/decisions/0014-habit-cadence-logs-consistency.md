@@ -134,6 +134,6 @@ A habit's cadence is one of:
   All children have composite FKs to `habits (id, user_id)` with cascade. The goal link is `SET NULL (goal_id)`.
 - The 6.2 engine is pure and owns every rule in "Consistency". The UI, the Home card (6.6) and the weekly review (7.1) call it and never recount.
 - The partial-week rounding, the current-week rule and the skip rule must be spelled out in the definition text, which makes it longer than one sentence.
-- Phase 10 export (10.1) must include habits, schedules, pauses and logs. Account deletion removes them by cascade.
+- Phase 10 export (10.1) includes habits, schedules, pauses and logs. Account closure retains them under the access restrictions in [ADR 0006](0006-deletion.md).
 - Habits don't remind in v1 ([ADR 0013](0013-reminders-sweep-and-delivery.md) lists what reminds).
 - `DATA_MODEL.md` (Habit, HabitSchedule, HabitPause, HabitLog) and chunks 6.1–6.6 of the implementation plan reflect these rules.

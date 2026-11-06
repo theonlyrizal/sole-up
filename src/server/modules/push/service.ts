@@ -12,6 +12,7 @@ import {
 import { db } from "@/server/db/client";
 import { pushSubscriptions } from "@/server/db/schema";
 import { ConflictError, NotFoundError } from "@/server/errors";
+import { activeAccount } from "@/server/modules/account-deletion/status";
 
 import { sendPush, type PushOutcome, type PushTarget } from "./send";
 import type {
@@ -145,7 +146,12 @@ export async function pushTargetsFor(
       auth: pushSubscriptions.auth,
     })
     .from(pushSubscriptions)
-    .where(eq(pushSubscriptions.userId, userId));
+    .where(
+      and(
+        eq(pushSubscriptions.userId, userId),
+        activeAccount(pushSubscriptions.userId),
+      ),
+    );
 }
 
 /**

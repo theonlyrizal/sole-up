@@ -11,6 +11,7 @@ import {
 } from "@/components/settings/delete-account-form";
 import { buttonClass } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/skeleton";
+import { ACCOUNT_RECOVERY_DAYS } from "@/lib/account-deletion";
 import { auth } from "@/server/auth/auth";
 import {
   DELETION_PROOF_COOKIE,
@@ -20,6 +21,7 @@ import { configuredProviders } from "@/server/auth/providers";
 import { db } from "@/server/db/client";
 import { accounts } from "@/server/db/schema";
 import { env } from "@/server/env";
+import { isAccountActive } from "@/server/modules/account-deletion/status";
 
 export const metadata: Metadata = { title: "Delete account · SoleUp" };
 
@@ -30,8 +32,10 @@ export default function DeleteAccountPage({
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-10">
       <h1 className="text-2xl font-semibold tracking-tight">Delete account</h1>
       <p className="text-muted-fg text-sm">
-        This permanently deletes your SoleUp data, signs you out on every
-        device, and stops push reminders. You cannot undo it.
+        This suspends your account, signs you out on every device, and pauses
+        push reminders. Sign in within {ACCOUNT_RECOVERY_DAYS} days to restore
+        access. After that, your account and related data will be permanently
+        unavailable.
       </p>
       <Suspense fallback={<LoadingState label="Checking verification" />}>
         <DeleteAccountStep searchParams={searchParams} />
@@ -56,7 +60,8 @@ async function DeleteAccountStep({
     headers: await headers(),
     query: { disableRefresh: true },
   });
-  if (!current) redirect("/sign-in");
+  if (!current || !(await isAccountActive(current.user.id)))
+    redirect("/sign-in");
 
   const context = await auth.$context;
   const proof = context.createAuthCookie(DELETION_PROOF_COOKIE);

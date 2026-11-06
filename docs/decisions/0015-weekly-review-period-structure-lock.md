@@ -59,7 +59,7 @@ The flow's "Adjust" step (pause or drop a goal, reschedule or cancel a task, pla
 ### Deletion and links
 - A review can be deleted at any time, closed or not, behind a confirmation. The lock stops rewriting, not the user's right to remove their own reflection. Its priorities go by cascade and its audit events are removed in the same transaction.
 - Deleting a goal or task removes the priority rows that link to it (cascade). The exactly-one CHECK rules out `SET NULL`. A completed, dropped or archived goal stays linked and shows its status.
-- Account deletion removes reviews and priorities by cascade.
+- Account closure retains reviews and priorities under the access restrictions in [ADR 0006](0006-deletion.md).
 
 ### Audit events
 Entity type `weekly_review`, with the review's ID:
