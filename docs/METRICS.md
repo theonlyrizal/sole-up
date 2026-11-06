@@ -27,6 +27,10 @@ The server metrics module calculates figures from each user's records. Every met
 
 ## Insights
 
+The task correction lists use the same date bounds and record criteria as their metrics. The overdue list shows the current details of every surviving task counted at least once across the four snapshots. Goal names link to goal details, and habit names link to their editable logs in Track.
+
+Each dismissal applies to one reporting period. Goal inactivity uses the current week in the user's saved time zone and week-start setting. Insights return when their reporting period rolls forward.
+
 The Insights page (`/review/insights`) uses `plannedVersusCompletedMetric` for the last fully completed week. Trend points are ordered oldest first. Both trends cover the last four fully completed weeks according to the user's week-start setting.
 
 | Metric | Definition | Range and values | Caveats |

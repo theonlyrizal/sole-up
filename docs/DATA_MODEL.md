@@ -534,6 +534,14 @@ Rules:
 
 Generated draft text (a later AI-assisted review) must be distinguishable from user-written content if both are retained.
 
+### InsightDismissal
+
+A user-owned dismissal of one insight for one reporting period. The `insight_dismissals` table stores `id`, `user_id`, `insight_key`, `period_start`, `period_end` and `created_at`.
+
+- Both period bounds are local dates. The end is exclusive and must be after the start.
+- The unique key is `(user_id, insight_key, period_start)`. Retries leave the existing dismissal in place. The saved dates remain fixed as periods roll forward.
+- Account deletion cascades to dismissals. The creation audit event records the insight key and dates in the same transaction.
+
 ## 3. Later intelligence and memory entities
 
 Do not implement these all in the MVP. Add them only with a clear user benefit and memory policy.

@@ -5,19 +5,17 @@ import { Suspense } from "react";
 import { InsightsView } from "@/components/reviews/insights-view";
 import { cx, focusRing } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
-import { addDays, startOfWeek } from "@/lib/dates";
+import { insightPeriod } from "@/lib/insights";
 import { todayClock } from "@/lib/today";
 import { requireUser } from "@/server/auth/session";
+import { dismissedInsightKeys } from "@/server/modules/insights/service";
 import {
   goalInactivityMetric,
   habitConsistencyTrendMetric,
   nextWeekWorkloadMetric,
   overdueTrendMetric,
 } from "@/server/modules/metrics/insights";
-import {
-  plannedVersusCompletedMetric,
-  reviewPeriod,
-} from "@/server/modules/metrics/review";
+import { plannedVersusCompletedMetric } from "@/server/modules/metrics/review";
 import { getUserPreferences } from "@/server/modules/preferences/service";
 
 export const metadata: Metadata = { title: "Insights · SoleUp" };
@@ -54,17 +52,18 @@ async function Insights() {
   const timeZone = timezone ?? "UTC";
   const clock = todayClock(timeZone);
   const context = { userId: user.id, clock, timeZone, weekStart };
-  const lastWeek = addDays(startOfWeek(clock.today, weekStart), -7);
-  const [planned, goals, overdue, habits, workload] = await Promise.all([
-    plannedVersusCompletedMetric({
-      ...context,
-      period: reviewPeriod(lastWeek),
-    }),
-    goalInactivityMetric(context),
-    overdueTrendMetric(context),
-    habitConsistencyTrendMetric(context),
-    nextWeekWorkloadMetric(context),
-  ]);
+  const [planned, goals, overdue, habits, workload, dismissed] =
+    await Promise.all([
+      plannedVersusCompletedMetric({
+        ...context,
+        period: insightPeriod("planned_vs_completed", clock.today, weekStart),
+      }),
+      goalInactivityMetric(context),
+      overdueTrendMetric(context),
+      habitConsistencyTrendMetric(context),
+      nextWeekWorkloadMetric(context),
+      dismissedInsightKeys(user.id, clock.today, weekStart),
+    ]);
 
   return (
     <InsightsView
@@ -75,6 +74,8 @@ async function Insights() {
       workload={workload}
       today={clock.today}
       locale={locale}
+      weekStart={weekStart}
+      dismissed={dismissed}
     />
   );
 }

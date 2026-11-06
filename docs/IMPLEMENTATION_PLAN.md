@@ -219,7 +219,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 8.✓ | Phase 8 checkpoint (user) | done | | 2026-11-06 | User marked the checkpoint done at the start of 9.1 |
 | 9.1 | Insight definitions and metrics | done | chunk/9.1-insight-metrics | 2026-11-06 | Documented all 15 metrics and added goal inactivity, overdue and habit trends, and next-week workload |
 | 9.2 | Insights page | done | chunk/9.2-insights-page | 2026-11-06 | Added five insights under Review with dated evidence, definitions and action links |
-| 9.3 | Dismiss and correct | todo | | | |
+| 9.3 | Dismiss and correct | done | chunk/9.3-dismiss-correct | 2026-11-06 | Added period dismissals and links to the editable records behind all five insights |
 | 10.1 | Export | todo | | | |
 | 10.2 | Account deletion | todo | | | |
 | 10.3 | Privacy notes | todo | | | |
@@ -3333,3 +3333,12 @@ Template:
 - **Next chunk should know:** `InsightsView` renders the existing metrics from one user-local clock. The goal and habit metrics return titles alongside IDs for links to the underlying records.
 - **Unverified:** Manual screen-reader and dark-mode checks. `pnpm verify` passed with 1,107 unit tests, 824 integration tests and the existing habit lint warning. `pnpm build` and `pnpm test:e2e` passed, with all 99 browser tests passing in production mode. Local tests used isolated PostgreSQL 18 databases in WSL.
 - **Follow-ups:** Dismiss and correct is chunk 9.3.
+
+### 9.3: Dismiss and correct (2026-11-06)
+
+- **Built.** Migration 0021 adds `insight_dismissals` with user ownership, unique period starts per insight, and a creation audit event. All five cards can be dismissed and link to editable records.
+- **Deviations.** None.
+- **Decisions.** Goal inactivity uses the current local week for dismissal. The other cards use their displayed reporting windows. Task correction links carry the period start and reuse the metric criteria.
+- **Next chunk should know.** The correction pages reuse Plan's task editors. The overdue list shows the current details of tasks counted in any of the four historical snapshots.
+- **Unverified.** Local verification used isolated PostgreSQL 18 databases in WSL. `pnpm verify` passed with 1,107 unit tests, 827 integration tests and the existing habit lint warning. `pnpm build` and all 99 browser tests passed in production mode.
+- **Follow-ups.** None.

@@ -6,13 +6,18 @@ import {
   metricRangeLabel,
 } from "@/components/home/metric-range";
 import { cx, focusRing } from "@/components/ui/cx";
-import { formatLocalDate, type LocalDate } from "@/lib/dates";
+import { formatLocalDate, type LocalDate, type WeekStart } from "@/lib/dates";
 import {
   formatDateSpan,
   trackHabitAnchor,
   trackHref,
 } from "@/lib/habits/track-range";
-import { upcomingHref } from "@/lib/upcoming";
+import {
+  INSIGHT_KEYS,
+  insightPeriod,
+  insightTaskHref,
+  type InsightKey,
+} from "@/lib/insights";
 import type {
   GoalInactivity,
   HabitConsistencyTrend,
@@ -22,9 +27,16 @@ import type {
 import type { Metric } from "@/server/modules/metrics/metric";
 import type { PlannedVersusCompleted } from "@/server/modules/metrics/review";
 
-type DateContext = { today: LocalDate; locale: string };
+import { DismissInsightButton } from "./dismiss-insight-button";
 
-type InsightsViewProps = DateContext & {
+type InsightContext = {
+  today: LocalDate;
+  locale: string;
+  weekStart: WeekStart;
+  dismissed: ReadonlySet<InsightKey>;
+};
+
+type InsightsViewProps = InsightContext & {
   planned: Metric<PlannedVersusCompleted>;
   goals: Metric<GoalInactivity[]>;
   overdue: Metric<OverdueWeek[]>;
@@ -42,8 +54,10 @@ export function InsightsView({
   workload,
   today,
   locale,
+  weekStart,
+  dismissed,
 }: InsightsViewProps) {
-  const dates = { today, locale };
+  const context = { today, locale, weekStart, dismissed };
   const number = new Intl.NumberFormat(locale);
   const credit = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const { estimatedMinutes, estimatedTasks, unestimatedTasks } = workload.value;
@@ -53,135 +67,150 @@ export function InsightsView({
 
   return (
     <>
-      <ul aria-label="Insights" className="flex flex-col gap-4">
-        <Insight
-          title="Planned versus completed"
-          metric={planned}
-          empty="No task history yet."
-          action={{ href: "/plan", label: "Plan your next tasks" }}
-          {...dates}
-        >
-          <p className="text-lg font-semibold">
-            {planned.value.planned > 0
-              ? `${number.format(planned.value.completed)} of ${number.format(planned.value.planned)} planned tasks completed`
-              : "No tasks were planned for that week."}
-          </p>
-        </Insight>
-        <Insight
-          title="Goal inactivity"
-          metric={goals}
-          empty="No active goals yet."
-          action={{ href: "/goals", label: "Review your active goals" }}
-          {...dates}
-        >
-          <ul className="divide-y divide-border">
-            {inactiveFirst.map((goal) => (
-              <li key={goal.id} className="flex flex-col gap-1 py-2">
-                <Link
-                  href={`/goals/${goal.id}`}
-                  className={cx(
-                    "self-start font-medium wrap-anywhere",
-                    linkStyle,
-                  )}
-                >
-                  {goal.title}
-                </Link>
-                <p className="text-sm text-muted">
-                  {goal.daysInactive === 0
-                    ? "Last action today"
-                    : `${number.format(goal.daysInactive)} ${goal.daysInactive === 1 ? "day" : "days"} since the last action`}
-                  {" · "}
-                  <time dateTime={goal.lastActionDate}>
-                    {formatLocalDate(goal.lastActionDate, locale)}
-                  </time>
-                </p>
-              </li>
-            ))}
-          </ul>
-        </Insight>
-        <Insight
-          title="Overdue task trend"
-          metric={overdue}
-          empty="No task deadlines in these weekly snapshots."
-          action={{
-            href: "/plan?due=past",
-            label: "Review tasks with past deadlines",
-          }}
-          {...dates}
-        >
-          <WeekTable valueLabel="Overdue tasks">
-            {overdue.value.map((week) => (
-              <WeekRow key={week.from} label={formatDateSpan(week, locale)}>
-                {number.format(week.overdue)}
-              </WeekRow>
-            ))}
-          </WeekTable>
-          <p className="text-sm text-muted">
-            These counts use recorded history for tasks that still exist.
-          </p>
-        </Insight>
-        <Insight
-          title="Habit consistency trend"
-          metric={habits}
-          empty="No expected or skipped habit activity in these weeks."
-          action={{
-            href: trackHref("12w"),
-            label: "Review habit history in Track",
-          }}
-          {...dates}
-        >
-          <p className="text-sm text-muted">
-            Skips are left out of the expected count. Quantity habits can earn
-            partial credit.
-          </p>
-          <ul className="flex flex-col gap-4">
-            {habits.value.map((habit) => (
-              <li key={habit.id} className="flex flex-col gap-1">
-                <Link
-                  href={`${trackHref("12w")}#${trackHabitAnchor(habit.id)}`}
-                  className={cx(
-                    "self-start font-medium wrap-anywhere",
-                    linkStyle,
-                  )}
-                >
-                  {habit.title}
-                </Link>
-                <WeekTable valueLabel="Completed of expected">
-                  {habit.weeks.map((week) => (
-                    <WeekRow
-                      key={week.from}
-                      label={formatDateSpan(week, locale)}
-                    >
-                      {week.expected === 0
-                        ? "None expected"
-                        : `${credit.format(week.completed)} of ${number.format(week.expected)}`}
-                      {week.skipped > 0 &&
-                        ` · ${number.format(week.skipped)} skipped`}
-                    </WeekRow>
-                  ))}
-                </WeekTable>
-              </li>
-            ))}
-          </ul>
-        </Insight>
-        <Insight
-          title="Next-week workload"
-          metric={workload}
-          empty="No open tasks planned or due next week."
-          action={{ href: upcomingHref(14), label: "Review upcoming tasks" }}
-          {...dates}
-        >
-          <p className="text-lg font-semibold">
-            {estimatedTasks > 0
-              ? `${number.format(estimatedMinutes)} estimated minutes`
-              : "No estimates yet"}
-          </p>
-          <p>
-            {number.format(estimatedTasks)} with estimates ·{" "}
-            {number.format(unestimatedTasks)} without estimates
-          </p>
-        </Insight>
-      </ul>
+      {dismissed.size === INSIGHT_KEYS.length ? (
+        <p>All insights are dismissed for their current periods.</p>
+      ) : (
+        <ul aria-label="Insights" className="flex flex-col gap-4">
+          <Insight
+            insightKey="planned_vs_completed"
+            title="Planned versus completed"
+            metric={planned}
+            empty="No task history yet."
+            action={{
+              href: insightTaskHref("planned_vs_completed", today, weekStart),
+              label: "Review tasks planned for this week",
+            }}
+            {...context}
+          >
+            <p className="text-lg font-semibold">
+              {planned.value.planned > 0
+                ? `${number.format(planned.value.completed)} of ${number.format(planned.value.planned)} planned tasks completed`
+                : "No tasks were planned for that week."}
+            </p>
+          </Insight>
+          <Insight
+            insightKey="goal_inactivity"
+            title="Goal inactivity"
+            metric={goals}
+            empty="No active goals yet."
+            action={{ href: "/goals", label: "Review your active goals" }}
+            {...context}
+          >
+            <ul className="divide-y divide-border">
+              {inactiveFirst.map((goal) => (
+                <li key={goal.id} className="flex flex-col gap-1 py-2">
+                  <Link
+                    href={`/goals/${goal.id}`}
+                    className={cx(
+                      "self-start font-medium wrap-anywhere",
+                      linkStyle,
+                    )}
+                  >
+                    {goal.title}
+                  </Link>
+                  <p className="text-sm text-muted">
+                    {goal.daysInactive === 0
+                      ? "Last action today"
+                      : `${number.format(goal.daysInactive)} ${goal.daysInactive === 1 ? "day" : "days"} since the last action`}
+                    {" · "}
+                    <time dateTime={goal.lastActionDate}>
+                      {formatLocalDate(goal.lastActionDate, locale)}
+                    </time>
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Insight>
+          <Insight
+            insightKey="overdue_trend"
+            title="Overdue task trend"
+            metric={overdue}
+            empty="No task deadlines in these weekly snapshots."
+            action={{
+              href: insightTaskHref("overdue_trend", today, weekStart),
+              label: "Review tasks counted as overdue",
+            }}
+            {...context}
+          >
+            <WeekTable valueLabel="Overdue tasks">
+              {overdue.value.map((week) => (
+                <WeekRow key={week.from} label={formatDateSpan(week, locale)}>
+                  {number.format(week.overdue)}
+                </WeekRow>
+              ))}
+            </WeekTable>
+            <p className="text-sm text-muted">
+              These counts use recorded history for tasks that still exist.
+            </p>
+          </Insight>
+          <Insight
+            insightKey="habit_consistency"
+            title="Habit consistency trend"
+            metric={habits}
+            empty="No expected or skipped habit activity in these weeks."
+            action={{
+              href: trackHref("12w"),
+              label: "Review habit history in Track",
+            }}
+            {...context}
+          >
+            <p className="text-sm text-muted">
+              Skips are left out of the expected count. Quantity habits can earn
+              partial credit.
+            </p>
+            <ul className="flex flex-col gap-4">
+              {habits.value.map((habit) => (
+                <li key={habit.id} className="flex flex-col gap-1">
+                  <Link
+                    href={`${trackHref("12w")}#${trackHabitAnchor(habit.id)}`}
+                    className={cx(
+                      "self-start font-medium wrap-anywhere",
+                      linkStyle,
+                    )}
+                  >
+                    {habit.title}
+                  </Link>
+                  <WeekTable valueLabel="Completed of expected">
+                    {habit.weeks.map((week) => (
+                      <WeekRow
+                        key={week.from}
+                        label={formatDateSpan(week, locale)}
+                      >
+                        {week.expected === 0
+                          ? "None expected"
+                          : `${credit.format(week.completed)} of ${number.format(week.expected)}`}
+                        {week.skipped > 0 &&
+                          ` · ${number.format(week.skipped)} skipped`}
+                      </WeekRow>
+                    ))}
+                  </WeekTable>
+                </li>
+              ))}
+            </ul>
+          </Insight>
+          <Insight
+            insightKey="next_week_workload"
+            title="Next-week workload"
+            metric={workload}
+            empty="No open tasks planned or due next week."
+            action={{
+              href: insightTaskHref("next_week_workload", today, weekStart),
+              label: "Review tasks in next week’s workload",
+            }}
+            {...context}
+          >
+            <p className="text-lg font-semibold">
+              {estimatedTasks > 0
+                ? `${number.format(estimatedMinutes)} estimated minutes`
+                : "No estimates yet"}
+            </p>
+            <p>
+              {number.format(estimatedTasks)} with estimates ·{" "}
+              {number.format(unestimatedTasks)} without estimates
+            </p>
+          </Insight>
+        </ul>
+      )}
       <p className="text-sm text-muted">
         Calculated{" "}
         <time dateTime={planned.range.asOf.toISOString()}>
@@ -195,20 +224,27 @@ export function InsightsView({
 }
 
 function Insight({
+  insightKey,
   title,
   metric,
   empty,
   action,
   today,
   locale,
+  weekStart,
+  dismissed,
   children,
-}: DateContext & {
+}: InsightContext & {
+  insightKey: InsightKey;
   title: string;
   metric: Metric<unknown>;
   empty: string;
   action: { href: string; label: string };
   children: ReactNode;
 }) {
+  if (dismissed.has(insightKey)) return null;
+  const { start } = insightPeriod(insightKey, today, weekStart);
+
   return (
     <li className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-surface p-4 sm:p-5">
       <div>
@@ -221,12 +257,19 @@ function Insight({
         {metric.hasData ? children : <p>{empty}</p>}
       </div>
       <p className="text-sm text-pretty text-muted">{metric.definition}</p>
-      <Link
-        href={action.href}
-        className={cx("self-start text-sm font-medium", linkStyle)}
-      >
-        {action.label}
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link
+          href={action.href}
+          className={cx("text-sm font-medium", linkStyle)}
+        >
+          {action.label}
+        </Link>
+        <DismissInsightButton
+          insightKey={insightKey}
+          start={start}
+          title={title}
+        />
+      </div>
     </li>
   );
 }
