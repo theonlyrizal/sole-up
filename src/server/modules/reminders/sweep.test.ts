@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { logger } from "@/server/logging/logger";
+import { finalizeExpiredAccountClosures } from "@/server/modules/account-deletion/service";
 
 import { captureLogs } from "../../../../tests/helpers/logs";
 import { claimDueReminders } from "./claim";
@@ -13,6 +14,9 @@ vi.mock("./claim", () => ({ claimDueReminders: vi.fn() }));
 vi.mock("./record", () => ({ recordDelivery: vi.fn() }));
 vi.mock("./sweep-status", () => ({ recordSweepFinished: vi.fn() }));
 vi.mock("@/server/db/client", () => ({ db: {} }));
+vi.mock("@/server/modules/account-deletion/service", () => ({
+  finalizeExpiredAccountClosures: vi.fn(),
+}));
 vi.mock("@/server/modules/push/send", () => ({ sendPush: vi.fn() }));
 vi.mock("@/server/modules/push/service", () => ({
   pushTargetsFor: vi.fn(),
@@ -33,6 +37,7 @@ describe("runSweep", () => {
 
     // Nothing claimed, so no second pass.
     expect(claimDueReminders).toHaveBeenCalledExactlyOnceWith(now);
+    expect(finalizeExpiredAccountClosures).toHaveBeenCalledExactlyOnceWith();
     expect(recordSweepFinished).toHaveBeenCalledExactlyOnceWith(now);
     expect(result).toEqual({
       counts: {

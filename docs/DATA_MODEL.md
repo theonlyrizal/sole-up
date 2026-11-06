@@ -11,7 +11,7 @@
 - Use foreign keys and constraints to protect data integrity.
 - Do not store the same authoritative fact in multiple places without a clear reason.
 - Prefer explicit status fields and timestamps over ambiguous booleans.
-- No soft deletion. Archive is a reversible status; delete is a confirmed hard delete (see §6 and [ADR 0006](decisions/0006-deletion.md)).
+- Archive is reversible and deleting an item is a confirmed hard delete. Account closure follows its own recovery and retention rules (see §6 and [ADR 0006](decisions/0006-deletion.md)).
 - Record the source and confidence of AI-related claims.
 - Keep private content out of analytics events and logs by default.
 
@@ -485,7 +485,7 @@ Rules:
 - Written in the **same transaction** as the change it records.
 - **No user content:** never titles, descriptions, note bodies, reasons, or reflections.
 - When an entity is hard-deleted, its events are deleted in the same transaction. There is no foreign key to cascade them, so this is explicit and tested.
-- Account deletion removes all of the user's events.
+- Account closure retains the user's audit events and suspends access to them.
 
 ### WeeklyReview
 A saved reflection for one user week ([ADR 0015](decisions/0015-weekly-review-period-structure-lock.md)).
@@ -540,7 +540,7 @@ A user-owned dismissal of one insight for one reporting period. The `insight_dis
 
 - Both period bounds are local dates. The end is exclusive and must be after the start.
 - The unique key is `(user_id, insight_key, period_start)`. Retries leave the existing dismissal in place. The saved dates remain fixed as periods roll forward.
-- Account deletion cascades to dismissals. The creation audit event records the insight key and dates in the same transaction.
+- Account closure retains dismissals. The creation audit event records the insight key and dates in the same transaction.
 
 ## 3. Later intelligence and memory entities
 
@@ -636,14 +636,14 @@ Exact indexes should follow real query patterns and query plans, not be added in
 
 ### Deletion rules ([ADR 0006](decisions/0006-deletion.md))
 - **Archive** is a reversible status. Archived records are hidden by default and can be restored.
-- **Delete** is a hard delete behind a clear confirmation. No soft deletion.
-- **Deleting an account** deletes its `users` row in one transaction. Foreign keys cascade to all owned rows, including audit events, sessions, push subscriptions, and reminders.
+- **Deleting an item** is a hard delete behind a clear confirmation.
+- **Closing an account** keeps its `users` and owned rows. `account_closures` holds the recovery deadline and `cemetery` holds the user ID and effective closure time after expiry. Both use the user ID as their primary key and restrict deletion of the referenced user.
 - **Deleting a goal** deletes its milestones and takes all its tasks (direct and via milestones) off it, recording a `task.moved` event for each (chunk 2.7). Open tasks with no planned date land in the inbox; planned ones keep their date and closed ones their status, all without a parent. The confirmation states each count. Tasks are never deleted implicitly.
 - **Deleting a milestone** takes its tasks off it the same way, with a `task.moved` event each (to no parent, not to the goal).
 - **Deleting a task** deletes its time blocks and their exceptions ([ADR 0012](decisions/0012-calendar-recurrence-time-blocks-views.md)). Deleting a goal or life area clears the link on calendar events and keeps the events.
 - **Deleting a goal or task** also removes any weekly review priority that links to it. **Deleting a weekly review** (allowed even when closed) removes its priorities ([ADR 0015](decisions/0015-weekly-review-period-structure-lock.md)).
 - **Deleting a goal or task** removes its note links and keeps the notes. **Deleting a note** removes its links and tags, and **deleting a tag** only untags its notes ([ADR 0016](decisions/0016-notes-rich-text-links-search-tags.md)).
-- **Deleting the account** cascades every user-owned row from `users` in one transaction, and revokes sessions and push subscriptions.
+- Scheduling closure revokes sessions. An authenticated user may reactivate before the 30-day deadline. After expiry the reminder sweep moves the marker to `cemetery` and revokes recovery sessions. Both pending and expired accounts are excluded from data access, exports, and push delivery.
 - Every hard delete also removes the entity's audit events in the same transaction.
 
 ### Export
@@ -653,7 +653,7 @@ including Markdown renderings of notes. See [Export format](EXPORT_FORMAT.md)
 for the archive structure and credential exclusions.
 
 ### Still to define before inviting other users
-- What account deletion removes immediately.
+- What account closure retains and when it suspends access and delivery.
 - What must be removed from derived records and AI memories.
 - How backups expire and how deletion propagates to backups.
 - How external integrations are disconnected.
@@ -669,7 +669,7 @@ Settled:
 2. Task deadlines: date **or** instant + zone, plus an optional planned date ([ADR 0004](decisions/0004-task-hierarchy-and-dates.md)).
 3. Calendar events are in the MVP ([ADR 0007](decisions/0007-platform-and-push.md)).
 4. History: audit events in the same transaction, content-free, allowlisted types ([ADR 0005](decisions/0005-history-and-audit-log.md)).
-5. Account deletion: cascading hard delete ([ADR 0006](decisions/0006-deletion.md)).
+5. Account closure with a 30-day reactivation window ([ADR 0006](decisions/0006-deletion.md)).
 6. ORM and migrations: Drizzle and drizzle-kit ([ADR 0001](decisions/0001-stack.md)).
 7. Goal statuses, priority, progress and dates; numeric targets deferred ([ADR 0010](decisions/0010-goal-status-priority-progress.md)).
 8. Task statuses, derived inbox, overdue planned tasks, priority and estimates ([ADR 0011](decisions/0011-task-status-planning-priority-estimates.md)).

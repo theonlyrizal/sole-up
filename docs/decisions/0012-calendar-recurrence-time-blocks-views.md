@@ -99,7 +99,7 @@ The gate recommended the smallest calendar: no recurrence, no time blocks, Week 
   - Titles, descriptions and locations never go in an audit event.
   - Hard deletes remove the entity's events, and there is no `*.deleted` event (as for tasks, goals and life areas).
   - The exact event names are set in the implementing chunks.
-- Deleting a goal or life area clears the link on events with the column-list `SET NULL`. Deleting a task deletes its blocks (above). Deleting the account cascades everything (ADR 0006).
+- Deleting a goal or life area clears the link on events with the column-list `SET NULL`. Deleting a task deletes its blocks (above). Account closure retains calendar records under the access restrictions in [ADR 0006](0006-deletion.md).
 
 ## Alternatives considered
 - **No recurrence in v1 (the gate's recommendation):** keeps `calendar_events` one row per event, but repeating commitments would have to be re-created by hand.

@@ -34,7 +34,8 @@ The archive omits `sessions.token`, `accounts.accessToken`,
 `push_subscriptions.endpoint`, `push_subscriptions.p256dh`, and
 `push_subscriptions.auth`. The OAuth verification store (`verifications`) and
 the global reminder sweep status (`reminder_sweep_status`) are outside the user
-tables.
+tables. The internal lifecycle markers `account_closures` and `cemetery` are
+excluded. An account must be active to download an export.
 
 The server reads rows in bounded batches as the browser downloads them. Edits
 made during the download can be reflected in later batches. `exportedAt` records

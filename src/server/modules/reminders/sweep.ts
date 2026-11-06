@@ -14,6 +14,8 @@ import {
 import { db } from "@/server/db/client";
 import { calendarEvents, tasks, userPreferences } from "@/server/db/schema";
 import { logger as appLogger, type Logger } from "@/server/logging/logger";
+import { finalizeExpiredAccountClosures } from "@/server/modules/account-deletion/service";
+import { isAccountActive } from "@/server/modules/account-deletion/status";
 import { sendPush } from "@/server/modules/push/send";
 import {
   pushTargetsFor,
@@ -119,6 +121,7 @@ export async function runSweep(
     retrying: 0,
   };
 
+  await finalizeExpiredAccountClosures();
   const first = await claimDueReminders(now);
   await deliverClaimed(first, now, counts, log);
   if (first.length > 0 && first.length < CLAIM_BATCH_MAX) {
@@ -367,6 +370,7 @@ async function deliverForUser(
   now: Date,
   counts: SweepCounts,
 ): Promise<void> {
+  if (!(await isAccountActive(userId))) return;
   const preferences = await preferencesOf(userId);
   const items = await itemsOf(userId, rows);
   const targets = preferences.remindersEnabled
@@ -418,6 +422,7 @@ async function deliverForUser(
       ),
     );
   const sendGroup = async (group: ClaimedReminder[], payload: PushPayload) => {
+    if (!(await isAccountActive(userId))) return;
     if (targets.length === 0) {
       for (const row of group) {
         await record(row, { status: "skipped", reason: "no_device" });

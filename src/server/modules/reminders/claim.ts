@@ -15,6 +15,7 @@ import {
 import { SWEEP_INTERVAL_MINUTES } from "@/lib/reminders";
 import { db } from "@/server/db/client";
 import { reminders } from "@/server/db/schema";
+import { activeAccount } from "@/server/modules/account-deletion/status";
 
 /** The most rows one sweep claims; the rest wait for the next sweep. */
 export const CLAIM_BATCH_MAX = 200;
@@ -66,6 +67,7 @@ export async function claimDueReminders(
       .from(reminders)
       .where(
         and(
+          activeAccount(reminders.userId),
           exceptIds.length > 0
             ? notInArray(reminders.id, [...exceptIds])
             : undefined,

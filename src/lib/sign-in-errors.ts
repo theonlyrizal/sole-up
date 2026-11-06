@@ -18,6 +18,9 @@ const MESSAGES: Record<string, string> = {
   email_not_verified:
     "The provider reports that email as unverified. Verify it with the provider, or use the other provider.",
   oauth_provider_not_found: "That sign-in option isn't available right now.",
+  account_closed: "This account is closed. Its reactivation period has ended.",
+  account_recovery_linked_provider:
+    "Sign in with a provider already linked to this account to reactivate it.",
 };
 
 const FALLBACK = "Sign-in didn't complete. Please try again.";

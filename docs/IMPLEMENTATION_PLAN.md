@@ -221,7 +221,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 9.2 | Insights page | done | chunk/9.2-insights-page | 2026-11-06 | Added five insights under Review with dated evidence, definitions and action links |
 | 9.3 | Dismiss and correct | done | chunk/9.3-dismiss-correct | 2026-11-06 | Added period dismissals and links to the editable records behind all five insights |
 | 10.1 | Export | done | chunk/10.1-export | 2026-11-06 | Settings streams a private JSON archive with note Markdown and schema-wide ownership coverage |
-| 10.2 | Account deletion | done | chunk/10.2-account-deletion | 2026-11-07 | Settings requires linked OAuth and typed confirmation, then cascades all owned data, sessions and push subscriptions |
+| 10.2 | Account deletion | done | chunk/10.2-account-recovery | 2026-11-07 | Added a 30-day reactivation window, cemetery on expiry, and access and push delivery suspension |
 | 10.3 | Privacy notes | todo | | | |
 | 10.4 | Security review | todo | | | |
 | 10.5 | Accessibility pass | todo | | | |
@@ -245,7 +245,7 @@ These were decided on 2026-10-20 and become ADRs in chunk 0.1.
 | Hosting and jobs | One Node host running the web app and a worker (pg-boss), on managed Postgres. For v1 on free hosting, the worker is replaced by a sweep route called every 15 minutes ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)) |
 | Auth | Better Auth with Google and GitHub OAuth, database sessions, account linking only on a verified email |
 | History | State tables are the source of truth. A full audit log is written in the same transaction, with no user content in it |
-| Deletion | Archive is a reversible status. Delete is a confirmed hard delete. Deleting a goal moves its tasks to the inbox. Deleting the account cascades everything |
+| Deletion | Archive is reversible. Item deletion is a confirmed hard delete. Deleting a goal moves its tasks to the inbox. Account closure suspends access and has a 30-day reactivation window |
 
 **Defaults** (change them in chunk 0.1 if you disagree):
 - **Data:** UUID keys. A per-user week start (default Monday). Changing time zone never rewrites stored local dates.
@@ -1235,8 +1235,9 @@ Decided 2026-10-29 in [ADR 0016](decisions/0016-notes-rich-text-links-search-tag
 
 ### 10.2 Account deletion
 - Settings → Delete account. Re-authentication is required, plus typed confirmation.
-- The delete is a single transaction that cascades from `users`. It also revokes push subscriptions and sessions.
-- **Test:** after deletion, no row in any table references the user ID. Make this generic by iterating over the schema.
+- Scheduling closure revokes all sessions in one transaction and suspends access and push delivery. A linked sign-in can reactivate the account within 30 days.
+- After the deadline, reactivation is unavailable. The reminder sweep moves expired requests to `cemetery` and revokes any recovery sessions. The user and foreign-key rows are retained. Access and delivery check account status.
+- **Test:** iterate over the schema to confirm retained records and another user's unchanged data. Check that suspended and closed accounts cannot retrieve data or receive reminders, and that recovery restores access before the deadline.
 
 ### 10.3 Privacy notes
 - `docs/PRIVACY.md` and an in-app page covering:
@@ -3359,4 +3360,13 @@ Template:
 - **Decisions.** The provider shows its account picker. The OAuth intent is bound to the initiating session. Successful verification yields a five-minute proof bound to the session created by that exchange. The provider controls credential prompts.
 - **Next chunk should know.** Account deletion uses the existing database foreign keys. The browser test shares the export fixtures, so new owned tables need representative rows for both accounts.
 - **Unverified.** Live Google and GitHub interactions remain unverified. `pnpm verify` passed with 1,107 unit and 827 integration tests and the existing habits lint warning. `pnpm build` passed. The production-mode `pnpm test:e2e --workers=2` passed all 101 browser tests after the local six-worker dev run timed out in existing specs.
+- **Follow-ups.** None.
+
+### 10.2: Account closure and recovery revision (2026-11-07)
+
+- **Built.** Settings schedules closure, revokes existing sessions, and preserves owned records. Linked OAuth sign-in allows reactivation within 30 days. Migration 0022 adds `account_closures` and `cemetery`. The reminder sweep moves expired requests and revokes recovery sessions.
+- **Deviations.** The user replaced the original hard-delete policy after PR #83 merged. The lifecycle tests now assert retention and account isolation across the schema.
+- **Decisions.** Pending and closed accounts are excluded from app access, exports, and push delivery. The database clock enforces the cutoff even when the sweep is delayed. Retained device subscriptions can resume after reactivation.
+- **Next chunk should know.** Privacy notes must describe retained closed accounts and the point at which access stops. Account status is enforced in the session and delivery paths. The existing sweep performs expiry even when no reminders are due.
+- **Unverified.** Live OAuth providers and the production sweep schedule remain unverified. `pnpm verify` passed with 1,107 unit and 829 integration tests and the existing habits lint warning. `pnpm build` passed. Production-mode `pnpm test:e2e --workers=2` passed all 101 tests.
 - **Follow-ups.** None.

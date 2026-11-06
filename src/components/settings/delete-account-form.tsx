@@ -108,7 +108,7 @@ export function DeleteAccountForm() {
         disabled={pending}
         className="self-start"
       >
-        {pending ? "Deleting…" : "Permanently delete account"}
+        {pending ? "Scheduling…" : "Schedule account closure"}
       </Button>
     </form>
   );

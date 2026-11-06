@@ -13,7 +13,7 @@ import {
 } from "@/server/auth/deletion-reauth";
 import { ConflictError } from "@/server/errors";
 
-import { deleteAccount } from "./service";
+import { reactivateAccount, scheduleAccountClosure } from "./service";
 
 export const confirmAccountDeletion = authedAction(
   z.object({
@@ -43,7 +43,7 @@ export const confirmAccountDeletion = authedAction(
       throw new ConflictError("Verify your account again before deleting it.");
     }
 
-    await deleteAccount(userId, current.session.id);
+    await scheduleAccountClosure(userId, current.session.id);
     for (const cookie of [proof, context.authCookies.sessionToken]) {
       jar.set(cookie.name, "", {
         path: cookie.attributes.path,
@@ -53,6 +53,16 @@ export const confirmAccountDeletion = authedAction(
         maxAge: 0,
       });
     }
-    redirect("/sign-in?deleted=1");
+    redirect("/sign-in?closure=scheduled");
   },
 );
+
+export async function confirmAccountReactivation() {
+  const current = await auth.api.getSession({
+    headers: await headers(),
+    query: { disableRefresh: true },
+  });
+  if (!current) redirect("/sign-in");
+  const restored = await reactivateAccount(current.user.id, current.session.id);
+  redirect(restored ? "/home" : "/sign-in");
+}

@@ -3,6 +3,11 @@ import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import {
+  accountStatus,
+  isAccountActive,
+} from "@/server/modules/account-deletion/status";
+
 import { auth } from "./auth";
 
 export type CurrentUser = {
@@ -21,7 +26,7 @@ export async function getUserFromHeaders(
   requestHeaders: Headers,
 ): Promise<CurrentUser | null> {
   const session = await auth.api.getSession({ headers: requestHeaders });
-  if (!session) return null;
+  if (!session || !(await isAccountActive(session.user.id))) return null;
   const { id, name, email, image } = session.user;
   return { id, name, email, image: image ?? null };
 }
@@ -29,6 +34,16 @@ export async function getUserFromHeaders(
 /** The signed-in user for the current request, or `null`. */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   return getUserFromHeaders(await headers());
+}
+
+/** The sign-in page can show recovery without authorizing access to user data. */
+export async function getSignedInAccount() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+    query: { disableRefresh: true },
+  });
+  if (!session) return null;
+  return accountStatus(session.user.id);
 }
 
 /**

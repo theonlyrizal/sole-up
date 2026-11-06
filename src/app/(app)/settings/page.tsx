@@ -92,7 +92,7 @@ export default function SettingsPage() {
           Delete account
         </h2>
         <p className="text-muted-fg text-sm">
-          Permanently remove your SoleUp account and its data.
+          Close your account with a 30-day reactivation period.
         </p>
         <Link
           href={DELETE_ACCOUNT_PATH}
