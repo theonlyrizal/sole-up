@@ -77,6 +77,7 @@ test("Home lists each active habit's figure and links to it on Track", async ({
   await expect(read).toContainText(
     "Last 4 weeks: Nothing expected in this range",
   );
+  await expect(read).toContainText(/0 of \d+ days? so far this week/);
   await expect(card).toContainText("Each active habit on its own");
   await expect(card.getByText("Nothing yet")).toHaveCount(0);
 
@@ -84,7 +85,12 @@ test("Home lists each active habit's figure and links to it on Track", async ({
   const main = page.getByRole("main");
   await expect(main).not.toContainText("%");
   await expect(main).not.toContainText(/score|streak/i);
-  await expect(card).not.toContainText(/1 of 2/);
+  // A habit can legitimately be at 1 of 2 days for this week.
+  await expect(
+    card.getByText(/\b1 of 2\b/).filter({
+      hasNotText: /^1 of 2 days? so far this week$/,
+    }),
+  ).toHaveCount(0);
   await expectNoSeriousViolations(page);
 
   // The title links to the habit's row on Track.
