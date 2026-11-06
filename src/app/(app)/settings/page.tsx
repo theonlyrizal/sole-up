@@ -5,6 +5,7 @@ import { PreferencesForm } from "@/components/preferences/preferences-form";
 import { PushNotifications } from "@/components/push/push-notifications";
 import { ReminderSettingsForm } from "@/components/reminders/reminder-settings-form";
 import { InstallHelp } from "@/components/pwa/install-help";
+import { buttonClass } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/skeleton";
 import { formatInstant } from "@/lib/dates";
 import { localeOptions, supportedTimeZones } from "@/lib/preferences";
@@ -64,6 +65,25 @@ export default function SettingsPage() {
         <Suspense fallback={<LoadingState label="Loading devices" />}>
           <Notifications />
         </Suspense>
+      </section>
+      <section aria-labelledby="export-heading" className="flex flex-col gap-4">
+        <h2 id="export-heading" className="text-lg font-semibold">
+          Export
+        </h2>
+        <p className="text-muted-fg text-sm">
+          Download your SoleUp data as a JSON file, including a Markdown copy of
+          each note. The file contains personal data, so store it somewhere
+          private.
+        </p>
+        <a
+          href="/api/export"
+          className={buttonClass({
+            variant: "secondary",
+            className: "self-start",
+          })}
+        >
+          Download export
+        </a>
       </section>
     </div>
   );
