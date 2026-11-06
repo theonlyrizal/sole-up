@@ -28,6 +28,7 @@ export const NAV_SUB_ITEMS: Partial<
   Record<NavItem["href"], readonly { href: string; label: string }[]>
 > = {
   "/plan": PLAN_SUB_ITEMS.filter((item) => item.href !== "/plan"),
+  "/review": [{ href: "/review/insights", label: "Insights" }],
 };
 export type NavIcon = NavItem["icon"];
 

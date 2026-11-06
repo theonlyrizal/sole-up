@@ -13,7 +13,7 @@ const NAV_LABELS = [
   "Review",
   "Settings",
 ];
-/** The sidebar also lists Today, Upcoming, Calendar and Inbox under Plan. */
+/** The desktop sidebar includes the Plan and Review sub-pages. */
 const SIDEBAR_LABELS = [
   "Home",
   "Goals",
@@ -25,6 +25,7 @@ const SIDEBAR_LABELS = [
   "Track",
   "Notes",
   "Review",
+  "Insights",
   "Settings",
 ];
 
@@ -33,7 +34,7 @@ function mainNav(page: Page) {
 }
 
 test.describe("desktop", () => {
-  test("the sidebar shows only Home, Goals, Plan (with its sub-pages), Track, Notes, Review and Settings", async ({
+  test("the sidebar shows the main destinations and their sub-pages", async ({
     page,
   }) => {
     await signInAndConfirm(page);
@@ -82,6 +83,18 @@ test.describe("desktop", () => {
       "aria-current",
       "true",
     );
+
+    await nav.getByRole("link", { name: "Insights" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Insights" }),
+    ).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Insights" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(
+      nav.getByRole("link", { name: "Review", exact: true }),
+    ).toHaveAttribute("aria-current", "true");
   });
 
   test("the shell has no serious accessibility violations", async ({
@@ -104,6 +117,7 @@ test.describe("desktop", () => {
       "/notes/search",
       "/notes/tags",
       "/review",
+      "/review/insights",
       "/settings",
     ]) {
       await page.goto(path);
@@ -127,9 +141,8 @@ test.describe("desktop", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator("main")).toBeFocused();
 
-    // From the top: skip link, brand, Add task, search, the destinations (with
-    // Today, Upcoming, Calendar and Inbox under Plan, then Track, Notes
-    // and Review), sign out.
+    // From the top: skip link, brand, Add task, search, the sidebar links,
+    // then sign out.
     await page.goto("/home");
     await expect(
       page.getByRole("heading", { level: 1, name: "Home" }),
@@ -154,9 +167,10 @@ test.describe("desktop", () => {
       expect(outline).not.toBe("none");
     }
 
-    // Shift+Tab back to Plan (past Settings, Review, Notes, Track, Inbox,
-    // Calendar, Upcoming and Today) and follow it with Enter.
-    for (let step = 0; step < 9; step += 1) {
+    // Shift+Tab from sign out back to Plan and follow it with Enter.
+    const stepsBackToPlan =
+      SIDEBAR_LABELS.length - SIDEBAR_LABELS.indexOf("Plan");
+    for (let step = 0; step < stepsBackToPlan; step += 1) {
       await page.keyboard.press("Shift+Tab");
     }
     const plan = mainNav(page).getByRole("link", { name: "Plan" });

@@ -122,8 +122,18 @@ it("finds each active goal's most recent qualifying audit action in local days",
   expect(result.value).toHaveLength(2);
   expect(result.value).toEqual(
     expect.arrayContaining([
-      { id: goal.id, lastActionDate: "2026-11-03", daysInactive: 3 },
-      { id: fallback.id, lastActionDate: "2026-10-01", daysInactive: 36 },
+      {
+        id: goal.id,
+        title: goal.title,
+        lastActionDate: "2026-11-03",
+        daysInactive: 3,
+      },
+      {
+        id: fallback.id,
+        title: fallback.title,
+        lastActionDate: "2026-10-01",
+        daysInactive: 36,
+      },
     ]),
   );
 
@@ -163,6 +173,7 @@ it("finds each active goal's most recent qualifying audit action in local days",
   ]);
   expect((await goalInactivityMetric(context)).value).toContainEqual({
     id: goal.id,
+    title: goal.title,
     lastActionDate: "2026-11-05",
     daysInactive: 1,
   });
@@ -275,6 +286,7 @@ it("uses cadence expectations and skips for completed weeks only", async () => {
   expect(result.hasData).toBe(true);
   expect(result.value).toHaveLength(1);
   expect(result.value[0].id).toBe(habit.id);
+  expect(result.value[0].title).toBe(habit.title);
   expect(result.value[0].weeks).toMatchObject([
     { expected: 0, completed: 0, skipped: 0 },
     { expected: 0, completed: 0, skipped: 0 },

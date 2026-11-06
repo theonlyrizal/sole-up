@@ -218,7 +218,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 8.5 | Tags | done | claude/nifty-bell-iyggvb | 2026-10-31 | `tags` + `note_tags` (migration 0020: unique `(user_id, lower(name))`, composite cascading FKs), `tags` module (set by name with inline create, rename, delete untags only), editor Tags field, list chips + `?tag=<id>` filter, search's notes-group filter, `/notes/tags` manager; no tag names in events or logs |
 | 8.✓ | Phase 8 checkpoint (user) | done | | 2026-11-06 | User marked the checkpoint done at the start of 9.1 |
 | 9.1 | Insight definitions and metrics | done | chunk/9.1-insight-metrics | 2026-11-06 | Documented all 15 metrics and added goal inactivity, overdue and habit trends, and next-week workload |
-| 9.2 | Insights page | todo | | | |
+| 9.2 | Insights page | done | chunk/9.2-insights-page | 2026-11-06 | Added five insights under Review with dated evidence, definitions and action links |
 | 9.3 | Dismiss and correct | todo | | | |
 | 10.1 | Export | todo | | | |
 | 10.2 | Account deletion | todo | | | |
@@ -3324,3 +3324,12 @@ Template:
 - **Next chunk should know:** Use `metrics/review.ts` for planned versus completed. Insights goal inactivity and the existing Weekly Review activity count use separate definitions documented in `docs/METRICS.md`.
 - **Unverified:** No manual checks for this chunk. `pnpm verify` passed with 1,107 unit tests, 824 integration tests and the existing lint warning in `habits/validation.test.ts`. Local integration used isolated Postgres 18 in WSL because Docker was unavailable.
 - **Follow-ups:** The Insights page is chunk 9.2.
+
+### 9.2: Insights page (2026-11-06)
+
+- **Built:** `/review/insights` under Review and in the desktop sidebar. It shows five insights with evidence, dates, definitions, empty states and links into Plan, Goals, Track and Upcoming.
+- **Deviations:** None.
+- **Decisions:** Planned versus completed uses the last completed user week. The overdue and habit trends use tables to make four exact weekly figures easy to compare. The habit table also shows skips and weeks with no expected activity alongside the counts. The other insights read clearly as text.
+- **Next chunk should know:** `InsightsView` renders the existing metrics from one user-local clock. The goal and habit metrics return titles alongside IDs for links to the underlying records.
+- **Unverified:** Manual screen-reader and dark-mode checks. `pnpm verify` passed with 1,107 unit tests, 824 integration tests and the existing habit lint warning. `pnpm build` and `pnpm test:e2e` passed, with all 99 browser tests passing in production mode. Local tests used isolated PostgreSQL 18 databases in WSL.
+- **Follow-ups:** Dismiss and correct is chunk 9.3.
