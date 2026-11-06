@@ -1,5 +1,4 @@
 import { eq } from "drizzle-orm";
-import { handleOAuthUserInfo } from "better-auth/oauth2";
 import { describe, expect, it } from "vitest";
 
 import { auth } from "@/server/auth/auth";
@@ -7,6 +6,7 @@ import { getUserFromHeaders } from "@/server/auth/session";
 import { db } from "@/server/db/client";
 import { accounts, sessions, users } from "@/server/db/schema";
 
+import { signInWithOAuthProfile } from "./helpers/oauth";
 import { asUser, createTestUser } from "./helpers/users";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -140,8 +140,7 @@ describe("account linking", () => {
     email: string;
     emailVerified: boolean;
   }) {
-    const context = await auth.$context;
-    return handleOAuthUserInfo({ context } as never, {
+    return signInWithOAuthProfile({
       userInfo: {
         id: profile.accountId,
         name: "Provider Name",

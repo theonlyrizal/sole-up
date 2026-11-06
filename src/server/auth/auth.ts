@@ -8,6 +8,10 @@ import * as schema from "@/server/db/schema";
 import { env } from "@/server/env";
 import { ensureUserPreferences } from "@/server/modules/preferences/service";
 
+import {
+  deletionReauthHooks,
+  validateDeletionIdentity,
+} from "./deletion-reauth";
 import { logAuth } from "./logger";
 import { configuredProviders, type ProviderId } from "./providers";
 
@@ -41,6 +45,8 @@ export const auth = betterAuth({
     usePlural: true,
   }),
   socialProviders: socialProviders(),
+  hooks: deletionReauthHooks,
+  user: { validateUserInfo: validateDeletionIdentity },
   account: {
     accountLinking: {
       enabled: true,

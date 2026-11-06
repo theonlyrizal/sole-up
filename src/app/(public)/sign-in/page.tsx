@@ -33,7 +33,7 @@ async function SignInOptions({
 }: Pick<PageProps<"/sign-in">, "searchParams">) {
   if (await getCurrentUser()) redirect("/home");
 
-  const { error } = await searchParams;
+  const { error, deleted } = await searchParams;
   const errorMessage = signInErrorMessage(
     typeof error === "string" ? error : undefined,
   );
@@ -45,6 +45,11 @@ async function SignInOptions({
 
   return (
     <div className="flex flex-col gap-4">
+      {deleted === "1" && (
+        <p role="status" className="text-sm text-muted">
+          Your SoleUp account was deleted.
+        </p>
+      )}
       {errorMessage && (
         <p
           role="alert"

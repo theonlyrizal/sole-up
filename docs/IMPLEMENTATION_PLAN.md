@@ -221,7 +221,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 9.2 | Insights page | done | chunk/9.2-insights-page | 2026-11-06 | Added five insights under Review with dated evidence, definitions and action links |
 | 9.3 | Dismiss and correct | done | chunk/9.3-dismiss-correct | 2026-11-06 | Added period dismissals and links to the editable records behind all five insights |
 | 10.1 | Export | done | chunk/10.1-export | 2026-11-06 | Settings streams a private JSON archive with note Markdown and schema-wide ownership coverage |
-| 10.2 | Account deletion | todo | | | |
+| 10.2 | Account deletion | done | chunk/10.2-account-deletion | 2026-11-07 | Settings requires linked OAuth and typed confirmation, then cascades all owned data, sessions and push subscriptions |
 | 10.3 | Privacy notes | todo | | | |
 | 10.4 | Security review | todo | | | |
 | 10.5 | Accessibility pass | todo | | | |
@@ -3350,4 +3350,13 @@ Template:
 - **Decisions.** Include the profile and metadata for authentication and devices. Select safe fields explicitly on credential-bearing tables. Read primary-key batches without holding a database connection across the download, so later batches can reflect edits made during export.
 - **Next chunk should know.** The export browser test discovers ownership through the Drizzle schema and compares the download with populated rows for two users. Add fixtures and review the export fields when adding an owned table.
 - **Unverified.** No manual checks required. `pnpm verify` passed with 1,107 unit and 827 integration tests and the existing habits lint warning. `pnpm build` and all 100 browser tests passed. Local integration verification used isolated PostgreSQL 18 in WSL after database and timeout failures on earlier runs.
+- **Follow-ups.** None.
+
+### 10.2: Account deletion (2026-11-07)
+
+- **Built.** Settings → Delete account uses linked-provider OAuth and exact `DELETE` confirmation. One transaction deletes the `users` row and cascades owned records, database sessions and push subscriptions. The browser test exercises the real Better Auth callback with a stubbed GitHub provider, scans complete rows across the schema, and compares another account's rows before and after.
+- **Deviations.** None.
+- **Decisions.** The provider shows its account picker. The OAuth intent is bound to the initiating session. Successful verification yields a five-minute proof bound to the session created by that exchange. The provider controls credential prompts.
+- **Next chunk should know.** Account deletion uses the existing database foreign keys. The browser test shares the export fixtures, so new owned tables need representative rows for both accounts.
+- **Unverified.** Live Google and GitHub interactions remain unverified. `pnpm verify` passed with 1,107 unit and 827 integration tests and the existing habits lint warning. `pnpm build` passed. The production-mode `pnpm test:e2e --workers=2` passed all 101 browser tests after the local six-worker dev run timed out in existing specs.
 - **Follow-ups.** None.

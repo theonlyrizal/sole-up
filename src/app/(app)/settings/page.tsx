@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { PreferencesForm } from "@/components/preferences/preferences-form";
@@ -7,6 +8,7 @@ import { ReminderSettingsForm } from "@/components/reminders/reminder-settings-f
 import { InstallHelp } from "@/components/pwa/install-help";
 import { buttonClass } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/skeleton";
+import { DELETE_ACCOUNT_PATH } from "@/lib/account-deletion";
 import { formatInstant } from "@/lib/dates";
 import { localeOptions, supportedTimeZones } from "@/lib/preferences";
 import { requireUser } from "@/server/auth/session";
@@ -84,6 +86,23 @@ export default function SettingsPage() {
         >
           Download export
         </a>
+      </section>
+      <section aria-labelledby="delete-heading" className="flex flex-col gap-4">
+        <h2 id="delete-heading" className="text-lg font-semibold">
+          Delete account
+        </h2>
+        <p className="text-muted-fg text-sm">
+          Permanently remove your SoleUp account and its data.
+        </p>
+        <Link
+          href={DELETE_ACCOUNT_PATH}
+          className={buttonClass({
+            variant: "danger",
+            className: "self-start",
+          })}
+        >
+          Delete account
+        </Link>
       </section>
     </div>
   );
