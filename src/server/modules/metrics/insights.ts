@@ -49,6 +49,7 @@ const MEANINGFUL_ACTIONS = {
 
 export type GoalInactivity = {
   id: string;
+  title: string;
   lastActionDate: LocalDate;
   daysInactive: number;
 };
@@ -58,9 +59,13 @@ export async function goalInactivityMetric({
   clock,
   timeZone,
 }: InsightContext): Promise<Metric<GoalInactivity[]>> {
-  const { rows } = await db.execute<{ id: string; lastActionSeconds: number }>(
+  const { rows } = await db.execute<{
+    id: string;
+    title: string;
+    lastActionSeconds: number;
+  }>(
     sql`
-      select ${goals.id}, extract(epoch from coalesce((
+      select ${goals.id}, ${goals.title}, extract(epoch from coalesce((
         select max(${auditEvents.occurredAt})
         from ${auditEvents}
         where ${auditEvents.userId} = ${goals.userId}
@@ -105,13 +110,14 @@ export async function goalInactivityMetric({
     `,
   );
 
-  const value = rows.map(({ id, lastActionSeconds }) => {
+  const value = rows.map(({ id, title, lastActionSeconds }) => {
     const lastActionDate = localDateOf(
       new Date(lastActionSeconds * 1000),
       timeZone,
     );
     return {
       id,
+      title,
       lastActionDate,
       daysInactive: daysBetween(lastActionDate, clock.today),
     };
@@ -200,6 +206,7 @@ export async function overdueTrendMetric(
 
 export type HabitConsistencyTrend = {
   id: string;
+  title: string;
   weeks: ({ from: LocalDate; to: LocalDate } & HabitConsistency)[];
 };
 
@@ -235,6 +242,7 @@ export async function habitConsistencyTrendMetric(
     });
     return {
       id: row.id,
+      title: row.title,
       weeks: weeks.map((week) => ({
         ...week,
         ...consistency({ ...input, range: week }),

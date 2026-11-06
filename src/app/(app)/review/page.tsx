@@ -41,15 +41,23 @@ export default function ReviewPage({ searchParams }: PageProps<"/review">) {
           Look back on a week, note what you learned, make a few changes, and
           choose what matters next week. Every step is optional.
         </p>
-        <Link
-          href="/review/history"
-          className={cx(
-            "self-start rounded-sm text-sm font-medium underline underline-offset-2",
-            focusRing,
-          )}
-        >
-          Past reviews
-        </Link>
+        <nav aria-label="Review pages" className="flex flex-wrap gap-4">
+          {[
+            { href: "/review/history", label: "Past reviews" },
+            { href: "/review/insights", label: "Insights" },
+          ].map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cx(
+                "rounded-sm text-sm font-medium underline underline-offset-2",
+                focusRing,
+              )}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
       </div>
       <Suspense fallback={<LoadingState label="Loading your review" />}>
         <Review searchParams={searchParams} />
