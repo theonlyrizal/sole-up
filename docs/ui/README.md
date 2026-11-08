@@ -1,6 +1,6 @@
 # SoleUp UI redesign
 
-**Status:** Approved plan, not yet built. Revision 2, 2026-10-30. It replaces the first draft from commit `c76c3a5`.
+**Status:** Redesign plan. Revision 3 experience refinement, 2026-11-08; builds on revision 2 (2026-10-30). Delivery status remains in the UI phase tracker; this revision does not claim implementation has shipped.
 **Track:** A separate delivery track, UI-0 to UI-13, run alongside the product chunks in [`../IMPLEMENTATION_PLAN.md`](../IMPLEMENTATION_PLAN.md).
 
 SoleUp gets a full frontend redesign. It follows **Google Material 3 Expressive**, adapted for an accessible, responsive Next.js PWA, and takes its visual direction from five reference images (described below). The backend stays as it is: the tables, services, Server Actions, queries, URL contracts and domain rules don't change. Pages, layouts and presentation components can be rebuilt from scratch.
@@ -16,12 +16,13 @@ SoleUp gets a full frontend redesign. It follows **Google Material 3 Expressive*
 | 5 | [UI_AUDIT.md](UI_AUDIT.md) | The current routes, data sources, URL contracts, states, tests, and which components to reuse or replace | Before touching a route |
 | 6 | [UI_IMPLEMENTATION_PLAN.md](UI_IMPLEMENTATION_PLAN.md) | Phases UI-0 to UI-13: scope, files, tasks, tests, done criteria, tracker and handoff notes | The agent running a phase |
 | 7 | [UI_AGENT_PROMPTS.md](UI_AGENT_PROMPTS.md) | One prompt to paste per phase | The user |
+| 8 | [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) | Reference analysis, page color recipes, interaction psychology, exact feedback sequences, small-screen treatments and a scored acceptance rubric | Every implementing agent |
 
-If two docs disagree, the more specific one wins: SCREENS beats COMPONENTS, COMPONENTS beats DESIGN_SYSTEM, and DESIGN_SYSTEM beats DESIGN_DECISIONS. The exceptions are the product rules in DESIGN_DECISIONS §2, which always win. `CLAUDE.md`, `PRODUCT_SPEC.md`, the ADRs and `DATA_MODEL.md` outrank everything in this folder. When a design here conflicts with one of them, stop and ask the user. Don't quietly pick one.
+Read EXPERIENCE_DESIGN after DESIGN_DECISIONS, before implementing a phase. Its revision 3 rules supersede older instructions for color composition, first-load progress animation, confirmation timing, Home's no-commitment treatment, and interactive chart hit targets. Otherwise the more specific document wins: SCREENS beats COMPONENTS, COMPONENTS beats DESIGN_SYSTEM, and DESIGN_SYSTEM beats DESIGN_DECISIONS. Product rules in DESIGN_DECISIONS §2 always win. `CLAUDE.md`, `PRODUCT_SPEC.md`, the ADRs and `DATA_MODEL.md` outrank this folder. DESIGN.md is a summary, not a second token source.
 
 ## The reference images
 
-The user supplied five images, saved locally at `C:\Users\salma\AppData\Local\Temp\claude\E--WebDev-sole-up\5fabdf84-8ecd-4f65-87f1-0e637b42ff72\images\1.webp` … `5.webp`. They are third-party portfolio shots, so **they are not committed to the repository**. The descriptions below are written so an agent doesn't need to see them.
+The user supplied five images, available under `C:/Users/salma/OneDrive/Pictures/` in this order: `f3f347e3364375fcb6f45914e2a47f5b.webp`, `0fcc227f93ff5dc63057479f2dcf6d42.webp`, `ba921a8a6090d5cd34f2f425b313f78b.webp`, `91ea10867b5993f1b84acae438dca09e.webp`, and `original-ab2beaa32cff35b3e6601ff36741fac4.webp`. They are third-party portfolio shots, so **they are not committed to the repository**. The descriptions below and EXPERIENCE_DESIGN's extraction table let an agent work without those machine-local files.
 
 1. **Blue "habit" app, three phones, tilted grid (primary reference).**
    - **Background and surfaces:** a pale sky-blue background with soft clouds; white rounded cards (about 28–32 px corners) floating above it.
@@ -53,6 +54,16 @@ DESIGN_DECISIONS §3 turns these into a pattern catalogue: what we take, how it 
 Token values in DESIGN_SYSTEM.md were checked on 2026-10-30 against Google's own Jetpack Compose Material 3 token sources (`androidx/compose/material3/tokens/*.kt`): motion springs (`ExpressiveMotionTokens`, `StandardMotionTokens`), corner scale (`ShapeTokens`), navigation bar and rail sizes (`NavigationBarTokens`, `NavigationRail*Tokens`). The guideline site is <https://m3.material.io/>. SoleUp builds its **own** React components on these tokens with Tailwind CSS 4 and Radix. It does not use `@material/web`, MUI, or any Android library (D-03).
 
 ## What changed from revision 1
+
+### Revision 3: experience refinement (2026-11-08)
+
+- Added EXPERIENCE_DESIGN: page-specific color composition, stable personal identity, rewarding feedback, calm return journeys, and explicit implementation ownership.
+- Reconciled the conflicting lime mini-spec in DESIGN.md with the lake-blue Material plan.
+- Replaced first-view progress spectacle with feedback tied to real saved changes; specified pending, failure, retry and correction.
+- Added Home's focal fallback and honest count treatment, accessible small-screen chart layouts, and a review rubric for the agents.
+- Psychology is stated as design hypotheses to validate, without unsupported claims about addiction or universal color effects.
+
+### Revision 2
 
 - Concrete values everywhere: colours, contrast ratios, sizes, motion curves and wireframes, instead of directions to "tune later".
 - Facts corrected: chunk 8.4 (Search, `/notes/search`) **has shipped**; revision 1 called it unbuilt.

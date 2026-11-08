@@ -1,6 +1,6 @@
 # SoleUp design system: Material 3 Expressive for the web
 
-**Status:** Revision 2, 2026-10-30. UI-1 implements these values exactly. If a value turns out wrong in practice (a contrast failure, a rendering bug), the phase that finds it fixes it here and in code in the same PR.
+**Status:** Revision 3, 2026-11-08. Existing role values are retained; §13 adds composition aliases and feedback rules. If a value fails contrast or rendering review, fix it here and in code in the same PR.
 
 Implementation lives in `src/app/globals.css` (tokens, `@theme`), `src/components/ui/*` (components), `src/components/icons/*` (icons) and `src/components/ui/shapes.ts` (shape library). Components use **utilities generated from roles** (`bg-primary`, `text-on-surface-variant`, `rounded-xl`, `shadow-card`, `ease-spatial-fast`). They never use raw hex values, never use Tailwind palette colours (`bg-blue-500`), and never use arbitrary values for anything that has a token.
 
@@ -325,7 +325,7 @@ Tailwind exposes these as `ease-<token>` and `duration-<token>`. Never pair an o
 Sample 120 points per shape (64 for `sunny`) and join them with straight segments. That is smooth at avatar sizes up to 96 px. These are **approximations** of the M3 shapes (the official ones come from AndroidX `graphics-shapes` `RoundedPolygon`). If an exact port is wanted later, it replaces this one file.
 
 Identity set (D-07, in hash order): `cookie-9, clover-4, cookie-6, flower, gem, clover-8, cookie-4, puffy-diamond, cookie-12`.
-Hash: FNV-1a 32-bit over the id string. `shape = set[h % 9]` and `palette = IDENTITY[(h >>> 8) % 6]`.
+Hash: FNV-1a 32-bit over `entityType + ":" + id`, shared across every route. `shape = set[h % 9]` and `palette = IDENTITY[(h >>> 8) % 6]`.
 
 ## 9. Iconography
 
@@ -397,3 +397,22 @@ The destination icons are home (Home), checklist (Plan), flag (Goals), cycle (Tr
 | button | `surface-container-high` |
 
 UI-13 removes every alias and every legacy utility use. It deletes the default Tailwind breakpoints and the `--fs-*` scale, and adds a CI-friendly check: `pnpm lint:tokens`, a small Node script that greps `src/` for `bg-surface\b`, `text-muted\b`, `bg-accent`, `border-border`, `\b(sm|md|lg|xl):`, `bg-(red|blue|…)-\d` and raw `#hex` in `.tsx`, and exits non-zero on any match.
+
+## 13. Experience composition tokens (revision 3)
+
+Read [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) for allocation and screen treatments. These aliases use the existing light/dark roles; they introduce no additional hex palette. UI-1 maps them into Tailwind using the same pattern as §1.2. Experience aliases remain after UI-13; they are not legacy aliases.
+
+| CSS token | Value | Paired foreground / purpose |
+|---|---|---|
+| `--md-feature-surface` | `var(--md-primary-container)` | `--md-on-feature-surface` = `var(--md-on-primary-container)`; one focal module |
+| `--md-resting-surface` | `var(--md-surface-container-lowest)` | `--md-on-resting-surface` = `var(--md-on-surface)`; ordinary content |
+| `--md-confirmation-surface` | `var(--md-tertiary-container)` | `--md-on-confirmation-surface` = `var(--md-on-tertiary-container)`; local confirmed response |
+| `--md-reflection-surface` | `var(--area-violet-container)` | `--md-on-reflection-surface` = `var(--area-violet-on)`; small Review/Notes motif |
+| `--feedback-halo-duration` | `600ms` | Maximum lifetime of the non-looping local halo; opacity uses existing effects easing |
+| `--feedback-press-scale` | `0.96` | Inner pointer-activated icon only; never scale a text field, target or whole task row |
+
+Use foreground/background aliases together at full opacity. Opacity applies only to a decorative halo layer, never its text or focus indicator. Confirmation roles are not error roles. Personal identity colors continue to use §1.3 rather than feature-surface aliases.
+
+**Motion:** progress is accurate and stationary on first paint. Animate only an actual value change caused by an action on the current screen, from the currently rendered value. Success emphasis requires a confirmed mutation; optimism alone never triggers it. No viewport-triggered fill, number count-up or repeating success animation. Reduced motion disables the spatial effect and halo while preserving all state text.
+
+**Contrast review:** aliases inherit existing role pairs. Recheck the final rendered composition, including interactive outlines, state layers and marks, rather than assuming a palette table proves every component. Large numerals must not cause supporting captions to fall below normal-text contrast. Identity color is never the sole state signal.

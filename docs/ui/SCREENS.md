@@ -1,6 +1,8 @@
 # SoleUp screens
 
-**Status:** Revision 2, 2026-10-30. One section per route or route group. For each screen:
+**Revision 3 experience refinement · 2026-11-08.** Each route also implements [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) §§2, 4–7: page color recipes, precise local feedback and visual acceptance. Wireframes show information order; they are not permission to render every module with identical weight.
+
+**Status:** Revision 3, 2026-11-08 (route inventory established in revision 2). One section per route or route group. For each screen:
 - the **question** it answers first;
 - the **data** (the exact existing functions and fields);
 - **wireframes** for compact (about 390 px) and expanded or large (about 1280 px);
@@ -87,6 +89,8 @@ Conventions in the wireframes:
 - `user.name` for the greeting.
 
 New pure helpers (unit tested): `greetingFor(clock, timeZone)` and `weekDays(today, weekStart, locale)`.
+
+**Home focal rule:** one blue focal module at a time. When `next.value` is null, Today takes `feature-surface` and the absence of a commitment becomes a compact neutral line with the existing calendar link. Preserve its definition/range access. Today counts are not completion progress; never graph planned/due/decide as a partition or use a fake denominator. Personal habit tiles use stable identity colors. See EXPERIENCE_DESIGN §5 for first-viewport composition.
 
 **Compact:**
 ```
@@ -397,7 +401,7 @@ Compact
 | `4w` (default) | The 4 × 7 grid of `HabitDayCell` (44 px) with date numbers |
 | `12w` | `DotMatrix` (28 px cells, no numbers), with week row labels |
 
-On compact, the 4-week grid fits: 7 × 44 + 6 × 4 = 332 px plus a 48 px row label = 380 px. That's too wide for 360 px phones, so below 380 px **the row label moves above each week row** (a `label-small` line) rather than squeezing the cells.
+On compact, compute fit from the available card content width after gutters and padding, not the viewport alone. Seven non-overlapping 48 px targets may require local horizontal overflow. Move week labels above rows at narrow widths, keep a visible overflow affordance and scroll focused cells into view. The twelve-week matrix uses 28 px visual dots inside 48 px interactive cells. Never shrink targets or permit document-wide overflow; test at 320/375/390 px. See EXPERIENCE_DESIGN §5.
 
 **Large:** a feed of habit cards in 2 columns, with the week chart wider. The header has [New habit] (filled) and [Archived (n)] (text).
 
@@ -405,7 +409,7 @@ On compact, the 4-week grid fits: 7 × 44 + 6 × 4 = 332 px plus a 48 px row lab
 - Tapping a loggable day opens a `ResponsiveSheet` titled with the `dateLabel` and described by the habit title.
 - **Check habits:** a `RadioRow` list of Done, Skip, or No log (clear).
 - **Quantity habits:** a `NumberStepper` with "Full target ({target} {unit})" as a tonal shortcut, plus Skip and Clear.
-- The figure updates straight away (the existing optimistic flow), and there's an Undo snackbar where it exists today.
+- The figure updates through the existing optimistic flow. Local success emphasis waits for confirmed persistence: check/amount settles, a 600 ms peach halo fades behind the changed icon, then the saved state rests. Roll back on failure, retain quantity input, and provide the existing retry/correction. Undo stays where supported today. No effect on mount, identical saves, back navigation or Undo. See EXPERIENCE_DESIGN §4.
 - Days where `loggable` is false are not buttons; they're `role="img"` with their label.
 
 **Must survive:**

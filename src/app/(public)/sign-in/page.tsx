@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -29,6 +30,12 @@ export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
       <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
         <SignInOptions searchParams={searchParams} />
       </Suspense>
+      <Link
+        href="/privacy"
+        className="text-sm text-accent underline underline-offset-4"
+      >
+        Privacy notes
+      </Link>
     </main>
   );
 }

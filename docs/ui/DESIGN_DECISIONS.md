@@ -1,6 +1,6 @@
 # SoleUp redesign: decisions
 
-**Status:** Revision 2, 2026-10-30. The decisions are settled for implementation. Items in §5 still need the user's sign-off before the phase that depends on them.
+**Status:** Revision 3, 2026-11-08. Experience refinements are specified in EXPERIENCE_DESIGN.md. Existing product-rule amendments in §5 retain their documented gates.
 **Scope:** The full frontend: public pages, the authenticated shell, every route, dialogs, and the loading, empty and error states.
 
 Each decision has an ID, so code comments, PRs and handoff notes can cite it (`D-11`). To change a decision, edit it here in the same PR and say why in the handoff note.
@@ -43,7 +43,7 @@ The five images are described in [README.md](README.md#the-reference-images). Ea
 | Avatar with "Today's Habit" header and round menu button (1, 3) | **Greeting header** on Home: monogram in an expressive shape, "Good morning, {first name}", today's date; round icon buttons for Search and More | `requireUser().name`, the user's local clock | Remote OAuth photos (privacy, D-07); "Jane Cooper" sample names |
 | Week strip of tall day capsules, today filled (1, 2, 3) | **Week strip** on Home, Today, and the Day/Agenda calendar on compact. Each chip links to that day's calendar view | `todayClock(zone)`, `weekStart` preference | Per-day "completion" dots (no such data) |
 | Square activity tiles with 3D illustrations (1, 3) | **Habit cards carousel** on Home: shape-avatar monogram, title, weekly pill progress | `habitsSummary` → `HabitSummaryItem` | 3D emoji or illustrations (no habit icon field; licensing). Follow-up F-1 |
-| "Activity Steps": big numeral, 0…target scale, row of thin progress pills, metric pills (1, 2) | **Segmented pill bar**: Today card ("3 planned for today" with chips for due and needs-a-decision); habit week progress ("2 of 3 times", one pill per expected unit) | `todayTaskCounts`, `HabitWeekProgress.done/target` | Step counts, kcal, km, minutes; any bar not backed by a count |
+| "Activity Steps": big numeral, 0…target scale, row of thin progress pills, metric pills (1, 2) | **Large numeral with secondary chips** for Today; **segmented pill bar** only for habit week progress ("2 of 3 times", one pill per expected unit) | `todayTaskCounts`, `HabitWeekProgress.done/target` | Step counts, kcal, km, minutes; any bar not backed by a count |
 | "Progress Goal 78 %" semicircle gauge with hatched remainder (2, 3) | **Milestone arc** on goal detail: one arc segment per countable milestone (up to 12), filled when completed, labelled "3 of 5 milestones" | `MilestoneProgress { completed, countable }` | "Total your score", a percentage numeral, combining goals |
 | "Favorite Habits" weekday bars with hatched inactive days and one highlighted day (3) | **Habit week chart** on Track: seven day pills, completed filled to the day's credit, skipped hatched, missed outlined, today ringed | `HabitHistory.weeks[].days[]` (`state`, `credit`) | "+83 %" labels, a "favourite" ranking |
 | Month chip row and month grid with joined range highlights (1, 3) | **Date picker** (navigation only): calendar "Go to date", task due and plan date fields | none; it writes dates through existing forms | A month **view** of events (ADR 0012 rules out a Month view) |
@@ -94,7 +94,7 @@ The current hand-written nav icons in `app-nav.tsx` are replaced.
 Shapes never hold body text, never act as a button's only affordance, and never vary at random from render to render: each one is deterministic, chosen by hashing the item's id.
 
 **D-07 · Identity avatars, without a schema change.** Habits, goals and the user get a `ShapeAvatar`: the first grapheme of the title, uppercased, centred in a shape.
-- **Shape:** picked by a stable hash of the entity id from the identity shape set.
+- **Shape:** picked by a stable hash of `entityType + ":" + id` from the identity shape set, through one shared helper. The same entity keeps its identity on every route and after renaming/reordering.
 - **Colour, for goals:** the life area's colour when the goal has one.
 - **Colour, for habits and goals without an area:** hashed into the six identity palettes (blue, teal, violet, pink, amber, green).
 - **The user:** the monogram from `user.name`, in `primary-container`. We don't load the OAuth profile picture (no third-party image requests; privacy rule 7).
@@ -167,7 +167,7 @@ The button opens a popover on medium and wider, or a bottom sheet on compact, wi
 
 | Form | Used for | Text equivalent |
 |---|---|---|
-| Segmented pill bar | Habit week progress, Today counts | "2 of 3 times so far this week" |
+| Segmented pill bar | Habit week progress with a real expected-unit denominator | "2 of 3 times so far this week" |
 | Week strip | Navigating dates | Each chip's `aria-label` is the full date |
 | Habit week chart (7 day pills) | Track and Home habit cards | Each day's `stateLabel` |
 | Dot matrix | Track, 12-week range | Each cell is a button whose label is `dateLabel: stateLabel` |
@@ -178,7 +178,7 @@ The button opens a popover on medium and wider, or a bottom sheet on compact, wi
 Forbidden: pie or donut charts, cross-entity percentages, sparklines with no axis, a decorative chart with no data.
 
 **D-18 · Ember, the tertiary colour, is used sparingly.** The tertiary palette (from reference 4's orange, `#E2662E`, and in tone 40 `#A23F11`) is allowed only for:
-- the habit **Done** confirmation morph;
+- the confirmed habit log/quantity response (D-20), including the brief local peach halo;
 - the **Review finished** celebration sheet;
 - search highlights (`<mark>`, as `tertiary-container`);
 - the Track identity tile in the More sheet and the rail tooltip;
@@ -203,9 +203,11 @@ It is never used for errors, warnings, missed days or destructive actions.
 Each state also has a different glyph or pattern, so colour is never the only signal (WCAG 1.4.1).
 
 **D-20 · Restrained celebration.**
-- **Habit Done:** the icon morphs from circle to check-in-cookie (an expressive fast spatial spring) and the button changes to "Done ✓". A snackbar offers Undo.
-- **Review finished:** a sheet with a soft-burst shape and "Your review is saved. It stays editable until {date}."
-- That is all: no confetti, sounds, streak counts or badges. Celebration motion follows reduced-motion settings.
+- **Habit save:** immediate press response, distinct pending state, then a confirmed check/quantity update with a brief peach halo local to its icon. Optimistic data follows the existing hook; success emphasis waits for confirmation. Use existing Undo when supported, with persistent correction available afterward.
+- **Tasks and milestones:** local saved feedback and an updated record; preserve focus and existing mutation behavior.
+- **Review finished:** a warm sheet with a soft-burst shape and "Your review is saved. It stays editable until {date}." Open only after explicit Finish succeeds.
+- **Failure:** rollback, retained input and actionable retry; no success effect. Reduced motion gets immediate state changes and the same semantic messages.
+- Exact sequencing, repetition limits, and page treatments are in EXPERIENCE_DESIGN §§4–5. No sounds, streak counts, badges, or first-load count-up effects.
 
 **D-21 · Voice and copy.** Sentence case. Plain words. Second person. No exclamation marks except "Welcome back" (none at all elsewhere). Existing copy that encodes a rule (section labels such as "Earlier, not done", and definitions) is reused word for word from `src/lib/*` constants. The Home greeting uses the first word of `user.name`, or no name if it's empty: "Good morning" (05:00–11:59), "Good afternoon" (12:00–17:59), "Good evening" (otherwise), worked out in the user's zone.
 
@@ -254,7 +256,7 @@ There are no route transitions in this track (the View Transitions API is deferr
 - **Errors that need action** stay inline, using `FormError`, `ErrorState` and field errors.
 
 **D-28 · Accessibility baseline: WCAG 2.2 AA.**
-- **Touch targets:** at least 48 × 48 px for primary controls (M3). For dense grids the absolute floor is 24 × 24 px (WCAG 2.5.8): only Track's 12-week dot matrix, which uses 28 px cells.
+- **Touch targets:** use non-overlapping 48 × 48 px interactive areas, including Track. A 28 px matrix dot may sit inside that area. Use local chart overflow on narrow cards rather than shrinking targets; static non-loggable marks need no hit area.
 - **Focus indicator:** a 3 px outline in `secondary`, offset 2 px; inset on bars and rails.
 - **Contrast:** checked for every pair (DESIGN_SYSTEM §1.4).
 - **Semantics:** every icon-only button has an `aria-label`; landmarks are `header`, `nav`, `main`; one `h1` per page; headings in order.
