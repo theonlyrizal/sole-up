@@ -1,12 +1,13 @@
 # SoleUp UI implementation plan
 
-**Status:** Revision 2, 2026-10-30. Replaces revision 1 (commit `c76c3a5`).
+**Status:** Revision 3 experience refinement, 2026-11-08. Retains the existing phase sequence and adds mandatory experience acceptance. The tracker records delivery status.
 **Scope:** A full frontend redesign in Material 3 Expressive, delivered as phases UI-0 to UI-13.
 **Source of truth for design:**
 - [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) (the D-xx decisions and the product rules in §2);
 - [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) (tokens);
 - [COMPONENTS.md](COMPONENTS.md);
 - [SCREENS.md](SCREENS.md);
+- [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) (revision 3 color recipes, feedback choreography, phase ownership and acceptance rubric);
 - [UI_AUDIT.md](UI_AUDIT.md) (current routes and contracts).
 
 ---
@@ -47,6 +48,14 @@
     ```
     From UI-13 on, also run `pnpm lint:tokens`.
 11. **Manual checks the agent can't do** (a real phone, installed PWA, screen reader): list them under "Manual steps for the user" and mark them unverified unless the user confirms.
+
+### Revision 3 experience requirements for every phase
+
+Read EXPERIENCE_DESIGN in full before implementing a phase; §8 maps delivery ownership. Implement the applicable page recipe and action states as part of the phase, not an optional polish follow-up. Add DESIGN_SYSTEM §13 aliases in UI-1 and the COMPONENTS Part H confirmation primitive in UI-2b. Wire the latter to existing actions in UI-5/9; the wrapper must never own mutations or infer persisted success.
+
+Every handoff includes: the EXPERIENCE_DESIGN §7 rubric with rationale, light/dark screenshots, and actual pending/failure/retry/reduced-motion observations for changed interactions. Add targeted behavioral tests for new feedback behavior. Do not write tests solely to mirror token names or color ratios. Never claim a retention or psychological effect without measured evidence.
+
+First paint shows true values without progress reveals or count-ups. Home gets one focal card with the no-commitment fallback. Preserve stable entity identity across routes. Chart targets remain 48 px with local overflow on small screens. These revision 3 rules supersede older visual instructions; product rules and domain behavior remain authoritative.
 
 ## 3. Shared engineering decisions
 
@@ -118,7 +127,7 @@ Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scop
    - Add the devDependency `@material-symbols/svg-400` (check the version and Apache-2.0 licence with `pnpm view`, and pin it exactly, as the repo pins every dependency).
    - Write `scripts/generate-material-icons.mts` using the allowlist in DESIGN_SYSTEM §9. Read the package's `rounded/<name>.svg` and `rounded/<name>-fill.svg` (check the folder layout first), extract the `d` attribute, and fail on a missing name.
    - Add the `icons:generate` script, the generated file, `src/components/icons/icon.tsx`, and an `IconName` type.
-5. **Shapes.** Add `src/components/ui/shapes.ts` (DESIGN_SYSTEM §8 formulas, 120 points each) and `src/lib/identity.ts` (FNV-1a hash → `{ shape, palette }`).
+5. **Shapes.** Add `src/components/ui/shapes.ts` (DESIGN_SYSTEM §8 formulas, 120 points each) and `src/lib/identity.ts` (FNV-1a hash of `entityType + ":" + id` → `{ shape, palette }`; unchanged by title, position or route).
 6. **Breakpoints and hooks.** Add `src/lib/breakpoints.ts`, move `time-grid-view.tsx`'s queries onto it (same pixel values for now, so behaviour doesn't change), and add `src/components/hooks/use-media-query.ts`.
 7. **Calendar and life areas.**
    - `calendar-theme.css`: remap to M3 roles (§12).
@@ -364,3 +373,10 @@ Append one note per phase, newest last. Template:
   - `@material-symbols/svg-400` 0.48.2 (Apache-2.0) was confirmed on npm.
 - **Open for the user:** sign-off on amendments 5-A to 5-D (asked at UI-3, 4, 9 and 12); ordering with chunk 8.5 (D-35).
 - **Checks run:** docs only. No code changed, so no test suite was run.
+
+### UI-0: Experience refinement (2026-11-08)
+
+- **Scope:** revision 3 planning refinement following the user's request for a more appealing and satisfying interface inspired by the five images.
+- **Delivered:** EXPERIENCE_DESIGN, reconciled DESIGN summary, page color recipes and aliases, local confirmed-feedback contract, Home focal fallback, honest count treatment, chart target corrections, and phase-specific prompt additions.
+- **Delivery state:** this entry documents planning only; it does not mark any implementation phase done or assert a PR has merged.
+- **Verification scope:** documentation links, phase-prompt coverage, formatting and whitespace checks; no application behavior is changed by this revision. Browser appearance, interaction timing and perceived appeal must be validated during implementation using the experience rubric.

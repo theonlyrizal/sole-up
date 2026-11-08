@@ -104,6 +104,20 @@ export default function SettingsPage() {
           Delete account
         </Link>
       </section>
+      <section
+        aria-labelledby="privacy-heading"
+        className="flex flex-col gap-4"
+      >
+        <h2 id="privacy-heading" className="text-lg font-semibold">
+          Privacy
+        </h2>
+        <Link
+          href="/privacy"
+          className="text-accent underline underline-offset-4"
+        >
+          Privacy notes
+        </Link>
+      </section>
     </div>
   );
 }

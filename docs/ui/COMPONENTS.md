@@ -1,5 +1,7 @@
 # SoleUp components
 
+**Revision 3 experience contract (2026-11-08):** apply [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) §§2–5. Success emphasis is local and confirmed; metrics render at their true value on mount. Color composition uses DESIGN_SYSTEM §13 aliases.
+
 **Status:** Revision 2, 2026-10-30. UI-2 builds everything in Parts A–F; later phases may add to it. Data-display components (Part G) are built by the first phase that needs them, which the "Phase" column names.
 
 Rules for every component:
@@ -25,7 +27,8 @@ type IconProps = { name: IconName; filled?: boolean; size?: 18 | 20 | 24 | 32 | 
 ### `ShapeAvatar`: `src/components/ui/shape-avatar.tsx`
 ```ts
 type ShapeAvatarProps = {
-  id: string;                 // hashed for shape + palette (DESIGN_SYSTEM §8)
+  id: string;                 // stable entity identifier
+  entityType: "user" | "goal" | "habit"; // namespace for the shared identity hash
   label: string;              // full title; first grapheme shown
   size?: 32 | 40 | 48 | 56 | 72;
   area?: LifeAreaColor | null; // overrides the hashed palette (goals)
@@ -347,17 +350,21 @@ type PageHeaderProps = { title: string; description?: string; actions?: ReactNod
 
 ## Part G: Data display (`src/components/data/`)
 
+**Shared identity:** `ShapeAvatar` and every entity preview use one `src/lib/identity.ts` helper keyed by `entityType + ':' + id`. Add an `entityType` prop for user/goal/habit; never key color to title, list index, route or render time. Area overrides retain their meaning. Keep labels visible alongside decorative avatars.
+
+**Chart interaction:** day marks may be visually small, but interactive targets are non-overlapping 48 px areas. On narrow cards use a local scroll container, a visible overflow cue and focus-into-view. No document-wide overflow or overlapping pseudo-element hit regions. Static, non-loggable days are not buttons.
+
 | Component | Phase | Spec |
 |---|---|---|
 | `MetricCard` | UI-4 | `Card` with `CardHeader` (icon tile, `title-medium` label, `InfoButton`), a body slot, and a range caption (`body-small`, `on-surface-variant`, the `metricRangeLabel` output). When `metric.hasData === false` it renders `EmptyState compact` with the card's "Nothing yet" copy. Props: `{ id, title, icon, metric: Metric<unknown>, empty, todayDate, locale, children }` (the same contract as the current `MetricCard` in `home-view.tsx`, extracted) |
 | `MetricInfo` / `InfoButton` | UI-4 | An `IconButton icon="info" label="How this is counted: {title}"` opening a `ResponsiveSheet` titled "How this is counted". It contains `metric.definition` (`body-large`), then a description list of **Range** and **As of** (`<time dateTime>`) using the existing `metricRangeLabel` and `metricAsOfLabel` |
 | `StatNumber` | UI-4 | A numeral (`display-small` on compact, `display-medium` on medium and wider, `tabular-nums`, ROND 100) with a unit label (`title-medium` `on-surface-variant`) baseline-aligned after it, as in reference 1's "4.256 / Steps". Optionally a link: the numeral is inside the link, and the accessible name reads "3 planned for today" |
-| `SegmentedPillBar` | UI-4 | `{ value: number; total: number; max?: 31; label: string }`. Renders `min(total, max)` vertical pills 6 px wide (8 px on medium and wider), 40 px tall, 4 px apart, `rounded-full`. Pills up to `floor(value)` are `primary`, a partial pill gets a `primary` fill from the bottom proportional to the fraction, and the rest are `progress-track`. When `total > max` the pills stand for proportions, and the visible caption must say the exact count. `role="img" aria-label={label}`. Fills animate up with a 20 ms stagger (`expressive-default-spatial`) on first view only (`IntersectionObserver`), not on every render |
+| `SegmentedPillBar` | UI-4 | `{ value: number; total: number; max?: 31; label: string }`. Renders `min(total, max)` vertical pills 6 px wide (8 px on medium and wider), 40 px tall, 4 px apart, `rounded-full`. Pills up to `floor(value)` are `primary`, a partial pill gets a `primary` fill from the bottom proportional to the fraction, and the rest are `progress-track`. When `total > max` the pills stand for proportions, and the visible caption must say the exact count. `role="img" aria-label={label}`. Render the true fill immediately on first view. Interpolate only a user-triggered value change using `expressive-default-spatial`; no IntersectionObserver reveal, count-up or stagger. See EXPERIENCE_DESIGN §4 |
 | `WeekStrip` | UI-4 | `{ days: { date, weekdayLetter, dayOfMonth, fullLabel, href }[]; today: LocalDate; selected?: LocalDate }`. Seven `rounded-4xl` capsules 48 × 76 (56 × 84 on medium and wider) in `surface-container-lowest` with `shadow-card` (light). The weekday letter is `label-small`, and the date is `title-medium` inside a 36 px `rounded-full` circle. **Today:** capsule `primary`, letter `on-primary`, date circle `surface-container-lowest` with `on-surface` text (reference 1). **Selected but not today:** a 2 px `primary` ring. Each capsule is a `Link` with `aria-label={fullLabel}`, and today's has `aria-current="date"`. It scrolls horizontally only when narrower than 7 × 48 + 6 × 8. The days come from a new pure helper, `weekDays(today, weekStart, locale)` in `src/lib/week-strip.ts` (unit tested) |
 | `Carousel` | UI-4 | M3 "multi-browse" carousel in CSS: `overflow-x: auto; scroll-snap-type: x mandatory`, items `scroll-snap-align: start`, 8 px gaps, 16 px start padding with `scroll-padding`. Items are 156 px wide (compact) and grow on medium. Previous and Next `IconButton`s appear on medium and wider (they scroll by one page). `role="region" aria-roledescription="carousel" aria-label`, and items in a list. No autoplay |
 | `HabitWeekChart` | UI-9 (built early in UI-4 for Home's habit card in compact form) | Seven day pills from `HabitHistoryDay[]` with the D-19 visual language. Pill 36 × 88 (compact) or 44 × 104, `rounded-full`. Below each pill: the weekday letter (`label-small`) and date (`label-medium`). Completed days fill from the bottom to `credit`. Today is ringed. In `interactive` mode each pill is the `DayLogDialog` trigger (existing behaviour) with `aria-label={dateLabel: stateLabel}`; otherwise it's `role="img"` on the group with a text summary. A `compact` variant (Home cards) uses pills 10 × 36 without letters |
 | `HabitDayCell` | UI-9 | A 44 × 44 `rounded-full` cell for the 4-week grid: the date number centred (`label-large`, `tabular-nums`) and the D-19 state look as fill or ring. The trigger for `DayLogDialog` |
-| `DotMatrix` | UI-9 | The 12-week grid: weeks as rows (oldest at the top) × 7 days as columns. 28 px `rounded-sm` (8) cells, 4 px gaps, the D-19 looks without date numbers. A `label-small` weekday header row, and each row headed by `week.shortLabel`. Each cell is a button (`DayLogDialog` trigger) |
+| `DotMatrix` | UI-9 | The 12-week grid: weeks as rows (oldest at the top) × 7 days as columns. 28 px `rounded-sm` (8) visual marks centered in non-overlapping 48 px interactive cells, the D-19 looks without date numbers. Use local horizontal overflow on narrow cards; keep row labels associated. A `label-small` weekday header row, and each row headed by `week.shortLabel`. Each cell is a button (`DayLogDialog` trigger) |
 | `MilestoneArc` | UI-8 | A 180° arc (reference 2 gauge) as SVG, 200 × 112 (compact) or 240 × 132, stroke width 28 with round caps. `countable` segments (capped at 12; above 12 a continuous arc), 6° gaps. Completed segments are `primary`, open ones `progress-track`, and on hover or focus the open segments show the hatch. The centre text is "3 of 5" in `display-small` with "milestones" in `body-medium` below. `countable === 0` gives no arc: just "No milestones yet". `role="img"` with the aria-label "3 of 5 milestones completed" |
 | `SplitStat` | UI-10 | Two figures side by side, split by a 1 px `outline-variant` divider: `display-small` numeral plus `body-medium` label each (reference 4's "60 Days / 27 Days") |
 | `StatusChip` | UI-6 | The goal, task and habit status → `Chip type="status"` mapping (icon plus text; colours: active `secondary-container`, paused `surface-container-highest`, completed `success-container`, dropped and cancelled `surface-container-highest` with strikethrough-free text) |
@@ -366,3 +373,16 @@ type PageHeaderProps = { title: string; description?: string; actions?: ReactNod
 | `DateBadge` | UI-6 | A two-line date block (weekday `label-small`, day `title-large`) for Upcoming and Agenda day headers, today in `primary` |
 | `Timeline` | UI-5 | Today's "Schedule": a vertical rail line in `outline-variant`, a 12 px time dot per item (`primary` for events, `secondary` for blocks, `tertiary` ring for "Now"), the time (`label-large` `tabular-nums`), a title link, and a kind chip. All-day items sit first in a horizontal chip row |
 | `DatePicker` | UI-7 | Navigation-only month grid in a `ResponsiveSheet` or `Popover`. A header with the month and year (`title-medium`) plus previous and next `IconButton`s. A **month chip row** (reference 1: Feb · Mar · **Apr** · May as `ConnectedButtonGroup` toggle). A 7-column grid of 40 px `rounded-full` day buttons (48 px targets): today ringed, the selected day `primary`, other-month days `on-surface-variant` at 38 % with the hatch. Arrow keys move by day, PageUp/PageDown by month, Home/End go to the week's start or end, and Enter selects (the ARIA grid pattern). **It shows no events.** Used by Calendar "Go to date" |
+
+## Part H: Local action confirmation (UI-2b; consumed in UI-5/9)
+
+`ActionConfirmation` is a presentational wrapper for an existing action icon, never a mutation coordinator. Its inputs are `phase: idle | pending | confirmed | error`, a caller-issued `confirmationKey` for one successful explicit action, and an accessible status supplied by the owner. It consumes no private content and stores no durable completion history.
+
+- Mounting in confirmed state renders the saved check immediately with no halo. Animate only a subsequent new confirmationKey while mounted; identical refreshes and rerenders do not replay.
+- Pending is aria-busy on the owning control, with duplicate submission prevented for that entity. The owner retains the existing action hook, error handling and rollback.
+- Confirmed uses the existing spring for the inner icon and a 600 ms peach halo using effects opacity; no change to button width or row height. The saved state remains after the halo ends.
+- Partial quantity success confirms the saved amount; it does not imply the full target was met. Error interrupts any halo.
+- Reduced motion disables spatial animation and the halo. Persistent saved/error text and one polite announcement remain; do not announce the same change from both wrapper and snackbar.
+- Gallery examples: idle, slow pending, confirmed, partial quantity, failure, retry, correction, repeated result and reduced motion, in both themes. Browser checks must prove failure never triggers success and mount never replays it.
+
+Do not wrap every autosave, archive or delete in this effect. See EXPERIENCE_DESIGN §4 for eligible actions and repetition limits.

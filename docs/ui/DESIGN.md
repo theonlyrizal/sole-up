@@ -1,45 +1,20 @@
----
-name: SoleUp
-colors:
-  primary: "#b1ff4a"
-  secondary: "#6bc1f2"
-  surface: "#d7f7e8"
-  on-surface: "#dafded"
-  error: "#f7471b"
-typography:
-  body-md:
-    fontFamily: Inter
-    fontSize: 16px
-    fontWeight: 400
-rounded:
-  md: 8px
----
+# SoleUp design direction
 
-# Design System
+**Revision 3 · 2026-11-08.** This is a short entry point. Exact tokens live in [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md); page layouts in [SCREENS.md](SCREENS.md); color composition and satisfying feedback in [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md).
 
-## Overview
-A focused, minimal interface for a Personal Management.
-Clean lines, low visual noise, easy on eyes information display, less reading.
-Material 3 Express components.
+## A clear morning, a satisfying mark
 
-## Colors
-- **Primary** (#b1ff4a): CTAs, active states, key interactive elements
-- **Secondary** (#6bc1f2): Supporting UI, chips, secondary actions
-- **Surface** (#d7f7e8): Page backgrounds
-- **On-surface** (#dafded): Primary text on dark backgrounds
-- **Error** (#f7471b): Validation errors, destructive actions
+An airy lake-blue canvas, substantial white surfaces, tactile weekday capsules, bold useful figures, and stable personal colors. Small peach confirmations make saved actions feel tangible. Material 3 Expressive provides the shapes, typography, color roles and motion language.
 
-## Typography
-- **Headlines**: Inter, semi-bold
-- **Body**: Inter, regular, 14–16px
-- **Labels**: Inter, medium, 12px, uppercase for section headers
+- **Direction:** lake blue — light primary `#26638B`, dark primary `#98CCF9`.
+- **Atmosphere:** mist `#CBE6FF` above light canvas `#F5FAFF`; dark counterparts come from the full role table.
+- **Content:** opaque white in light mode; deliberately layered dark surfaces in dark mode.
+- **Identity:** six stable container palettes; life-area colors retain their existing meaning.
+- **Confirmation:** peach `tertiary-container`, local and brief; green success for saved/working status.
+- **Typography:** Google Sans Flex for UI, Geist Mono for code. Use semantic type tokens.
+- **Shape:** 28–32 px major cards, 16 px fields, pill actions and day capsules. Shape varies by function.
+- **Response:** immediate activation, honest pending, confirmed save, recoverable failure. Progress rests at its true value on first paint.
 
-## Components
-- **Buttons**: Rounded (8px), primary uses brand blue fill
-- **Inputs**: 1px border, subtle surface-variant background
-- **Cards**: No elevation, relies on border and background contrast
+Use paired role colors, 4.5:1 minimum normal-text contrast, 3:1 large-text and required non-text contrast, visible focus, full keyboard access and reduced motion. Color reinforces labels and patterns.
 
-## Do's and Don'ts
-- Do use the primary color sparingly, only for the most important action
-- Don't mix rounded and sharp corners in the same view
-- Do maintain 4:1 contrast ratio for all text
+The previous lime/Inter mini-spec is superseded. It contradicted the full plan and had incomplete light/dark role pairing. This file must not become a parallel token source again.

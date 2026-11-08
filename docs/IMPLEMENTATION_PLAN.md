@@ -222,7 +222,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 9.3 | Dismiss and correct | done | chunk/9.3-dismiss-correct | 2026-11-06 | Added period dismissals and links to the editable records behind all five insights |
 | 10.1 | Export | done | chunk/10.1-export | 2026-11-06 | Settings streams a private JSON archive with note Markdown and schema-wide ownership coverage |
 | 10.2 | Account deletion | done | chunk/10.2-account-recovery | 2026-11-07 | Added a 30-day reactivation window, cemetery on expiry, and access and push delivery suspension |
-| 10.3 | Privacy notes | todo | | | |
+| 10.3 | Privacy notes | done | chunk/10.3-ui-decisions-privacy | 2026-11-08 | Added public privacy notes grounded in code, retained closure data and unconfirmed retention; included existing UI decisions |
 | 10.4 | Security review | todo | | | |
 | 10.5 | Accessibility pass | todo | | | |
 | 10.6 | Backup restore drill | todo | | | |
@@ -3370,3 +3370,12 @@ Template:
 - **Next chunk should know.** Privacy notes must describe retained closed accounts and the point at which access stops. Account status is enforced in the session and delivery paths. The existing sweep performs expiry even when no reminders are due.
 - **Unverified.** Live OAuth providers and the production sweep schedule remain unverified. `pnpm verify` passed with 1,107 unit and 829 integration tests and the existing habits lint warning. `pnpm build` passed. Production-mode `pnpm test:e2e --workers=2` passed all 101 tests.
 - **Follow-ups.** None.
+
+### 10.3: Privacy notes and UI decisions (2026-11-08)
+
+- **Built:** `docs/PRIVACY.md` and public `/privacy`, linked from Settings and sign-in. Covered stored data, documented hosting, encryption boundaries, OAuth/push/scheduler services, item deletion versus retained closed accounts, backups, logs and no current AI processing. Added claim-to-source references and clarified retention/redaction limits in DEPLOY.md. Included the user's existing revision 3 UI decision documents and `docs/ui/EXPERIENCE_DESIGN.md`; these remain planning documents.
+- **Deviations:** the user authorized proceeding with their unrelated UI edits preserved and asked for one branch covering UI decisions and 10.3. Created `chunk/10.3-ui-decisions-privacy` from updated main and included those edits without changing their content. No UI redesign or other implementation chunk was started.
+- **Decisions:** the user confirmed that host/database backup retention should be stated as unconfirmed. The documented six-hour recovery window is not a guarantee of live backup retention. Closure retains account data after the 30-day recovery window, with no implemented purge. Live log retention is also unconfirmed. At-rest encryption is attributed to Neon's published security documentation, not application-level encryption.
+- **Next chunk should know:** update both privacy surfaces when behavior changes. The document's references map claims to checked code/configuration. Existing framework/auth/host logging can bypass or exceed app redaction; the privacy text makes no blanket no-personal-data promise.
+- **Unverified:** live hosting, backup/log retention and provider settings were not audited. `pnpm verify` passed (1,107 unit and 829 integration tests, with the existing habits lint warning); `pnpm build` passed. Production-server browser checks reached `/privacy` from sign-in at 1280 and 375 px, with six sections, no overflow/page errors and zero serious/critical axe findings; desktop screenshot inspected. All 68 local links checked in the privacy and UI docs resolved, and whitespace checks passed. No full local e2e run for this static page/link change; CI runs it. No manual screen-reader pass.
+- **Follow-ups:** operator confirmation of backup and log retention would allow replacing the documented uncertainty. Account erasure policy and UI implementation remain outside this chunk.

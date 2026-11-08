@@ -1,5 +1,7 @@
 # SoleUp UI redesign: agent prompts
 
+**Revision 3 · 2026-11-08.** Every paste-ready prompt includes the experience refinement, so its implementation does not depend on copying a separate preamble. Read EXPERIENCE_DESIGN alongside the older screen specs; revision 3 resolves the visual/feedback conflicts described in README.
+
 Paste one prompt per session, in order. Each prompt points the agent to its phase in [UI_IMPLEMENTATION_PLAN.md](UI_IMPLEMENTATION_PLAN.md). The plan's §1 adapts the repository's **Agent session protocol** ([`../IMPLEMENTATION_PLAN.md`](../IMPLEMENTATION_PLAN.md#agent-session-protocol)) to this track: one phase is one branch (`chunk/ui-<n>-<slug>`) and one PR, the previous UI phase's PR must merge first (working untracked while it's pending), and the tracker and handoff notes live in the UI plan.
 
 You can start the next session as soon as the previous one has opened its PR. Phases UI-3, UI-4, UI-9 and UI-12 begin with a **sign-off question** (DESIGN_DECISIONS §5). The agent asks you, with its recommendation, before writing code.
@@ -16,6 +18,8 @@ Every prompt ends with the same two lines as the product prompts: the subagent r
 
 ### UI-1: Foundations
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Add DESIGN_SYSTEM §13 experience aliases and the stable identity helper keyed by entityType + id. Reuse the existing palette and motion tokens; do not introduce a parallel palette or count-up/reveal system. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, and in docs/ui/UI_IMPLEMENTATION_PLAN.md §1–§3, phase UI-1 in §6, the §4 tracker and the §7 handoffs. Then read docs/ui/DESIGN_SYSTEM.md in full and DESIGN_DECISIONS D-01–D-10, D-25, D-28. Follow the Agent session protocol in docs/IMPLEMENTATION_PLAN.md with the UI plan §1 changes; the previous PR is the one for branch ui-0.0-planning. Read the Next.js guides in node_modules/next/dist/docs/ for next/font, CSS and root layout metadata/viewport before coding.
 
 Build UI-1 only:
@@ -39,6 +43,8 @@ Finish line: Stop immediately once pnpm verify, pnpm build, pnpm test:e2e and pn
 
 ### UI-2a: Components, part 1
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Make activation and pending states legible without changing target dimensions. Keep personal identity stable and hit targets non-overlapping. Gallery examples must include long labels, dark mode, reduced motion and errors. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-2a, the tracker and every handoff note. Then read docs/ui/COMPONENTS.md Parts A–C and DESIGN_DECISIONS D-03, D-22, D-28 and D-30, and the installed radix-ui entry points for ToggleGroup, Checkbox, Switch, RadioGroup and Tooltip. Follow the session protocol with the UI plan §1 changes. Read the Next.js guides on Server and Client Components and route groups before coding.
 
 Build UI-2a only:
@@ -57,6 +63,8 @@ Finish line: Stop immediately once the gallery shows every Part A–C component 
 
 ### UI-2b: Components, part 2
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Implement COMPONENTS Part H ActionConfirmation and all its gallery states. Animate only a new confirmed explicit action while mounted; no effect on initial render, repeated results, error or correction. Owners retain mutations and live announcements. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-2b, the tracker and every handoff note. Then read docs/ui/COMPONENTS.md Parts D–F and DESIGN_DECISIONS D-23 to D-27, plus the installed radix-ui Dialog, Popover, DropdownMenu, Collapsible and Toast entry points. Follow the session protocol with the UI plan §1 changes.
 
 Build UI-2b only:
@@ -76,6 +84,8 @@ Finish line: Stop immediately once every Part D–F component is in the gallery 
 
 ### UI-3: App shell and navigation
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Use the shared page framing and selected-state language. Preserve stable identity between destinations and previews. No replaying whole-page entrance or distracting navigation animation. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-3, the tracker and every handoff note. Then read docs/ui/SCREENS.md §0, COMPONENTS.md Part E, DESIGN_DECISIONS D-11 to D-15 and D-27, and the current src/app/(app)/layout.tsx, src/components/shell/*, quick-add.tsx, shell-search.tsx, search-handoff.ts, sign-out-button.tsx, plan-subnav.tsx, tests/e2e/shell.spec.ts and nav-items.test.ts. Read the Next.js guides on layouts, linking/navigation and client components before coding.
 
 FIRST, before any code: ask the user to sign off amendment 5-C (phone bar Home · Plan · Goals · Track · More, with More holding Notes, Review, Search and Settings). Recommend accepting it, and give the fallback from the UI plan. Record the answer in your handoff.
@@ -102,6 +112,8 @@ Finish line: Stop immediately once every route is reachable at 390 px and 1280 p
 
 ### UI-4: Home
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Apply EXPERIENCE_DESIGN §5 Home composition: one blue focal module; Today takes that role when no next commitment exists. Render Today counts as a numeral and labelled links, never a progress partition. Habit previews use stable personal colors; true progress is stationary on mount. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-4, the tracker and every handoff note. Then read docs/ui/SCREENS.md §1, COMPONENTS.md Part G (MetricCard, MetricInfo, StatNumber, SegmentedPillBar, WeekStrip, Carousel, HabitWeekChart compact), DESIGN_DECISIONS D-16, D-17 and D-21, PRODUCT_SPEC §8–9, home/page.tsx, home-view.tsx, metric-range.ts, the types in metrics/home.ts, and tests/e2e/home*.spec.ts. Read the Next.js guides on Server Components, loading and error files before coding.
 
 FIRST: ask the user to sign off amendment 5-A (each metric shows its range; the definition and "as of" sit behind a labelled "How this is counted" button). Recommend accepting it, and give the fallback.
@@ -127,6 +139,8 @@ Finish line: Stop immediately once SCREENS §1 is met at 390 px and 1280 px in b
 
 ### UI-5: Plan, Today
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Wire confirmed local habit feedback through the existing hook and shared confirmation primitive. Pending is distinct; failure rolls back and retains input; partial quantities never imply full completion. Keep task rows visually traceable and focus safe. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-5, the tracker and every handoff note. Then read docs/ui/SCREENS.md §2, ADR 0011, today-view.tsx, today-timeline.tsx, add-to-today.tsx, task-schedule-editor.tsx, today-habits.tsx, use-habit-log.ts, src/lib/today.ts, and tests/e2e/{today,schedule,habit-logging}.spec.ts.
 
 Build UI-5 only:
@@ -145,6 +159,8 @@ Finish line: Stop immediately once SCREENS §2 holds, every Today action works b
 
 ### UI-6: Plan, task lists, task dialog, Quick Add
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Apply local saved task feedback only after confirmed success. Keep row identity, draft retention, correction and focus safe. No fake removal delay or decorative daily completion score. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-6, the tracker and every handoff note. Then read docs/ui/SCREENS.md §3, plan/page.tsx, plan/upcoming, plan/inbox, plan-filters.tsx, plan-task-list.tsx, upcoming-view.tsx, inbox-view.tsx, task-form.tsx, task-parent-select.tsx, task-blocks.tsx, task-notes.tsx, delete-task-dialog.tsx, quick-add.tsx, reminder-select.tsx, reminder-status.tsx, src/lib/task-list.ts, src/lib/upcoming.ts, and the plan, upcoming, inbox and journey specs.
 
 Build UI-6 only:
@@ -164,6 +180,8 @@ Finish line: Stop immediately once every URL filter round-trips, every task acti
 
 ### UI-7: Calendar
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Apply the calm grid recipe: clear today, selection and Now states, quiet empty time, no decorative event data. Use local overflow for date grids when full targets cannot fit; no overlapping hit areas. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-7, the tracker and every handoff note. Then read docs/ui/SCREENS.md §4, ADR 0012, ADR 0013, the README calendar paragraphs, plan/calendar/page.tsx, every file in src/components/calendar/, src/lib/{calendar-views,agenda,area-columns,area-timeline,event-form,block-form}.ts, and the calendar, agenda, week-day, area-columns, area-timeline and time-blocks specs.
 
 Build UI-7 only:
@@ -181,6 +199,8 @@ Finish line: Stop immediately once all five views and every dialog match SCREENS
 
 ### UI-8: Goals and life areas
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Use stable area/goal identity; keep overview progress compact and reserve the large arc for detail. Animate a segment only after a confirmed milestone mutation, never on initial page view. Next action remains near the goal identity and reason. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-8, the tracker and every handoff note. Then read docs/ui/SCREENS.md §5, ADR 0010, goals-view.tsx, goal-detail.tsx, goal-form.tsx, goal-tasks.tsx, milestone-list.tsx, delete-goal-dialog.tsx, archived-goals-view.tsx, everything in src/components/life-areas/, linked-notes.tsx, and the goals, goal-detail, goal-tasks, milestones, goal-archive and life-areas specs.
 
 Build UI-8 only:
@@ -198,6 +218,8 @@ Finish line: Stop immediately once SCREENS §5 holds, pnpm verify, pnpm build, p
 
 ### UI-9: Track and habits
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Apply all three Track compositions and EXPERIENCE_DESIGN §4 feedback choreography. Enforce 48 px non-overlapping day targets even for 28 px matrix marks, with local overflow on small cards. Check success, slow pending, failure, retry, identical save, correction and reduced motion. No success emphasis on optimistic response alone. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-9, the tracker and every handoff note. Then read docs/ui/SCREENS.md §6, DESIGN_DECISIONS D-17 and D-19, ADR 0014, track-view.tsx, habit-strip.tsx, habit-form.tsx, delete-habit-dialog.tsx, archived-habits-view.tsx, use-habit-log.ts, src/lib/habits/* (read only), the types in habits/queries.ts, and the habits, habit-logging and track-history specs.
 
 FIRST: ask the user to sign off amendment 5-B (the habit figure stays visible, and its definition moves behind the card's "How this is counted" button). Recommend accepting it, and give the fallback.
@@ -220,6 +242,8 @@ Finish line: Stop immediately once SCREENS §6 holds, pnpm verify, pnpm build, p
 
 ### UI-10: Weekly review
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Use the warm peach finish composition only after explicit Finish succeeds; no replay on opening a completed review or reloading. Keep prompts quiet and a meaningful Done exit. No trophy or follow-on engagement prompt. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-10, the tracker and every handoff note. Then read docs/ui/SCREENS.md §7, DESIGN_DECISIONS D-16 and D-20, ADR 0015, review/page.tsx, review/history/**, everything in src/components/reviews/, src/lib/review-flow.ts, the types in metrics/review.ts, and the review and review-history specs. The 5-A answer recorded in the UI-4 handoff applies to the Look back metrics.
 
 Build UI-10 only:
@@ -242,6 +266,8 @@ Finish line: Stop immediately once SCREENS §7 holds, pnpm verify, pnpm build, p
 
 ### UI-11: Notes and search
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Keep the writing canvas calm, preserve persistent Saving/Saved/error/conflict status, and use readable peach search marks. Autosave never triggers repeated celebration or toast. Identity treatments do not imply unavailable note metadata. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-11, the tracker and every handoff note. Then read docs/ui/SCREENS.md §8, DESIGN_DECISIONS D-33, ADR 0016, everything in src/components/notes/ and src/components/search/, the notes/** routes, the .note-content CSS, and the notes, note-links and search specs. Check the product progress log: build tag UI only if chunk 8.5 has merged.
 
 Build UI-11 only:
@@ -261,6 +287,8 @@ Finish line: Stop immediately once SCREENS §8 holds, pnpm verify, pnpm build, p
 
 ### UI-12: Settings, appearance, public and system pages
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Apply the Settings and public-entry page recipes, paired light/dark colors, theme preview and meaningful selected states. Keep provider names, errors and permissions clear. No fabricated stats or testimonials. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, docs/ui/README.md, UI plan §1–§3, phase UI-12, the tracker and every handoff note. Then read docs/ui/SCREENS.md §9–§10, DESIGN_DECISIONS D-08, ADRs 0007 and 0013, settings/page.tsx, preferences-form.tsx, reminder-settings-form.tsx, push-notifications.tsx, install-help.tsx, src/app/page.tsx, sign-in/page.tsx, sign-in-buttons.tsx, src/app/{error,not-found,loading}.tsx, every route error.tsx and not-found.tsx, and the preferences, reminders, push-devices, pwa, auth and errors specs.
 
 FIRST: ask the user to sign off amendment 5-D (Settings → Appearance: System, Light or Dark, saved per device). Recommend accepting it, and give the fallback.
@@ -287,6 +315,8 @@ Finish line: Stop immediately once SCREENS §9–§10 hold, pnpm verify, pnpm bu
 
 ### UI-13: Consistency, cleanup and accessibility sweep
 ```text
+Experience requirements (revision 3): read docs/ui/EXPERIENCE_DESIGN.md §§1–8 and the DESIGN_SYSTEM §13 tokens. Run the EXPERIENCE_DESIGN §7 rubric across all routes and states. Check stable identity, focal color allocation, feedback repetition, failures, small chart layouts and reduced motion. Require at least 13/16 with full truthfulness/accessibility and no zero; document screenshots and remaining issues. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.
+
 Read CLAUDE.md, AGENTS.md, everything in docs/ui/, UI plan §1–§3, phase UI-13, the tracker and every handoff note, then review the captures from each phase.
 
 Build UI-13 only:

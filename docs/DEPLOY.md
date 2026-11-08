@@ -232,6 +232,8 @@ Push notifications are signed with a VAPID key pair (chunk 5.3). **All three var
 
 ## Backups and point-in-time recovery
 
+**Privacy/retention status (2026-11-08):** host/database backup retention is unconfirmed. The recovery window described below is not a retention promise for all provider backups. Manual dumps and restore branches have no configured expiry schedule or automated cleanup in this repository. See [PRIVACY.md](PRIVACY.md) and the public `/privacy` page for what item deletion and account closure do and do not remove; closed accounts retain their data after the 30-day recovery window.
+
 **What Neon Free gives you:** point-in-time restore of the root branch to any moment in the last **6 hours** (capped at 1 GB of change history). Free has no longer window and no daily snapshots. A problem noticed after 6 hours can't be undone from Neon alone.
 
 **Safety net, weekly and before any risky migration:** a logical backup to your own machine. It needs Docker locally (the same `postgres:18.3-alpine` image as `docker-compose.yml`, whose `pg_dump` matches the server's major version):
@@ -273,7 +275,8 @@ Run it with `DATABASE_URL` set in your shell to the production string. The dump 
 
 ## Logs and monitoring
 
-- **Logs:** Render's **Logs** tab shows the app's JSON lines (pino, redacted; see README > Logging and errors). Search by `requestId` from a user's error reference, or by an error's digest. Logs aren't shipped anywhere else. Render keeps them for a limited period that depends on the workspace plan.
+- **Logs:** Render's **Logs** tab shows the app's JSON lines (pino, redacted; see README > Logging and errors). Search by `requestId` from a user's error reference, or by an error's digest. No external app-log shipper is configured in this repository. Render keeps logs for a limited period that depends on the workspace plan.
+- **Retention and redaction limits:** the live log-retention duration is unconfirmed, and the app has no log-expiry job. Framework/authentication/host output is not covered by a blanket no-personal-data guarantee; framework errors can bypass the pino redactor. See [PRIVACY.md](PRIVACY.md#logs-and-their-retention).
 - **Request IDs:** the app generates its own `x-request-id` for every request and ignores any incoming value, including any from Render's proxy.
 - **Health:** Render checks `/api/health` continuously while the service is awake.
 - **Client IPs and rate limits:** Better Auth's rate limiter reads the client IP from `x-forwarded-for`, and only when that header holds exactly one address. Next.js fills the header from the socket when it's absent, so a direct request is still counted per IP. A request whose header holds several addresses has no usable IP, so it goes into one shared bucket. Better Auth then logs, once per process: `Rate limiting could not determine a client IP`. A client that sends its own header can trigger this (Render appends to it), and that only throttles the shared bucket. But if Render's proxy itself adds an address to every request, all users share 10 sign-ins a minute. After the first deploy, sign in once and search the logs for that warning. If it appears on your own normal sign-in, set `advanced.ipAddress` in `src/server/auth/auth.ts` for Render's proxy.
