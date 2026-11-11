@@ -103,6 +103,13 @@ export const auth = betterAuth({
   },
   advanced: {
     database: { generateId: "uuid" },
+    // Render's Cloudflare edge overwrites this header. Trust only that
+    // header on Render, where a client can prepend to X-Forwarded-For.
+    ipAddress: {
+      ipAddressHeaders: [
+        process.env.RENDER === "true" ? "cf-connecting-ip" : "x-forwarded-for",
+      ],
+    },
     // Secure cookies whenever the app is served over HTTPS (always in
     // production); plain http://localhost in development cannot use them.
     useSecureCookies: env.BETTER_AUTH_URL.startsWith("https://"),

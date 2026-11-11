@@ -17,6 +17,7 @@ test("the service worker is served uncached with a strict policy", async ({
   const headers = response.headers();
   expect(headers["content-type"]).toBe("application/javascript; charset=utf-8");
   expect(headers["cache-control"]).toContain("no-cache");
+  expect(headers["x-content-type-options"]).toBe("nosniff");
   expect(headers["content-security-policy"]).toBe(
     "default-src 'self'; script-src 'self'",
   );

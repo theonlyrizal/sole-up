@@ -62,6 +62,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Endpoint security inventory
+        run: pnpm security:endpoints
+
       - name: Unit tests
         run: pnpm test:unit
 

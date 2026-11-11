@@ -241,20 +241,26 @@ describe("providers", () => {
 });
 
 describe("rate limiting", () => {
-  it("limits sign-in attempts per client IP", async () => {
+  it.each([
+    {
+      path: "/sign-in/social",
+      max: 10,
+      body: { provider: "github", callbackURL: "/home" },
+    },
+    { path: "/callback/github", max: 10 },
+    { path: "/get-session", max: 100 },
+  ])("limits $path to $max requests per IP", async ({ path, max, body }) => {
     const attempt = (ip: string) =>
-      authRequest("/sign-in/social", {
-        method: "POST",
-        body: { provider: "github", callbackURL: "/home" },
-        ip,
-      });
+      authRequest(path, { method: body ? "POST" : "GET", body, ip });
 
     const statuses: number[] = [];
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < max; i++) {
       statuses.push((await attempt("203.0.113.20")).status);
     }
-    expect(statuses.slice(0, 10)).not.toContain(429);
-    expect(statuses[10]).toBe(429);
+    expect(statuses).not.toContain(429);
+    const blocked = await attempt("203.0.113.20");
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get("x-retry-after"))).toBeGreaterThan(0);
 
     // Another client is not affected.
     expect((await attempt("203.0.113.21")).status).not.toBe(429);
