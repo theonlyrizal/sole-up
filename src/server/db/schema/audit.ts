@@ -41,10 +41,23 @@ export const auditEvents = pgTable(
       table.userId,
       table.occurredAt,
     ),
-    index("audit_events_user_id_entity_idx").on(
+    // 10.7 plans: entity history needs a bounded, ordered scan by instant.
+    index("audit_events_user_entity_time_idx").on(
       table.userId,
       table.entityType,
       table.entityId,
+      table.occurredAt,
+      table.id,
     ),
+    // plannedTaskIds filters the saved plan date, independent of occurred_at.
+    index("audit_events_task_planned_date_idx")
+      .on(
+        table.userId,
+        sql`(${table.changes} -> 'plannedDate' ->> 'to')`,
+        table.entityId,
+      )
+      .where(
+        sql`${table.entityType} = 'task' and ${table.eventType} in ('task.created', 'task.planned')`,
+      ),
   ],
 );

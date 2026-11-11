@@ -162,6 +162,13 @@
       "when": 1793989199855,
       "tag": "0022_account_recovery",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794387117210,
+      "tag": "0023_performance_audit_indexes",
+      "breakpoints": true
     }
   ]
 }

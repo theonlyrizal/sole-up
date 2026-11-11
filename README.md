@@ -143,6 +143,8 @@ The schema is defined with [Drizzle ORM](https://orm.drizzle.team) in `src/serve
 | `pnpm db:generate` | Diffs the schema against the last snapshot and writes a new SQL migration to `src/server/db/migrations/` |
 | `pnpm db:migrate` | Applies pending migrations. The journal lives in the `drizzle.__drizzle_migrations` table |
 | `pnpm db:studio` | Opens Drizzle Studio to browse the database |
+| `pnpm db:seed:performance` | Seeds 365 days for synthetic users in a local `_perf` database |
+| `pnpm db:explain:performance` | Captures application query plans and five warm timings per query, with `--out=<file.json>` |
 | `pnpm db:reset` | Drops every table in the database, then re-applies all migrations. Local only: refuses when `NODE_ENV=production` or when `DATABASE_URL` is not on `localhost` |
 
 These commands read `DATABASE_URL` from `.env.local`; a value set in the shell wins. To target the test database:
@@ -152,6 +154,8 @@ DATABASE_URL=postgres://soleup:soleup@localhost:5432/soleup_test pnpm db:migrate
 ```
 
 In PowerShell, set `$env:DATABASE_URL = "postgres://soleup:soleup@localhost:5432/soleup_test"` first, and `Remove-Item Env:DATABASE_URL` afterwards.
+
+The development performance tools accept `--as-of=YYYY-MM-DD` for reproducible runs. The seed also accepts `--users=1..100` and defaults to 24. Setup, workload details and the evidence for migration 0023 are recorded in the [performance report](docs/performance/10.7.md).
 
 **Conventions**
 
