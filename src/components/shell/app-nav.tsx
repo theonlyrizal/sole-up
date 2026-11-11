@@ -39,7 +39,7 @@ export function AppNav() {
                 // and the sub-page link as the current page.
                 aria-current={activeSub ? "true" : active ? "page" : undefined}
                 className={cx(
-                  "flex flex-1 flex-col items-center gap-1 px-1 py-2 text-xs font-medium md:flex-row md:gap-3 md:rounded-md md:px-3 md:text-sm",
+                  "flex flex-1 flex-col items-center gap-1 px-1 py-2 text-xs font-medium max-[384px]:px-0 max-[360px]:text-(length:--text-label-small) md:flex-row md:gap-3 md:rounded-md md:px-3 md:text-sm",
                   focusRing,
                   "focus-visible:-outline-offset-2 md:focus-visible:outline-offset-2",
                   active

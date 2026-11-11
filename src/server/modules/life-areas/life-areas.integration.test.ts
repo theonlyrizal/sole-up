@@ -88,7 +88,9 @@ describe("schema", () => {
       db.insert(lifeAreas).values({ ...base, status: "deleted" as never }),
     ).rejects.toThrow();
     await expect(
-      db.insert(lifeAreas).values({ ...base, color: "#ff0000" as never }),
+      db
+        .insert(lifeAreas)
+        .values({ ...base, color: "rgb(255, 0, 0)" as never }),
     ).rejects.toThrow();
     await expect(
       db.insert(lifeAreas).values({ ...base, name: "" }),

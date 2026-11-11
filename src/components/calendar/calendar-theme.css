@@ -6,43 +6,51 @@
  */
 .soleup-calendar {
   /* buttons */
-  --fc-classic-button: var(--surface);
-  --fc-classic-button-border: var(--border);
-  --fc-classic-button-strong: var(--surface-muted);
-  --fc-classic-button-strong-border: var(--fg-muted);
-  --fc-classic-button-outline: var(--focus);
-  --fc-classic-button-foreground: var(--fg);
+  --fc-classic-button: var(--md-surface-container-high);
+  --fc-classic-button-border: var(--md-outline);
+  --fc-classic-button-strong: var(--md-surface-container-highest);
+  --fc-classic-button-strong-border: var(--md-outline);
+  --fc-classic-button-outline: var(--md-focus);
+  --fc-classic-button-foreground: var(--md-on-surface);
 
   /* primary */
-  --fc-classic-primary: var(--accent);
-  --fc-classic-primary-foreground: var(--accent-fg);
+  --fc-classic-primary: var(--md-primary);
+  --fc-classic-primary-foreground: var(--md-on-primary);
 
   /* calendar content */
-  --fc-classic-event: var(--accent);
-  --fc-classic-event-contrast: var(--accent-fg);
-  --fc-classic-background-event: var(--success);
+  --fc-classic-event: var(--md-primary-container);
+  --fc-classic-event-contrast: var(--md-on-primary-container);
+  --fc-classic-background-event: var(--md-success);
   --fc-classic-background-event-opacity: 15%;
   --fc-classic-background-event-foreground-opacity: 50%;
-  --fc-classic-highlight: color-mix(in srgb, var(--accent) 15%, transparent);
-  --fc-classic-today: color-mix(in srgb, var(--accent) 8%, transparent);
-  --fc-classic-now: var(--danger);
+  --fc-classic-highlight: color-mix(
+    in srgb,
+    var(--md-primary) 12%,
+    transparent
+  );
+  --fc-classic-today: color-mix(in srgb, var(--md-primary) 6%, transparent);
+  --fc-classic-now: var(--md-feature-ink);
   --fc-classic-small-dot-width: 8px;
   --fc-classic-large-dot-width: 10px;
 
   /* neutral backgrounds */
-  --fc-classic-background: var(--surface);
-  --fc-classic-faint: color-mix(in srgb, var(--fg) 4%, transparent);
-  --fc-classic-muted: var(--surface-muted);
-  --fc-classic-strong: color-mix(in srgb, var(--fg) 14%, transparent);
+  --fc-classic-background: var(--md-resting-surface);
+  --fc-classic-faint: color-mix(in srgb, var(--md-on-surface) 4%, transparent);
+  --fc-classic-muted: var(--md-surface-container);
+  --fc-classic-strong: color-mix(
+    in srgb,
+    var(--md-on-surface) 14%,
+    transparent
+  );
 
   /* neutral foregrounds */
-  --fc-classic-foreground: var(--fg);
-  --fc-classic-faint-foreground: var(--fg-muted);
-  --fc-classic-muted-foreground: var(--fg-muted);
+  --fc-classic-foreground: var(--md-on-surface);
+  --fc-classic-faint-foreground: var(--md-on-surface-variant);
+  --fc-classic-muted-foreground: var(--md-on-surface-variant);
 
   /* neutral borders */
-  --fc-classic-border: var(--border);
-  --fc-classic-strong-border: var(--fg-muted);
+  --fc-classic-border: var(--md-outline-variant);
+  --fc-classic-strong-border: var(--md-outline);
 }
 
 /*
@@ -50,13 +58,12 @@
  * dashed outline on the muted surface, rather than a filled block.
  */
 .soleup-calendar .soleup-deadline {
-  border: 1px dashed var(--fg-muted);
+  border: 1px dashed var(--md-outline);
 }
 
 /* Week's day headings are FullCalendar's nav links: the app's focus ring. */
 .soleup-calendar [role="link"]:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  outline-offset: -3px;
   border-radius: var(--corner-sm);
 }
 
@@ -66,12 +73,12 @@
  * the success colour; a skipped one is dashed.
  */
 .soleup-calendar .soleup-block {
-  border: 1px solid var(--accent);
+  border: 1px solid var(--md-secondary-ink);
   border-left-width: 4px;
 }
 
 .soleup-calendar .soleup-block-done {
-  border-color: var(--success);
+  border-color: var(--md-success);
 }
 
 .soleup-calendar .soleup-block-skipped {

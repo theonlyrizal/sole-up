@@ -3,15 +3,15 @@ import type { LifeAreaColor } from "@/lib/life-areas";
 
 // Literal class names, so Tailwind generates them.
 const swatchClasses: Record<LifeAreaColor, string> = {
-  gray: "bg-gray-400",
-  red: "bg-red-500",
-  orange: "bg-orange-500",
-  amber: "bg-amber-400",
-  green: "bg-green-500",
-  teal: "bg-teal-500",
-  blue: "bg-blue-500",
-  violet: "bg-violet-500",
-  pink: "bg-pink-500",
+  gray: "bg-area-gray-dot",
+  red: "bg-area-red-dot",
+  orange: "bg-area-orange-dot",
+  amber: "bg-area-amber-dot",
+  green: "bg-area-green-dot",
+  teal: "bg-area-teal-dot",
+  blue: "bg-area-blue-dot",
+  violet: "bg-area-violet-dot",
+  pink: "bg-area-pink-dot",
 };
 
 export function colorLabel(color: LifeAreaColor) {

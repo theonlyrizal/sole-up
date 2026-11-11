@@ -1,21 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { useMediaQuery } from "@/components/hooks/use-media-query";
 import { useRefreshOnNewDay } from "@/components/tasks/use-refresh-on-new-day";
 import { Button } from "@/components/ui/button";
 import { cx } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { agendaEntryKind } from "@/lib/agenda";
+import { CALENDAR_QUERIES } from "@/lib/breakpoints";
 import {
   blockStatusLabel,
   defaultBlockMinutes,
@@ -77,25 +72,6 @@ const LINKED_ITEM_FRAMES = 300;
 
 const ITEM_SELECTOR = "[data-calendar-item]";
 
-/** Tailwind's `md`: narrower than this, Day stands in for Week. */
-const WIDE_QUERY = "(min-width: 48rem)";
-
-/** Tailwind's `lg`: from here the task panel sits beside Week (desktop). */
-const DESKTOP_QUERY = "(min-width: 64rem)";
-
-/** Whether the window matches `query`; null on the server. */
-function useMediaQuery(query: string): boolean | null {
-  return useSyncExternalStore(
-    (onChange) => {
-      const list = window.matchMedia(query);
-      list.addEventListener("change", onChange);
-      return () => list.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia(query).matches,
-    () => null,
-  );
-}
-
 /** How an item looks on the grid. */
 function itemStyle(
   entry: CalendarEntry,
@@ -106,20 +82,23 @@ function itemStyle(
   switch (entry.kind) {
     // Events are filled blocks.
     case "event":
-      return { color: "var(--accent)", contrastColor: "var(--accent-fg)" };
+      return {
+        color: "var(--md-primary-container)",
+        contrastColor: "var(--md-on-primary-container)",
+      };
     // Time blocks are tinted with a strong edge, and can be dragged.
     case "block":
       return {
-        color: "color-mix(in srgb, var(--accent) 16%, var(--surface))",
-        contrastColor: "var(--fg)",
+        color: "var(--md-secondary-container)",
+        contrastColor: "var(--md-on-secondary-container)",
         className: `soleup-block soleup-block-${entry.block.status}`,
         editable: true,
       };
     // Deadlines are quiet markers.
     case "task":
       return {
-        color: "var(--surface-muted)",
-        contrastColor: "var(--fg)",
+        color: "var(--md-surface-container)",
+        contrastColor: "var(--md-on-surface)",
         className: "soleup-deadline",
       };
   }
@@ -150,8 +129,8 @@ export function TimeGridView({
 }: TimeGridViewProps) {
   useRefreshOnNewDay(nextDayStartsAt);
   const router = useRouter();
-  const isWide = useMediaQuery(WIDE_QUERY);
-  const isDesktop = useMediaQuery(DESKTOP_QUERY);
+  const isWide = useMediaQuery(CALENDAR_QUERIES.week);
+  const isDesktop = useMediaQuery(CALENDAR_QUERIES.taskPanel);
   const tooNarrow = range.view === "week" && isWide === false;
   const showPanel = range.view === "week" && isDesktop === true;
   const [slot, setSlot] = useState<{ start: Date; end: Date } | null>(null);

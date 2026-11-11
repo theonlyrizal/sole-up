@@ -11,13 +11,13 @@
 import { writeFileSync } from "node:fs";
 
 import { chromium } from "@playwright/test";
-
-// Keep in sync with --accent (light) in src/app/globals.css.
-const ACCENT = "#2f6f5e";
+// Standalone artwork uses the Forest Green and Cream swatches from globals.css.
+const ACCENT = "rgb(33,72,57)";
+const FOREGROUND = "rgb(247,244,236)";
 
 const art = `
-  <path d="M160 300 L256 204 L352 300" fill="none" stroke="#fff" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M176 368 H336" fill="none" stroke="#fff" stroke-width="44" stroke-linecap="round" stroke-opacity="0.6"/>`;
+  <path d="M160 300 L256 204 L352 300" fill="none" stroke="${FOREGROUND}" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M176 368 H336" fill="none" stroke="${FOREGROUND}" stroke-width="44" stroke-linecap="round" stroke-opacity="0.6"/>`;
 
 const roundedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="112" fill="${ACCENT}"/>${art}
