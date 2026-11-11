@@ -81,7 +81,7 @@ async function PlanTasks({
         ) : (
           <EmptyState
             title={filters.showClosed ? "No tasks yet" : "No open tasks"}
-            description="Press Q or use Add task to capture one. Tasks you add show up here."
+            description="Press Alt+Enter or use Add task to capture one. Tasks you add show up here."
           />
         )
       ) : (

@@ -28,6 +28,7 @@ test("an unexpected action error shows a generic message with its request ID", a
   expect(requestId).toMatch(UUID);
   await expect(alert).toContainText(`Reference: ${requestId}`);
   await expect(page.locator("main")).not.toContainText("private note");
+  await expectNoSeriousViolations(page);
 });
 
 test("a rendering error shows the error page with a reference", async ({

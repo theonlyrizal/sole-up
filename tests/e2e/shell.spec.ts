@@ -97,35 +97,6 @@ test.describe("desktop", () => {
     ).toHaveAttribute("aria-current", "true");
   });
 
-  test("the shell has no serious accessibility violations", async ({
-    page,
-  }) => {
-    await signInAndConfirm(page);
-    await expectNoSeriousViolations(page);
-
-    for (const path of [
-      "/goals",
-      "/plan",
-      "/plan/today",
-      "/plan/upcoming",
-      "/plan/inbox",
-      "/track",
-      "/track/archived",
-      "/notes",
-      "/notes/archived",
-      "/notes/new",
-      "/notes/search",
-      "/notes/tags",
-      "/review",
-      "/review/insights",
-      "/settings",
-    ]) {
-      await page.goto(path);
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-      await expectNoSeriousViolations(page);
-    }
-  });
-
   test("the shell works with the keyboard alone", async ({ page }) => {
     await signInAndConfirm(page);
     await page.goto("/home");

@@ -225,7 +225,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 10.2 | Account deletion | done | chunk/10.2-account-recovery | 2026-11-07 | Added a 30-day reactivation window, cemetery on expiry, and access and push delivery suspension |
 | 10.3 | Privacy notes | done | chunk/10.3-ui-decisions-privacy | 2026-11-08 | Added public privacy notes grounded in code, retained closure data and unconfirmed retention; included existing UI decisions |
 | 10.4 | Security review | done | chunk/10.4-security-review | 2026-11-11 | Endpoint inventory checks 85 actions and eight route handlers. Added nonce CSP, security headers and trusted client IP handling. Review and audit found zero high or critical issues. |
-| 10.5 | Accessibility pass | todo | | | |
+| 10.5 | Accessibility pass | done | chunk/10.5-accessibility | 2026-11-11 | Added page-wide axe coverage and keyboard walkthroughs of all four primary journeys. Fixed hover contrast, the Quick Add shortcut, and a duplicate main landmark. |
 | 10.6 | Backup restore drill | todo | | | |
 | 10.7 | Performance pass | todo | | | |
 | 10.✓ | Phase 10 exit check (user) | todo | | | |
@@ -3390,3 +3390,13 @@ Template:
 - **Checks** The inventory found zero unguarded endpoints and rejected probes with missing authentication, missing validation and caller-supplied ownership. `pnpm verify`, `pnpm build` and `pnpm test:e2e` in the production CI configuration passed. All 102 e2e tests passed there. One accessibility sweep timed out on the development server. A local production check confirmed fresh script nonces, HSTS and a 404 from the test sign-in endpoint.
 - **Unverified** Live Render client IP behavior and the external slash-command result.
 - **Follow-ups** Upgrade the transitive tooling affected by the two moderate audit advisories. Review uncaught Next.js errors that can bypass application log redaction. [esbuild advisory](https://github.com/advisories/GHSA-67mh-4wv8-2f99), [minimatch advisory](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+
+### 10.5: Accessibility pass (2026-11-11)
+
+- **Built** Playwright axe coverage for every page route. The route suite checks public and signed-in pages in light and dark mode. Feature specs scan populated detail pages, calendar views, dialogs, and error states. Four keyboard walkthroughs cover the product spec journeys, including first-run time zone confirmation.
+- **Deviations** None. The manual screen-reader checks are listed for the user in the README.
+- **Decisions** Quick Add uses Alt+Enter to leave bare character keys available to assistive technology. Primary and danger controls use opaque hover backgrounds with sufficient text contrast. The missing-insight fallback uses the app shell's main landmark.
+- **Next chunk should know** Add new static routes to `tests/e2e/accessibility.spec.ts` and scan record-backed routes in their feature specs once their content is visible. The shared axe helper gates serious and critical WCAG A/AA findings.
+- **Checks** `pnpm verify` passed with 1,107 unit tests, 831 integration tests, and the existing habit lint warning. `pnpm build` passed. `pnpm test:e2e` passed in production mode with 134 tests and zero serious or critical axe violations.
+- **Unverified** Manual screen-reader announcements and focus behavior. See the [spot checks](../README.md#accessibility-checks).
+- **Follow-ups** None.

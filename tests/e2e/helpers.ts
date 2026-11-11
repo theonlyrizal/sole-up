@@ -3,11 +3,8 @@ import { randomUUID } from "node:crypto";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page } from "@playwright/test";
 
-/**
- * Signs in a new user and confirms the proposed time zone. Returns the
- * user's ID, for the few tests that set up data through the test database.
- */
-export async function signInAndConfirm(
+/** Creates a test user and sets the browser's session cookie without OAuth. */
+export async function signInForTest(
   page: Page,
   name = "Alan Turing",
 ): Promise<string> {
@@ -16,6 +13,12 @@ export async function signInAndConfirm(
   });
   expect(response.status()).toBe(200);
   const { userId } = (await response.json()) as { userId: string };
+  return userId;
+}
+
+/** Signs in and confirms the proposed time zone. Returns the test user ID. */
+export async function signInAndConfirm(page: Page, name?: string) {
+  const userId = await signInForTest(page, name);
   await page.goto("/home");
   await page.getByRole("button", { name: "Confirm and continue" }).click();
   await expect(

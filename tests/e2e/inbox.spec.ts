@@ -6,12 +6,12 @@ function inboxList(page: Page) {
   return page.getByRole("list", { name: "Inbox tasks" });
 }
 
-/** Captures a task the quickest way: Q, type the title, Enter. */
+/** Captures a task by shortcut: Alt+Enter, type the title, Enter. */
 async function captureWithKeyboard(page: Page, title: string) {
   const dialog = page.getByRole("dialog", { name: "Add task" });
   // The shortcut listener attaches once the page hydrates; retry until then.
   await expect(async () => {
-    if (!(await dialog.isVisible())) await page.keyboard.press("q");
+    if (!(await dialog.isVisible())) await page.keyboard.press("Alt+Enter");
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();
   await expect(dialog.getByLabel("Title")).toBeFocused();
@@ -51,16 +51,21 @@ test("a task is captured with one field and Enter, and lands in the inbox", asyn
     inboxList(page).getByRole("checkbox", { name: "Book the dentist" }),
   ).toBeVisible();
 
+  const dialog = page.getByRole("dialog", { name: "Add task" });
+  // A bare character on the page is available to assistive technology.
+  await page.keyboard.press("q");
+  await expect(dialog).toBeHidden();
+
   // It's stored, not just shown.
   await page.reload();
   await expect(
     inboxList(page).getByRole("checkbox", { name: "Book the dentist" }),
   ).toBeVisible();
 
-  // Q typed into a field is just a letter.
-  await page.getByRole("button", { name: "Add task" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add task" });
-  await dialog.getByLabel("Title").fill("quiet");
+  const addTask = page.getByRole("button", { name: "Add task" });
+  await expect(addTask).toHaveAttribute("aria-keyshortcuts", "Alt+Enter");
+  await addTask.click();
+  await page.keyboard.type("quiet");
   await expect(dialog.getByLabel("Title")).toHaveValue("quiet");
   await expectNoSeriousViolations(page);
   await page.keyboard.press("Escape");
