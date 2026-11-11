@@ -1,6 +1,6 @@
 # SoleUp redesign: decisions
 
-**Status:** Revision 3, 2026-11-08. Experience refinements are specified in EXPERIENCE_DESIGN.md. Existing product-rule amendments in §5 retain their documented gates.
+**Status** — Revision 4, 2026-11-12. DESIGN_SYSTEM and EXPERIENCE_DESIGN define the updated brand roles and screen compositions.
 **Scope:** The full frontend: public pages, the authenticated shell, every route, dialogs, and the loading, empty and error states.
 
 Each decision has an ID, so code comments, PRs and handoff notes can cite it (`D-11`). To change a decision, edit it here in the same PR and say why in the handoff note.
@@ -13,7 +13,7 @@ SoleUp helps a person decide what matters, plan realistic next steps, follow thr
 
 The redesign should make SoleUp feel **calm, warm, clear and connected**:
 
-- **Calm:** a soft mist background and opaque white cards, colour where it means something, and no alarms.
+- **Calm:** a Cream background, opaque cards and neutral treatment of incomplete work.
 - **Warm:** rounded, expressive shapes, friendly type, and small moments of celebration that never turn into pressure.
 - **Clear:** each screen answers one question first ("what's next?", "how is this habit going?"). Explanations stay one tap away.
 - **Connected:** goals, tasks, habits, notes and reviews share one visual language, and every link between them looks the same.
@@ -26,7 +26,7 @@ These come from `CLAUDE.md`, `PRODUCT_SPEC.md` and ADRs 0010–0016. No visual d
 2. **No streaks, trophies, leaderboards or percentages for habits.** Consistency is a count such as "12 of 14 days" ([ADR 0014](../decisions/0014-habit-cadence-logs-consistency.md)). Reference 4's flames and trophies are rejected outright.
 3. **"Nothing yet" is not 0.** `Metric.hasData === false` renders a "Nothing yet" state. It never shows a zero.
 4. **Every metric keeps its definition, range and "as of"** within reach of the number: visible, or one labelled tap away (D-16, §5).
-5. **No shame.** "Missed", "Earlier, not done" and "Needs a decision" use neutral colours. Red is only for errors and destructive actions. Copy never says "late", "failed" or "overdue" in an accusing tone.
+5. **No shame.** "Missed", "Earlier, not done" and "Needs a decision" use neutral colours. Tomato Burst identifies explicit promotions and actionable alerts. Errors and destructive actions use the error roles. Copy never says "late", "failed" or "overdue" in an accusing tone.
 6. **The user decides.** No automatic changes. Destructive actions are confirmed, and recoverable actions offer Undo.
 7. **Privacy.** Search terms never go in a URL (ADR 0016). Note content never goes in logs. The redesign makes no third-party requests: no remote avatars and no CDN fonts at runtime.
 8. **The backend is frozen.** No schema, migration, service, Server Action or query-logic changes. Pages read through the existing authenticated queries in `src/server/modules/**/queries.ts` (plus the metric and service reads already called from pages). If a screen needs data no query returns, **stop and propose a separate backend chunk** (D-32).
@@ -39,7 +39,7 @@ The five images are described in [README.md](README.md#the-reference-images). Ea
 
 | Pattern (reference) | SoleUp use | Real data behind it | Refused |
 |---|---|---|---|
-| Pale sky background with opaque white cards floating above (1, 2, 3) | **Canvas mist**: a CSS gradient wash at the top of every app page, with opaque `surface-container-lowest` cards (D-09) | none (decoration) | Photographic clouds or mountains, blur behind text, gradients inside cards |
+| Pale sky background with opaque white cards floating above (1, 2, 3) | **Cream canvas** with opaque resting cards and an optional shallow header wash (D-09) | none (decoration) | Photographic clouds or mountains, blur behind text, gradients inside cards |
 | Avatar with "Today's Habit" header and round menu button (1, 3) | **Greeting header** on Home: monogram in an expressive shape, "Good morning, {first name}", today's date; round icon buttons for Search and More | `requireUser().name`, the user's local clock | Remote OAuth photos (privacy, D-07); "Jane Cooper" sample names |
 | Week strip of tall day capsules, today filled (1, 2, 3) | **Week strip** on Home, Today, and the Day/Agenda calendar on compact. Each chip links to that day's calendar view | `todayClock(zone)`, `weekStart` preference | Per-day "completion" dots (no such data) |
 | Square activity tiles with 3D illustrations (1, 3) | **Habit cards carousel** on Home: shape-avatar monogram, title, weekly pill progress | `habitsSummary` → `HabitSummaryItem` | 3D emoji or illustrations (no habit icon field; licensing). Follow-up F-1 |
@@ -49,12 +49,12 @@ The five images are described in [README.md](README.md#the-reference-images). Ea
 | Month chip row and month grid with joined range highlights (1, 3) | **Date picker** (navigation only): calendar "Go to date", task due and plan date fields | none; it writes dates through existing forms | A month **view** of events (ADR 0012 rules out a Month view) |
 | Habit list rows with icon tile, metadata and a "Start" pill (1, 3) | **Today habits list**: shape avatar, title, schedule or progress label, a one-tap **Done** filled-tonal button, and Skip in the overflow | `getTodayHabits` → `TodayHabit` | "Start" timers, locations, durations |
 | Four-item bottom bar with filled active icon (1, 3) | **Navigation bar** with five items and a pill indicator (D-11) | — | — |
-| Warm gradient header and greeting (4) | Rejected as a page header. The warmth moves to the **Ember tertiary** colour, used sparingly (D-18) | — | Orange as the main colour; streak copy |
+| Warm gradient header and greeting (4) | Warm colour draws focus to one featured module or a small confirmation (D-18) | — | Orange as the main colour; streak copy |
 | Dot-matrix heatmap texture (4) | **Dot matrix** for Track's 12-week range: 7 × 12 rounded squares, each a real day | `HabitHistory` for 12 weeks | Decorative heatmaps with no data |
-| Bottom sheet with drag handle; edit form of labelled field containers; Save plus icon-button action row (4) | **Sheets** on compact (D-23). **Filled fields with a static inner label** (D-22). A **sticky action bar** in full-screen dialogs: a wide primary action, with icon buttons for secondary and destructive actions | — | Gradient buttons, "Congrats!" pop-ups for routine actions |
+| Bottom sheet with drag handle; edit form of labelled field containers; Save plus icon-button action row (4) | **Sheets** on compact (D-23). **Filled fields with static inner labels** (D-22), paired start/end fields in Calendar, and a sticky Save footer on compact | — | Gradient buttons, "Congrats!" pop-ups for routine actions |
 | Streak week row of flame circles; "60 days goal / 27 completed" split stat (4) | The **split stat** layout for count pairs (Review "Planned vs completed": planned \| completed) | `weeklySummary.plannedVersusCompleted` | Flames, goal-days counters |
 | Donut ring "78 %" with legend (5) | Rejected | — | Composite percentages |
-| Activity icon grid picker; slider with value bubble (5) | Rejected for now. There's no icon field (F-1). Quantity targets keep a number field with − and + steppers | — | Glossy 3D buttons, glassmorphism |
+| Activity icon grid picker; slider with value bubble (5) | **Life-area swatch grid** uses a visible selected check and ring. Quantity targets use the existing number field and steppers | Existing area colour options and habit target fields | Glossy controls, new icon metadata |
 | Raised centre "+" in the bottom bar (5) | Rejected in favour of an M3 **FAB menu** above the bar, bottom right (D-12) | — | — |
 | Onboarding hero with product photo and one CTA (5) | **Landing page** hero: mist background, the shape motif, one "Sign in" CTA | — | Stock photos, promises of unbuilt features |
 
@@ -67,7 +67,7 @@ The five images are described in [README.md](README.md#the-reference-images). Ea
 - density is a little higher on expanded widths;
 - field labels are static (D-22).
 
-**D-02 · A fixed brand palette, not dynamic colour.** The colours come from reference 1's deep lake blue (`#2F6B93`) and are built into M3-style tonal palettes (tone = CIELAB L\*). The primary role is `#26638B` in light mode and `#98CCF9` in dark mode. There is no wallpaper-based dynamic colour: the web has no wallpaper source, and a predictable identity helps recognition. All values and contrast ratios are in [DESIGN_SYSTEM §1](DESIGN_SYSTEM.md#1-colour).
+**D-02 · Fixed SoleUp brand palette.** Cream is the light canvas, Forest Green anchors primary actions and Kiwi supports secondary actions. Crisp Carrot marks featured content, Sunshine marks rewards and highlights, and Tomato Burst signals promotions and alerts. [DESIGN_SYSTEM §1](DESIGN_SYSTEM.md#1-colour) defines the exact swatches, paired light and dark roles, and measured contrast.
 
 **D-03 · Our own components, on Radix and Tailwind.** We keep `radix-ui` for behaviour (dialog, dropdown menu, popover, tabs, toast, switch, checkbox, radio group, tooltip, collapsible, toggle group, scroll area) and style it with M3 tokens. Rejected:
 - **`@material/web`:** maintenance mode, Lit web components that fight React 19 SSR/hydration and Tailwind, and no Expressive components.
@@ -104,10 +104,10 @@ Follow-up **F-1** (needs an ADR and a migration, outside this track): an optiona
 **D-08 · Theme: System by default, with a per-device override.**
 - **Where it lives:** Settings → Appearance offers System, Light and Dark. The choice is stored per device in `localStorage["soleup.theme"]`. Its scope matches what it is (a display preference for one device), and it avoids a schema change.
 - **Before paint:** an inline `<script>` in `src/app/layout.tsx` `<head>` (about 10 lines, no external file) sets `document.documentElement.dataset.theme` before first paint. `<html suppressHydrationWarning>`.
-- **Browser chrome:** `viewport.themeColor` gets the new `surface` values.
-- **Light is the reference's hero look.** Dark is designed with equal care: it is not an inversion.
+- **Browser chrome:** `viewport.themeColor` uses the light and dark `canvas` values.
+- Both themes use the same colour meanings and hierarchy.
 
-**D-09 · Canvas mist.** The app background is `surface`. A fixed, non-interactive layer behind content adds two soft radial gradients from `canvas-mist-top` (the primary tone 90 in light, tone 17 in dark) fading to transparent over the first 360 px. There are no image files, and no `backdrop-filter`. Cards are opaque. Under `prefers-contrast: more` the mist is removed.
+**D-09 · Cream canvas and opaque panels.** The app uses `canvas` and opaque `resting-surface` cards. Home, landing and sign-in can use a quiet CSS `canvas-mist` wash within the top 360 px. The wash ends before dense content, sits behind the UI, and disappears under `prefers-contrast: more`. Notes and Calendar use a flat canvas.
 
 **D-10 · Window size classes become Tailwind breakpoints.** M3's classes are added as named breakpoints in `@theme`:
 
@@ -146,7 +146,7 @@ The JS media queries in `time-grid-view.tsx` (`48rem`, `64rem`) move to `src/lib
 **D-13 · Top app bars, compact only.**
 - **Pages:** each page gets a 64 px small app bar. The title is `title-large`. The leading slot is a back arrow on detail routes and empty on top-level pages. The trailing slots hold up to 2 icon buttons (Search, then page overflow).
 - **Home:** gets the **greeting header** instead (D-15, SCREENS §Home).
-- **Scrolling:** the app bar is transparent over the mist at the top of the page, and switches to `surface-container` once scrolled (an effects spring).
+- **Scrolling:** the app bar is transparent over the canvas at the top of the page, and switches to `surface-container` once scrolled (an effects spring).
 - **Medium and wider:** no app bar. Each page renders a **page header** (D-14).
 
 **D-14 · Page header, medium and wider.** One row with the `headline-medium` title (Expressive emphasized at large widths), an optional one-line `body-medium` supporting text, and actions aligned to the end (at most one filled button plus a tonal or text button and an overflow menu). Subnavigation sits directly below. Content is bounded: 1240 px for overviews and lists, 840 px for detail, 720 px for forms and reading (DESIGN_SYSTEM §6).
@@ -177,14 +177,10 @@ The button opens a popover on medium and wider, or a bottom sheet on compact, wi
 
 Forbidden: pie or donut charts, cross-entity percentages, sparklines with no axis, a decorative chart with no data.
 
-**D-18 · Ember, the tertiary colour, is used sparingly.** The tertiary palette (from reference 4's orange, `#E2662E`, and in tone 40 `#A23F11`) is allowed only for:
-- the confirmed habit log/quantity response (D-20), including the brief local peach halo;
-- the **Review finished** celebration sheet;
-- search highlights (`<mark>`, as `tertiary-container`);
-- the Track identity tile in the More sheet and the rail tooltip;
-- the "Now" chip on a commitment that's under way.
-
-It is never used for errors, warnings, missed days or destructive actions.
+**D-18 · Each accent has a job.**
+- **Crisp Carrot** marks the Home feature card and the Now chip. Use `feature-ink` for thin Now markers in Calendar and Today's timeline.
+- **Sunshine** appears in readable search marks, the local confirmed-log halo and the Review finish sheet. These are highlights of real activity.
+- **Tomato Burst** appears in promotions and warning banners with a visible label. Errors and destructive actions use their own paired roles. Missed habits and incomplete tasks stay neutral.
 
 **D-19 · Neutral visual language for habit states.** No state uses red:
 
@@ -203,7 +199,7 @@ It is never used for errors, warnings, missed days or destructive actions.
 Each state also has a different glyph or pattern, so colour is never the only signal (WCAG 1.4.1).
 
 **D-20 · Restrained celebration.**
-- **Habit save:** immediate press response, distinct pending state, then a confirmed check/quantity update with a brief peach halo local to its icon. Optimistic data follows the existing hook; success emphasis waits for confirmation. Use existing Undo when supported, with persistent correction available afterward.
+- **Habit save:** immediate press response, distinct pending state, then a confirmed check/quantity update with a brief Sunshine halo local to its icon. Optimistic data follows the existing hook; success emphasis waits for confirmation. Use existing Undo when supported, with persistent correction available afterward.
 - **Tasks and milestones:** local saved feedback and an updated record; preserve focus and existing mutation behavior.
 - **Review finished:** a warm sheet with a soft-burst shape and "Your review is saved. It stays editable until {date}." Open only after explicit Finish succeeds.
 - **Failure:** rollback, retained input and actionable retry; no success effect. Reduced motion gets immediate state changes and the same semantic messages.
@@ -225,14 +221,14 @@ Supporting text sits below the container. This matches reference 4's field cards
 
 | Use | compact | medium and wider |
 |---|---|---|
-| Create or edit forms (goal, task, habit, event, block, area) | **Full-screen dialog**: an app bar with ✕, the title, and a **Save** text button; the content scrolls; destructive actions sit at the bottom | Centred dialog, max 560 px wide (720 px for event/block), radius `extra-large` 28 px |
+| Create or edit forms (goal, task, habit, event, block, area) | **Full-screen dialog** with Close and title at the top, scrollable fields, a wide filled Save in the sticky footer, and destructive actions in the scrolling content | Centred dialog, max 560 px wide (720 px for event/block), radius `extra-large` 28 px |
 | Pickers, menus with explanations, the metric info, More | **Modal bottom sheet**: drag handle, radius 28 px at the top, max 90 dvh, a close button always present, and swipe-down to dismiss as an extra option | Popover or menu anchored to its trigger |
 | Confirmations (delete, discard) | Basic dialog, 312 px minimum | Basic dialog |
 
 Every dialog and sheet uses Radix Dialog for focus trap, Escape, focus restore and the accessible title. A sheet's drag gesture is never the only way to close it.
 
 **D-24 · Grouped lists are the default way to show collections.** Tasks, notes, goals, habits in lists, devices and review history are M3 Expressive **segmented list groups**:
-- each item is its own `surface-container-lowest` container with a 2 px gap between items;
+- each item is its own `resting-surface` container with a 2 px gap between items;
 - the outer corners of the group use `large` (16 px) and the inner corners `extra-small` (4 px);
 - an item's leading slot holds a checkbox, an avatar or an icon. Its trailing slot holds a meta label and at most one icon button.
 
@@ -257,7 +253,7 @@ There are no route transitions in this track (the View Transitions API is deferr
 
 **D-28 · Accessibility baseline: WCAG 2.2 AA.**
 - **Touch targets:** use non-overlapping 48 × 48 px interactive areas, including Track. A 28 px matrix dot may sit inside that area. Use local chart overflow on narrow cards rather than shrinking targets; static non-loggable marks need no hit area.
-- **Focus indicator:** a 3 px outline in `secondary`, offset 2 px; inset on bars and rails.
+- **Focus indicator:** a 3 px `focus` outline, offset 2 px on neutral surfaces. Use a contrasting inner stroke on filled controls and check inset rings inside clipping containers (DESIGN_SYSTEM §5).
 - **Contrast:** checked for every pair (DESIGN_SYSTEM §1.4).
 - **Semantics:** every icon-only button has an `aria-label`; landmarks are `header`, `nav`, `main`; one `h1` per page; headings in order.
 - **Live status:** live regions for save status and snackbars.
@@ -307,6 +303,6 @@ The redesign changes described behaviour in `PRODUCT_SPEC.md` in these places. T
 | Restyling everything breaks many E2E specs at once | Legacy token aliases keep unredesigned pages coherent (UI-1). One route group per phase. Selectors are updated deliberately in each phase (D-29) |
 | Colour hashing gives two neighbouring habits the same look | The shape *and* the colour are hashed independently (14 × 6 combinations), the title is always shown, and identity never carries meaning |
 | Expressive motion feels busy | Springs are limited to the components in D-25. Large sections never animate in on render. Reduced motion is respected |
-| Mist and white surfaces look washed out in sunlight | Text contrast is ≥ 7:1 for body text on all surfaces (DESIGN_SYSTEM §1.4). The mist sits only at the top of the page |
+| Light surfaces look washed out in sunlight | Use the measured text pairs in DESIGN_SYSTEM §1.4. Use the shallow wash only at the top and keep content surfaces opaque |
 | The five-item bar plus a FAB crowds 360 px phones | The FAB sits above the bar, not in it. Each bar item is 72 px at 360 px. Labels are short, single words |
 | Google Sans Flex's variable axes add weight | A single variable file with `latin` and `latin-ext` subsets, `display: swap`, and size-adjusted fallback metrics from `next/font` |

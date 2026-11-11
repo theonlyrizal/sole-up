@@ -1,62 +1,40 @@
 # SoleUp: the experience should feel worth returning to
 
-**Revision 3 · 2026-11-08 · Implementation specification.** Read alongside SCREENS and COMPONENTS. This document refines their visual treatment and feedback; it does not change domain calculations, routes, or backend contracts. Example figures below describe test fixtures, never production defaults.
+**Revision 4 · 2026-11-12.** Use with SCREENS, COMPONENTS and the role pairs in DESIGN_SYSTEM. Example figures describe test fixtures.
 
-<!-- Hallmark · pre-emit critique: Philosophy 5 / Hierarchy 4 / Execution 4 / Specificity 5 / Restraint 4 / Variety 5. Planning assessment; rendered implementation still needs visual review. -->
+<!-- Hallmark design review for the specification: Philosophy 5 / Hierarchy 5 / Execution 4 / Specificity 5 / Restraint 5 / Variety 5. -->
 
-## 1. Creative direction: a clear morning, a satisfying mark
+## 1. Creative direction
 
-SoleUp should feel airy when opened, tactile when touched, and reassuring after an action. The defining composition is **mist around the content, crisp white underneath it, lake blue for direction, personal colors for recognition, and a small warm response when effort becomes a saved record**.
+Use warm neutral space, substantial opaque cards, and shapes that help people recognise what they can do. Give each page a distinct composition. Home uses a featured commitment and small browseable tiles. Today favours action rows. Track makes time visible through three different chart geometries. Calendar uses a compact date picker beside its denser schedule. Review ends with a focused sheet.
 
-The user's request for a more addictive interface is implemented as an appealing, repeatable usefulness loop: notice something meaningful → take one easy action → see that it worked → leave with a clear next step. Success means people willingly return to their plans and trust their records. Session length, compulsive checking, and notification volume are not success measures.
+The references use large figures with small units, soft corners, inset date circles, and visible status marks to direct attention. [The reference guide](README.md#the-reference-images) traces those components to their SoleUp uses.
 
-### What the reference images contribute
+## 2. Colour composition
 
-| Reference detail | Why it is visually compelling | SoleUp execution |
+| Layer | Treatment |
+|---|---|
+| Canvas and content | Cream `canvas` in light mode, with opaque `resting-surface` cards. Use paired text roles for titles and metadata. Home, landing and sign-in can use the shallow `canvas-mist` wash. |
+| Primary action and data | Forest `primary` for primary actions, links, current day capsules and actual progress. |
+| Secondary action | Kiwi `secondary` for tonal buttons and selected filters. Use the quieter `secondary-container` for large or recurring surfaces such as the navigation indicator and time blocks. |
+| Featured content | One `feature-surface` focal module on Home. Use the same Crisp Carrot family for a compact Now chip or a thin `feature-ink` line with the current time. |
+| Rewards and highlights | Sunshine `reward-container` for search marks and Review finish art. Use `confirmation-surface` for brief feedback after a saved log. Persistent saved/working indicators use the success roles. |
+| Promotions and alerts | Tomato Burst for an actual promotion or actionable warning, with a label and the relevant icon. Use the dedicated error roles for validation failures and destructive actions. |
+| Identity | Use the area or identity container on a 40–56 px avatar, a chip or a short leading accent. Keep each entity's colour stable across routes through the shared `entityType + ':' + id` helper. |
+
+| Page | First emphasis | Supporting treatment |
 |---|---|---|
-| Pale blue atmosphere, thick white cards | Strong figure/background separation with breathing room | A mist wash confined to the upper canvas; solid cards; one large focal module, then smaller supporting surfaces |
-| Tall weekday capsules with inset date circles | Repeated, touchable shapes establish a recognizable rhythm | Seven evenly spaced capsules, one filled today; date remains legible at small widths; calendar navigation stays explicit |
-| Large numeral with small baseline unit | A useful answer can be scanned before reading explanatory text | One principal count per module, unit beside it, period below; never a giant unexplained percentage |
-| Rounded progress strokes | Progress reads as tangible marks rather than a spreadsheet | Actual expected units in habit progress and countable milestones in a goal arc; no decorative progress on task counts |
-| Warm orange celebration and dot texture | Warmth contrasts with the cool surroundings | A brief peach accent at the changed control; a warm Review finish composition; day matrices display actual logs |
-| Blue/pink activity identity | Personal items are easier to distinguish | Stable teal, violet, pink, amber, blue and green avatar containers; labels always carry the meaning |
-| Layered sheets and wide action buttons | The next action feels reachable and contained | Opaque elevated sheets, 28 px top corners, one wide primary action; no information under translucent layers |
+| Home | Crisp Carrot next-commitment card, or Today when the commitment is absent | Forest calendar action and current date. Opaque habit tiles with personal avatars |
+| Today | Forest primary action and current date | Kiwi Done shortcut on otherwise neutral habit rows |
+| Track | Forest history fill and current-day outline | Personal identity tile and brief Sunshine feedback |
+| Goals | Goal name and area, with a Forest milestone arc on detail | Compact counts in overview and neutral history |
+| Calendar | Forest current-date marker and selected day | Kiwi time blocks and Crisp Carrot Now marker. Quiet grid and empty time |
+| Review | Period and step label | Sunshine finish art after a confirmed save |
+| Notes/Search | Opaque writing and result surfaces | Sunshine marks on matched text |
+| Settings | Quiet groups and theme preview | Kiwi selection and green working status |
+| Landing/Sign-in | Forest primary action and opaque surfaces | Small shape composition in the landing hero |
 
-The screenshots do not establish exact fonts, colors, or numerical ratios. The chosen tokens are SoleUp's interpretation, not sampled claims about the source files.
-
-## 2. Color choreography
-
-Use the existing DESIGN_SYSTEM palette. Do not add another brand palette or change the hue on each page. Color has four jobs: orient, identify, confirm, and decorate. One element must not perform all four at once.
-
-### Layer recipe
-
-1. **Canvas:** `canvas`, with the existing `canvas-mist` wash within the first 360 px. Add no mist behind the Notes writing body or the Calendar time grid.
-2. **Resting content:** `surface-container-lowest`, paired with `on-surface`; use `on-surface-variant` for metadata. Cards remain opaque.
-3. **Focal content:** one `primary-container` module per viewport, paired with `on-primary-container`. It gets the strongest numeral or title and the clearest action.
-4. **Personal identity:** area/identity container colors appear on a 40–56 px avatar, an area chip, or one short leading accent. Keep the chart's semantic fill blue.
-5. **Action confirmation:** `tertiary-container` with `on-tertiary-container`, local to the changed control. Stable saved/working indicators use success roles.
-
-**Composition targets, not mechanical pixel quotas:** roughly three quarters of visible content should remain quiet surfaces and space; the focal tint should occupy around one sixth; identity and warm accents share the remainder. A large chart or a dense calendar is an exception. At a glance, there must be an obvious focal region and generous neutral space. Do not count pixels to satisfy this rule.
-
-### Page treatments
-
-| Page | Focal treatment | Supporting color | What stays quiet |
-|---|---|---|---|
-| Home | Lake-blue next commitment; when absent, Today gets the focal treatment | Personal habit avatars; peach Now chip only when actually under way | Goals needing action and deadlines |
-| Today | Blue selected day and primary create action; white task rows | Identity chips connect tasks to their goals | Earlier and needs-a-decision groups use neutral surfaces |
-| Track | White habit cards; blue history and today outline | A colored identity tile per habit; brief peach confirmation | Paused/inactive days remain readable neutrals |
-| Goals | White overview grouped by area; one blue arc on detail | Life-area chips and identity tiles | Descriptions and audit history |
-| Calendar | Blue today marker and selection | Existing area labels/swatches where data supplies them; peach Now marker | Grid, empty time and navigation chrome |
-| Review | Blue period heading; peach finish panel only after saving | A small violet identity motif in the heading, without implying a new metric | Prompts, textareas and history |
-| Notes/Search | White writing canvas and neutral result groups | Violet page icon; peach search matches | Editor toolbar and note content |
-| Settings | Quiet grouped surfaces with a live theme preview | Blue selected setting and green verified working status | Secondary instructions |
-| Sign-in/Landing | Lake-blue focal action, mist and one expressive shape composition | One pink or teal decorative shape, never competing CTAs | Provider names, errors and required disclosures |
-
-Use named aliases in DESIGN_SYSTEM §13. Never set an entire card's text in a saturated identity color. Never tint every row a different pastel. An entity keeps its avatar color across Home, Track, selectors, and linked contexts. Hash `entityType + ':' + id` once in a shared pure helper; never hash its title or array position. Renaming/reordering must not change identity. Goals with a life-area color continue to use it.
-
-### Dark mode is another composition
-
-Keep the same hierarchy and color meanings. Use the dark role pairs, opaque panels, and a low-contrast mist. No white glow, neon outer shadow, or inverted illustrations. A warm confirmation remains peach/brown, never a bright orange flash. Review both a nearly empty page and a dense page; dark mode must retain surface separation without relying on shadows.
+In dark mode, preserve the same visual hierarchy with the paired roles in DESIGN_SYSTEM. Dark cards lift by tone. Check both sparse and dense screens for readable supporting text and clear boundaries.
 
 ## 3. Interaction psychology, expressed as testable design choices
 
@@ -91,7 +69,7 @@ All durations reference DESIGN_SYSTEM §7 springs and effects. Do not add a seco
 |---|---|
 | Pointer/key activation | State layer responds immediately; pointer-only inner icon may compress to 0.96. Keep the target and label fixed. Keyboard gets the same state feedback without a spatial nudge |
 | Request in progress | Use the existing optimistic hook. Mark the control `aria-busy`; prevent duplicate submissions for this entity only. Optimistic history fills may update, but no success burst or Saved announcement yet |
-| Confirmed success | The affected day/segment moves from its current value to the confirmed value with default spatial motion. The control's icon becomes a check with a fast spatial response. A peach confirmation halo appears behind that icon for 600 ms, fading with effects easing. Label becomes Done or the existing quantity summary |
+| Confirmed success | The affected day/segment moves from its current value to the confirmed value with default spatial motion. The control's icon becomes a check with a fast spatial response. A Sunshine confirmation halo appears behind that icon for 600 ms, fading with effects easing. Label becomes Done or the existing quantity summary |
 | Rest | Halo disappears. The saved check/fill remains. No card bounce, layout shift, scrolling, or replay on refresh |
 | Failure | Roll back using the existing hook; retain entered quantity; show the existing error and retry. Restore the prior visual state, announce failure, and run no celebration |
 | Undo/correction | Use the existing inverse mutation if offered. Keep pending/error handling and animate toward the returned value. Never celebrate Undo as another achievement |
@@ -124,11 +102,11 @@ Progress and metrics render their true values on initial load. **No zero-to-valu
 
 At 390 × 844, use a compact greeting (not a marketing headline), the week capsules, one focal commitment card and the beginning of Today. Header + week strip + focal card should target 400 px or less excluding the OS/browser chrome, without truncating a long title. The primary action should be visible before scrolling on this representative viewport. At larger text settings allow natural growth.
 
-Commitment card: 24 px inner padding, a small kind label, a 24–28 px title with natural wrapping, time as secondary information, and a clearly labelled calendar action. At most one low-contrast decorative shape may sit in an empty corner; it must disappear when the title grows into that space. Place the Now chip near the time, not floating over the art.
+Give the commitment card 20 px padding on compact and 28 px on wider screens. Use a small kind label, a 24–28 px title with natural wrapping, time as supporting information, and a clearly labelled Forest calendar action. At most one low-contrast decorative shape may sit in an empty corner; it must disappear when the title grows into that space. Place the Now chip near the time, not floating over the art.
 
-Today: the planned count is the figure; due and needs-a-decision are secondary links with labels. These categories can overlap and have no completion denominator. Never render them as segments of a progress bar. If there is no next commitment, Today becomes the focal blue card and the absence of a commitment is a quiet line/link. Keep all metric definitions accessible.
+Today leads with the planned count. Due and needs-a-decision appear as labelled secondary links. Each count stands on its own because the categories can overlap. If there is no next commitment, Today becomes the focal Crisp Carrot card and the absence of a commitment is a quiet line/link. Keep all metric definitions accessible.
 
-Habit previews: white 176–208 px tiles, a 48 px identity shape, up to two title lines, real weekly unit marks, and their full caption. Preserve a reachable complete title when clamped. On compact use a horizontal snap list with a small next-tile preview; on expanded use a grid. No autoplay or forced swipe tutorial. Avoid a tall carousel consuming the whole first viewport.
+Habit previews use opaque, square-proportioned tiles with a 48 px identity shape, up to two title lines, and a row of real weekly unit marks above the full count caption. Keep the full title in the link’s accessible name and allow the card to grow at larger text settings. Use 176–208 px tiles in a horizontal snap list on compact and a grid on expanded. Show a partial next tile when more items are available, and give the list visible, keyboard-accessible Previous and Next controls when it overflows.
 
 ### Today: feel actionable rather than demanding
 
@@ -136,7 +114,7 @@ Keep task rows aligned and quiet. Place the checkbox first, the task title next,
 
 ### Track: make the record beautiful enough to inspect
 
-The visual anchor of a habit card is its real record: blue rounded day pills in week mode, date cells in four-week mode, a matrix in twelve-week mode. Identity color appears in its avatar and a small context chip, never as a competing chart scale. Separate title/cadence, record, and figure with 12–16 px gaps. Display the range near the range control and keep each habit's figure adjacent to its chart.
+A habit card leads with its name and cadence, then makes the time scale visible. Week mode shows seven tall Forest day pills, four-week mode uses circular numbered cells, and twelve-week mode uses a matrix of small rounded squares. Identity color appears in its avatar and a small context chip, never as a competing chart scale. Separate title/cadence, record, and figure with 12–16 px gaps. Display the range near the range control and keep each habit's figure adjacent to its chart.
 
 The empty and paused states deserve equal care: neutral cells with legible labels, a useful Resume/Create action, and the same quality of spacing. Do not fade an entire paused card to illegibility. A newly saved day receives the local response in §4; a missed day receives no animation.
 
@@ -148,11 +126,17 @@ Overview rows/cards lead with the goal name and life-area chip. Reserve the larg
 
 ### Review: a warm ending to a focused sequence
 
-Use the period and four-step navigation as a clear scaffold; prompts sit on neutral surfaces. Warmth arrives at the saved finish sheet: 72 px soft-burst art, peach container, saved heading, editable-until date, one Done action. The sheet does not advertise another habit or initiate another review. History stays neutral and readable.
+Use the period and four-step navigation as a clear scaffold; prompts sit on neutral surfaces. Warmth arrives at the saved finish sheet: 72 px soft-burst art on a Sunshine container, saved heading, editable-until date and one wide Forest Done action on compact. The sheet does not advertise another habit or initiate another review. History stays neutral and readable.
 
-### Notes, Calendar and Settings: restraint supports satisfaction
+### Calendar and forms
 
-The writing surface has no moving decoration. Search highlights are readable peach marks, not fluorescent full-row fills. Calendar's dense data needs pale grid lines and clear selection rather than large decorative capsules within every event. Settings has a useful theme preview and clean selected controls; saved confirmation is enough. Public/sign-in screens inherit the same palette and shape language with accurate product copy, never sample stats or invented testimonials.
+The date picker pairs a row of month chips with circular day buttons. A Forest fill marks the selected date. A ring and current-date semantics identify today. When both states fall on the same date, keep the fill and a contrasting inset ring. Keep dates visible over any hatch and preserve keyboard navigation when the grid scrolls locally.
+
+Present existing Calendar start and end controls as a labelled pair. Stack the fields on compact and place them side by side when both labels and values fit. Keep optional scheduling, reminder and link fields in their existing groups. Compact full-screen forms put the primary submit button in an opaque sticky footer above the safe area and keyboard, with scroll room for the final field and its error.
+
+### Notes, Settings and public pages
+
+Keep the writing surface quiet. Search matches use the paired Sunshine container and foreground. Settings pairs a useful theme preview with clear selected controls. Public and sign-in screens use a Forest action and accurate product copy. The landing page uses one expressive shape composition.
 
 ## 6. Copy at the moment it matters
 
@@ -169,7 +153,7 @@ Reuse domain labels/definitions exactly. New decorative captions are optional; c
 
 ## 7. Acceptance: the experience must survive real states
 
-Capture Home, Today, Track week/4w/12w, goal detail, Review finish, Notes and Settings in light and dark. Use representative seeded records and both short and long titles. Check 320, 375, 390, 768 and 1280 px widths; use 390 × 844 and 1280 × 800 for the existing phase screenshot set. Include 200% text sizing and reduced motion. Screenshots cannot prove feedback timing: exercise mutations in a browser as well.
+Capture Home with and without a commitment, Today, Track week/4w/12w, Calendar’s date picker and event form, goal detail, Review finish, Notes and Settings in light and dark. Use representative seeded records and both short and long titles. Check 320, 375, 390, 414, 768 and 1280 px widths; use 390 × 844 and 1280 × 800 for the existing phase screenshot set. Include 200% text sizing and reduced motion. Screenshots cannot prove feedback timing: exercise mutations in a browser as well.
 
 For each changed action, verify successful, pending, failed, repeated and corrected states using the existing test fixtures/mocking boundaries. Slow a request to observe pending, reject it to observe rollback, then retry. Reuse existing behavioral tests; add targeted coverage only for new behavior, not tests that merely repeat CSS token values.
 
@@ -178,8 +162,8 @@ For each changed action, verify successful, pending, failed, repeated and correc
 | Dimension | A convincing implementation |
 |---|---|
 | Hierarchy | First question and primary action are clear without reading all copy |
-| Character | Mist, opaque surfaces, tactile day shapes and personal identity feel coherent |
-| Color | Focal tint is deliberate; text pairs pass contrast; personal colors remain stable |
+| Character | Warm canvas, opaque surfaces, tactile day shapes and personal identity feel coherent |
+| Color | Featured, secondary, reward and alert roles are distinct. Paired text, functional marks and focus pass contrast |
 | Response | Activation, pending, saved, error and correction are distinguishable |
 | Truthfulness | Every figure, fill, label and confirmation agrees with available data |
 | Accessibility | Keyboard, zoom, small screens and reduced motion retain the experience |
@@ -194,12 +178,12 @@ If trying the design with users, ask them to find the next commitment, log/corre
 
 | Phase | Required delivery from this document |
 |---|---|
-| UI-1 | Role aliases from DESIGN_SYSTEM §13; stable identity helper; motion tokens reused |
-| UI-2a/b | Local confirmation primitive and gallery states; readable hit targets and local overflow; no success effect on mount |
+| UI-1 | Light/dark colour roles and aliases in DESIGN_SYSTEM §§1 and 13, plus the stable identity helper |
+| UI-2a/b | Show paired button and banner roles, compact sticky form footer, accessible overflow and local confirmation states in the gallery |
 | UI-3 | Consistent selected navigation and page framing; no replaying page entrances |
 | UI-4 | Home focal fallback, honest Today count treatment, stable colorful habit tiles |
 | UI-5/6 | Stable task feedback and focus; distinguish saving/saved/error without new domain behavior |
-| UI-7 | Calm grid, clear selection/Now and date picker; no decorative event data |
+| UI-7 | Quiet grid, distinct selected/today states, Now marker, month chips and paired start/end fields |
 | UI-8 | Goal identity, restrained overview, confirmed milestone arc changes |
 | UI-9 | All three range compositions, accessible grids, confirmed local log response and rollback |
 | UI-10 | Warm saved finish; strict explicit-success trigger |

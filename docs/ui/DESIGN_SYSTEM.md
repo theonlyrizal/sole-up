@@ -1,6 +1,6 @@
 # SoleUp design system: Material 3 Expressive for the web
 
-**Status:** Revision 3, 2026-11-08. Existing role values are retained; §13 adds composition aliases and feedback rules. If a value fails contrast or rendering review, fix it here and in code in the same PR.
+**Status** — Revision 4, 2026-11-12. The six brand swatches, light and dark roles, and screen composition aliases below are the implementation specification.
 
 Implementation lives in `src/app/globals.css` (tokens, `@theme`), `src/components/ui/*` (components), `src/components/icons/*` (icons) and `src/components/ui/shapes.ts` (shape library). Components use **utilities generated from roles** (`bg-primary`, `text-on-surface-variant`, `rounded-xl`, `shadow-card`, `ease-spatial-fast`). They never use raw hex values, never use Tailwind palette colours (`bg-blue-500`), and never use arbitrary values for anything that has a token.
 
@@ -8,117 +8,134 @@ Implementation lives in `src/app/globals.css` (tokens, `@theme`), `src/component
 
 ## 1. Colour
 
-### 1.1 How the palette was made
+### 1.1 Brand palette
 
-The seeds are primary `#2F6B93` (reference 1's deep lake blue), tertiary `#E2662E` (reference 4's orange), error `#B3261E` (M3 baseline) and success `#2E7D4F`. Tonal palettes were generated in CIELAB LCh (M3 "tone" is CIELAB L\*). Chroma was reduced until each colour fits the sRGB gamut, and the colours were assigned to roles by M3's tone mapping. Chroma by palette:
+These six swatches are the fixed SoleUp brand colours. Cream covers most of the light UI. Forest Green anchors actions and navigation. Use the other four colours in small, purposeful areas and pair every coloured surface with its specified foreground.
 
-| Palette | Chroma |
-|---|---|
-| primary | 28 |
-| secondary | 12 (same hue) |
-| tertiary | 60 |
-| neutral | 4 (primary hue) |
-| neutral-variant | 9 |
-| error | 80 |
-| success | 48 |
-
-The generator script is in the UI-1 handoff, and UI-1 commits it as `scripts/generate-palette.mts` so the values can be reproduced.
+| Brand colour | Hex | Description | Use |
+|---|---|---|---|
+| Sunshine | `#EAC45B` | Muted golden yellow | Rewards and highlights |
+| Tomato Burst | `#D86753` | Dusty terracotta red | Promotions and alerts |
+| Crisp Carrot | `#E99A64` | Soft burnt orange | Featured content |
+| Cream | `#F7F4EC` | Warm ivory | Main background |
+| Forest Green | `#214839` | Deep botanical green | Primary brand and buttons |
+| Kiwi | `#B5CC8B` | Muted sage-lime | Secondary actions |
 
 ### 1.2 Roles
 
-`canvas` is M3's **surface** role. It is renamed because the legacy utility `bg-surface` (the white card colour) stays as an alias until UI-13 (§12).
-
-| Role (CSS var `--md-<role>`, utility `<prop>-<role>`) | Light | Dark | Use |
-|---|---|---|---|
-| `primary` | `#26638B` | `#98CCF9` | Filled buttons, active states, progress fill, links |
-| `on-primary` | `#FFFFFF` | `#00344E` | Text and icons on primary |
-| `primary-container` | `#CBE6FF` | `#024B6F` | Hero cards (Next commitment), FAB, selected chips |
-| `on-primary-container` | `#001E2F` | `#CBE6FF` | |
-| `inverse-primary` | `#98CCF9` | `#26638B` | Actions in snackbars |
-| `secondary` | `#4E6071` | `#B5C9DC` | Focus ring, quiet emphasis, nav active label |
-| `on-secondary` | `#FFFFFF` | `#203241` | |
-| `secondary-container` | `#D1E5F8` | `#374959` | Nav active indicator, tonal buttons, filter chips (selected), progress track (alt) |
-| `on-secondary-container` | `#091D2B` | `#D1E5F8` | |
-| `tertiary` (Ember) | `#A23F11` | `#FFB596` | See D-18: celebration and highlight only |
-| `on-tertiary` | `#FFFFFF` | `#581E00` | |
-| `tertiary-container` | `#FFDBCC` | `#802A00` | `<mark>`, Now chip, celebration sheet art |
-| `on-tertiary-container` | `#311400` | `#FFDBCC` | |
-| `error` | `#BF0312` | `#FFB4A5` | Errors and destructive actions only |
-| `on-error` | `#FFFFFF` | `#690100` | |
-| `error-container` | `#FFDAD3` | `#93010B` | Inline error banners |
-| `on-error-container` | `#380C00` | `#FFDAD3` | |
-| `success` | `#026D3C` | `#78DA9C` | The "Saved" icon, the device "Working" status |
-| `on-success` | `#FFFFFF` | `#01391C` | |
-| `success-container` | `#94F7B7` | `#00522C` | Success banner (rare) |
-| `on-success-container` | `#00210D` | `#94F7B7` | |
-| `canvas` (M3 surface) | `#F5FAFF` | `#0F1419` | Page background |
-| `surface-dim` | `#D5DBE1` | `#0F1419` | |
-| `surface-bright` | `#F5FAFF` | `#353A3F` | |
-| `surface-container-lowest` | `#FFFFFF` | `#080F15` | **Cards and list items** (the white cards of the references) |
-| `surface-container-low` | `#EEF4FB` | `#171C21` | Grouped section background, rail (large) |
-| `surface-container` | `#E8EFF5` | `#1B2025` | Nav bar, scrolled app bar, menus |
-| `surface-container-high` | `#E3E9EF` | `#262A2F` | Skeletons, dialogs (dark), chips (unselected) |
-| `surface-container-highest` | `#DDE3EA` | `#30353A` | Filled text fields, switch track (off) |
-| `on-surface` | `#171C21` | `#DDE3EA` | Primary text |
-| `on-surface-variant` | `#3B4854` | `#BAC8D6` | Secondary text, inactive icons |
-| `outline` | `#6B7986` | `#8592A0` | Field outlines, outlined buttons, missed-day ring. **Not for text** |
-| `outline-variant` | `#BAC8D6` | `#3B4854` | Dividers, hatch pattern, decorative borders |
-| `inverse-surface` | `#2C3136` | `#DDE3EA` | Snackbars, tooltips |
-| `inverse-on-surface` | `#EBF1F8` | `#2C3136` | |
-| `scrim` | `#000000` | `#000000` | At 32 % behind dialogs and sheets |
-| `canvas-mist` | `#CBE6FF` | `#002D45` | The top-of-page mist gradient (D-09) |
-
-Two app-specific roles are added for data display:
+The six swatches above supply exact base values. The role table adds supporting tones and paired foregrounds for light and dark themes. Use the role utilities below in components. Expose roles as CSS variables `--md-<role>` and Tailwind utilities such as `bg-canvas` and `text-on-primary`. `canvas` is the M3 surface role. The legacy `bg-surface` remains an alias until UI-13 (§12).
 
 | Role | Light | Dark | Use |
 |---|---|---|---|
-| `progress-track` | `#B5C9DC` (secondary tone 80) | `#374959` (secondary tone 30) | Unfilled segments of pill bars, arcs and day pills |
-| `focus` | = `secondary` | = `secondary` | The focus ring (an alias, so it can be tuned separately) |
+| `primary` | `#214839` | `#A9CCB3` | Filled primary actions, links, selected dates, progress fill |
+| `on-primary` | `#F7F4EC` | `#172C21` | Text and icons on primary |
+| `primary-container` | `#DDE9DA` | `#294638` | Forest-tinted calendar event, Create FAB, user monogram |
+| `on-primary-container` | `#214839` | `#DFEBDF` | Text and icons on primary container |
+| `inverse-primary` | `#A9CCB3` | `#214839` | Actions in snackbars |
+| `secondary` | `#B5CC8B` | `#B5CC8B` | Kiwi fill for selected chips and tonal actions |
+| `on-secondary` | `#263617` | `#263617` | Text and icons on Kiwi |
+| `secondary-container` | `#E7EED5` | `#344322` | Subtle selected surfaces, time blocks, navigation indicator |
+| `on-secondary-container` | `#34451E` | `#DDE9C5` | Text and icons on secondary container |
+| `secondary-ink` | `#4D682F` | `#C5D7A6` | Thin time-block markers on resting surfaces |
+| `tertiary` | `#E99A64` | `#E99A64` | Crisp Carrot accent for the Now chip and small marks on featured content |
+| `on-tertiary` | `#352012` | `#352012` | Text and icons on Crisp Carrot |
+| `tertiary-container` | `#F9E3D0` | `#503320` | Featured cards |
+| `on-tertiary-container` | `#562E17` | `#FFE4CD` | Text and icons on featured surfaces |
+| `feature-ink` | `#93451F` | `#F1B98D` | Calendar Now line and timeline Now ring |
+| `reward` | `#EAC45B` | `#EAC45B` | Sunshine accent for earned feedback and highlights |
+| `on-reward` | `#322706` | `#322706` | Text and icons on Sunshine |
+| `reward-container` | `#FBEDBC` | `#4A3C17` | Search marks, confirmation halo, Review finish art |
+| `on-reward-container` | `#48370D` | `#FBE9A9` | Text and icons on reward containers |
+| `alert` | `#D86753` | `#D86753` | Tomato Burst accent for promotions and alerts |
+| `on-alert` | `#25120D` | `#25120D` | Text and icons on Tomato Burst |
+| `alert-container` | `#F9DDD5` | `#512D26` | Promotion or warning banner background |
+| `on-alert-container` | `#682C20` | `#FFDAD0` | Text and icons on promotion or warning banners |
+| `error` | `#9F3627` | `#FFB4A5` | Error text and filled destructive actions |
+| `on-error` | `#FFFDF8` | `#5C1D13` | Text and icons on destructive buttons |
+| `error-container` | `#FBE1DA` | `#68291E` | Inline errors |
+| `on-error-container` | `#691E15` | `#FFDED6` | Text and icons on inline errors |
+| `success` | `#326747` | `#A8D6B1` | Saved and working status |
+| `on-success` | `#FFFDF8` | `#173724` | Text and icons on success fill |
+| `success-container` | `#DDEFE0` | `#284D35` | Success banner |
+| `on-success-container` | `#254D34` | `#D7F1DB` | Text and icons on success container |
+| `canvas` | `#F7F4EC` | `#191F19` | Cream main background in light mode |
+| `surface-dim` | `#E7E3D7` | `#191F19` | Recessed neutral surface |
+| `surface-bright` | `#FFFDF8` | `#3A4438` | Raised neutral surface |
+| `surface-container-lowest` | `#FFFDF8` | `#151B16` | Light card surface, dark recessed surface |
+| `surface-container-low` | `#F2EFE5` | `#212923` | Light grouped surface, dark card surface |
+| `surface-container` | `#EDE8DC` | `#273229` | Navigation, menus and scrolled app bar |
+| `surface-container-high` | `#E7E1D3` | `#2F3B30` | Skeletons and dialogs |
+| `surface-container-highest` | `#E0DACC` | `#384438` | Filled fields and off switch track |
+| `on-surface` | `#222B23` | `#EDF0E5` | Main text |
+| `on-surface-variant` | `#505B4E` | `#BAC6B6` | Supporting text and inactive icons |
+| `outline` | `#6C7566` | `#8B9A89` | Required control borders and data outlines |
+| `outline-variant` | `#CBCBBE` | `#49564A` | Decorative dividers and hatch texture |
+| `inverse-surface` | `#2A352B` | `#E8EEE3` | Snackbars and tooltips |
+| `inverse-on-surface` | `#F7F4EC` | `#263228` | Text on inverse surface |
+| `scrim` | `#000000` | `#000000` | At 32% behind dialogs and sheets |
+| `canvas-mist` | `#EDE6D4` | `#283427` | Optional shallow header wash |
+| `progress-track` | `#C4D0BF` | `#455246` | Open segments of pill bars and arcs |
+| `focus` | `#214839` | `#B5CC8B` | Outer focus ring on surrounding light or dark surface |
+
+Use `alert-container` with a warning icon and explicit text for actionable cautions. Use `alert` with `on-alert` for a small promotion label when there is an actual promotion. Field errors and destructive actions use the error family. Earlier tasks, missed habits and other neutral record states keep their neutral treatment. See [D-18](DESIGN_DECISIONS.md#data-display-and-copy).
 
 ### 1.3 Life areas and identity colours
 
-Life areas store one of nine colour names (`src/lib/life-areas.ts`). Each name maps to a **container / on-container / dot** triple. Six of them (blue, teal, violet, pink, amber, green) are also the **identity palettes** that D-07 hashes into.
+Life areas store one of nine colour names (`src/lib/life-areas.ts`). These muted categorical colours apply to existing areas and small identity marks. Six of them (blue, teal, violet, pink, amber, green) are also the identity palettes that D-07 hashes into. A goal with an area uses that area's colour.
 
 | Name | Light container / on | Dark container / on | Dot light / dark |
 |---|---|---|---|
-| gray | `#DDE3EA` / `#171C21` | `#42474D` / `#DDE3EA` | `#72787D` / `#A6ACB2` |
-| red | `#FFDAD8` / `#410004` | `#920023` / `#FFDAD8` | `#D0474F` / `#FF8988` |
-| orange | `#FFDBCC` / `#301400` | `#7F2B00` / `#FFDBCC` | `#C05928` / `#FE8D59` |
-| amber | `#FFDDB6` / `#271900` | `#633F00` / `#FFDDB6` | `#A36B01` / `#E09E3D` |
-| green | `#B1F3AA` / `#072100` | `#0C5215` / `#B1F3AA` | `#468544` / `#7ABB75` |
-| teal | `#80F5F2` / `#00201F` | `#02504F` / `#80F5F2` | `#028584` / `#40BCBA` |
-| blue | `#CAE6FF` / `#011E2E` | `#004C6D` / `#CAE6FF` | `#017FB4` / `#35B5F9` |
-| violet | `#E9DDFF` / `#1A0F4F` | `#4D3A80` / `#E9DDFF` | `#816AB6` / `#B89EEE` |
-| pink | `#FFD8E8` / `#3D0024` | `#7F2154` / `#FFD8E8` | `#B75685` / `#F18BBB` |
+| gray | `#EAE8DF` / `#2C332B` | `#333B34` / `#E5EBE0` | `#606A5E` / `#ADB9AA` |
+| red | `#F9DDD5` / `#682C20` | `#512D26` / `#FFDAD0` | `#A54737` / `#F19C8B` |
+| orange | `#F9E3D0` / `#562E17` | `#503320` / `#FFE4CD` | `#93451F` / `#F1B98D` |
+| amber | `#FBEDBC` / `#48370D` | `#4A3C17` / `#FBE9A9` | `#856213` / `#EAC45B` |
+| green | `#E7EED5` / `#34451E` | `#344322` / `#DDE9C5` | `#4D682F` / `#B5CC8B` |
+| teal | `#DBEBE3` / `#21493D` | `#233F36` / `#D1EDE1` | `#3D7365` / `#91C3B0` |
+| blue | `#E2EBEF` / `#294754` | `#2D424B` / `#D4E7EF` | `#4A6977` / `#98BBCC` |
+| violet | `#EDE6F0` / `#4D365A` | `#42354B` / `#EDDEF2` | `#775887` / `#C7ABD2` |
+| pink | `#F3E4E9` / `#622F45` | `#4D303D` / `#F6DCE7` | `#99536C` / `#DFA6B9` |
 
-Variables: `--area-<name>-container`, `--area-<name>-on`, `--area-<name>-dot`, exposed as utilities (`bg-area-teal-container`). Text on a container uses `-on`: 13.3:1 in light and at least 7.2:1 in dark. **A colour always comes with the area's name in text** (WCAG 1.4.1). The `ColorSwatch` component (`life-area-colors.tsx`) is rebuilt on these variables, and its Tailwind palette classes are removed.
+Variables are `--area-<name>-container`, `--area-<name>-on` and `--area-<name>-dot`, exposed as utilities such as `bg-area-teal-container`. Paired text contrast is at least 8.15:1 in light and 8.26:1 in dark. Dots against their own containers exceed 4.4:1 in both themes. Always show the area name in text. Update `ColorSwatch` in `life-area-colors.tsx` to use these variables.
 
-Life-area calendar items (By area, Timeline) use the container as the fill and `-on` as the text, with a 3 px start border in the dot colour.
+Life-area calendar items (By area and Timeline) use the container fill, paired foreground and a 3 px start border in the dot colour.
 
 ### 1.4 Measured contrast (WCAG 2.x relative luminance)
 
 | Pair | Light | Dark | Needed |
 |---|---|---|---|
-| on-surface / canvas | 16.33 | 14.32 | 4.5 |
-| on-surface-variant / canvas | 8.93 | 10.86 | 4.5 |
-| on-surface-variant / surface-container-highest | 7.25 | 7.26 | 4.5 |
-| on-surface-variant / surface-container-lowest | 9.37 | 11.31 | 4.5 |
-| primary / canvas (links, text buttons) | 6.17 | 10.88 | 4.5 |
-| primary / surface-container (nav bar) | 5.59 | 9.64 | 4.5 |
-| on-primary / primary | 6.48 | 7.71 | 4.5 |
-| on-primary-container / primary-container | 13.29 | 7.28 | 4.5 |
-| on-secondary-container / secondary-container | 13.32 | 7.20 | 4.5 |
-| on-tertiary-container / tertiary-container | 13.21 | 7.23 | 4.5 |
-| on-error / error | 6.49 | 7.68 | 4.5 |
-| error / canvas (field error text) | 6.18 | 10.86 | 4.5 |
-| success / canvas | 6.14 | 10.85 | 4.5 |
-| inverse-on-surface / inverse-surface | 11.55 | 10.16 | 4.5 |
-| inverse-primary / inverse-surface (snackbar action) | 7.71 | 5.02 | 4.5 |
-| on-surface / canvas-mist (text over the mist peak) | 13.31 | 11.12 | 4.5 |
-| outline / canvas (field border, non-text) | 4.25 | 5.83 | 3.0 |
-| primary / progress-track (filled vs unfilled segment) | 3.81 | 5.46 | 3.0 |
+| `on-surface` / `canvas` | 13.29 | 14.54 | 4.5 |
+| `on-surface` / `canvas-mist` | 11.73 | 11.30 | 4.5 |
+| `on-surface-variant` / `canvas` | 6.48 | 9.46 | 4.5 |
+| `on-surface-variant` / `surface-container-highest` | 5.11 | 5.77 | 4.5 |
+| `on-surface-variant` / `resting-surface` | 7.01 | 8.42 | 4.5 |
+| `primary` / `canvas` | 9.32 | 9.57 | 4.5 |
+| `primary` / `surface-container` | 8.38 | 7.61 | 4.5 |
+| `on-primary` / `primary` | 9.32 | 8.44 | 4.5 |
+| `on-primary-container` / `primary-container` | 8.16 | 8.43 | 4.5 |
+| `on-secondary` / `secondary` | 7.38 | 7.38 | 4.5 |
+| `on-secondary-container` / `secondary-container` | 8.72 | 8.39 | 4.5 |
+| `on-tertiary` / `tertiary` | 6.78 | 6.78 | 4.5 |
+| `on-tertiary-container` / `tertiary-container` | 9.41 | 9.39 | 4.5 |
+| `on-reward` / `reward` | 8.78 | 8.78 | 4.5 |
+| `on-reward-container` / `reward-container` | 9.82 | 8.89 | 4.5 |
+| `on-alert` / `alert` | 5.11 | 5.11 | 4.5 |
+| `on-alert-container` / `alert-container` | 8.29 | 9.24 | 4.5 |
+| `on-error` / `error` | 6.82 | 7.51 | 4.5 |
+| `on-error-container` / `error-container` | 9.39 | 8.66 | 4.5 |
+| `error` / `canvas` | 6.30 | 9.85 | 4.5 |
+| `on-success` / `success` | 6.52 | 8.03 | 4.5 |
+| `on-success-container` / `success-container` | 7.99 | 7.94 | 4.5 |
+| `success` / `canvas` | 6.03 | 10.32 | 4.5 |
+| `inverse-on-surface` / `inverse-surface` | 11.63 | 11.32 | 4.5 |
+| `inverse-primary` / `inverse-surface` | 7.29 | 8.67 | 4.5 |
+| `outline` / `canvas` | 4.37 | 5.66 | 3.0 |
+| `focus` / `canvas` | 9.32 | 9.57 | 3.0 |
+| `focus` / `surface-container` | 8.38 | 7.61 | 3.0 |
+| `secondary-ink` / `resting-surface` | 6.19 | 9.70 | 3.0 |
+| `feature-ink` / `resting-surface` | 6.64 | 8.58 | 3.0 |
+| `primary` / `progress-track` | 6.40 | 4.70 | 3.0 |
 
-`progress-track` against white is 1.70:1. The unfilled part of a bar is decorative because the count is always in text, but the filled-vs-unfilled boundary passes 3:1 (WCAG 1.4.11). Never put text in `outline` or `outline-variant`.
+The progress track can be low contrast against a card because the filled segments and the text equivalent carry the value. Kiwi, Sunshine and Crisp Carrot work as fills with their paired dark text. Use `primary`, `secondary-ink` or `feature-ink` for thin marks in their respective roles. `outline` defines control boundaries. Reserve `outline-variant` for decorative detail. Verify rendered states, including state layers and focus against the adjacent colours.
 
 ### 1.5 Patterns
 
@@ -218,7 +235,7 @@ M3 elevates mainly with **tone**. Shadows are kept for floating surfaces.
 | Level | Shadow (light) | Use |
 |---|---|---|
 | 0 | none | Cards on the canvas (tone does the work), rail |
-| `shadow-card` (brand) | `0 1px 2px rgb(23 28 33 / 0.04), 0 8px 24px -12px rgb(38 99 139 / 0.18)` | Cards on the mist (reference 1's floating white cards). **Dark: none** |
+| `shadow-card` (brand) | `0 1px 2px rgb(34 43 35 / 0.04), 0 8px 24px -12px rgb(33 72 57 / 0.16)` | Opaque cards on Cream. **Dark:** none |
 | 1 | `0 1px 2px rgb(0 0 0 / .3), 0 1px 3px 1px rgb(0 0 0 / .15)` | Elevated buttons (rare) |
 | 2 | `0 1px 2px rgb(0 0 0 / .3), 0 2px 6px 2px rgb(0 0 0 / .15)` | Nav bar when content scrolls under it, menus |
 | 3 | `0 1px 3px rgb(0 0 0 / .3), 0 4px 8px 3px rgb(0 0 0 / .15)` | FAB, FAB menu items, snackbars, dialogs |
@@ -239,7 +256,7 @@ In dark mode, levels 1–5 keep the same shadows, but the surface also steps up 
 
 Utility: `.state-layer` (relative, overflow hidden, `::before` inset 0, `background: currentColor`, opacity from `--state`, transition `default-effects`).
 
-**Focus ring:** `outline: 3px solid var(--md-focus); outline-offset: 2px`. Nav items, list items and day cells inside bars use `outline-offset: -3px`. The existing `focusRing` helper in `cx.ts` is updated, not replaced.
+**Focus ring.** Use a 3 px `focus` outline with a 2 px offset on neutral surfaces. On filled or tinted controls, use a two-tone ring with a contrasting inner stroke against the fill and an outer stroke against the surrounding surface. For nav items, list items and day cells inside clipping containers, keep the ring inset and verify its contrast locally. Update the existing `focusRing` helper in `cx.ts`. Retain visible focus in forced-colour modes.
 
 ## 6. Layout
 
@@ -361,9 +378,9 @@ The destination icons are home (Home), checklist (Plan), flag (Goals), cycle (Tr
 
 ## 11. Dark theme specifics
 
-- Cards use `surface-container-low` on `canvas` (not `-lowest`), so they lift by tone. There is no `shadow-card`.
-- The mist uses `canvas-mist` dark (`#002D45`) at 60 % strength.
-- Primary-filled elements become pale (`#98CCF9`), with dark text (`on-primary #00344E`). Check every filled control by eye in dark mode.
+- Cards use `resting-surface` on `canvas`, with tone providing separation.
+- Any upper-canvas wash uses the dark `canvas-mist` tone and fades out before dense content.
+- Dark mode pairs a light Forest-derived `primary` with dark `on-primary` for legible buttons and links. Kiwi, Crisp Carrot, Sunshine and Tomato Burst keep their meanings in both themes.
 - FullCalendar's variables follow automatically through `calendar-theme.css` (§12).
 
 ## 12. Migration from the current tokens (UI-1)
@@ -373,7 +390,7 @@ The destination icons are home (Home), checklist (Plan), flag (Goals), cycle (Tr
 | Legacy var / utility | Becomes |
 |---|---|
 | `--bg` / `bg-bg` | `var(--md-canvas)` |
-| `--surface` / `bg-surface` | `var(--md-surface-container-lowest)` |
+| `--surface` / `bg-surface` | `var(--md-resting-surface)` |
 | `--surface-muted` / `bg-surface-muted` | `var(--md-surface-container)` |
 | `--fg` / `text-fg` | `var(--md-on-surface)` |
 | `--fg-muted` / `text-muted` | `var(--md-on-surface-variant)` |
@@ -392,21 +409,21 @@ The destination icons are home (Home), checklist (Plan), flag (Goals), cycle (Tr
 |---|---|
 | event | `primary-container` / `on-primary-container` |
 | today | 6 % primary |
-| now line | `tertiary` |
+| now line | `feature-ink` |
 | highlight | 12 % primary |
 | button | `surface-container-high` |
 
 UI-13 removes every alias and every legacy utility use. It deletes the default Tailwind breakpoints and the `--fs-*` scale, and adds a CI-friendly check: `pnpm lint:tokens`, a small Node script that greps `src/` for `bg-surface\b`, `text-muted\b`, `bg-accent`, `border-border`, `\b(sm|md|lg|xl):`, `bg-(red|blue|…)-\d` and raw `#hex` in `.tsx`, and exits non-zero on any match.
 
-## 13. Experience composition tokens (revision 3)
+## 13. Experience composition tokens
 
-Read [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) for allocation and screen treatments. These aliases use the existing light/dark roles; they introduce no additional hex palette. UI-1 maps them into Tailwind using the same pattern as §1.2. Experience aliases remain after UI-13; they are not legacy aliases.
+Read [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) for screen treatments. UI-1 maps these aliases to Tailwind using the pattern in §1.2. Keep the experience aliases through UI-13.
 
 | CSS token | Value | Paired foreground / purpose |
 |---|---|---|
-| `--md-feature-surface` | `var(--md-primary-container)` | `--md-on-feature-surface` = `var(--md-on-primary-container)`; one focal module |
-| `--md-resting-surface` | `var(--md-surface-container-lowest)` | `--md-on-resting-surface` = `var(--md-on-surface)`; ordinary content |
-| `--md-confirmation-surface` | `var(--md-tertiary-container)` | `--md-on-confirmation-surface` = `var(--md-on-tertiary-container)`; local confirmed response |
+| `--md-feature-surface` | `var(--md-tertiary-container)` | `--md-on-feature-surface` = `var(--md-on-tertiary-container)`; one focal module |
+| `--md-resting-surface` | Light `var(--md-surface-container-lowest)`, dark `var(--md-surface-container-low)` | `--md-on-resting-surface` = `var(--md-on-surface)`; ordinary content |
+| `--md-confirmation-surface` | `var(--md-reward-container)` | `--md-on-confirmation-surface` = `var(--md-on-reward-container)`; local confirmed response |
 | `--md-reflection-surface` | `var(--area-violet-container)` | `--md-on-reflection-surface` = `var(--area-violet-on)`; small Review/Notes motif |
 | `--feedback-halo-duration` | `600ms` | Maximum lifetime of the non-looping local halo; opacity uses existing effects easing |
 | `--feedback-press-scale` | `0.96` | Inner pointer-activated icon only; never scale a text field, target or whole task row |
@@ -415,4 +432,4 @@ Use foreground/background aliases together at full opacity. Opacity applies only
 
 **Motion:** progress is accurate and stationary on first paint. Animate only an actual value change caused by an action on the current screen, from the currently rendered value. Success emphasis requires a confirmed mutation; optimism alone never triggers it. No viewport-triggered fill, number count-up or repeating success animation. Reduced motion disables the spatial effect and halo while preserving all state text.
 
-**Contrast review:** aliases inherit existing role pairs. Recheck the final rendered composition, including interactive outlines, state layers and marks, rather than assuming a palette table proves every component. Large numerals must not cause supporting captions to fall below normal-text contrast. Identity color is never the sole state signal.
+**Contrast review.** Aliases inherit the role pairs in §1. Recheck the final rendered composition, including interactive outlines, state layers and marks, rather than assuming a palette table proves every component. Large numerals must not cause supporting captions to fall below normal-text contrast. Identity color is never the sole state signal.

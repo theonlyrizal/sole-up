@@ -1,20 +1,16 @@
 # SoleUp design direction
 
-**Revision 3 · 2026-11-08.** This is a short entry point. Exact tokens live in [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md); page layouts in [SCREENS.md](SCREENS.md); color composition and satisfying feedback in [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md).
+**Revision 4 · 2026-11-12**
 
-## A clear morning, a satisfying mark
+## Warm surfaces and clear actions
 
-An airy lake-blue canvas, substantial white surfaces, tactile weekday capsules, bold useful figures, and stable personal colors. Small peach confirmations make saved actions feel tangible. Material 3 Expressive provides the shapes, typography, color roles and motion language.
+Cream (`#F7F4EC`) is the main background. Opaque cards carry the content. Forest Green (`#214839`) gives primary buttons, links and selected dates a consistent anchor. Kiwi (`#B5CC8B`) supports secondary actions. Crisp Carrot (`#E99A64`) draws attention to a featured card, Sunshine (`#EAC45B`) marks rewards and highlights, and Tomato Burst (`#D86753`) signals promotions and alerts.
 
-- **Direction:** lake blue — light primary `#26638B`, dark primary `#98CCF9`.
-- **Atmosphere:** mist `#CBE6FF` above light canvas `#F5FAFF`; dark counterparts come from the full role table.
-- **Content:** opaque white in light mode; deliberately layered dark surfaces in dark mode.
-- **Identity:** six stable container palettes; life-area colors retain their existing meaning.
-- **Confirmation:** peach `tertiary-container`, local and brief; green success for saved/working status.
-- **Typography:** Google Sans Flex for UI, Geist Mono for code. Use semantic type tokens.
-- **Shape:** 28–32 px major cards, 16 px fields, pill actions and day capsules. Shape varies by function.
-- **Response:** immediate activation, honest pending, confirmed save, recoverable failure. Progress rests at its true value on first paint.
+Use shape and hierarchy to distinguish components. Home pairs tall weekday capsules with a featured commitment and a strip of habit tiles. Today uses compact action rows. Track shifts from tall bars to date cells to a dot matrix as the range grows. Goal detail shows the milestone count in a segmented arc, and Review uses a warm finish sheet after a successful save.
 
-Use paired role colors, 4.5:1 minimum normal-text contrast, 3:1 large-text and required non-text contrast, visible focus, full keyboard access and reduced motion. Color reinforces labels and patterns.
+Use Google Sans Flex for UI and Geist Mono for code. Pair each coloured surface with its foreground, preserve visible focus and keyboard access, and use reduced-motion settings. Progress renders at its true value on first paint. Save feedback follows the confirmed action.
 
-The previous lime/Inter mini-spec is superseded. It contradicted the full plan and had incomplete light/dark role pairing. This file must not become a parallel token source again.
+- [Design system and exact role pairs](DESIGN_SYSTEM.md#1-colour)
+- [Component anatomy](COMPONENTS.md)
+- [Screen compositions](SCREENS.md)
+- [Colour and interaction recipes](EXPERIENCE_DESIGN.md)

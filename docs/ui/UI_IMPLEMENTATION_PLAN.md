@@ -1,13 +1,13 @@
 # SoleUp UI implementation plan
 
-**Status:** Revision 3 experience refinement, 2026-11-08. Retains the existing phase sequence and adds mandatory experience acceptance. The tracker records delivery status.
+**Status** — Revision 4, 2026-11-12. The phase tracker records delivery status.
 **Scope:** A full frontend redesign in Material 3 Expressive, delivered as phases UI-0 to UI-13.
 **Source of truth for design:**
 - [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) (the D-xx decisions and the product rules in §2);
 - [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) (tokens);
 - [COMPONENTS.md](COMPONENTS.md);
 - [SCREENS.md](SCREENS.md);
-- [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) (revision 3 color recipes, feedback choreography, phase ownership and acceptance rubric);
+- [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) (colour composition, feedback, phase ownership and acceptance);
 - [UI_AUDIT.md](UI_AUDIT.md) (current routes and contracts).
 
 ---
@@ -49,13 +49,13 @@
     From UI-13 on, also run `pnpm lint:tokens`.
 11. **Manual checks the agent can't do** (a real phone, installed PWA, screen reader): list them under "Manual steps for the user" and mark them unverified unless the user confirms.
 
-### Revision 3 experience requirements for every phase
+### Experience requirements for every phase
 
 Read EXPERIENCE_DESIGN in full before implementing a phase; §8 maps delivery ownership. Implement the applicable page recipe and action states as part of the phase, not an optional polish follow-up. Add DESIGN_SYSTEM §13 aliases in UI-1 and the COMPONENTS Part H confirmation primitive in UI-2b. Wire the latter to existing actions in UI-5/9; the wrapper must never own mutations or infer persisted success.
 
 Every handoff includes: the EXPERIENCE_DESIGN §7 rubric with rationale, light/dark screenshots, and actual pending/failure/retry/reduced-motion observations for changed interactions. Add targeted behavioral tests for new feedback behavior. Do not write tests solely to mirror token names or color ratios. Never claim a retention or psychological effect without measured evidence.
 
-First paint shows true values without progress reveals or count-ups. Home gets one focal card with the no-commitment fallback. Preserve stable entity identity across routes. Chart targets remain 48 px with local overflow on small screens. These revision 3 rules supersede older visual instructions; product rules and domain behavior remain authoritative.
+First paint shows true values without progress reveals or count-ups. Home gets one focal card with the no-commitment fallback. Preserve stable entity identity across routes. Chart targets remain 48 px with local overflow on small screens. Check the phase’s visual states against the role pairs in DESIGN_SYSTEM, including filled controls, focus, warnings and progress marks.
 
 ## 3. Shared engineering decisions
 
@@ -70,7 +70,7 @@ First paint shows true values without progress reveals or count-ups. Home gets o
 - **Breakpoints in JS.** `src/lib/breakpoints.ts` exports `BREAKPOINTS = { medium: 600, expanded: 840, large: 1200, xlarge: 1600 }` and `mediaQuery(name)`. CSS `@theme` uses the same numbers. A unit test reads `globals.css` and checks they match.
 - **`useMediaQuery` / `useKeyboardOpen` / `useScrolled`** live in `src/components/hooks/`, as client-only hooks with `useSyncExternalStore` (copy the pattern in `time-grid-view.tsx`).
 - **Icons pipeline.** `pnpm icons:generate` runs `node scripts/generate-material-icons.mts` and writes `src/components/icons/icon-paths.generated.ts`, which is committed and starts with a "generated, do not edit" header. Adding an icon means editing the allowlist and regenerating. CI doesn't regenerate.
-- **Palette script.** `scripts/generate-palette.mts` (committed in UI-1) prints the token table and the contrast report in DESIGN_SYSTEM §1. It documents where the values came from; it isn't wired into the build.
+- **Palette script.** `scripts/generate-palette.mts` (UI-1) prints the fixed brand swatches, resolved role pairs and their contrast report from DESIGN_SYSTEM §1. It uses the documented role values as inputs.
 - **Legacy aliases** (DESIGN_SYSTEM §12) exist from UI-1 to UI-13 so pages not yet redesigned stay coherent.
 
 ## 4. UI phase tracker
@@ -114,15 +114,15 @@ Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scop
 
 **Build:**
 1. **`globals.css`.**
-   - Add `--md-*` roles for light (`:root`) and dark (both the `prefers-color-scheme` block and the `[data-theme="dark"]` block, kept identical, as today), the area variables, `--md-progress-track`, `--md-focus` and `--md-canvas-mist`.
+   - Add the roles and aliases in DESIGN_SYSTEM §§1 and 13, including life-area variables. Keep the system-dark and explicit-dark values identical.
    - In `@theme inline`, map them to `--color-<role>` (with `--color-canvas` for M3 surface).
    - Add the type scale as `--text-<token>` with `--text-<token>--line-height`, `--letter-spacing` and `--font-weight` (Tailwind v4 font-size tuple variables), plus the emphasized variants as utilities.
    - Add the radius scale (`--radius-xs` … `--radius-4xl`), the shadows (`--shadow-card`, `--shadow-1` … `--shadow-5`), and the easing and duration tokens. Tailwind v4 generates `ease-*` from `--ease-*`. If `duration-*` has no theme namespace, use `duration-(--duration-<token>)` and document that in the file.
    - Add the breakpoints `--breakpoint-medium/expanded/large/xlarge`.
-   - Add `.state-layer`, `.morph-press`, `.morph-select`, `.bg-hatch`, the canvas mist layer (`body::before` or a layout element; fixed, `pointer-events: none`, `z-index: -1`), and the reduced-motion and `prefers-contrast: more` blocks.
+   - Add `.state-layer`, `.morph-press`, `.morph-select`, `.bg-hatch`, the scoped header wash described by D-09, and the reduced-motion and `prefers-contrast: more` blocks.
    - Turn the legacy variables into aliases (DESIGN_SYSTEM §12). Keep the `.note-content` rules, retuned to the new type tokens.
 2. **Fonts.** In `layout.tsx`, replace Geist with `Google_Sans_Flex` (variable, `axes: ["ROND", "opsz", "wdth", "GRAD"]` as the installed `next/font` supports, `subsets: ["latin", "latin-ext"]`, `display: "swap"`, `variable: "--font-sans"`). Keep `Geist_Mono` as `--font-mono`. Set `font-variation-settings` per type token for ROND. Check that the font is self-hosted at build time (no runtime Google request).
-3. **Theme.** Add `src/lib/theme.ts` and the init script in `<head>` (§3). Update `viewport.themeColor` to the `canvas` values (`#F5FAFF` / `#0F1419`).
+3. **Theme.** Add `src/lib/theme.ts` and the init script in `<head>` (§3). Update `viewport.themeColor` to the `canvas` values (`#F7F4EC` / `#191F19`).
 4. **Icons.**
    - Add the devDependency `@material-symbols/svg-400` (check the version and Apache-2.0 licence with `pnpm view`, and pin it exactly, as the repo pins every dependency).
    - Write `scripts/generate-material-icons.mts` using the allowlist in DESIGN_SYSTEM §9. Read the package's `rounded/<name>.svg` and `rounded/<name>-fill.svg` (check the folder layout first), extract the `d` attribute, and fail on a missing name.
@@ -132,8 +132,8 @@ Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scop
 7. **Calendar and life areas.**
    - `calendar-theme.css`: remap to M3 roles (§12).
    - `life-area-colors.tsx`: swatches use `bg-area-<name>-dot`; remove the Tailwind palette classes.
-8. **Focus.** `cx.ts`: change `focusRing` to the 3 px `focus` outline.
-9. **Scripts.** Commit `scripts/generate-palette.mts` (the generator behind DESIGN_SYSTEM §1). Add the visual harness (§5): `scripts/run-visual.mts`, `tests/e2e/visual-capture.spec.ts` covering `/home`, `/plan/today`, `/track`, `/review` and `/settings`, and the `test:visual` script.
+8. **Focus.** `cx.ts`: update `focusRing` for the neutral and filled-control treatments in DESIGN_SYSTEM §5.
+9. **Scripts.** Commit `scripts/generate-palette.mts` (the fixed-role and contrast report from DESIGN_SYSTEM §1). Add the visual harness (§5): `scripts/run-visual.mts`, `tests/e2e/visual-capture.spec.ts` covering `/home`, `/plan/today`, `/track`, `/review` and `/settings`, and the `test:visual` script.
 
 **Tests:**
 - **Unit:** `theme.test.ts` (`resolveTheme`, script string), `shapes.test.ts` (every shape has 120 points so they can morph; the paths are deterministic), `identity.test.ts` (stable output for fixed ids; the distribution covers every shape and palette over 1,000 random UUIDs), `icon.test.tsx` (`aria-hidden`, viewBox), `breakpoints.test.ts` (the CSS and JS values match).
@@ -163,7 +163,7 @@ Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scop
 
 **Build:**
 - `Card` + `CardHeader`, `ListGroup` / `ListItem`, `Disclosure`.
-- Rewrite `DialogContent`; add `FormDialog` (adapting by size class through `useMediaQuery("medium")`, server-safe: render the dialog variant until mounted); restyle `ConfirmDialog`.
+- Rewrite `DialogContent` and restyle `ConfirmDialog`. Add `FormDialog` with a centred dialog on medium and wider and a compact full-screen form with an opaque sticky submit footer. Use `useMediaQuery("medium")` and render the centred variant until mounted.
 - `BottomSheet` / `ResponsiveSheet`, `Menu`, `Popover`, `Tooltip`.
 - Restyle `toast()` / `Toaster` as snackbars (placement per D-27, using the UI-3 bar height constant; until UI-3 lands, keep today's offsets).
 - `LoadingIndicator`, `Skeleton` / `LoadingState`, `EmptyState` (with `art` and `compact`), `ErrorState`, `InlineBanner`, `FormError` (on `InlineBanner`), `SaveStatus`, `Badge`, and the `PageContainer` and `PageHeader` shells (the shell wiring itself is UI-3).
@@ -187,7 +187,7 @@ Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scop
   - a content column holding `<main id="main" tabIndex={-1}>`;
   - `NavigationBar` and `Fab` (compact);
   - `Toaster`;
-  - the mist layer;
+  - the canvas and the scoped header wash (D-09);
   - the time-zone gate (no nav, as before), restyled per SCREENS §0.
 - Rail collapse state per D-11 (`localStorage["soleup.rail"]`, read after mount; the default expanded at `large:` gives no layout shift, because CSS decides the first paint and the stored "collapsed" applies after hydration with no width animation on that first apply).
 - `nav-items.ts`:
@@ -221,7 +221,7 @@ Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scop
 **Gate:** ask for sign-off on **5-A**. Fallback: MetricCard shows the definition as a visible `body-small` line under the value, plus the range caption, and puts only "As of" behind the info button.
 
 **Build:**
-- `src/components/data/*` for the listed components.
+- Build the listed data components. Use one Crisp Carrot feature card, with Today taking that role when there is no next commitment. Present habit previews as a snap list on compact and a grid on expanded.
 - Pure helpers `src/lib/greeting.ts` (`greetingFor(now, timeZone)`) and `src/lib/week-strip.ts` (`weekDays`), plus `isCommitmentUnderWay` in `src/lib/schedule.ts` (additive).
 - Rebuild `home-view.tsx` (split it into `home/greeting.tsx`, `home/next-commitment-card.tsx`, `home/today-card.tsx`, `home/habit-carousel.tsx`, `home/goals-card.tsx`, `home/deadlines-card.tsx`) and `home/page.tsx` (pass `user.name` and `weekStart`).
 - `home/loading` skeleton and `error.tsx` restyle.
@@ -265,7 +265,7 @@ Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scop
 - The responsive calendar header (view group in link mode, date navigation, `DatePicker` "Go to date", action buttons).
 - The compact `WeekStrip`.
 - Restyle the FullCalendar wrapper and `calendar-theme.css` (item cards per SCREENS), `agenda-view`, `time-grid-view` and its task panel, `area-columns-view` and `area-timeline-view` (area colours and `AreaChip` headings), and `view-nav`.
-- Dialogs on `FormDialog`, with Repeat as a `Disclosure`, the scope chooser as `RadioRow`s, and warnings as `InlineBanner`.
+- Use `FormDialog` for Calendar forms, with paired Start and End field groups, Repeat as a `Disclosure`, the scope chooser as `RadioRow`s, and Tomato Burst warning banners.
 - Do not change the item-placement maths or any keyboard handler logic.
 
 **Tests:** every calendar spec passes, with names updated if needed; add axe for each view in both themes; check the date picker by keyboard (arrows, PageUp/PageDown, Enter navigates to `?date=`); check that at 390 px Week falls back to Day as before.
@@ -380,3 +380,8 @@ Append one note per phase, newest last. Template:
 - **Delivered:** EXPERIENCE_DESIGN, reconciled DESIGN summary, page color recipes and aliases, local confirmed-feedback contract, Home focal fallback, honest count treatment, chart target corrections, and phase-specific prompt additions.
 - **Delivery state:** this entry documents planning only; it does not mark any implementation phase done or assert a PR has merged.
 - **Verification scope:** documentation links, phase-prompt coverage, formatting and whitespace checks; no application behavior is changed by this revision. Browser appearance, interaction timing and perceived appeal must be validated during implementation using the experience rubric.
+
+### UI-0 · Brand and component refinement (2026-11-12)
+
+- **Delivered** — Six fixed brand swatches, paired light and dark roles, contrast calculations, and component recipes for Home, Today, Track, Calendar, Goals, and Review. The phase briefs and prompts use the updated specification.
+- **Verification scope** — Role values, contrast calculations, cross-references, and Markdown diff. Browser appearance and interactions are part of phase acceptance.

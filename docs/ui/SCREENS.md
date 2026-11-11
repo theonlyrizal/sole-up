@@ -1,8 +1,7 @@
 # SoleUp screens
 
-**Revision 3 experience refinement · 2026-11-08.** Each route also implements [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) §§2, 4–7: page color recipes, precise local feedback and visual acceptance. Wireframes show information order; they are not permission to render every module with identical weight.
+**Revision 4 · 2026-11-12.** Use [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) for colour, feedback and visual acceptance. Each section gives:
 
-**Status:** Revision 3, 2026-11-08 (route inventory established in revision 2). One section per route or route group. For each screen:
 - the **question** it answers first;
 - the **data** (the exact existing functions and fields);
 - **wireframes** for compact (about 390 px) and expanded or large (about 1280 px);
@@ -22,7 +21,7 @@ Conventions in the wireframes:
 
 **Compact:**
 ```
-┌──────────────────────────────┐  ← TopAppBar (64 + safe top), transparent over the mist
+┌──────────────────────────────┐  ← TopAppBar (64 + safe top), transparent over the canvas
 │ ‹  Title               🔍  ⋮ │
 │                              │
 │   page content …             │
@@ -71,8 +70,8 @@ Conventions in the wireframes:
 
 **Time-zone gate** (`(app)/layout.tsx` with `confirmed === false`):
 - No nav, no FAB.
-- A centred `PageContainer width="reading"` holds a `Card variant="hero"`: the `ShapeAvatar` user monogram, "Confirm your time zone" in `headline-small`, the existing copy, and then `PreferencesForm mode="confirm"` restyled with the new fields.
-- Full mist background.
+- A centred `PageContainer width="reading"` holds a default `Card` with the `ShapeAvatar` user monogram, "Confirm your time zone" in `headline-small`, the existing copy, and then `PreferencesForm mode="confirm"` restyled with the new fields.
+- Cream canvas in light mode. Use the paired dark canvas when selected.
 
 **Tests to update:** `tests/e2e/shell.spec.ts` (nav names, More sheet, rail), `src/components/shell/nav-items.test.ts`. Add: a compact viewport test that every destination is reachable through the bar or More, a keyboard pass through the rail, and axe in light and dark.
 
@@ -90,7 +89,7 @@ Conventions in the wireframes:
 
 New pure helpers (unit tested): `greetingFor(clock, timeZone)` and `weekDays(today, weekStart, locale)`.
 
-**Home focal rule:** one blue focal module at a time. When `next.value` is null, Today takes `feature-surface` and the absence of a commitment becomes a compact neutral line with the existing calendar link. Preserve its definition/range access. Today counts are not completion progress; never graph planned/due/decide as a partition or use a fake denominator. Personal habit tiles use stable identity colors. See EXPERIENCE_DESIGN §5 for first-viewport composition.
+**Home focal rule:** one Crisp Carrot focal module on `feature-surface`. When `next.value` is null, Today takes that treatment and the absence of a commitment becomes a compact neutral line with the existing calendar link. Preserve its definition/range access. Show planned, due and needs-a-decision as distinct counts and links. Personal habit tiles use stable identity colours. See EXPERIENCE_DESIGN §5 for first-viewport composition.
 
 **Compact:**
 ```
@@ -156,9 +155,9 @@ New pure helpers (unit tested): `greetingFor(clock, timeZone)` and `weekDays(tod
 | Greeting | `greetingFor` + first word of `user.name` | No name → "Good morning" |
 | Date line | `clock.today` formatted `weekday long, day, month long` in `locale` | |
 | WeekStrip | `weekDays(clock.today, weekStart)`; `href = calendarHref({ view: "day", date })` from `src/lib/calendar-views.ts` (use the existing builder) | Today `aria-current="date"` |
-| Next commitment | `next.value` (`ScheduleEntry`): kind label `agendaEntryKind`, `title`, `commitmentWhenLabel(...)`, link `calendarItemHref(entry, today, zone)` | "Now" chip (tertiary-container) when the commitment is under way. Add a pure `isCommitmentUnderWay(entry, now)` to `src/lib/schedule.ts` that mirrors `commitmentWhenLabel`'s `!allDay && end !== null && start <= now` branch, and unit-test the two together. Never parse the label string. `next.value === null` → "Nothing coming up in the next 30 days." with [Add an event] → `/plan/calendar` |
+| Next commitment | `next.value` (`ScheduleEntry`): kind label `agendaEntryKind`, `title`, `commitmentWhenLabel(...)`, link `calendarItemHref(entry, today, zone)` | "Now" chip (`tertiary` / `on-tertiary`) when the commitment is under way. Add a pure `isCommitmentUnderWay(entry, now)` to `src/lib/schedule.ts` that mirrors `commitmentWhenLabel`'s `!allDay && end !== null && start <= now` branch, and unit-test the two together. Never parse the label string. `next.value === null` → "Nothing coming up in the next 30 days." with [Add an event] → `/plan/calendar` |
 | Today | `today.value.planned`, `.due`, `.decide`; anchors `todaySectionAnchor(...)`; labels `TODAY_SECTION_LABELS` | Zero counts show as outlined chips, still linked |
-| Habit cards | `habits.value[]`: `ShapeAvatar(id, title)`, `title`, `SegmentedPillBar(value = thisWeek.done, total = thisWeek.target)`, caption `weekProgressFigure(thisWeek, cadenceType, measure)`, second line `TRACK_RANGE_LABELS["4w"] + ": " + formatConsistency(consistency, cadenceType, measure)` | The card title links to `/track#habit-<id>` (`trackHabitAnchor`). No combined number anywhere |
+| Habit cards | `habits.value[]`: `ShapeAvatar(id, title)`, `title`, `SegmentedPillBar(value = thisWeek.done, total = thisWeek.target, max = 12)` on compact, caption `weekProgressFigure(thisWeek, cadenceType, measure)`, second line `TRACK_RANGE_LABELS["4w"] + ": " + formatConsistency(consistency, cadenceType, measure)` | The card title links to `/track#habit-<id>` (`trackHabitAnchor`). No combined number anywhere |
 | Goals card | `goals.value` count, `goalList` (first 3; "View all {n}" expands in place with a `Disclosure`, keeping `id="goals-without-next-action"`) | Rows link to `/goals/<id>` |
 | Deadlines | `deadlines.value` → `/plan?due=next7` | |
 | Range captions and ⓘ | `metric.range` via `metricRangeLabel`, `metricAsOfLabel`, `metric.definition` | D-16 (needs sign-off 5-A; otherwise the definition shows as a visible `body-small` line) |
@@ -188,7 +187,7 @@ New pure helpers (unit tested): `greetingFor(clock, timeZone)` and `weekDays(tod
 │ Schedule                             │ title-medium
 │ (All day: Conference ›)              │ all-day chips first
 │ ● 09:00  Standup · Event          ›  │ Timeline
-│ ◎ 14:30  Thesis block · Time block › │ (Now ring tertiary)
+│ ◎ 14:30  Thesis block · Time block › │ (Now ring feature-ink)
 │ ─────────────────────────────────── │
 │ Planned for today   3  [+ Add to today] │ header + count badge + section action (tonal xs → ResponsiveSheet)
 │ 3 tasks · 1 h 30 min estimated, 1 …  │ hint: plannedSummary(tasks) when non-empty, else TODAY_SECTION_HINTS
@@ -256,7 +255,7 @@ New pure helpers (unit tested): `greetingFor(clock, timeZone)` and `weekDays(tod
   5. Estimate (a `NumberStepper` in minutes);
   6. Reminder (`ReminderSelect`).
 - **Sections below** the fields (`Disclosure`-free, each a titled card section): **Time blocks** (`task-blocks`) and **Linked notes** (`task-notes` / `linked-notes`).
-- **Footer:** status actions (Complete, Cancel task, Reopen) and **Delete…** (danger-text) on the start side.
+- **Actions:** Compact keeps Save in the sticky footer. Place status actions (Complete, Cancel task, Reopen) and **Delete…** in a separate section of the scrolling content. On wider screens these actions can sit at the start of the dialog footer.
 - **Must survive:** the delete confirmation copy that names kept notes and points open tasks at cancelling; reminder status and snooze; opening by `?item` from search results (the task dialog opens from `/notes/search`).
 
 ### Quick Add (`quick-add.tsx`)
@@ -278,18 +277,19 @@ New pure helpers (unit tested): `greetingFor(clock, timeZone)` and `weekDays(tod
 - **Compact:** the app bar reads "Calendar" (tabs above). Toolbar row 1: `‹` `Today` `›` and the date label (`title-medium`, a button that opens the `DatePicker` "Go to date"). Row 2: a view `ConnectedButtonGroup` in link mode (Agenda · Day · Areas · Timeline). **Week is hidden on compact**, because the existing Week → Day fallback applies below the `medium`/`expanded` threshold (keep the `useMediaQuery` behaviour, now through `src/lib/breakpoints.ts`).
 - **Medium and wider:** one row: date navigation · date label · the view group (Agenda, Week, Day, By area, Timeline) · then [New event] (filled), [Block time] (tonal), and for Agenda the days group (7 · 14 · 30).
 - **Day and Agenda on compact** show a `WeekStrip` under the toolbar for quick day jumps (its links keep `view` and set `date`).
+- **Go to date** opens a sheet on compact or an anchored popover on wider screens. The month chips sit above a circular date grid. The selected date is filled, today is ringed, and other-month dates remain legible over the hatch.
 
 **Views:**
 - **Agenda** (`agenda-view.tsx`): the FullCalendar list, restyled.
   - **Day headers:** `DateBadge` plus the weekday.
-  - **Items:** a `ListItem`-like row: a leading time column (`label-large` `tabular-nums`, "All day" first), a 4 px colour bar (event `primary`, block `secondary`, deadline dashed `outline`), the title, and a kind chip.
+  - **Items:** a `ListItem`-like row: a leading time column (`label-large` `tabular-nums`, "All day" first), a 4 px colour bar (event `primary`, block `secondary-ink`, deadline dashed `outline`), the title, and a kind chip.
 - **Week and Day** (`time-grid-view.tsx`):
-  - **Grid:** the FullCalendar time grid with a 1 px `outline-variant` slot lattice on `surface-container-lowest`, hour labels in `label-small`, a "now" line (2 px `tertiary` with a 8 px dot), and today's column tinted 6 % `primary`.
+  - **Grid:** the FullCalendar time grid with a 1 px `outline-variant` slot lattice on `resting-surface`, hour labels in `label-small`, a "now" line (2 px `feature-ink` with an 8 px dot), and today's column tinted 6 % `primary`.
   - **Items:** events are `primary-container` cards with radius 8, a 3 px start bar in `primary`, and `label-large` title plus time. Time blocks are `secondary-container` with the block status icon. Timed deadlines are a dashed `outline` marker.
   - **Interaction:** the selection highlight is 12 % `primary`, and dragged items get level 5 with a scale of 1.02. The desktop task panel becomes a `Card` on the right at `large:`.
 - **By area and Timeline:** as Week and Day, but each item uses its area's container and on colours with a dot bar (DESIGN_SYSTEM §1.3). Column and row headings carry `AreaChip`. The "No area" heading uses gray. Archived areas are marked with a "(archived)" text suffix and the `archive` icon.
 - **Dialogs** (event, block, move-block, delete-event, scope chooser, repeat builder): `FormDialog` with progressive disclosure.
-  - **Always visible:** title, all-day `Switch`, start and end.
+  - **Always visible:** title, all-day `Switch`, and paired Start and End field groups. Stack the groups on compact and place them side by side when both can fit their labels, values and inline errors. Retain the existing date/time controls and timezone behaviour.
   - **"Repeat" section:** a `Disclosure` that shows the summary (`describeRecurrence`) when closed.
   - **"Reminder", "Goal / area" and "Notes":** sections.
   - **Scope chooser:** a `RadioRow` list ("This event", "This and following", "All events") with the existing dropped-exceptions warning as an `InlineBanner warning`.
@@ -341,7 +341,7 @@ Compact
 │ ‹ Goals                       ⋮  │ ⋮ = Edit · status actions · Delete…
 │ (L)  Learn Spanish               │ ShapeAvatar 56 + headline-small (h1)
 │ (Active) (● Learning) Target 1 Jun│ StatusChip · AreaChip · target
-│ ▢ hero  Why this matters          │ reason (body-large) — the anchor of the page
+│ ▢ Why this matters               │ reason (body-large) — the anchor of the page
 │ ▢ Next action                     │ nextAction as TaskRow, or "No next action yet" + [Add a task]
 │ ▢ Progress                        │ MilestoneArc 200px, "3 of 5 milestones", ⓘ MILESTONE_PROGRESS_HELP
 │ ▢ Milestones           [+ Add]    │ ListGroup: drag handle → Up/Down buttons (existing), check, ⋮
@@ -357,7 +357,7 @@ Compact
 - **Starter offer:** `starter-life-areas-offer` as a dismissible `Card variant="tonal"` with the area chips previewed.
 - **List:** a `ListGroup` of active areas. Each row: the colour `ColorSwatch` (16 px), the name, the goal count if available today, ↑ ↓ `IconButton`s (the existing reorder), and ⋮ (Edit, Archive, Delete…).
 - **Archived:** a `Disclosure` "Archived (n)".
-- **Area form:** `FormDialog` with Name and Colour. Colour is a `RadioGroup` of 9 swatch buttons, 40 px circles, each labelled by its name (`colorLabel`), plus "No colour". The selected swatch gets a `check` and a ring.
+- **Area form:** `FormDialog` with Name and Colour. Colour is a `RadioGroup` of 9 swatch buttons, 40 px circles, each labelled by its name (`colorLabel`), plus "No colour". The selected swatch gets a `check`, a contrasting ring, and the checked radio state. Each circle sits within a non-overlapping 48 px target.
 
 ### Archived goals `/goals/archived`
 A `ListGroup`. Each row shows the avatar, title, "Completed on …" or "Archived on …", and the counts. The trailing [Restore] (tonal xs) has a ⋮ with Delete….
@@ -409,7 +409,7 @@ On compact, compute fit from the available card content width after gutters and 
 - Tapping a loggable day opens a `ResponsiveSheet` titled with the `dateLabel` and described by the habit title.
 - **Check habits:** a `RadioRow` list of Done, Skip, or No log (clear).
 - **Quantity habits:** a `NumberStepper` with "Full target ({target} {unit})" as a tonal shortcut, plus Skip and Clear.
-- The figure updates through the existing optimistic flow. Local success emphasis waits for confirmed persistence: check/amount settles, a 600 ms peach halo fades behind the changed icon, then the saved state rests. Roll back on failure, retain quantity input, and provide the existing retry/correction. Undo stays where supported today. No effect on mount, identical saves, back navigation or Undo. See EXPERIENCE_DESIGN §4.
+- The figure updates through the existing optimistic flow. Once the save succeeds, the check or amount settles and a 600 ms Sunshine halo fades behind the icon. The saved state stays visible. Roll back on failure, retain quantity input, and provide the existing retry/correction. Undo stays where supported today. No effect on mount, identical saves, back navigation or Undo. See EXPERIENCE_DESIGN §4.
 - Days where `loggable` is false are not buttons; they're `role="img"` with their label.
 
 **Must survive:**
@@ -472,7 +472,7 @@ Compact
   - **Chosen list:** an ordered `ListGroup` with position numbers, ↑ ↓ `IconButton`s ("Move {title} up") and remove.
   - **Limit:** a counter "{n} of 10" in `label-large`; at 10 the add buttons disable and a hint explains the limit. An optional note `Textarea` follows.
 - **Finish:**
-  - On success, a `BottomSheet` "celebration" (D-20) shows the soft-burst art in `tertiary-container`, "Your review is saved", "You can change it until {closesOn}.", and [Done].
+  - On success, a `BottomSheet` "celebration" (D-20) shows the 72 px soft-burst art on `reward-container`, "Your review is saved", "You can change it until {closesOn}.", and a wide filled [Done] on compact.
   - The page then shows the finished-but-open state: a status chip "Finished" and the steps still editable.
 - **Closed review:** `ReadOnlyReview` shows the same layout without inputs, an `InlineBanner info` "This week has closed, so the review is read-only.", and no adjust actions.
 - **History:** a `ListGroup` of the week span, "Finished on …" or "Not finished" (neutral chip), and "Open until …" or "Closed on …". Each row links to its detail. The empty state reads "Reviews you start show here."
@@ -525,7 +525,7 @@ Large /notes/<id> (list–detail, D-33)
 - **New note with `?goal=`/`?task=`:** an `input` chip preview "Will link to: {title}" above the title. The "first save creates" behaviour is unchanged.
 - **Search** `/notes/search`:
   - **Field:** a large search field (`SearchBar`: 56 px, `rounded-full`, `surface-container-highest`, leading `search` icon, trailing clear), focused on load (as today).
-  - **Results:** three sections, Notes, Goals and Tasks, each with a count and up to 20 `ListItem`s. Highlights render through the existing `Highlighted` component as `<mark>` in `tertiary-container`. Tasks open the task dialog.
+  - **Results:** three sections, Notes, Goals and Tasks, each with a count and up to 20 `ListItem`s. Highlights render through the existing `Highlighted` component as `<mark>` using `reward-container` / `on-reward-container`. Tasks open the task dialog.
   - **Empty and "only very common words" states:** use the existing copy.
   - **Privacy:** terms are never put in the URL or logs, and the field value isn't persisted.
 - **Tags (8.5, if it has shipped before UI-11):** tags show as `filter` chips in a horizontally scrolling row above the list. On the editor they are `input` chips in the "Linked to" area under a "Tags" label.
@@ -567,13 +567,13 @@ Large /notes/<id> (list–detail, D-33)
 ## 10. Public, system and error screens (UI-12)
 
 - **Landing `/`:**
-  - Full-height mist. Centred on compact, split on expanded.
+  - Cream canvas with a shallow header wash. Centred on compact, split on expanded.
   - The headline is "Decide what matters. Plan what's realistic. See how it went." in `display-small`/`display-large` with ROND 100 (product promise copy from PRODUCT_SPEC §1).
   - One [Sign in] filled `m` button.
   - A decorative composition of 3 identity shapes (cookie-9 `primary-container`, clover-4 `secondary-container`, soft-burst `tertiary-container`) floating behind, `aria-hidden`, static under reduced motion.
   - Three short feature lines with icons: Goals → Today, Habits counted kindly, Weekly review. No screenshots or invented numbers. A footer with the "Your data stays yours" privacy line.
 - **Sign in `/sign-in`:**
-  - A `Card` (max 400 px) on the mist: the wordmark, "Sign in to SoleUp" (`headline-small`), one-line reassurance, and provider buttons as **outlined `m` buttons** with the provider name ("Continue with Google" / "Continue with GitHub"). Use the brand marks as inline SVG: each provider's trademark guidelines allow their logo on sign-in buttons. Keep the existing provider logic.
+  - An opaque `Card` (max 400 px) on the canvas contains the wordmark, "Sign in to SoleUp" (`headline-small`), one-line reassurance, and **outlined `m` buttons** with the provider name ("Continue with Google" / "Continue with GitHub"). Use the brand marks as inline SVG: each provider's trademark guidelines allow their logo on sign-in buttons. Keep the existing provider logic.
   - The mapped `?error=` message as an `InlineBanner error`.
   - "No provider is configured" as an `InlineBanner info`.
 - **Error boundaries** (`src/app/error.tsx` and every route `error.tsx`): the new `ErrorState` with the fixed copy, `ErrorReference` (digest), [Try again] (filled, `reset()`), [Go to Home] (text).
