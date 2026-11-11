@@ -1,6 +1,6 @@
 # Deploying SoleUp
 
-Production runs on two free services, chosen in chunk 0.14:
+The production deployment plan calls for two free services selected in chunk 0.14. As of 2026-11-11, SoleUp has only run locally.
 
 | Part | Service | Plan | Region |
 |---|---|---|---|
@@ -244,7 +244,7 @@ docker run --rm -e DATABASE_URL postgres:18.3-alpine sh -c 'pg_dump --format=cus
 
 Run it with `DATABASE_URL` set in your shell to the production string. The dump holds every user's personal data. Store it encrypted (for example in your password manager's file storage or an encrypted disk), never in the repo, and delete old dumps you no longer need.
 
-**Check that PITR works.** Do this once at provisioning, then again before chunk 10.6's restore drill. It changes nothing:
+**Check that PITR works.** Do this at provisioning and before the first production restore drill:
 
 1. Neon console → **Branches → Create branch.** Parent `production`, **Include data up to: a specific time**, set to about 1 hour ago (after your first life area existed). Name it `pitr-check`.
 2. Open **SQL Editor** on `pitr-check` and run `select count(*) from life_areas;`. The count reflects that time.
@@ -272,6 +272,120 @@ Run it with `DATABASE_URL` set in your shell to the production string. The dump 
 3. Check it: connect with the SQL Editor and spot-check `select count(*) from users;` and `from life_areas;`.
 4. Point Render's `DATABASE_URL` at it and **Save, rebuild and deploy.** The release step applies any migrations newer than the dump.
 5. Writes made after the dump are lost. Sessions created after it are gone too, so users sign in again.
+
+### Local restore rehearsal
+
+On 2026-11-11, SoleUp had only run locally. The rehearsal used the Docker Compose PostgreSQL 18.3 service and restored `soleup_dev` into a fresh database named `soleup_restore_drill_fbcdc6fd` on that service. The source queries and `pg_dump` used the same exported snapshot, so any concurrent writes would be outside both results. The scratch restore ran in one transaction.
+
+The verification reports matched for 32 tables, including the Drizzle migration journal. Eighteen tables held data. All 83 timestamp checks matched, including 43 with a non-null latest value. The following wall times include Docker command overhead and exclude initial setup and cleanup.
+
+| Stage | Time |
+|---|---:|
+| Read source snapshot and create dump | 0.90 s |
+| Create scratch database | 0.89 s |
+| Run `pg_restore` | 0.79 s |
+| Query scratch database and compare reports | 0.91 s |
+| Total before rounding the individual stages | 3.48 s |
+
+The dump and reports were stored in the container's `/dev/shm` and removed after comparison. Production timing and Neon point-in-time recovery still need a drill after the first deploy.
+
+#### Verification queries
+
+Save these queries as `verify.sql` in a local temporary directory. Run them with `psql`. The first query produces exact counts for every base table in the application schemas. The second reports the latest value of each timestamp column in UTC. The journal stores its timestamps as epoch milliseconds, so it has a separate query.
+
+```sql
+SET TIME ZONE 'UTC';
+
+SELECT format(
+  'SELECT %L, %L, count(*) FROM %I.%I',
+  'count', table_schema || '.' || table_name, table_schema, table_name
+)
+FROM information_schema.tables
+WHERE table_schema IN ('public', 'drizzle')
+  AND table_type = 'BASE TABLE'
+ORDER BY table_schema, table_name
+\gexec
+
+SELECT format(
+  'SELECT %L, %L, %L, max(%I) FROM %I.%I',
+  'latest', c.table_schema || '.' || c.table_name,
+  c.column_name, c.column_name, c.table_schema, c.table_name
+)
+FROM information_schema.columns AS c
+JOIN information_schema.tables AS t USING (table_schema, table_name)
+WHERE c.table_schema IN ('public', 'drizzle')
+  AND t.table_type = 'BASE TABLE'
+  AND c.data_type IN ('timestamp with time zone', 'timestamp without time zone')
+ORDER BY c.table_schema, c.table_name, c.ordinal_position
+\gexec
+
+SELECT 'latest', 'drizzle.__drizzle_migrations', 'created_at',
+       to_timestamp(max(created_at)::double precision / 1000)
+FROM drizzle.__drizzle_migrations;
+```
+
+#### Repeat the local rehearsal
+
+With Docker Compose running, use PowerShell from the repository root. Replace the verification file path with the one you saved above. The script creates a fresh database for each run and prints its name so you can inspect it.
+
+```powershell
+$verifySql = Get-Content -Raw -LiteralPath 'C:\path\to\verify.sql'
+if (-not $verifySql) { throw 'Could not read verify.sql.' }
+
+$drillDatabase = 'soleup_restore_drill_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+$drillDirectory = docker compose exec -T postgres mktemp -d /dev/shm/soleup-restore-XXXXXX
+if ($LASTEXITCODE -ne 0 -or $drillDirectory -notmatch '^/dev/shm/soleup-restore-[A-Za-z0-9]{6}$') {
+  throw 'Could not create the drill work directory.'
+}
+
+$sourceSql = @'
+BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SELECT pg_export_snapshot() AS drill_snapshot \gset
+\setenv DRILL_SNAPSHOT :drill_snapshot
+\o source.tsv
+\i verify.sql
+\o
+\! pg_dump --username=soleup --dbname=soleup_dev --snapshot="$DRILL_SNAPSHOT" --format=custom --no-owner --no-privileges --file=source.dump
+\if :SHELL_ERROR
+  \echo dump_failed
+\else
+  \echo dump_complete
+\endif
+COMMIT;
+'@
+
+try {
+  $verifySql | docker compose exec -T postgres sh -c 'cat > "$1/verify.sql"' sh $drillDirectory
+  if ($LASTEXITCODE -ne 0) { throw 'Could not stage verify.sql.' }
+
+  $timer = [Diagnostics.Stopwatch]::StartNew()
+  $dumpStatus = $sourceSql | docker compose exec -T --workdir $drillDirectory postgres psql -XqAt -v ON_ERROR_STOP=1 -U soleup -d soleup_dev -f -
+  if ($LASTEXITCODE -ne 0 -or $dumpStatus -ne 'dump_complete') {
+    throw 'The source snapshot or dump failed.'
+  }
+
+  docker compose exec -T postgres createdb -U soleup --template=template0 $drillDatabase
+  if ($LASTEXITCODE -ne 0) { throw 'Could not create the scratch database.' }
+
+  docker compose exec -T --workdir $drillDirectory postgres pg_restore -U soleup -d $drillDatabase --single-transaction --no-owner --no-privileges source.dump
+  if ($LASTEXITCODE -ne 0) { throw "Restore failed in $drillDatabase." }
+
+  docker compose exec -T --workdir $drillDirectory postgres psql -XqAt -v ON_ERROR_STOP=1 -U soleup -d $drillDatabase -o scratch.tsv -f verify.sql
+  if ($LASTEXITCODE -ne 0) { throw 'The scratch verification query failed.' }
+
+  docker compose exec -T --workdir $drillDirectory postgres cmp -s source.tsv scratch.tsv
+  if ($LASTEXITCODE -ne 0) { throw "Verification reports differ for $drillDatabase." }
+
+  $timer.Stop()
+  "Verified $drillDatabase in $($timer.Elapsed.TotalSeconds) seconds."
+} finally {
+  docker compose exec -T postgres rm -f -- "$drillDirectory/verify.sql" "$drillDirectory/source.tsv" "$drillDirectory/source.dump" "$drillDirectory/scratch.tsv"
+  docker compose exec -T postgres rmdir -- $drillDirectory
+}
+```
+
+Once you finish inspecting the scratch database, remove it with `docker compose exec -T postgres dropdb -U soleup $drillDatabase` from the same PowerShell session.
+
 
 ## Logs and monitoring
 
