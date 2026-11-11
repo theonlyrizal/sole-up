@@ -18,8 +18,7 @@ import type { TaskParentOption } from "@/server/modules/tasks/queries";
 
 import { TaskParentSelect } from "./task-parent-select";
 
-/** The global shortcut that opens quick add. */
-export const QUICK_ADD_KEY = "q";
+const QUICK_ADD_SHORTCUT = "Alt+Enter";
 
 /** True when a key press is meant for the page, not for a field. */
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -31,7 +30,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Global quick add: an "Add task" button, and the Q key anywhere outside a
+ * Global quick add: an "Add task" button, and Alt+Enter outside a
  * field or dialog. Only the title is needed; Enter adds the task. A goal or
  * milestone, a planned date and a due date are optional, behind "More
  * options". Priority and estimate are left for the edit form (ADR 0011).
@@ -42,11 +41,12 @@ export function QuickAdd() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (
-        event.key.toLowerCase() !== QUICK_ADD_KEY ||
+        event.key !== "Enter" ||
+        !event.altKey ||
         event.repeat ||
         event.ctrlKey ||
         event.metaKey ||
-        event.altKey ||
+        event.shiftKey ||
         event.defaultPrevented ||
         isTypingTarget(event.target) ||
         document.querySelector('[role="dialog"], [role="alertdialog"]')
@@ -65,8 +65,8 @@ export function QuickAdd() {
       <DialogTrigger asChild>
         <Button
           size="sm"
-          aria-keyshortcuts={QUICK_ADD_KEY.toUpperCase()}
-          title={`Add task (${QUICK_ADD_KEY.toUpperCase()})`}
+          aria-keyshortcuts={QUICK_ADD_SHORTCUT}
+          title={`Add task (${QUICK_ADD_SHORTCUT})`}
         >
           Add task
         </Button>

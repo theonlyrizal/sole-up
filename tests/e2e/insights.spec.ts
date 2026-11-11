@@ -81,6 +81,7 @@ test("Review Insights shows evidence and links to the relevant work", async ({
     await expect(
       tasks.getByRole("button", { name: "Edit: Return a book" }),
     ).toBeVisible();
+    await expectNoSeriousViolations(page);
     await page.getByRole("link", { name: "← Insights" }).click();
   }
 
@@ -89,6 +90,7 @@ test("Review Insights shows evidence and links to the relevant work", async ({
     .click();
   const tasks = page.getByRole("list", { name: "Tasks", exact: true });
   await expect(tasks.getByRole("listitem")).toHaveCount(2);
+  await expectNoSeriousViolations(page);
   await tasks.getByRole("button", { name: "Edit: Pick up a book" }).click();
   const editor = page.getByRole("dialog", { name: "Edit task" });
   await editor.getByLabel("Estimate (minutes)").fill("60");

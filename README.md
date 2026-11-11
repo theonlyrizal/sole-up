@@ -231,6 +231,18 @@ Test users and sessions:
 
 `server-only` is replaced by a no-op in Vitest, so server modules can be tested directly. A module that parses the environment on import (like `src/server/env.ts`) needs the variables stubbed before it is imported; see `src/server/env.test.ts`.
 
+### Accessibility checks
+
+The Playwright suite runs axe against every page. The [route suite](tests/e2e/accessibility.spec.ts) covers public and signed-in pages in light and dark mode. Feature specs cover populated detail pages, calendar views, dialogs and error states. Axe fails the suite on serious or critical WCAG A/AA findings. The [keyboard walkthroughs](tests/e2e/keyboard-journeys.spec.ts) cover creating a goal and its next action, planning the day, tracking a habit and finishing a weekly review.
+
+Run these manual spot checks with NVDA in Firefox or Chrome, or with VoiceOver in Safari. Use a test account with an event, a habit and a note.
+
+1. **Sign-in and navigation.** Confirm the provider buttons and first-run time zone fields have clear names. From Home, activate **Skip to content** and verify focus lands in the main content. Navigate to Goals and Today and listen for the new page title and current navigation item.
+2. **Goals and tasks.** Open **New goal** and submit with a blank title. Check that the dialog title, field label, invalid state and error are announced. Press Escape and verify focus returns to the opener. Use **Add task** or Alt+Enter, then plan and complete a task on Today. Listen for the save and completion feedback.
+3. **Calendar.** In Agenda and Week, listen for the date, title, time or all-day status, and item type. Tab to an item, use the arrows in Week, then open and close its dialog. Verify that focus returns to the item and that **New event** and **Block time** are reachable by Tab.
+4. **Track and Review.** Open a habit day and verify that its full date and status are read. Change the log and listen for the save and updated status. In Review, use **Next** and check that the new step heading receives focus and that finishing is announced.
+5. **Notes.** Navigate between the title, formatting controls and note body. Toggle bold, open and dismiss the link dialog, then edit the body. Check the pressed state, focus return and save announcement.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`, in two jobs:

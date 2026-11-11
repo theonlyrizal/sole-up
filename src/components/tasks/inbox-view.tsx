@@ -111,7 +111,7 @@ export function InboxView({
     return (
       <EmptyState
         title="Your inbox is clear"
-        description="Tasks you capture without a goal or a plan wait here until you decide what to do with them. Press Q or use Add task to capture one."
+        description="Tasks you capture without a goal or a plan wait here until you decide what to do with them. Press Alt+Enter or use Add task to capture one."
       />
     );
   }
