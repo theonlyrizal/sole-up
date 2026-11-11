@@ -22,7 +22,8 @@
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:integration",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm security:endpoints && pnpm test:unit && pnpm test:integration",
+    "security:endpoints": "node scripts/audit-endpoints.mts",
     "db:migrate:deploy": "node scripts/db-migrate-deploy.mts",
     "reminders:sweep": "node scripts/reminders-sweep.mts",
     "reminders:failed": "node scripts/reminders-failed.mts"

@@ -57,12 +57,17 @@ Checks: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`. The bu
 
 Sign-in uses [Better Auth](https://www.better-auth.com) (`src/server/auth/`) with Google and GitHub OAuth and database sessions; see [ADR 0002](docs/decisions/0002-auth.md). Its tables (`users`, `sessions`, `accounts`, `verifications`) are in `src/server/db/schema/auth.ts`, with UUID IDs.
 
-- **In code:** call `requireUser()` from `@/server/auth/session` first in every authenticated page and route handler. It returns the user or redirects to `/sign-in`. The `(app)` layout also checks the session, but a layout is not an authorization boundary.
+- **In code:** use `requireUser()` from `@/server/auth/session` in authenticated pages. It returns the user or redirects to `/sign-in`. For JSON and download routes, use `getUserFromHeaders(request.headers)` and return 401 when it returns null. Both use the same database session and active-account checks. Each private entry point checks access independently of the `(app)` layout.
 - **Server Actions:** wrap each one in `authedAction(schema, handler)` from `@/server/auth/authed-action`. It authenticates (an anonymous call gets an `UNAUTHENTICATED` result and the handler never runs), validates the input with the Zod schema (failures return `fieldErrors`), runs `handler(input, { userId })`, and returns an `ActionResult` (`@/lib/result`). Services throw `NotFoundError`, `ValidationError` or `ConflictError` (`@/server/errors`) with fixed, user-safe messages; anything else is logged (see [Logging and errors](#logging-and-errors)) and becomes a generic `INTERNAL` error whose message ends with `Reference: <request ID>`.
 - **Proxy:** `src/proxy.ts` gives every request an ID (see below) and redirects requests without a session cookie away from `(app)` routes. It checks only that the cookie exists, so it is a convenience, not a security check. Add each new top-level `(app)` folder to `APP_ROUTE_SEGMENTS` in `src/lib/protected-paths.ts`; a unit test fails until you do.
 - **Account linking:** signing in with a second provider joins the existing account only when that provider reports the same email as verified, and the existing account's email is verified too. Otherwise the sign-in page explains what happened.
 - **Rate limiting:** Better Auth's limiter (in memory) runs on every request through `/api/auth/*`: 100 requests a minute per IP and path, and 10 a minute for sign-in and OAuth callbacks. Sign-in and sign-out go through the Better Auth client for this reason; server-side `auth.api.*` calls are not limited.
 - **Providers** are enabled only when both their ID and secret are set. Setting only one of the pair stops the server at boot with a clear message.
+
+### Security checks
+
+- Run `pnpm security:endpoints` to list Server Actions, route handler exports and the methods Next.js provides automatically. The script checks the auth and validation boundaries and follows the session user ID to service calls. Public, scheduler, test and recovery endpoints have individually reviewed checks in `scripts/audit-endpoints.mts`. Changes to those endpoints require reviewing their security controls again. Use cross-user integration tests to verify ownership inside the services.
+- HTML responses use a fresh CSP script nonce from `src/proxy.ts`. Next.js renders the document per request so its inline scripts carry that nonce. Inline styles support the calendar, note editor and component library. `next.config.ts` sets the other security headers and the service worker's own policy.
 
 ### Creating the OAuth apps
 
@@ -230,7 +235,7 @@ Test users and sessions:
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`, in two jobs:
 
-- **Lint, test and build**, in this order: install (`--frozen-lockfile`), lint, format check, typecheck, unit tests, migrate from zero (`pnpm db:migrate` against an empty Postgres 18.3 service container), integration tests, build, then the e2e tests (Playwright builds and starts the app itself with `CI` set). The Playwright report is uploaded when the job fails.
+- **Lint, test and build** runs the frozen install, lint, format check, typecheck, endpoint security inventory, unit tests, migrations against an empty Postgres 18.3 service container, integration tests, build and e2e tests in that order. Playwright builds and starts the app with `CI` set. CI uploads the Playwright report when the job fails.
 - **Migration drift**: runs `pnpm db:generate` and fails if it changes anything in `src/server/db/migrations`, meaning a schema change was committed without its migration.
 
 The pnpm store is cached by `actions/setup-node`. Actions are pinned to commit SHAs (the version is in a comment next to each).

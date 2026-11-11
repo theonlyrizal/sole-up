@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { connection } from "next/server";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 
 import "./globals.css";
@@ -31,7 +32,9 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Next.js reads the CSP forwarded by proxy and adds its nonce to scripts.
+  await connection();
   return (
     <html
       lang="en"

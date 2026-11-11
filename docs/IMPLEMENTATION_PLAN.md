@@ -128,7 +128,8 @@ Each command exists from the chunk shown.
 | `docker compose up -d` | 0.3 | starts local Postgres. Integration tests need it running |
 | `pnpm db:generate` / `pnpm db:migrate` | 0.4 | Drizzle migrations |
 | `pnpm test:unit` / `pnpm test:integration` / `pnpm test:e2e` | 0.5 | test suites |
-| `pnpm verify` | 0.5 | `format:check` + `lint` + `typecheck` + `test:unit` + `test:integration` |
+| `pnpm verify` | 0.5 | `format:check` + `lint` + `typecheck` + `security:endpoints` + `test:unit` + `test:integration` |
+| `pnpm security:endpoints` | 10.4 | inventories Server Actions and route handlers and checks authentication, validation and user scoping |
 | `pnpm reminders:sweep` | 5.1 | runs one reminder sweep locally (no worker in v1, ADR 0013) |
 | `pnpm reminders:failed` | 5.7 | prints failed reminders by error code and age, no content |
 
@@ -223,7 +224,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 10.1 | Export | done | chunk/10.1-export | 2026-11-06 | Settings streams a private JSON archive with note Markdown and schema-wide ownership coverage |
 | 10.2 | Account deletion | done | chunk/10.2-account-recovery | 2026-11-07 | Added a 30-day reactivation window, cemetery on expiry, and access and push delivery suspension |
 | 10.3 | Privacy notes | done | chunk/10.3-ui-decisions-privacy | 2026-11-08 | Added public privacy notes grounded in code, retained closure data and unconfirmed retention; included existing UI decisions |
-| 10.4 | Security review | todo | | | |
+| 10.4 | Security review | done | chunk/10.4-security-review | 2026-11-11 | Endpoint inventory checks 85 actions and eight route handlers. Added nonce CSP, security headers and trusted client IP handling. Review and audit found zero high or critical issues. |
 | 10.5 | Accessibility pass | todo | | | |
 | 10.6 | Backup restore drill | todo | | | |
 | 10.7 | Performance pass | todo | | | |
@@ -3379,3 +3380,13 @@ Template:
 - **Next chunk should know:** update both privacy surfaces when behavior changes. The document's references map claims to checked code/configuration. Existing framework/auth/host logging can bypass or exceed app redaction; the privacy text makes no blanket no-personal-data promise.
 - **Unverified:** live hosting, backup/log retention and provider settings were not audited. `pnpm verify` passed (1,107 unit and 829 integration tests, with the existing habits lint warning); `pnpm build` passed. Production-server browser checks reached `/privacy` from sign-in at 1280 and 375 px, with six sections, no overflow/page errors and zero serious/critical axe findings; desktop screenshot inspected. All 68 local links checked in the privacy and UI docs resolved, and whitespace checks passed. No full local e2e run for this static page/link change; CI runs it. No manual screen-reader pass.
 - **Follow-ups:** operator confirmation of backup and log retention would allow replacing the documented uncertainty. Account erasure policy and UI implementation remain outside this chunk.
+
+### 10.4: Security review (2026-11-11)
+
+- **Built** `pnpm security:endpoints`, also run by `pnpm verify` and CI. The script lists 85 Server Actions and eight source route handlers, including the PWA manifest, and reports Next.js-generated methods. It checks session and validation boundaries and follows the session user ID to service calls. Reviewed exceptions cover public, OAuth, scheduler, test and account recovery endpoints. A source change to a reviewed exception prompts another review.
+- **Deviations** The external `/security-review` command required a signed-in account. The user approved a main-thread review of authorization, ownership, injection, OAuth, outbound push and logging. The review found no high or critical issues.
+- **Decisions** HTML uses a per-request script nonce and renders dynamically. Inline styles support the calendar, editor and component library. The service worker retains its own CSP. Render rate limiting trusts the edge-set `CF-Connecting-IP` header.
+- **Next chunk should know** The inventory checks owner forwarding at the service boundary. Keep cross-user integration coverage for the underlying queries. Auth tests confirm 10 sign-ins or callbacks per minute and 100 requests per minute on the default rule, per IP and path.
+- **Checks** The inventory found zero unguarded endpoints and rejected probes with missing authentication, missing validation and caller-supplied ownership. `pnpm verify`, `pnpm build` and `pnpm test:e2e` in the production CI configuration passed. All 102 e2e tests passed there. One accessibility sweep timed out on the development server. A local production check confirmed fresh script nonces, HSTS and a 404 from the test sign-in endpoint.
+- **Unverified** Live Render client IP behavior and the external slash-command result.
+- **Follow-ups** Upgrade the transitive tooling affected by the two moderate audit advisories. Review uncaught Next.js errors that can bypass application log redaction. [esbuild advisory](https://github.com/advisories/GHSA-67mh-4wv8-2f99), [minimatch advisory](https://github.com/advisories/GHSA-g3hv-75wg-m249).
