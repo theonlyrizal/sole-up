@@ -227,7 +227,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 10.4 | Security review | done | chunk/10.4-security-review | 2026-11-11 | Endpoint inventory checks 85 actions and eight route handlers. Added nonce CSP, security headers and trusted client IP handling. Review and audit found zero high or critical issues. |
 | 10.5 | Accessibility pass | done | chunk/10.5-accessibility | 2026-11-11 | Added page-wide axe coverage and keyboard walkthroughs of all four primary journeys. Fixed hover contrast, the Quick Add shortcut, and a duplicate main landmark. |
 | 10.6 | Backup restore drill | done | chunk/10.6-backup-restore | 2026-11-11 | Verified a local scratch restore in 3.48 seconds end to end. Production and Neon point-in-time recovery remain follow-ups after deployment. |
-| 10.7 | Performance pass | todo | | | |
+| 10.7 | Performance pass | done | chunk/10.7-performance | 2026-11-11 | Seeded 365 days for 24 synthetic users, captured 85 query pairs, and tuned two audit access paths in migration 0023. |
 | 10.✓ | Phase 10 exit check (user) | todo | | | |
 
 ## Settled decisions
@@ -3410,3 +3410,13 @@ Template:
 - **Checks** All 32 table counts and 83 latest timestamp values matched. The restore took 0.79 seconds and the timed rehearsal took 3.48 seconds. Prettier and `git diff --check` passed for both docs.
 - **Unverified** Restore timing against production and Neon point-in-time recovery.
 - **Follow-ups** Repeat the drill against production after the first deploy.
+
+### 10.7: Performance pass (2026-11-11)
+
+- **Built** `pnpm db:seed:performance` seeds 365 days in a local `_perf` database. `pnpm db:explain:performance` captures the application's SQL and binds. The [performance report](performance/10.7.md) records 85 matching before/after plans across 25 view scenarios, using 24 synthetic users with 70,080 tasks and 190,907 audit events.
+- **Deviations** None.
+- **Decisions** Migration 0023 replaces the shorter audit entity index with one that includes `occurred_at, id`. The Insights overdue trend went from 74.808 to 47.345 ms and from 116,229 to 67,571 shared hits. The partial index on the saved planning date reduced Review's `plannedTaskIds` from 1.361 to 0.105 ms and from 356 to 19 shared hits. Both are warm medians of five PostgreSQL 18.3 executions. The [before](performance/10.7-before.json) and [after](performance/10.7-after.json) plans show the removed and replacement index paths and the added expression index.
+- **Next chunk should know** The seed replaces reserved synthetic identities atomically and preserves other accounts. The `soleup_perf` database remains available locally. Use the same `--as-of` date for seeding and explaining.
+- **Checks** `pnpm verify` and `pnpm build` passed, including all 831 integration tests and the existing habit lint warning. Migration generation reported no drift. Verified seed guards, rollback on collision, smaller reseeds, preservation of an unrelated account, and matching SQL, binds and result row counts for all 85 plan pairs.
+- **Unverified** Production Neon and browser timings.
+- **Follow-ups** Review's goal-activity query still took 64.957 ms after migration. Its plan scans all 70,080 tasks six times and applies a joined `coalesce` filter. Investigate the query shape and owner predicates separately.
