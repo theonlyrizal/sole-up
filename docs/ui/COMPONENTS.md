@@ -1,8 +1,6 @@
 # SoleUp components
 
-**Revision 3 experience contract (2026-11-08):** apply [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) §§2–5. Success emphasis is local and confirmed; metrics render at their true value on mount. Color composition uses DESIGN_SYSTEM §13 aliases.
-
-**Status:** Revision 2, 2026-10-30. UI-2 builds everything in Parts A–F; later phases may add to it. Data-display components (Part G) are built by the first phase that needs them, which the "Phase" column names.
+**Revision 4 · 2026-11-12.** Use the colour pairs in [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) and the compositions in [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md). UI-2 builds Parts A–F. The first phase using each Part G component builds it.
 
 Rules for every component:
 
@@ -74,7 +72,7 @@ buttonClass(opts): string     // same signature + new options, for <Link>
 | Variant | Container | Content | Border |
 |---|---|---|---|
 | filled | `primary` | `on-primary` | – |
-| tonal | `secondary-container` | `on-secondary-container` | – |
+| tonal | `secondary` | `on-secondary` | – |
 | outlined | transparent | `primary` | 1 px `outline` |
 | text | transparent | `primary` | – (inline padding 12) |
 | elevated | `surface-container-low` + level 1 | `primary` | – |
@@ -116,7 +114,7 @@ type Props = { label: string /* group aria-label */; items: Item[]; value: strin
 - **Two modes:**
   - **Link mode** (every item has `href`): renders `<nav aria-label={label}>` with `Link`s, and `aria-current="page"` on the selected one. Used for URL-backed choices: Track range, calendar view, Agenda `days`, Upcoming `days`, Goals status.
   - **Toggle mode:** Radix `ToggleGroup type="single"`. Used for the in-page theme picker.
-- **Look:** buttons sit 2 px apart. The group's outer corners are `full`, and inner corners are `extra-small` (4 px), or `small` (8 px) on s. The selected item morphs to `full` and fills with `secondary-container`, with its icon swapped for `check` when the item has no icon of its own. Unselected items are `surface-container`.
+- **Look:** buttons sit 2 px apart. The group's outer corners are `full`, and inner corners are `extra-small` (4 px), or `small` (8 px) on s. The selected item morphs to `full` and uses `secondary` / `on-secondary`, with its icon swapped for `check` when the item has no icon of its own. Unselected items are `surface-container`.
 - **Overflow:** horizontal scroll with hidden scrollbars, and the selected item scrolled into view on mount.
 
 ---
@@ -168,10 +166,10 @@ D-22 static inner label. `FormField` stays the API: it renders the label **insid
 | Type | Look | Use |
 |---|---|---|
 | assist | 32 px, radius 8, 1 px `outline-variant`, leading icon | "Open in calendar", "Block time" |
-| filter | 32 px, radius 8. Unselected: outlined. Selected: `secondary-container` with a leading `check`, morphs to radius 16 | Plan filters, Notes tags (8.5) |
+| filter | 32 px, radius 8. Unselected: outlined. Selected: `secondary` / `on-secondary` with a leading `check`, morphs to radius 16 | Plan filters, Notes tags (8.5) |
 | input | 32 px, radius 8, trailing ✕ `IconButton` (label "Remove {x}") | Active filter summary, note links |
 | status | 24 px, radius 6, `label-medium`, tonal fill by status, icon plus text | Goal and task status, "Paused", "Archived" |
-| metric | 32 px pill (`rounded-full`). Filled tonal `primary-container` for a highlighted count, outlined for zero | Today card counts (reference 1's "64 min / 1288 kcal" pills) |
+| metric | 32 px pill (`rounded-full`). Filled tonal `secondary-container` / `on-secondary-container` for a nonzero count, outlined for zero | Today card counts (reference 1's "64 min / 1288 kcal" pills) |
 
 Every chip is a `button` or a link when interactive, and a `span` otherwise.
 
@@ -193,11 +191,12 @@ type CardProps = { as?: "section" | "article" | "div"; variant?: "default" | "he
 ```
 | Variant | Light | Dark | Radius | Padding |
 |---|---|---|---|---|
-| default | `surface-container-lowest` + `shadow-card` | `surface-container-low` | 28 (`rounded-2xl`) | 16 compact / 24 medium+ |
-| hero | `primary-container`, text `on-primary-container` | same roles | 32 (`rounded-3xl`) | 20 / 28 |
+| default | `resting-surface` + `shadow-card` | `resting-surface` | 28 (`rounded-2xl`) | 16 compact / 24 medium+ |
+| hero | `feature-surface` / `on-feature-surface` | same roles | 32 (`rounded-3xl`) | 20 / 28 |
 | tonal | `surface-container` | `surface-container` | 28 | 16 / 24 |
 | outlined | transparent + 1 px `outline-variant` | same | 28 | 16 / 24 |
 
+- **Featured composition.** The hero variant is for the Home focal module. Its heading and body use `on-feature-surface`. Keep its primary action in the Forest pair, with a visible boundary and focus treatment on the featured surface.
 - **Card heading parts:** `CardHeader` lays out `title` (`title-medium`, or `title-large` on detail pages), an optional leading `Icon` in a 40 px `secondary-container` circle (reference 1's "Activity Steps" icon tile), and trailing actions: at most one `IconButton` (overflow or info).
 - **Clickable cards:** a card is never a button containing other buttons. When the whole card links somewhere, the title is the link, and its `::after` stretches over the card (the "stretched link" pattern).
 
@@ -208,7 +207,7 @@ type CardProps = { as?: "section" | "article" | "div"; variant?: "default" | "he
             meta="Due 17:00" trailing={<IconButton icon="more_vert" label="Actions for Write intro"/>}
             href? onClick? selected? />
 ```
-- **Rows:** min height 56, 72 or 88 px depending on lines. The headline is `body-large` (the `title-medium` weight for emphasis), the supporting text `body-medium` `on-surface-variant` (up to 2 lines, clamped), the meta `label-medium` `on-surface-variant`. Slots are spaced 16 px apart.
+- **Rows:** use `resting-surface`. Minimum height is 56, 72 or 88 px depending on lines. The headline is `body-large` (the `title-medium` weight for emphasis), the supporting text `body-medium` `on-surface-variant` (up to 2 lines, clamped), the meta `label-medium` `on-surface-variant`. Slots are spaced 16 px apart.
 - **Corners:** the first item has top corners at 16 px and the rest at 4 px; the last item has bottom corners at 16 px. A single item has every corner at 16 px.
 - **Interactive rows:** the row gets `.state-layer`. A row with `href` renders the headline as the link, and stretches it.
 - **Selected:** `secondary-container` fill and full-radius morph (used in the Notes list–detail pane).
@@ -221,7 +220,7 @@ type CardProps = { as?: "section" | "article" | "div"; variant?: "default" | "he
 ### `Dialog`, `DialogContent` (rewrite), `FormDialog` (new), `ConfirmDialog` (restyled)
 - **`DialogContent`:** the same props as today. Centred, `surface-container-high`, radius 28, padding 24, max width 560 (`size="l"` gives 720). The title is `headline-small`. The close button is an `IconButton`. Enter: scale 0.96 → 1 with an opacity effects spring. The scrim is `scrim` at 32 %.
 - **`FormDialog`** (new): adapts by size class (D-23).
-  - **Compact:** full screen with an app bar (✕ `IconButton` labelled "Close", the `title-large` title, a **Save** text button that submits the form via its `form` attribute). The content scrolls. Destructive actions sit in a footer row at the bottom.
+  - **Compact:** full screen with a Close icon button and title at the top, independently scrolling fields, and an opaque sticky footer with one wide filled submit button using its `form` attribute. Allow room for the last field and its error above the footer. Keep the footer above the bottom safe area and visible keyboard. Place destructive actions in a separate section of the scrolling form.
   - **Medium and wider:** renders as `DialogContent` with the footer actions on the right (Cancel text button, Save filled).
   - **Props:** `{ title, description?, formId, submitLabel, pending, destructive?: ReactNode, trigger?, open?, onOpenChange? }`.
   - **Uses:** goal, task, habit, event, block and life-area forms move to it in their phases.
@@ -249,7 +248,7 @@ type CardProps = { as?: "section" | "article" | "div"; variant?: "default" | "he
 ### `NavigationBar`: `src/components/shell/navigation-bar.tsx` (client)
 - **Layout:** fixed to the bottom, compact only (`medium:hidden`). `surface-container` (level 2 shadow when content sits under it), height 64 + the safe area. Five equal items.
 - **Items:** a 56 × 32 `rounded-full` indicator behind the icon, with the label 4 px below in `label-medium`.
-  - **Active:** indicator `secondary-container`, `-fill` icon in `on-secondary-container`, label `secondary` and emphasized. The indicator grows from 0 to 56 px wide with `expressive-fast-spatial`.
+  - **Active:** indicator `secondary-container`, `-fill` icon in `on-secondary-container`, label `primary` and emphasized. The indicator grows from 0 to 56 px wide with `expressive-fast-spatial`.
   - **Inactive:** icon and label `on-surface-variant`.
 - **Semantics:** `nav aria-label="Main"`, `aria-current="page"` on the exact page and `"true"` on a parent section (the existing semantics in `app-nav.tsx`).
 - **More:** a `button` with `aria-haspopup="dialog"` that opens `MoreSheet`. It is marked current when the path is in its group.
@@ -281,7 +280,7 @@ type CardProps = { as?: "section" | "article" | "div"; variant?: "default" | "he
 type TopAppBarProps = { title: string; back?: { href: string; label: string }; actions?: ReactNode;
                         variant?: "small" | "greeting" };
 ```
-- **Layout:** sticky top, 64 px plus `env(safe-area-inset-top)`, transparent over the mist. Once `scrollY > 4` it switches to `surface-container` with the `default-effects` colour transition (an `IntersectionObserver` sentinel, no scroll listener).
+- **Layout:** sticky top, 64 px plus `env(safe-area-inset-top)`, transparent over the canvas. Once `scrollY > 4` it switches to `surface-container` with the `default-effects` colour transition (an `IntersectionObserver` sentinel, no scroll listener).
 - **Title:** `title-large`, truncated, and **not** an `h1`: the page's own `h1` is in the content, visually hidden on compact when it would repeat the title.
 - **Greeting variant** (Home): the user `ShapeAvatar` (40), a two-line block ("Good morning, Alex" in `title-medium`, and the date "Friday, 30 October" in `body-medium` `on-surface-variant`), and trailing Search and More icon buttons.
 
@@ -308,7 +307,7 @@ type PageHeaderProps = { title: string; description?: string; actions?: ReactNod
 ### `Snackbar`: the `toast()` / `Toaster` restyle
 - **Look:** `inverse-surface` / `inverse-on-surface`, radius 4 (`xs`), min height 48, `body-medium`, max width 560. The action button is a text button in `inverse-primary`. A close `IconButton` appears when there's an action.
 - **Placement:** see D-27. The Radix viewport classes move to `bottom-[calc(64px+72px+env(safe-area-inset-bottom))]` on compact, and the start side next to the rail on medium and wider.
-- **API:** `toast()` is unchanged, plus `variant: "error"` turns the title `error`-tinted on `inverse-surface` (`#FFB4A5` on `#2C3136` measures 8.0:1).
+- **API:** `toast()` keeps its existing API. For `variant: "error"`, show an error glyph and a descriptive title using `inverse-on-surface`.
 
 ### `LoadingIndicator`: `src/components/ui/loading-indicator.tsx`
 - **Shape:** M3 Expressive loading indicator: a 48 px (or 24 / 38) shape that cycles `circle → sunny → cookie-9 → pill → soft-burst`, morphing and rotating (`expressive-default-spatial` per step, 650 ms step, constant rotation). Colour `primary`, with `contained` adding a `primary-container` 48 px circle behind.
@@ -327,7 +326,7 @@ type PageHeaderProps = { title: string; description?: string; actions?: ReactNod
 
 ### `ErrorState`, `ErrorReference`, `FormError`, `InlineBanner`
 - **`InlineBanner`** (new):
-  - **Tones:** `info` (`secondary-container`), `warning` (`tertiary-container`, with the `warning` icon and the word "Warning:" visually hidden), `error` (`error-container`), `success` (`success-container`).
+  - **Tones:** `info` (`secondary-container`), `warning` (`alert-container` with the warning icon and a visible warning title), `error` (`error-container`), and `success` (`success-container`). Use the paired foreground for the title, body and icon.
   - **Look:** radius 16, padding 16, a leading icon, a `title-small` title, `body-medium` text, and an optional action.
   - **Uses:** the reminder sweep warning, no-device notes, the stale conflict prompt in notes.
 - **`ErrorState`:** an error-tinted `EmptyState` (the `error` icon in `error-container` shape art), the same copy rules, and Retry plus Go home buttons.
@@ -358,21 +357,21 @@ type PageHeaderProps = { title: string; description?: string; actions?: ReactNod
 |---|---|---|
 | `MetricCard` | UI-4 | `Card` with `CardHeader` (icon tile, `title-medium` label, `InfoButton`), a body slot, and a range caption (`body-small`, `on-surface-variant`, the `metricRangeLabel` output). When `metric.hasData === false` it renders `EmptyState compact` with the card's "Nothing yet" copy. Props: `{ id, title, icon, metric: Metric<unknown>, empty, todayDate, locale, children }` (the same contract as the current `MetricCard` in `home-view.tsx`, extracted) |
 | `MetricInfo` / `InfoButton` | UI-4 | An `IconButton icon="info" label="How this is counted: {title}"` opening a `ResponsiveSheet` titled "How this is counted". It contains `metric.definition` (`body-large`), then a description list of **Range** and **As of** (`<time dateTime>`) using the existing `metricRangeLabel` and `metricAsOfLabel` |
-| `StatNumber` | UI-4 | A numeral (`display-small` on compact, `display-medium` on medium and wider, `tabular-nums`, ROND 100) with a unit label (`title-medium` `on-surface-variant`) baseline-aligned after it, as in reference 1's "4.256 / Steps". Optionally a link: the numeral is inside the link, and the accessible name reads "3 planned for today" |
-| `SegmentedPillBar` | UI-4 | `{ value: number; total: number; max?: 31; label: string }`. Renders `min(total, max)` vertical pills 6 px wide (8 px on medium and wider), 40 px tall, 4 px apart, `rounded-full`. Pills up to `floor(value)` are `primary`, a partial pill gets a `primary` fill from the bottom proportional to the fraction, and the rest are `progress-track`. When `total > max` the pills stand for proportions, and the visible caption must say the exact count. `role="img" aria-label={label}`. Render the true fill immediately on first view. Interpolate only a user-triggered value change using `expressive-default-spatial`; no IntersectionObserver reveal, count-up or stagger. See EXPERIENCE_DESIGN §4 |
-| `WeekStrip` | UI-4 | `{ days: { date, weekdayLetter, dayOfMonth, fullLabel, href }[]; today: LocalDate; selected?: LocalDate }`. Seven `rounded-4xl` capsules 48 × 76 (56 × 84 on medium and wider) in `surface-container-lowest` with `shadow-card` (light). The weekday letter is `label-small`, and the date is `title-medium` inside a 36 px `rounded-full` circle. **Today:** capsule `primary`, letter `on-primary`, date circle `surface-container-lowest` with `on-surface` text (reference 1). **Selected but not today:** a 2 px `primary` ring. Each capsule is a `Link` with `aria-label={fullLabel}`, and today's has `aria-current="date"`. It scrolls horizontally only when narrower than 7 × 48 + 6 × 8. The days come from a new pure helper, `weekDays(today, weekStart, locale)` in `src/lib/week-strip.ts` (unit tested) |
-| `Carousel` | UI-4 | M3 "multi-browse" carousel in CSS: `overflow-x: auto; scroll-snap-type: x mandatory`, items `scroll-snap-align: start`, 8 px gaps, 16 px start padding with `scroll-padding`. Items are 156 px wide (compact) and grow on medium. Previous and Next `IconButton`s appear on medium and wider (they scroll by one page). `role="region" aria-roledescription="carousel" aria-label`, and items in a list. No autoplay |
+| `StatNumber` | UI-4 | A numeral (`display-small` on compact, `display-medium` on medium and wider, `tabular-nums`, ROND 100) with a baseline-aligned unit label in `title-medium`. Use `on-surface-variant` on resting surfaces and `on-feature-surface` on the Home feature card. Optionally a link: the numeral is inside the link, and the accessible name reads "3 planned for today" |
+| `SegmentedPillBar` | UI-4 | Accepts `value`, `total`, `label` and an optional `max` (default 31). Use up to 12 pills in a compact habit tile. The marks are 6 px wide, 40 px tall and 4 px apart. When the target fits, one pill represents one expected unit. When the target exceeds the cap, distribute the fraction across the visible pills and show the exact count in text. Use Forest `primary` over `progress-track` and a partial fill for fractions. If the target is zero or absent, show the existing caption alone. Expose the chart as `role="img"` with the equivalent label. Render the true value on mount. See EXPERIENCE_DESIGN §4 for updates |
+| `WeekStrip` | UI-4 | `{ days: { date, weekdayLetter, dayOfMonth, fullLabel, href }[]; today: LocalDate; selected?: LocalDate }`. Seven `rounded-4xl` capsules 48 × 76 (56 × 84 on medium and wider) in `resting-surface` with `shadow-card` (light). The weekday letter is `label-small`, and the date is `title-medium` inside a 36 px `rounded-full` circle. **Today:** capsule `primary`, letter `on-primary`, date circle `resting-surface` with `on-surface` text (reference 1). **Selected but not today:** a 2 px `primary` ring. Each capsule is a `Link` with `aria-label={fullLabel}`, and today's has `aria-current="date"`. Use local scrolling when seven capsules plus gaps exceed the available content width. Keep the selected or current date visible on entry and scroll focused capsules into view within the strip. The days come from a new pure helper, `weekDays(today, weekStart, locale)` in `src/lib/week-strip.ts` (unit tested) |
+| `Carousel` | UI-4 | Compact horizontal snap list with 176–208 px opaque tiles, an 8 px gap, and a partial next tile when there is more content. Each tile has a 48 px identity shape, linked title, weekly marks and a full count caption. Show Previous and Next controls when it overflows. Use a labelled region and list. On expanded widths, show the same tiles in a grid |
 | `HabitWeekChart` | UI-9 (built early in UI-4 for Home's habit card in compact form) | Seven day pills from `HabitHistoryDay[]` with the D-19 visual language. Pill 36 × 88 (compact) or 44 × 104, `rounded-full`. Below each pill: the weekday letter (`label-small`) and date (`label-medium`). Completed days fill from the bottom to `credit`. Today is ringed. In `interactive` mode each pill is the `DayLogDialog` trigger (existing behaviour) with `aria-label={dateLabel: stateLabel}`; otherwise it's `role="img"` on the group with a text summary. A `compact` variant (Home cards) uses pills 10 × 36 without letters |
-| `HabitDayCell` | UI-9 | A 44 × 44 `rounded-full` cell for the 4-week grid: the date number centred (`label-large`, `tabular-nums`) and the D-19 state look as fill or ring. The trigger for `DayLogDialog` |
-| `DotMatrix` | UI-9 | The 12-week grid: weeks as rows (oldest at the top) × 7 days as columns. 28 px `rounded-sm` (8) visual marks centered in non-overlapping 48 px interactive cells, the D-19 looks without date numbers. Use local horizontal overflow on narrow cards; keep row labels associated. A `label-small` weekday header row, and each row headed by `week.shortLabel`. Each cell is a button (`DayLogDialog` trigger) |
+| `HabitDayCell` | UI-9 | A 44 × 44 `rounded-full` visual mark for the 4-week grid, with a 48 px target when loggable: the date number centred (`label-large`, `tabular-nums`) and the D-19 state look as fill or ring. The trigger for `DayLogDialog` |
+| `DotMatrix` | UI-9 | The 12-week grid: weeks as rows (oldest at the top) × 7 days as columns. 28 px `rounded-sm` (8) visual marks centered in non-overlapping 48 px interactive cells, the D-19 looks without date numbers. Use local horizontal overflow on narrow cards; keep row labels associated. A `label-small` weekday header row, and each row headed by `week.shortLabel`. Loggable cells are `DayLogDialog` triggers. Other cells are static with readable date and state |
 | `MilestoneArc` | UI-8 | A 180° arc (reference 2 gauge) as SVG, 200 × 112 (compact) or 240 × 132, stroke width 28 with round caps. `countable` segments (capped at 12; above 12 a continuous arc), 6° gaps. Completed segments are `primary`, open ones `progress-track`, and on hover or focus the open segments show the hatch. The centre text is "3 of 5" in `display-small` with "milestones" in `body-medium` below. `countable === 0` gives no arc: just "No milestones yet". `role="img"` with the aria-label "3 of 5 milestones completed" |
 | `SplitStat` | UI-10 | Two figures side by side, split by a 1 px `outline-variant` divider: `display-small` numeral plus `body-medium` label each (reference 4's "60 Days / 27 Days") |
 | `StatusChip` | UI-6 | The goal, task and habit status → `Chip type="status"` mapping (icon plus text; colours: active `secondary-container`, paused `surface-container-highest`, completed `success-container`, dropped and cancelled `surface-container-highest` with strikethrough-free text) |
 | `PriorityMark` | UI-6 | Priority shown as 1–3 small ascending bars (`label-small` text "High", "Medium" or "Low" beside it on medium and wider; `aria-label` always), never red |
 | `AreaChip` | UI-8 | The life-area colour dot plus name, in a `status`-sized chip using the area's container and on colours |
 | `DateBadge` | UI-6 | A two-line date block (weekday `label-small`, day `title-large`) for Upcoming and Agenda day headers, today in `primary` |
-| `Timeline` | UI-5 | Today's "Schedule": a vertical rail line in `outline-variant`, a 12 px time dot per item (`primary` for events, `secondary` for blocks, `tertiary` ring for "Now"), the time (`label-large` `tabular-nums`), a title link, and a kind chip. All-day items sit first in a horizontal chip row |
-| `DatePicker` | UI-7 | Navigation-only month grid in a `ResponsiveSheet` or `Popover`. A header with the month and year (`title-medium`) plus previous and next `IconButton`s. A **month chip row** (reference 1: Feb · Mar · **Apr** · May as `ConnectedButtonGroup` toggle). A 7-column grid of 40 px `rounded-full` day buttons (48 px targets): today ringed, the selected day `primary`, other-month days `on-surface-variant` at 38 % with the hatch. Arrow keys move by day, PageUp/PageDown by month, Home/End go to the week's start or end, and Enter selects (the ARIA grid pattern). **It shows no events.** Used by Calendar "Go to date" |
+| `Timeline` | UI-5 | Today's "Schedule": a vertical rail line in `outline-variant`, a 12 px time dot per item (`primary` for events, `secondary-ink` for blocks, `feature-ink` ring for "Now"), the time (`label-large` `tabular-nums`), a title link, and a kind chip. All-day items sit first in a horizontal chip row |
+| `DatePicker` | UI-7 | Navigation-only month grid in a `ResponsiveSheet` or `Popover`. A header with the month and year (`title-medium`) plus previous and next `IconButton`s. A **month chip row** (reference 1: Feb · Mar · **Apr** · May as `ConnectedButtonGroup` toggle). A 7-column grid of 40 px `rounded-full` day buttons (48 px targets): today ringed, the selected day in `primary` / `on-primary`, and other-month days with a decorative hatch and legible date text. When today is selected, add a contrasting inset ring to the filled cell. Use local overflow if seven full targets cannot fit. Arrow keys move by day, PageUp/PageDown by month, Home/End go to the week's start or end, and Enter selects (the ARIA grid pattern). **It shows no events.** Used by Calendar "Go to date" |
 
 ## Part H: Local action confirmation (UI-2b; consumed in UI-5/9)
 
@@ -380,7 +379,7 @@ type PageHeaderProps = { title: string; description?: string; actions?: ReactNod
 
 - Mounting in confirmed state renders the saved check immediately with no halo. Animate only a subsequent new confirmationKey while mounted; identical refreshes and rerenders do not replay.
 - Pending is aria-busy on the owning control, with duplicate submission prevented for that entity. The owner retains the existing action hook, error handling and rollback.
-- Confirmed uses the existing spring for the inner icon and a 600 ms peach halo using effects opacity; no change to button width or row height. The saved state remains after the halo ends.
+- Confirmed uses the existing spring for the inner icon and a 600 ms Sunshine halo on `confirmation-surface` using effects opacity; no change to button width or row height. The saved state remains after the halo ends.
 - Partial quantity success confirms the saved amount; it does not imply the full target was met. Error interrupts any halo.
 - Reduced motion disables spatial animation and the halo. Persistent saved/error text and one polite announcement remain; do not announce the same change from both wrapper and snackbar.
 - Gallery examples: idle, slow pending, confirmed, partial quantity, failure, retry, correction, repeated result and reduced motion, in both themes. Browser checks must prove failure never triggers success and mount never replays it.
