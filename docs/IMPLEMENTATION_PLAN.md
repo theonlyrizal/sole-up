@@ -226,7 +226,7 @@ Agents update their own row. Statuses are `todo`, `in progress`, `done`, `blocke
 | 10.3 | Privacy notes | done | chunk/10.3-ui-decisions-privacy | 2026-11-08 | Added public privacy notes grounded in code, retained closure data and unconfirmed retention; included existing UI decisions |
 | 10.4 | Security review | done | chunk/10.4-security-review | 2026-11-11 | Endpoint inventory checks 85 actions and eight route handlers. Added nonce CSP, security headers and trusted client IP handling. Review and audit found zero high or critical issues. |
 | 10.5 | Accessibility pass | done | chunk/10.5-accessibility | 2026-11-11 | Added page-wide axe coverage and keyboard walkthroughs of all four primary journeys. Fixed hover contrast, the Quick Add shortcut, and a duplicate main landmark. |
-| 10.6 | Backup restore drill | todo | | | |
+| 10.6 | Backup restore drill | done | chunk/10.6-backup-restore | 2026-11-11 | Verified a local scratch restore in 3.48 seconds end to end. Production and Neon point-in-time recovery remain follow-ups after deployment. |
 | 10.7 | Performance pass | todo | | | |
 | 10.✓ | Phase 10 exit check (user) | todo | | | |
 
@@ -1257,7 +1257,7 @@ Decided 2026-10-29 in [ADR 0016](decisions/0016-notes-rich-text-links-search-tag
 - An axe scan on every page in Playwright, a keyboard walkthrough of each journey, and a screen-reader spot check.
 
 ### 10.6 Backup restore drill
-- Restore production to a scratch database, verify the data, and document how long it took.
+- Restore a logical backup of `soleup_dev` to a local scratch database. Verify the row counts and latest timestamps against the dump snapshot and document the timings. Repeat against production and check Neon point-in-time recovery after the first production deploy.
 
 ### 10.7 Performance pass
 - Seed a year of realistic data, run `EXPLAIN ANALYZE` on the main views, and add or remove indexes based on the evidence.
@@ -3400,3 +3400,13 @@ Template:
 - **Checks** `pnpm verify` passed with 1,107 unit tests, 831 integration tests, and the existing habit lint warning. `pnpm build` passed. `pnpm test:e2e` passed in production mode with 134 tests and zero serious or critical axe violations.
 - **Unverified** Manual screen-reader announcements and focus behavior. See the [spot checks](../README.md#accessibility-checks).
 - **Follow-ups** None.
+
+### 10.6: Backup restore drill (2026-11-11)
+
+- **Built** Documented the PostgreSQL 18.3 rehearsal, commands, verification queries and stage timings in [DEPLOY.md](DEPLOY.md#local-restore-rehearsal).
+- **Deviations** SoleUp had only run locally, so the rehearsal used `soleup_dev` as the source and a fresh database in Docker Compose as the target.
+- **Decisions** Queried source counts and timestamps in the snapshot used by `pg_dump`. Restored the archive in one transaction and compared both reports.
+- **Next chunk should know** The dump and reports were removed after comparison. The scratch database remains available for inspection.
+- **Checks** All 32 table counts and 83 latest timestamp values matched. The restore took 0.79 seconds and the timed rehearsal took 3.48 seconds. Prettier and `git diff --check` passed for both docs.
+- **Unverified** Restore timing against production and Neon point-in-time recovery.
+- **Follow-ups** Repeat the drill against production after the first deploy.
