@@ -80,7 +80,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | Phase | Scope | Status | Branch | Date | Note |
 |---|---|---|---|---|---|
 | UI-0 | Planning: decisions, system, components, screens, audit, plan, prompts | in progress | ui-0.0-planning | 2026-10-30 | Revision 2 docs. Set to done when its PR merges |
-| UI-1 | Foundations: tokens, type, theme, icons, shapes, motion, breakpoints | todo | | | |
+| UI-1 | Foundations: tokens, type, theme, icons, shapes, motion, breakpoints | done | chunk/ui-1-foundations | 2026-11-12 | Verified both themes and the 16.4.3 font fix |
 | UI-2a | Components: actions, selection, inputs, gallery | todo | | | |
 | UI-2b | Components: containment, navigation primitives, feedback, states | todo | | | |
 | UI-3 | App shell: nav bar, rail, app bar, FAB menu, More, page structure | todo | | | Needs sign-off 5-C |
@@ -385,3 +385,28 @@ Append one note per phase, newest last. Template:
 
 - **Delivered** — Six fixed brand swatches, paired light and dark roles, contrast calculations, and component recipes for Home, Today, Track, Calendar, Goals, and Review. The phase briefs and prompts use the updated specification.
 - **Verification scope** — Role values, contrast calculations, cross-references, and Markdown diff. Browser appearance and interactions are part of phase acceptance.
+
+### UI-1 · Foundations (2026-11-12)
+
+- **Branch / PR** — `chunk/ui-1-foundations` · [UI-1 pull request](https://github.com/theonlyrizal/sole-up/pulls?q=is%3Apr+head%3Achunk%2Fui-1-foundations). The revision 4 planning PR [#91](https://github.com/theonlyrizal/sole-up/pull/91) was merged before implementation.
+- **Routes and components** — Added the six brand colours, M3 role pairs, area swatches, composition and legacy aliases, Google Sans Flex, a nonce-backed pre-hydration theme script, the shape and identity helpers, the rounded icon generator and `Icon`, and the shared media-query hook. Applied the foundation through the existing app shell, fields, calendar, and life-area swatches.
+- **Data paths and contracts** — Existing Home, Today, Track, Review, Settings, Calendar, and Notes queries and actions supplied the rendered data. The capture harness seeds an isolated test database. Existing routes, query parameters, anchors, and Calendar’s 768 px and 1024 px thresholds retain their behaviour.
+- **Decisions and deviations** — Next.js and its ESLint config are pinned to 16.4.3, which fixes extensionless Google Fonts URLs in Turbopack ([release notes](https://github.com/vercel/next.js/releases/tag/v16.4.3)). A controlled URL with query parameters reproduced the reported resolver error on 16.4.2 and compiled on 16.4.3. The icon generator maps `restore`, `install_mobile`, `expand_more`, and `expand_less` to the package’s `history`, `mobile_arrow_down`, `keyboard_arrow_down`, and `keyboard_arrow_up` filenames. The narrow shell and Plan nav now fit at 320 px, and Calendar Timeline keeps horizontal scrolling inside its existing panel.
+- **Checks run** — `pnpm verify` passed with 1,140 unit and 831 integration tests. `pnpm build` passed on Next.js 16.4.3 with Turbopack. `pnpm test:e2e` passed all 138 E2E tests, and `pnpm test:visual` passed its four cases separately. Icon generation reproduced all 95 icons and their filled variants from `@material-symbols/svg-400@0.48.3` (Apache-2.0). The palette report passed all 49 checks. The source scan found no raw hex colours outside the permitted token files.
+- **Screenshots** — 166 Playwright PNGs in `test-results/visual/ui-1/`. The core route prefixes are `home`, `plan-today`, `track`, `review`, and `settings`, each with `-390-light`, `-390-dark`, `-1280-light`, and `-1280-dark` captures. See also `calendar-timeline-1280-dark.png`, `home-keyboard-focus-390-dark.png`, `home-quick-add-pending-390-light.png`, `home-quick-add-error-390-light.png`, `today-habit-saved-390-dark.png`, and `track-first-paint-390-light.png`.
+- **Accessibility and interaction evidence** — The core routes had no page-level horizontal overflow at 320, 375, 390, 414, 768, or 1280 px in either theme. They also fit at 200% text size at 1280 px. The capture harness found no serious or critical axe violations on the scanned routes in either theme. Keyboard Tab reached the filled Add task control, Enter focused Title, and Escape returned focus. Quick Add exposed a disabled Adding state during a held request, kept the title on validation failure, and succeeded on retry. Today’s habit save and Undo worked under reduced motion. Track displayed the persisted 1-of-3 figure with hydration scripts blocked.
+- **Unverified** — Real devices, manual screen readers, and browser engines other than the configured Chromium runner.
+- **Follow-ups** — The shared component and screen phases can adopt the new icon, identity, motion, and colour utilities in their existing scope.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | Home’s next commitment, Today’s task groups, and Review’s current step are visible without opening a secondary control. |
+| Character | 1 | The warm canvas, opaque surfaces, and variable font are visible. The identity helper is ready for the later component and screen phases. |
+| Color | 2 | All 49 role and life-area contrast checks passed. Both themes show a distinguishable canvas, surfaces, controls, and focus. |
+| Response | 2 | Captures show focus, pending, field error, and a saved habit. The browser check exercised retry and Undo. |
+| Truthfulness | 2 | Seeded commitment and milestone counts agree with the screens. Track shows its saved weekly figure before hydration. |
+| Accessibility | 2 | Keyboard focus, reduced motion, higher contrast, responsive widths, 200% text size, and axe checks passed in the tested scope. |
+| Restraint | 2 | The wash is scoped to the page header and disappears with higher contrast. Progress has no first-paint reveal. |
+| Variety | 1 | The captures show the existing task lists, timeline, and editor. New screen compositions belong to later phases. |
+
+**Total — 14/16.**

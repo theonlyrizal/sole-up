@@ -1,4 +1,4 @@
-import { cx, focusRing } from "./cx";
+import { cx, filledFocusRing, focusRing } from "./cx";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md";
@@ -23,7 +23,7 @@ export function buttonClass({
 }: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}) {
   return cx(
     "inline-flex items-center justify-center gap-2 rounded-md font-medium disabled:cursor-not-allowed disabled:opacity-60",
-    focusRing,
+    variant === "primary" || variant === "danger" ? filledFocusRing : focusRing,
     variants[variant],
     sizes[size],
     className,

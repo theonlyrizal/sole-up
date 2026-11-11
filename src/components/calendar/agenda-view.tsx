@@ -70,14 +70,13 @@ export function AgendaView({
         start: entry.start,
         end: entry.end,
         order: entry.order,
-        // Events in the accent colour, blocks in the success colour,
-        // tasks in a quieter one.
+        // Forest for events, Kiwi ink for time blocks, neutral for deadlines.
         color:
           entry.kind === "event"
-            ? "var(--accent)"
+            ? "var(--md-primary)"
             : entry.kind === "block"
-              ? "var(--success)"
-              : "var(--fg-muted)",
+              ? "var(--md-secondary-ink)"
+              : "var(--md-on-surface-variant)",
         data: entry,
       })),
     [entries],

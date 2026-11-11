@@ -41,7 +41,7 @@ type Review = { hash: string; endpoints: Record<string, Checks> };
 // change invalidates the review. Verify the boundary before updating its hash.
 const reviewed: Record<string, Review> = {
   "src/app/manifest.ts": {
-    hash: "154369b4a7d56a0d206a3d4a4c5cd2103a7f459e876d0a4367ecc48e63e30d4f",
+    hash: "25feda0b3fe5caed7d5cd962538dc0f7466d4be8a3e2b5be5eaa723eb8c3f6f6",
     endpoints: {
       GET: {
         auth: "public PWA manifest",

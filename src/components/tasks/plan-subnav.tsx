@@ -14,7 +14,10 @@ import { cx, focusRing } from "@/components/ui/cx";
 export function PlanSubnav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Plan" className="flex border-b border-border sm:gap-1">
+    <nav
+      aria-label="Plan"
+      className="flex flex-wrap border-b border-border sm:gap-1"
+    >
       {PLAN_SUB_ITEMS.map((item) => {
         const active = pathname === item.href;
         return (
@@ -23,7 +26,7 @@ export function PlanSubnav() {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cx(
-              // Narrower on phones, so all five fit across 375px.
+              // Compact padding keeps most phones on one row.
               "-mb-px rounded-t-md border-b-2 px-2 py-2 text-sm font-medium whitespace-nowrap sm:px-3",
               focusRing,
               active

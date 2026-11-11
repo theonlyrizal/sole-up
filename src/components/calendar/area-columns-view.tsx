@@ -313,11 +313,13 @@ function Column({
 export function areaItemBoxClass(entry: ScheduleEntry): string {
   return entry.kind === "block"
     ? cx(
-        "border border-l-4 bg-[color-mix(in_srgb,var(--accent)_16%,var(--surface))] text-fg",
-        entry.block.status === "done" ? "border-success" : "border-accent",
+        "border border-l-4 bg-secondary-container text-on-secondary-container",
+        entry.block.status === "done"
+          ? "border-success"
+          : "border-secondary-ink",
         entry.block.status === "skipped" && "border-dashed",
       )
-    : "bg-accent text-accent-fg";
+    : "bg-primary-container text-on-primary-container";
 }
 
 /** An item in a column, in its box. */

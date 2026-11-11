@@ -240,7 +240,17 @@ test("dark theme and phone width use the app's tokens and fit the screen", async
     "--fc-classic-background",
     surface,
   );
-  expect(surface).toBe("#1b1b1a");
+  const background = await page
+    .locator(".soleup-calendar")
+    .evaluate((calendar) => {
+      const probe = document.createElement("span");
+      probe.style.backgroundColor = "var(--fc-classic-background)";
+      calendar.append(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
+  expect(background).toBe("rgb(33, 41, 35)");
   await expectNoSeriousViolations(page);
   // No sideways scrolling on a phone.
   expect(
