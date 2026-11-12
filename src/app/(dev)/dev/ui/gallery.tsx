@@ -418,6 +418,7 @@ function SaveExample({ theme }: { theme: Theme }) {
   const pending = status === "saving";
   const error = status === "error";
   const saved = status === "saved";
+  const submitLabel = pending ? "Saving…" : error ? "Retry save" : "Save";
 
   return (
     <form
@@ -448,7 +449,20 @@ function SaveExample({ theme }: { theme: Theme }) {
           pending={pending}
           className="min-w-30"
         >
-          {pending ? "Saving…" : error ? "Retry save" : "Save"}
+          {/* Size the target for every label in the current font and text size. */}
+          <span className="grid">
+            {["Save", "Saving…", "Retry save"].map((label) => (
+              <span
+                key={label}
+                className={cx(
+                  "col-start-1 row-start-1",
+                  label !== submitLabel && "invisible",
+                )}
+              >
+                {label}
+              </span>
+            ))}
+          </span>
         </Button>
         <Button
           variant="outlined"

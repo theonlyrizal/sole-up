@@ -428,7 +428,7 @@ Append one note per phase, newest last. Template:
 | Hierarchy | 2 | Forest leads the action samples. Kiwi supports secondary actions, and the preview keeps feedback by its field and submit control. |
 | Character | 2 | The Cream and dark canvases pair with opaque surfaces and stable avatar shapes and palettes. The rename sample uses the same entity key. |
 | Color | 2 | Both rendered palettes passed the gallery's axe scans. Keyboard focus, selected controls and validation remain distinct. |
-| Response | 2 | A pointer press changed the corner radius with stable bounds. The preview exposed pending, failure, retry, saved and correction in the browser. |
+| Response | 2 | A pointer press changed the corner radius with stable bounds. The preview exposed pending, failure, retry, saved and correction in the browser. It sizes its save target to fit every state label in the active font. |
 | Truthfulness | 2 | Zero and nonzero metrics display their supplied counts. Save feedback is explicitly marked as a preview and matches the fixture outcome. |
 | Accessibility | 2 | Both themes passed keyboard, axe, narrow-width, larger-text and reduced-motion checks in Chromium. |
 | Restraint | 2 | Feedback stays at the activated control. The gallery has no page entrance effects or repeating success animation. |
