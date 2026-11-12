@@ -413,7 +413,7 @@ Append one note per phase, newest last. Template:
 +
 ### UI-2a · Actions, selection and filled fields (2026-11-12)
 
-- **Branch / PR** — `chunk/ui-2a-action-input-components`. PR link follows creation.
+- **Branch / PR** — `chunk/ui-2a-action-input-components` · [#93](https://github.com/theonlyrizal/sole-up/pull/93).
 - **Routes and components** — Added `/dev/ui` under a minimal route-group layout and documented it in the README. Delivered Parts A–C in `src/components/ui/` and added the rounded remove symbol to the existing icon generator.
 - **Data paths and contracts** — Existing queries, actions, URLs and accessible form names retain their behavior. Button aliases map to their revision 4 variants and sizes. Inputs, textareas and selects retain their native props and submit the original field names. The gallery uses local preview state and makes no data mutations.
 - **Decisions and deviations** — Followed D-03, D-22, D-28 and D-30. D-08 now defaults to Light. Explicit System and Dark preferences still work. Theme role variables resolve at each gallery theme wrapper. Smaller painted controls sit inside reserved 48 px targets. The existing desktop sidebar scrolls locally at short heights so Sign out stays reachable. A production-only rewrite returns HTTP 404 before streaming, alongside the page's `notFound()` guard. Updated the stale UI-0 tracker row with the user's approval after confirming #74 merged.
