@@ -104,7 +104,7 @@ Restart `pnpm dev` after editing `.env.local`.
 
 ## UI shell and components
 
-Run `pnpm dev` and open [the component gallery](http://localhost:3000/dev/ui) to try the shared actions, selection controls and fields. Compare displays light and dark examples together on wide screens and stacks them on narrow screens. The gallery follows the browser's reduced-motion setting and returns 404 in production.
+Run `pnpm dev` and open [the component gallery](http://localhost:3000/dev/ui) to try shared controls, dialogs, sheets, loading and feedback states. Compare displays light and dark examples together on wide screens and stacks them on narrow screens. The Action confirmation preview lets you hold a request pending, fail it, retry, repeat the saved value and correct it. The gallery follows the browser's reduced-motion setting and returns 404 in production.
 
 - **Shell:** `src/app/(app)/layout.tsx` owns the page's `<main id="main">`, a "Skip to content" link, and the navigation (`src/components/shell/`): a sidebar from the `md` breakpoint up, a bottom bar on phones. Pages under `(app)` render their content without their own `<main>`. Add a destination to `NAV_ITEMS` only when its page exists.
 - **Primitives** in `src/components/ui/`: `Button` (and `buttonClass` for links), `Input`, `Textarea`, `Select` (styled native select), `FormField` (label, hint and errors wired with `aria-describedby`), `FormError` (a failed action's message that belongs to no field), `Dialog`, `ConfirmDialog` (for destructive actions; stays open until the action settles and shows a failed `ActionResult`'s message), `toast()` with the `<Toaster />` in the (app) layout, `EmptyState`, `ErrorState`, `Skeleton` and `LoadingState`. Dialogs and toasts are built on Radix (`radix-ui`).

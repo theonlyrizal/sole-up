@@ -2,9 +2,10 @@
 
 import { Toast as ToastPrimitive } from "radix-ui";
 import { useSyncExternalStore } from "react";
+import { Icon } from "@/components/icons/icon";
 
 import { buttonClass } from "./button";
-import { cx, focusRing } from "./cx";
+import { IconButton } from "./icon-button";
 
 export type ToastVariant = "info" | "success" | "error";
 
@@ -67,7 +68,11 @@ export function Toaster() {
     () => noToasts,
   );
   return (
-    <ToastPrimitive.Provider swipeDirection="right" label="Notification">
+    <ToastPrimitive.Provider
+      swipeDirection="right"
+      label="Notification"
+      duration={4000}
+    >
       {items.map((item) => (
         <ToastPrimitive.Root
           key={item.id}
@@ -77,59 +82,52 @@ export function Toaster() {
           onOpenChange={(open) => {
             if (!open) remove(item.id);
           }}
-          className={cx(
-            "flex items-start gap-3 rounded-lg border bg-surface p-4 shadow-lg",
-            item.variant === "error" ? "border-danger" : "border-border",
-          )}
+          className="snackbar pointer-events-auto flex min-h-12 flex-wrap items-center gap-x-2 rounded-xs bg-inverse-surface px-4 py-2 text-body-medium text-inverse-on-surface shadow-3"
         >
-          <div className="flex flex-1 flex-col gap-1">
-            <ToastPrimitive.Title
-              className={cx(
-                "text-sm font-semibold",
-                item.variant === "error" && "text-danger",
-                item.variant === "success" && "text-success",
-              )}
-            >
-              {item.title}
-            </ToastPrimitive.Title>
-            {item.description && (
-              <ToastPrimitive.Description className="text-sm text-muted">
-                {item.description}
-              </ToastPrimitive.Description>
+          <div className="flex min-w-40 flex-1 items-start gap-2 py-1 wrap-anywhere">
+            {item.variant === "error" && (
+              <Icon name="error" size={20} className="shrink-0" />
             )}
+            <div>
+              <ToastPrimitive.Title
+                className={item.description ? "font-medium" : undefined}
+              >
+                {item.title}
+              </ToastPrimitive.Title>
+              {item.description && (
+                <ToastPrimitive.Description>
+                  {item.description}
+                </ToastPrimitive.Description>
+              )}
+            </div>
           </div>
           {item.action && (
-            <ToastPrimitive.Action
-              altText={item.action.altText}
-              onClick={item.action.onClick}
-              className={buttonClass({ variant: "secondary", size: "sm" })}
-            >
-              {item.action.label}
-            </ToastPrimitive.Action>
+            <div className="ms-auto flex items-center gap-1">
+              <ToastPrimitive.Action
+                altText={item.action.altText}
+                onClick={item.action.onClick}
+                className={buttonClass({
+                  variant: "text",
+                  size: "xs",
+                  className: "snackbar-action",
+                })}
+              >
+                {item.action.label}
+              </ToastPrimitive.Action>
+              <ToastPrimitive.Close asChild>
+                <IconButton
+                  icon="close"
+                  label="Dismiss"
+                  tooltip={false}
+                  className="snackbar-close"
+                />
+              </ToastPrimitive.Close>
+            </div>
           )}
-          <ToastPrimitive.Close
-            aria-label="Dismiss"
-            className={cx(
-              "-m-1 rounded-md p-1 text-muted hover:bg-surface-muted hover:text-fg",
-              focusRing,
-            )}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              className="size-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-            >
-              <path d="M5 5l10 10M15 5L5 15" />
-            </svg>
-          </ToastPrimitive.Close>
         </ToastPrimitive.Root>
       ))}
-      {/* Above the mobile bottom bar; bottom-right on wider screens. */}
-      <ToastPrimitive.Viewport className="fixed right-0 bottom-20 z-50 flex w-full max-w-sm flex-col gap-2 p-4 outline-none md:bottom-0" />
+      {/* Keep the existing shell offsets until UI-3 replaces its navigation. */}
+      <ToastPrimitive.Viewport className="pointer-events-none fixed right-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex w-full max-w-[592px] flex-col gap-2 p-4 md:bottom-0" />
     </ToastPrimitive.Provider>
   );
 }

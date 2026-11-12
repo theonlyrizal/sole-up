@@ -1,4 +1,5 @@
 import type { ActionError } from "@/lib/result";
+import { InlineBanner } from "./inline-banner";
 
 /** A failed action's message that doesn't belong to one field. */
 export function FormError({ error }: { error: ActionError | null }) {
@@ -7,9 +8,5 @@ export function FormError({ error }: { error: ActionError | null }) {
     error.code === "VALIDATION"
       ? error.formErrors.join(" ") || null
       : error.message;
-  return message ? (
-    <p role="alert" className="text-sm text-danger">
-      {message}
-    </p>
-  ) : null;
+  return message ? <InlineBanner tone="error">{message}</InlineBanner> : null;
 }

@@ -149,59 +149,68 @@
   left: 50%;
   width: 1.5rem;
   height: 1.5rem;
+  color: inherit;
   translate: -50% -50%;
-  --pending-cycle: calc(5 * 650ms);
+}
+
+.loading-indicator {
+  --loading-step: 650ms;
+  --loading-cycle: calc(5 * var(--loading-step));
+}
+
+.loading-indicator > rect {
+  clip-path: var(--loading-circle);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .action-spinner {
-    animation: pending-rotate var(--pending-cycle) linear infinite;
+  .loading-indicator {
+    animation: loading-rotate var(--loading-cycle) linear infinite;
   }
-  .action-spinner > path {
-    animation: pending-morph var(--pending-cycle)
+  .loading-indicator > rect {
+    animation: loading-morph var(--loading-cycle)
       var(--ease-expressive-default-spatial) infinite;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .action-spinner > path {
-    animation: pending-pulse var(--duration-slow-effects)
-      var(--ease-slow-effects) infinite alternate;
+  .loading-indicator > rect {
+    animation: loading-pulse var(--loading-step) var(--ease-slow-effects)
+      infinite alternate;
   }
 }
 
-@keyframes pending-rotate {
+@keyframes loading-rotate {
   to {
     rotate: 1turn;
   }
 }
 
 /* Each 650ms step allows the 440ms spatial spring to settle before the next. */
-@keyframes pending-morph {
+@keyframes loading-morph {
   0%,
   93.54%,
   100% {
-    d: var(--pending-circle);
+    clip-path: var(--loading-circle);
   }
   13.54%,
   20% {
-    d: var(--pending-sunny);
+    clip-path: var(--loading-sunny);
   }
   33.54%,
   40% {
-    d: var(--pending-cookie);
+    clip-path: var(--loading-cookie);
   }
   53.54%,
   60% {
-    d: var(--pending-pill);
+    clip-path: var(--loading-pill);
   }
   73.54%,
   80% {
-    d: var(--pending-burst);
+    clip-path: var(--loading-burst);
   }
 }
 
-@keyframes pending-pulse {
+@keyframes loading-pulse {
   to {
     opacity: 0.38;
   }
