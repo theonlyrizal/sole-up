@@ -1,3 +1,4 @@
+import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, type Locator, test, type Page } from "@playwright/test";
 
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
@@ -227,6 +228,10 @@ test("without areas everything is under No area, and a phone scrolls the columns
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 812 });
+  await page.addInitScript(
+    (key) => localStorage.setItem(key, "system"),
+    THEME_STORAGE_KEY,
+  );
   await page.emulateMedia({ colorScheme: "dark" });
   await signInAndConfirm(page);
   await page.goto("/plan/calendar?view=day");

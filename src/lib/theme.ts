@@ -18,11 +18,11 @@ export function themeInitScript(): string {
   return `(() => {
     try {
       const choice = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
-      if (choice === "light" || choice === "dark") {
+      if (choice === "light" || choice === "dark" || choice === "system") {
         document.documentElement.dataset.theme = choice;
       }
     } catch {
-      // Storage can be blocked. CSS still follows the system.
+      // Storage can be blocked. CSS keeps the light default.
     }
   })();`;
 }

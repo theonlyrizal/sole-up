@@ -64,7 +64,7 @@ First paint shows true values without progress reveals or count-ups. Home gets o
   - `THEME_STORAGE_KEY = "soleup.theme"`;
   - `type ThemeChoice = "system" | "light" | "dark"`;
   - `resolveTheme(choice, prefersDark)`;
-  - `themeInitScript()`, a string for an inline `<script>` that reads `localStorage` inside `try/catch`, sets `data-theme` only for `light` or `dark`, and does nothing for `system` (CSS media queries handle that).
+  - `themeInitScript()`, a string for an inline `<script>` that reads `localStorage` inside `try/catch`, sets `data-theme` for explicit `light`, `dark` or `system` choices. The default is light. A media query applies the OS preference to `system`.
 
   `layout.tsx` renders it in `<head>` with `<html suppressHydrationWarning>`. Unit-test `resolveTheme` and that the script string has no template injection. The Settings toggle (UI-12) writes the key and sets `dataset.theme` straight away.
 - **Breakpoints in JS.** `src/lib/breakpoints.ts` exports `BREAKPOINTS = { medium: 600, expanded: 840, large: 1200, xlarge: 1600 }` and `mediaQuery(name)`. CSS `@theme` uses the same numbers. A unit test reads `globals.css` and checks they match.
@@ -79,9 +79,9 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 
 | Phase | Scope | Status | Branch | Date | Note |
 |---|---|---|---|---|---|
-| UI-0 | Planning: decisions, system, components, screens, audit, plan, prompts | in progress | ui-0.0-planning | 2026-10-30 | Revision 2 docs. Set to done when its PR merges |
+| UI-0 | Planning: decisions, system, components, screens, audit, plan, prompts | done | ui-0.0-planning | 2026-10-30 | Planning PR #74 merged. Revision 4 followed in #91 |
 | UI-1 | Foundations: tokens, type, theme, icons, shapes, motion, breakpoints | done | chunk/ui-1-foundations | 2026-11-12 | Verified both themes and the 16.4.3 font fix |
-| UI-2a | Components: actions, selection, inputs, gallery | todo | | | |
+| UI-2a | Components: actions, selection, inputs, gallery | done | chunk/ui-2a-action-input-components | 2026-11-12 | Parts A–C, gallery, and finish-line checks verified |
 | UI-2b | Components: containment, navigation primitives, feedback, states | todo | | | |
 | UI-3 | App shell: nav bar, rail, app bar, FAB menu, More, page structure | todo | | | Needs sign-off 5-C |
 | UI-4 | Home | todo | | | Needs sign-off 5-A |
@@ -410,3 +410,28 @@ Append one note per phase, newest last. Template:
 | Variety | 1 | The captures show the existing task lists, timeline, and editor. New screen compositions belong to later phases. |
 
 **Total — 14/16.**
++
+### UI-2a · Actions, selection and filled fields (2026-11-12)
+
+- **Branch / PR** — `chunk/ui-2a-action-input-components`. PR link follows creation.
+- **Routes and components** — Added `/dev/ui` under a minimal route-group layout and documented it in the README. Delivered Parts A–C in `src/components/ui/` and added the rounded remove symbol to the existing icon generator.
+- **Data paths and contracts** — Existing queries, actions, URLs and accessible form names retain their behavior. Button aliases map to their revision 4 variants and sizes. Inputs, textareas and selects retain their native props and submit the original field names. The gallery uses local preview state and makes no data mutations.
+- **Decisions and deviations** — Followed D-03, D-22, D-28 and D-30. D-08 now defaults to Light. Explicit System and Dark preferences still work. Theme role variables resolve at each gallery theme wrapper. Smaller painted controls sit inside reserved 48 px targets. The existing desktop sidebar scrolls locally at short heights so Sign out stays reachable. A production-only rewrite returns HTTP 404 before streaming, alongside the page's `notFound()` guard. Updated the stale UI-0 tracker row with the user's approval after confirming #74 merged.
+- **Checks run** — `pnpm verify` passed with 1,172 unit and 831 integration tests. `pnpm build` passed. `pnpm test:e2e` passed against a production build and a separate gallery dev server with 144 tests passing on first run and one existing time-zone test passing on retry. Six visual-only cases were skipped in that run. `pnpm test:visual` passed all six cases. The production response returned HTTP 404 with the standard not-found content.
+- **Screenshots** — 28 PNGs in `test-results/visual/ui-2a/`. See `gallery-compare-1280.png`, `gallery-light-390.png`, `gallery-dark-390.png`, `pointer-press-light-1280.png`, `long-label-focus-light-390.png`, and `fab-open-dark-1280.png`. The `pending-reduced-motion-*`, `error-*` and `retry-saved-*` captures cover both themes at 390 × 844 and 1280 × 800.
+- **Accessibility and interaction evidence** — Zero axe violations in each themed gallery column at 390 × 844 and 1280 × 800. Tab reached each sequential stop. Arrows reached the remaining Radix group items. Enter opened the FAB menu, and Escape closed it and returned focus. Link navigation exposed the current page through `aria-current`. The gallery fit at 320, 375, 390, 414, 768 and 1280 px and at 200% text size. The pressed Save target stayed 80.42 × 48 px, and the 16 action targets in that sample had disjoint rectangles. The reduced-motion preview held pending without changing the target dimensions, retained the draft and announced failure, then succeeded on retry and supported Undo.
+- **Unverified** — Physical devices, manual screen readers and browser engines beyond the configured Chromium runner.
+- **Follow-ups** — UI-2b owns containment and the reusable local confirmation primitive.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | Forest leads the action samples. Kiwi supports secondary actions, and the preview keeps feedback by its field and submit control. |
+| Character | 2 | The Cream and dark canvases pair with opaque surfaces and stable avatar shapes and palettes. The rename sample uses the same entity key. |
+| Color | 2 | Both rendered palettes passed the gallery's axe scans. Keyboard focus, selected controls and validation remain distinct. |
+| Response | 2 | A pointer press changed the corner radius with stable bounds. The preview exposed pending, failure, retry, saved and correction in the browser. |
+| Truthfulness | 2 | Zero and nonzero metrics display their supplied counts. Save feedback is explicitly marked as a preview and matches the fixture outcome. |
+| Accessibility | 2 | Both themes passed keyboard, axe, narrow-width, larger-text and reduced-motion checks in Chromium. |
+| Restraint | 2 | Feedback stays at the activated control. The gallery has no page entrance effects or repeating success animation. |
+| Variety | 1 | The gallery covers the distinct action, selection and field anatomies. App screen compositions belong to later phases. |
+
+**Total — 15/16.**

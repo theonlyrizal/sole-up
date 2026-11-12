@@ -1,3 +1,5 @@
+import { Icon } from "@/components/icons/icon";
+
 /** Props a FormField hands to its control. Spread them onto it. */
 export type FieldControlProps = {
   id: string;
@@ -6,26 +8,14 @@ export type FieldControlProps = {
 };
 
 type FormFieldProps = {
-  /** The control's id. Use `useId()` for a unique one. */
+  /** The control's id. Use useId() for a unique one. */
   id: string;
   label: string;
   hint?: React.ReactNode;
-  /** Validation messages; any message marks the field invalid. */
   errors?: string[];
   children: (control: FieldControlProps) => React.ReactNode;
 };
 
-/**
- * A label, a control, an optional hint and validation errors, wired
- * together: the label targets the control, and the hint and errors are
- * linked with `aria-describedby`.
- *
- * ```tsx
- * <FormField id={id} label="Title" errors={fieldErrors.title}>
- *   {(control) => <Input {...control} name="title" />}
- * </FormField>
- * ```
- */
 export function FormField({
   id,
   label,
@@ -37,23 +27,28 @@ export function FormField({
   const errorId = errors?.length ? `${id}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
-      {children({
-        id,
-        "aria-describedby": describedBy,
-        "aria-invalid": errorId ? true : undefined,
-      })}
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="filled-field" data-invalid={errorId ? true : undefined}>
+        <label htmlFor={id} className="block text-label-medium wrap-anywhere">
+          {label}
+        </label>
+        {children({
+          id,
+          "aria-describedby": describedBy,
+          "aria-invalid": errorId ? true : undefined,
+        })}
+        {errorId && (
+          <Icon name="error" size={20} className="field-error-icon" />
+        )}
+      </div>
       {hint && (
-        <p id={hintId} className="text-sm text-muted">
+        <p id={hintId} className="text-body-small text-on-surface-variant">
           {hint}
         </p>
       )}
       {errorId && (
-        <p id={errorId} className="text-sm text-danger">
-          {errors!.join(" ")}
+        <p id={errorId} className="text-body-small text-error">
+          {errors?.join(" ")}
         </p>
       )}
     </div>

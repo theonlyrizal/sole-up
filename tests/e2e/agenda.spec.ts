@@ -1,3 +1,4 @@
+import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
@@ -222,6 +223,10 @@ test("dark theme and phone width use the app's tokens and fit the screen", async
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 812 });
+  await page.addInitScript(
+    (key) => localStorage.setItem(key, "system"),
+    THEME_STORAGE_KEY,
+  );
   await page.emulateMedia({ colorScheme: "dark" });
   await signInAndConfirm(page);
   await addTask(page, "Renew passport", tokyoDate(1));
@@ -236,10 +241,17 @@ test("dark theme and phone width use the app's tokens and fit the screen", async
       .getPropertyValue("--surface")
       .trim(),
   );
-  await expect(page.locator(".soleup-calendar")).toHaveCSS(
-    "--fc-classic-background",
-    surface,
-  );
+  await expect
+    .poll(() =>
+      page
+        .locator(".soleup-calendar")
+        .evaluate((calendar) =>
+          getComputedStyle(calendar)
+            .getPropertyValue("--fc-classic-background")
+            .trim(),
+        ),
+    )
+    .toBe(surface);
   const background = await page
     .locator(".soleup-calendar")
     .evaluate((calendar) => {

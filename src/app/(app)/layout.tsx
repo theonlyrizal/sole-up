@@ -57,7 +57,7 @@ async function SignedInShell({ children }: { children: React.ReactNode }) {
   const confirmed = preferences.timezone !== null;
   return (
     <div className="flex flex-1 flex-col md:flex-row">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3 max-[360px]:gap-2 max-[360px]:px-3 md:h-dvh md:w-56 md:shrink-0 md:flex-col md:items-stretch md:justify-start md:gap-6 md:border-r md:border-b-0 md:px-3 md:py-5">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3 max-[360px]:gap-2 max-[360px]:px-3 md:h-dvh md:w-56 md:shrink-0 md:flex-col md:items-stretch md:justify-start md:gap-6 md:overflow-y-auto md:border-r md:border-b-0 md:px-3 md:py-5">
         <Link
           href="/home"
           className={cx("rounded-sm font-semibold md:px-3", focusRing)}

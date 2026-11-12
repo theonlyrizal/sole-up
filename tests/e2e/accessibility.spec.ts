@@ -1,3 +1,4 @@
+import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
@@ -44,6 +45,10 @@ for (const [requiresSignIn, routes] of [
 ] as const) {
   for (const [path, title] of routes) {
     test(`axe scans ${path} in light and dark mode`, async ({ page }) => {
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
       await page.emulateMedia({ colorScheme: "light" });
       if (requiresSignIn) await signInAndConfirm(page);
       await page.goto(path);
@@ -73,6 +78,10 @@ for (const [requiresSignIn, routes] of [
 }
 
 test("axe scans the hovered primary and danger buttons", async ({ page }) => {
+  await page.addInitScript(
+    (key) => localStorage.setItem(key, "system"),
+    THEME_STORAGE_KEY,
+  );
   await signInAndConfirm(page);
   for (const colorScheme of ["light", "dark"] as const) {
     await test.step(colorScheme, async () => {
