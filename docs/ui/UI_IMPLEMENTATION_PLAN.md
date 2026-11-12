@@ -438,7 +438,7 @@ Append one note per phase, newest last. Template:
 
 ### UI-2b · Containment and feedback (2026-11-12)
 
-- **Branch** — `chunk/ui-2b-containment-feedback`.
+- **Branch / PR** — `chunk/ui-2b-containment-feedback` · [#94](https://github.com/theonlyrizal/sole-up/pull/94).
 - **Routes and components** — Added the Part D–F containment, overlays, feedback, states and page primitives, plus Part H `ActionConfirmation`, to the shared components and both themes of `/dev/ui`. The gallery exercises them with local workshop and habit fixtures.
 - **Data paths and contracts** — App paths, query parameters, anchors, mutations and live announcement owners retain their existing contracts. Legacy dialogs keep their props, including `onCloseAutoFocus`. Confirmations stay open through pending and failed actions. The existing `toast()` API, Escape, F8, Undo and announcements continue through Radix.
 - **Decisions** — Followed D-23 to D-27. The compact form keeps the title and Save visible around one independently scrolling fields area. Its viewport follows keyboard resize and pan where the browser exposes them. Centred dialogs stay nearly opaque through the transition to preserve contrast. Escape reaches the focused dialog even when a snackbar arrives after it opens. Snackbars use the current shell offsets.
