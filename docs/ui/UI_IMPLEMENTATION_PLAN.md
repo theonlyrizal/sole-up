@@ -463,7 +463,7 @@ Append one note per phase, newest last. Template:
 
 ### UI-3 · App shell and navigation (2026-11-12)
 
-- **Branch** — `chunk/ui-3-app-shell`.
+- **Branch / PR** — `chunk/ui-3-app-shell` · [#95](https://github.com/theonlyrizal/sole-up/pull/95).
 - **Decision 5-C** — The user approved Home · Plan · Goals · Track · More on phones, with Notes, Review, Search and Settings in More. Updated PRODUCT_SPEC §7 and the README shell guide.
 - **Routes and components** — Added compact and rail navigation, the More sheet, the Create menu, and shared page framing on the authenticated routes. Plan links use the same paths in the tabs and expanded rail. The time-zone gate uses the shared card and monogram. The compact chrome clears the page end and yields to the keyboard.
 - **Data paths and contracts** — Existing queries, actions, deep links and note exit guards supply the same flows. The expanded search field sends terms to `/notes/search` through the existing in-memory handoff. The same user ID supplies the avatar in the greeting, More, the rail and the time-zone gate.
