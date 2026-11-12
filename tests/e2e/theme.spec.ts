@@ -23,13 +23,13 @@ for (const [choice, colorScheme] of [
     }
     await page.goto("/", { waitUntil: "domcontentloaded" });
     const root = page.locator("html");
-    if (choice === "light" || choice === "dark") {
+    if (choice !== null) {
       expect(await root.getAttribute("data-theme")).toBe(choice);
     } else {
       expect(await root.getAttribute("data-theme")).toBeNull();
     }
     expect(
       await root.evaluate((element) => getComputedStyle(element).colorScheme),
-    ).toBe(choice === "light" || choice === "dark" ? choice : colorScheme);
+    ).toBe(choice === "system" ? colorScheme : (choice ?? "light"));
   });
 }

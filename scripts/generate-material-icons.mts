@@ -15,6 +15,7 @@ const allowlist = [
   "settings",
   "search",
   "add",
+  "remove",
   "close",
   "arrow_back",
   "more_vert",

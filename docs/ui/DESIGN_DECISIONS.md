@@ -101,7 +101,7 @@ Shapes never hold body text, never act as a button's only affordance, and never 
 
 Follow-up **F-1** (needs an ADR and a migration, outside this track): an optional `icon` per habit and goal from a curated Material Symbols list.
 
-**D-08 · Theme: System by default, with a per-device override.**
+**D-08 · Theme: Light by default, with a per-device override.**
 - **Where it lives:** Settings → Appearance offers System, Light and Dark. The choice is stored per device in `localStorage["soleup.theme"]`. Its scope matches what it is (a display preference for one device), and it avoids a schema change.
 - **Before paint:** an inline `<script>` in `src/app/layout.tsx` `<head>` (about 10 lines, no external file) sets `document.documentElement.dataset.theme` before first paint. `<html suppressHydrationWarning>`.
 - **Browser chrome:** `viewport.themeColor` uses the light and dark `canvas` values.

@@ -1,0 +1,667 @@
+/* The painted shape is inset within the reserved 48px target. */
+.ui-action {
+  isolation: isolate;
+  overflow: visible;
+  color: var(--action-fg, var(--md-on-surface-variant));
+}
+
+.ui-action::before,
+.ui-action::after {
+  inset: var(--action-inset, 0px) var(--action-inline-inset, 0px);
+  border-radius: inherit;
+}
+
+.ui-action::after {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  border: 1px solid var(--action-border, transparent);
+  background: var(--action-layer, var(--action-bg, transparent));
+  box-shadow: var(--action-shadow, 0 0 transparent);
+  transition: background-color var(--duration-default-effects)
+    var(--ease-default-effects);
+}
+
+.ui-action:focus-visible::after {
+  box-shadow:
+    var(--action-focus, 0 0 transparent), var(--action-shadow, 0 0 transparent);
+}
+
+.ui-action:is(:disabled, [aria-disabled="true"]) {
+  background-color: transparent;
+  color: var(--action-fg);
+  cursor: not-allowed;
+}
+
+.ui-action:is(:disabled, [aria-disabled="true"]):not(.action-pending) {
+  --action-fg: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+  --action-bg: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+  --action-border: transparent;
+  --action-shadow: 0 0 transparent;
+}
+
+.action-xs {
+  --action-inset: 0.5rem;
+  padding-inline: 0.75rem;
+}
+
+.action-s {
+  --action-inset: 0.25rem;
+  padding-inline: 1.5rem;
+}
+
+.action-xs,
+.action-s {
+  min-height: 3rem;
+  padding-block: 0.875rem;
+}
+
+.action-m {
+  min-height: 3.5rem;
+  padding: 1rem 1.5rem;
+}
+
+.ui-action:is(.action-xs, .action-s, .action-m):is(
+    .action-filled,
+    .action-tonal,
+    .action-elevated,
+    .action-danger
+  ):not(:disabled, [aria-disabled="true"]) {
+  --action-layer: color-mix(
+    in srgb,
+    var(--action-bg),
+    currentColor calc(var(--state) * 100%)
+  );
+  background-color: var(--action-layer);
+  background-clip: content-box;
+  transition:
+    background-color var(--duration-default-effects) var(--ease-default-effects),
+    border-radius var(--duration-expressive-fast-spatial)
+      var(--ease-expressive-fast-spatial);
+
+  &::before {
+    opacity: 0;
+  }
+}
+
+.action-s.action-with-icon {
+  padding-inline: 1rem;
+}
+
+.action-icon-dense {
+  --action-inset: 0.25rem;
+  --action-inline-inset: 0.25rem;
+}
+
+.action-filled {
+  --action-bg: var(--md-primary);
+  --action-fg: var(--md-on-primary);
+  --action-focus: inset 0 0 0 2px currentColor;
+}
+
+.action-tonal {
+  --action-bg: var(--md-secondary);
+  --action-fg: var(--md-on-secondary);
+  --action-focus: inset 0 0 0 2px currentColor;
+}
+
+.action-outlined {
+  --action-border: var(--md-outline);
+  --action-fg: var(--md-primary);
+}
+
+.action-text,
+.action-danger-text {
+  padding-inline: 0.75rem;
+}
+
+.action-text,
+.action-elevated {
+  --action-fg: var(--md-primary);
+}
+
+.action-elevated {
+  --action-bg: light-dark(
+    var(--md-surface-container-low),
+    var(--md-surface-container)
+  );
+  --action-shadow: var(--shadow-1);
+}
+
+.action-danger {
+  --action-bg: var(--md-error);
+  --action-fg: var(--md-on-error);
+  --action-focus: inset 0 0 0 2px currentColor;
+}
+
+.action-danger-text {
+  --action-fg: var(--md-error);
+}
+
+.button-toggle[aria-pressed="false"] {
+  --morph-rest-radius: var(--radius-md);
+}
+
+.action-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  translate: -50% -50%;
+  --pending-cycle: calc(5 * 650ms);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .action-spinner {
+    animation: pending-rotate var(--pending-cycle) linear infinite;
+  }
+  .action-spinner > path {
+    animation: pending-morph var(--pending-cycle)
+      var(--ease-expressive-default-spatial) infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-spinner > path {
+    animation: pending-pulse var(--duration-slow-effects)
+      var(--ease-slow-effects) infinite alternate;
+  }
+}
+
+@keyframes pending-rotate {
+  to {
+    rotate: 1turn;
+  }
+}
+
+/* Each 650ms step allows the 440ms spatial spring to settle before the next. */
+@keyframes pending-morph {
+  0%,
+  93.54%,
+  100% {
+    d: var(--pending-circle);
+  }
+  13.54%,
+  20% {
+    d: var(--pending-sunny);
+  }
+  33.54%,
+  40% {
+    d: var(--pending-cookie);
+  }
+  53.54%,
+  60% {
+    d: var(--pending-pill);
+  }
+  73.54%,
+  80% {
+    d: var(--pending-burst);
+  }
+}
+
+@keyframes pending-pulse {
+  to {
+    opacity: 0.38;
+  }
+}
+
+.connected-item {
+  --action-bg: var(--md-surface-container);
+  --action-fg: var(--md-on-surface);
+  --connected-corner: var(--radius-sm);
+  border-radius: var(--connected-corner);
+}
+
+.connected-item.action-xs {
+  --connected-corner: var(--radius-xs);
+}
+
+.connected-item:first-child {
+  border-start-start-radius: var(--radius-full);
+  border-end-start-radius: var(--radius-full);
+}
+
+.connected-item:last-child {
+  border-start-end-radius: var(--radius-full);
+  border-end-end-radius: var(--radius-full);
+}
+
+.connected-item:is([aria-current="page"], [data-state="on"]) {
+  --action-bg: var(--md-secondary);
+  --action-fg: var(--md-on-secondary);
+  border-radius: var(--radius-full);
+}
+
+.connected-item:focus-visible,
+.ui-tab:focus-visible {
+  outline-offset: -3px;
+}
+
+.connected-item:is([aria-current="page"], [data-state="on"]):focus-visible {
+  outline-color: var(--md-on-secondary);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .connected-item,
+  .chip-filter {
+    transition: border-radius var(--duration-expressive-fast-spatial)
+      var(--ease-expressive-fast-spatial);
+  }
+}
+
+.fab {
+  --morph-rest-radius: var(--radius-xl);
+  --morph-pressed-radius: var(--radius-lg);
+}
+
+.fab[aria-expanded="true"] {
+  z-index: 50;
+}
+
+.fab-shell {
+  z-index: 30;
+  @media (width < 600px) {
+    position: fixed;
+    inset-inline-end: 1rem;
+    bottom: calc(4rem + 1rem + env(safe-area-inset-bottom));
+  }
+}
+
+.fab-icon > svg {
+  grid-area: 1 / 1;
+  transition: opacity var(--duration-fast-effects) var(--ease-fast-effects);
+}
+
+.fab-icon-close,
+[aria-expanded="true"] .fab-icon-rest {
+  opacity: 0;
+}
+
+[aria-expanded="true"] .fab-icon-close {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fab-icon {
+    transition: rotate var(--duration-expressive-fast-spatial)
+      var(--ease-expressive-fast-spatial);
+  }
+  .fab-icon-close {
+    rotate: -45deg;
+  }
+  [aria-expanded="true"] .fab-icon {
+    rotate: 45deg;
+  }
+  .fab-menu-item {
+    animation: fab-enter var(--duration-expressive-default-spatial)
+      var(--ease-expressive-default-spatial) calc(30ms * var(--fab-index)) both;
+  }
+}
+
+@keyframes fab-enter {
+  from {
+    scale: 0.6;
+    translate: 0 1rem;
+  }
+}
+
+.fab-menu-item {
+  @apply state-layer inline-flex min-h-14 max-w-full items-center gap-2 rounded-full bg-primary-container ps-4 pe-5 text-title-medium text-on-primary-container shadow-3;
+}
+
+.fab-menu-item[data-highlighted] {
+  --state: 0.1;
+  outline: 3px solid var(--md-focus);
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 2px currentColor,
+    var(--shadow-3);
+}
+
+.fab-menu-item[data-disabled] {
+  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+  cursor: not-allowed;
+}
+
+.chip {
+  min-height: 2rem;
+}
+
+.chip-status {
+  min-height: 1.5rem;
+  border-radius: 6px;
+}
+
+.chip.ui-action {
+  --action-inset: 0.5rem;
+  min-height: 3rem;
+  padding-block: 0.875rem;
+}
+
+.chip-status.ui-action {
+  --action-inset: 0.75rem;
+}
+
+.chip-outlined:not(.ui-action) {
+  border: 1px solid var(--md-outline-variant);
+}
+
+.chip-outlined.ui-action {
+  --action-border: var(--md-outline-variant);
+}
+
+.chip-metric {
+  --action-bg: var(--md-secondary-container);
+  --action-fg: var(--md-on-secondary-container);
+  background: var(--action-bg);
+  color: var(--action-fg);
+}
+
+.chip-metric.ui-action {
+  background: transparent;
+}
+
+.chip-filter:is([aria-pressed="true"], [aria-current="page"]) {
+  border-radius: var(--radius-lg);
+}
+
+.input-chip::before {
+  content: "";
+  position: absolute;
+  inset: 0.5rem 0;
+  z-index: -1;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.field-control,
+.filled-field {
+  border-radius: var(--radius-lg);
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+}
+
+.field-control {
+  min-height: 4rem;
+  padding: 0.5rem 1rem;
+}
+
+textarea.field-control {
+  min-height: 7.5rem;
+  resize: vertical;
+}
+
+.field-control::placeholder {
+  color: color-mix(in srgb, var(--md-on-surface-variant) 70%, transparent);
+}
+
+.filled-field {
+  position: relative;
+  min-height: 4rem;
+  padding: 0.75rem 1rem 0.5rem;
+}
+
+.filled-field > label {
+  color: var(--md-on-surface-variant);
+}
+
+.filled-field:has(> .field-control, > .native-select) > label::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+
+.filled-field > .field-control,
+.filled-field > .native-select > .field-control {
+  position: relative;
+  display: block;
+  min-height: 1.5rem;
+  margin-top: 0.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  outline: none;
+}
+
+.filled-field:has(> textarea.field-control) {
+  min-height: 7.5rem;
+}
+
+.filled-field > textarea.field-control {
+  min-height: 5rem;
+}
+
+.filled-field:focus-within,
+.field-control:not(.filled-field .field-control):focus {
+  outline: 2px solid var(--md-primary);
+  outline-offset: -2px;
+}
+
+.filled-field:focus-within > label {
+  color: var(--md-primary);
+}
+
+.filled-field:is(
+  [data-invalid="true"],
+  :has(.field-control[aria-invalid="true"])
+),
+.field-control:not(.filled-field .field-control)[aria-invalid="true"] {
+  outline: 2px solid var(--md-error);
+  outline-offset: -2px;
+}
+
+.filled-field[data-invalid="true"] {
+  padding-inline-end: 3rem;
+}
+
+.filled-field[data-invalid="true"] > label {
+  color: var(--md-error);
+}
+
+.field-error-icon {
+  position: absolute;
+  inset-inline-end: 1rem;
+  top: 2rem;
+  color: var(--md-error);
+  pointer-events: none;
+}
+
+.field-control:disabled,
+.filled-field:has(.field-control:disabled) {
+  background: color-mix(in srgb, var(--md-on-surface) 4%, transparent);
+  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+  cursor: not-allowed;
+}
+
+.filled-field:has(.field-control:disabled) > label {
+  color: inherit;
+}
+
+.filled-field .field-control:disabled {
+  background: transparent;
+}
+
+.native-select {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.native-select > .field-control,
+.filled-field > .native-select > .field-control {
+  appearance: none;
+  padding-inline-end: 2rem;
+}
+
+.native-select-icon {
+  position: absolute;
+  inset-inline-end: 1rem;
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--md-on-surface-variant);
+  pointer-events: none;
+}
+
+.filled-field .native-select-icon {
+  inset-inline-end: 0;
+}
+
+.native-select:has(:disabled) .native-select-icon {
+  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+}
+
+.selection-label {
+  padding-inline-end: 3.75rem;
+}
+
+.selection-leading .selection-label {
+  padding-inline: 3.5rem 0;
+}
+
+.selection-control {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.selection-leading .selection-control {
+  inset-inline: 0 auto;
+}
+
+.selection-control:disabled {
+  background-color: transparent;
+}
+
+@media (hover: hover) {
+  .selection-label:hover + .selection-control:not(:disabled) {
+    --state: 0.08;
+  }
+}
+
+.selection-label:active + .selection-control:not(:disabled) {
+  --state: 0.1;
+}
+
+.selection-row:has(:disabled) .selection-label {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.check-mark,
+.radio-mark {
+  border: 2px solid var(--md-outline);
+  color: var(--md-primary);
+  position: relative;
+}
+
+[aria-checked="true"] .radio-mark {
+  border-color: currentColor;
+}
+
+.check-indicator {
+  display: grid;
+  place-items: center;
+  position: absolute;
+}
+
+.check-indicator[data-state="unchecked"] {
+  scale: 0;
+  visibility: hidden;
+}
+
+[aria-checked="true"] .check-mark,
+[aria-checked="mixed"] .check-mark {
+  border-color: var(--md-primary);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.selection-control:disabled :is(.check-mark, .radio-mark, .switch-track) {
+  opacity: 0.38;
+}
+
+.switch-track {
+  border: 2px solid var(--md-outline);
+  background: var(--md-surface-container-highest);
+}
+
+.switch-thumb {
+  position: absolute;
+  inset-inline-start: 0.875rem;
+  top: 50%;
+  translate: -50% -50%;
+  width: 1rem;
+  height: 1rem;
+  background: var(--md-outline);
+}
+
+.switch-thumb:dir(rtl) {
+  translate: 50% -50%;
+}
+
+[data-state="checked"] > .switch-track {
+  border-color: var(--md-primary);
+  background: var(--md-primary);
+}
+
+.switch-thumb[data-state="checked"] {
+  inset-inline-start: 2.125rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: var(--md-on-primary);
+  color: var(--md-primary);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .switch-thumb,
+  .check-indicator {
+    transition:
+      inset-inline-start var(--duration-expressive-fast-spatial)
+        var(--ease-expressive-fast-spatial),
+      width var(--duration-expressive-fast-spatial)
+        var(--ease-expressive-fast-spatial),
+      height var(--duration-expressive-fast-spatial)
+        var(--ease-expressive-fast-spatial),
+      scale var(--duration-expressive-fast-spatial)
+        var(--ease-expressive-fast-spatial);
+  }
+
+  .selection-control:not(:disabled):active .switch-thumb {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+}
+
+.tab-strip {
+  --tab-width: -0.5rem;
+}
+
+.ui-tab {
+  color: var(--md-on-surface-variant);
+}
+
+.ui-tab:is([aria-current="page"], [aria-selected="true"]) {
+  @apply text-label-large-emphasized;
+  color: var(--md-primary);
+}
+
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--tab-x, 0px) - 0.25rem);
+  width: calc(var(--tab-width) + 0.5rem);
+  height: 3px;
+  pointer-events: none;
+  border-radius: var(--radius-full) var(--radius-full) 0 0;
+  background: var(--md-primary);
+  transition:
+    left var(--duration-expressive-fast-spatial)
+      var(--ease-expressive-fast-spatial),
+    width var(--duration-expressive-fast-spatial)
+      var(--ease-expressive-fast-spatial);
+}

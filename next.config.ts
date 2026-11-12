@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
 const nextConfig: NextConfig = {
   // Playwright runs its own dev server (playwright.config.ts). It needs its
@@ -57,4 +58,19 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default function config(phase: string): NextConfig {
+  return {
+    ...nextConfig,
+    async rewrites() {
+      return {
+        // Route to the 404 before rendering can stream a 200 response.
+        beforeFiles:
+          phase === PHASE_DEVELOPMENT_SERVER
+            ? []
+            : [{ source: "/dev/ui", destination: "/404" }],
+        afterFiles: [],
+        fallback: [],
+      };
+    },
+  };
+}

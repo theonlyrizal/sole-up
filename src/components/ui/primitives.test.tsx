@@ -30,9 +30,7 @@ describe("FormField", () => {
     expect(html).toContain('aria-describedby="title-hint title-error"');
     expect(html).toContain('aria-invalid="true"');
     expect(html).toContain('<p id="title-hint"');
-    expect(html).toContain(
-      '<p id="title-error" class="text-sm text-danger">Required.</p>',
-    );
+    expect(html).toMatch(/<p id="title-error"[^>]*>Required\.<\/p>/);
   });
 
   it("describes only by the hint when there are no errors", () => {

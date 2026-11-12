@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./ui-primitives.css";
 
 /* Both sources of dark mode use the same role pairs through light-dark(). */
 :root,
@@ -9,7 +10,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
+  :root[data-theme="system"] {
     color-scheme: dark;
     --md-card-shadow: none;
   }
@@ -20,7 +21,9 @@
   --md-card-shadow: none;
 }
 
-:root {
+/* Resolve paired roles again inside independently themed surfaces. */
+:root,
+[data-theme] {
   --brand-forest-green: #214839;
   --brand-kiwi: #b5cc8b;
   --brand-crisp-carrot: #e99a64;
@@ -117,9 +120,6 @@
   --md-on-confirmation-surface: var(--md-on-reward-container);
   --md-reflection-surface: var(--area-violet-container);
   --md-on-reflection-surface: var(--area-violet-on);
-  --feedback-halo-duration: 600ms;
-  --feedback-press-scale: 0.96;
-
   /* Legacy aliases, kept through UI-13. Hover fills keep their paired text. */
   --bg: var(--md-canvas);
   --surface: var(--md-resting-surface);
@@ -139,6 +139,11 @@
     var(--md-on-primary) 8%
   );
   --danger-hover: color-mix(in srgb, var(--md-error), var(--md-on-error) 8%);
+}
+
+:root {
+  --feedback-halo-duration: 600ms;
+  --feedback-press-scale: 0.96;
   --space-unit: 0.25rem;
   --corner-sm: 8px;
   --corner-md: 12px;
@@ -875,7 +880,8 @@ body:has(.header-wash) {
 }
 
 @media (prefers-contrast: more) {
-  :root {
+  :root,
+  [data-theme] {
     --border: var(--md-outline);
   }
 

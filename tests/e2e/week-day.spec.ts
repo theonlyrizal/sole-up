@@ -1,3 +1,4 @@
+import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
@@ -330,6 +331,10 @@ test("a phone gets Day instead of Week, in the dark theme, without sideways scro
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 812 });
+  await page.addInitScript(
+    (key) => localStorage.setItem(key, "system"),
+    THEME_STORAGE_KEY,
+  );
   await page.emulateMedia({ colorScheme: "dark" });
   await signInAndConfirm(page);
   const today = tokyoDate();

@@ -22,7 +22,7 @@ describe("themeInitScript", () => {
   it.each([
     ["dark", { theme: "dark" }],
     ["light", { theme: "light" }],
-    ["system", {}],
+    ["system", { theme: "system" }],
     [null, {}],
     ['</script><script>throw Error("injected")</script>', {}],
   ])("only writes an explicit supported choice (%s)", (choice, expected) => {
@@ -38,7 +38,7 @@ describe("themeInitScript", () => {
     expect(dataset).toEqual(expected);
   });
 
-  it("leaves the system default when storage access throws", () => {
+  it("leaves the light default when storage access throws", () => {
     const dataset = {};
     runInNewContext(themeInitScript(), {
       get localStorage() {

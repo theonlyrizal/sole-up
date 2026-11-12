@@ -1,5 +1,7 @@
+import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
+import { galleryBaseURL } from "../../playwright.config";
 import { expectNoSeriousViolations } from "./helpers";
 import {
   DAILY_HABIT,
@@ -18,6 +20,66 @@ const sizes = [
   { width: 1280, height: 800 },
 ] as const;
 const themes = ["light", "dark"] as const;
+
+for (const viewport of sizes) {
+  test(`@visual UI-2a component gallery ${viewport.width}`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize(viewport);
+    await page.goto(`${galleryBaseURL}/dev/ui`);
+    await expect(
+      page.getByRole("radiogroup", { name: "Gallery appearance" }),
+    ).toHaveAttribute("tabindex", "0");
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    const path = (name: string) =>
+      `test-results/visual/ui-2a/${name}-${viewport.width}.png`;
+    await page.screenshot({ path: path("gallery-compare"), fullPage: true });
+
+    for (const theme of themes) {
+      const name = theme === "light" ? "Light" : "Dark";
+      const column = page.getByRole("region", { name, exact: true });
+      await column.screenshot({ path: path(`gallery-${theme}`) });
+      const fab = column.getByRole("button", { name: "Create menu" });
+      await fab.scrollIntoViewIfNeeded();
+      await fab.focus();
+      await page.keyboard.press("Enter");
+      await expect(
+        column.getByRole("menuitem", { name: "Create task" }),
+      ).toBeFocused();
+      await page.screenshot({
+        path: path(`fab-open-${theme}`),
+        animations: "disabled",
+      });
+      await page.keyboard.press("Escape");
+      await expect(fab).toBeFocused();
+
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const form = column.getByRole("form", { name: `${theme} save preview` });
+      const save = form.getByRole("button", { name: "Save", exact: true });
+      await save.focus();
+      await form.screenshot({ path: path(`focus-${theme}`) });
+      await page.keyboard.press("Enter");
+      await expect(
+        form.getByRole("button", { name: "Saving…" }),
+      ).toHaveAttribute("aria-busy", "true");
+      await form.screenshot({
+        path: path(`pending-reduced-motion-${theme}`),
+        animations: "disabled",
+      });
+      await form.getByRole("button", { name: "Resolve preview" }).click();
+      await expect(form.getByRole("status")).toHaveText("Preview save failed.");
+      await form.screenshot({ path: path(`error-${theme}`) });
+      await form.getByRole("button", { name: "Retry save" }).click();
+      await form.getByRole("button", { name: "Resolve preview" }).click();
+      await expect(form.getByRole("status")).toHaveText("Preview saved.");
+      await form.screenshot({ path: path(`retry-saved-${theme}`) });
+      await form.getByRole("button", { name: "Undo" }).click();
+      await expect(save).toBeEnabled();
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+    }
+  });
+}
 
 async function openPage(page: Page, path: string) {
   await page.goto(path);
@@ -59,6 +121,10 @@ for (const viewport of sizes) {
       test.setTimeout(150_000);
       await page.setViewportSize(viewport);
       await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
       const fontOrigins = new Set<string>();
       page.on("request", (request) => {
         if (request.resourceType() === "font")
@@ -149,6 +215,10 @@ for (const viewport of sizes) {
         .context()
         .browser()!
         .newContext({ viewport, colorScheme, reducedMotion: "reduce" });
+      await guestContext.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
       try {
         const guest = await guestContext.newPage();
         for (const [name, path] of [
@@ -196,7 +266,13 @@ for (const viewport of sizes) {
       await expect(add).toBeFocused();
       await expect(add).toHaveCSS("outline-width", "3px");
       await expect(add).toHaveCSS("outline-offset", "2px");
-      await expect(add).toHaveCSS("box-shadow", /inset/);
+      await expect
+        .poll(() =>
+          add.evaluate(
+            (button) => getComputedStyle(button, "::after").boxShadow,
+          ),
+        )
+        .toMatch(/inset/);
       await capture("home-keyboard-focus");
       await page.keyboard.press("Enter");
       const dialog = page.getByRole("dialog", { name: "Add task" });
