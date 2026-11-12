@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Tooltip } from "radix-ui";
-import { useState } from "react";
 import { Icon, type IconName } from "@/components/icons/icon";
 import { useMediaQuery } from "@/components/hooks/use-media-query";
 import { cx, focusRing } from "./cx";
+import { Tooltip } from "./tooltip";
 
 const variants = {
   standard: "action-standard",
@@ -47,23 +46,11 @@ function IconTooltip({
   children: React.ReactElement;
 }) {
   const medium = useMediaQuery("medium");
-  const [open, setOpen] = useState(false);
-  // Keep the trigger mounted when crossing the breakpoint.
+  if (!enabled) return children;
   return (
-    <Tooltip.Provider delayDuration={500}>
-      <Tooltip.Root
-        open={Boolean(enabled && medium && open)}
-        onOpenChange={setOpen}
-      >
-        <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
-        <Tooltip.Content
-          sideOffset={4}
-          className="z-50 max-w-xs rounded-xs bg-inverse-surface px-2 py-1 text-body-small text-inverse-on-surface"
-        >
-          {label}
-        </Tooltip.Content>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+    <Tooltip label={label} enabled={Boolean(medium)}>
+      {children}
+    </Tooltip>
   );
 }
 

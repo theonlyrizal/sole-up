@@ -1,14 +1,6 @@
 import { Icon, type IconName } from "@/components/icons/icon";
 import { cx, focusRing } from "./cx";
-import { SHAPES } from "./shapes";
-
-const pendingShapes = {
-  "--pending-circle": `path("${SHAPES.circle}")`,
-  "--pending-sunny": `path("${SHAPES.sunny}")`,
-  "--pending-cookie": `path("${SHAPES["cookie-9"]}")`,
-  "--pending-pill": `path("${SHAPES.pill}")`,
-  "--pending-burst": `path("${SHAPES["soft-burst"]}")`,
-} as React.CSSProperties;
+import { LoadingIndicator } from "./loading-indicator";
 
 const variants = {
   filled: "action-filled",
@@ -85,17 +77,7 @@ export function Button({
 }: ButtonProps) {
   const iconSize = size === "m" ? 24 : 20;
   const spinner = pending && (
-    <svg
-      aria-hidden="true"
-      focusable="false"
-      className="action-spinner"
-      style={pendingShapes}
-      viewBox="0 0 100 100"
-      width="24"
-      height="24"
-    >
-      <path d={SHAPES.circle} fill="currentColor" />
-    </svg>
+    <LoadingIndicator decorative size={24} className="action-spinner" />
   );
   const inlineSpinner = Boolean(icon || trailingIcon);
   return (

@@ -82,7 +82,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-0 | Planning: decisions, system, components, screens, audit, plan, prompts | done | ui-0.0-planning | 2026-10-30 | Planning PR #74 merged. Revision 4 followed in #91 |
 | UI-1 | Foundations: tokens, type, theme, icons, shapes, motion, breakpoints | done | chunk/ui-1-foundations | 2026-11-12 | Verified both themes and the 16.4.3 font fix |
 | UI-2a | Components: actions, selection, inputs, gallery | done | chunk/ui-2a-action-input-components | 2026-11-12 | Parts A–C, gallery, and finish-line checks verified |
-| UI-2b | Components: containment, navigation primitives, feedback, states | todo | | | |
+| UI-2b | Components: containment, navigation primitives, feedback, states | done | chunk/ui-2b-containment-feedback | 2026-11-12 | Parts D–F and H, gallery and finish-line checks verified |
 | UI-3 | App shell: nav bar, rail, app bar, FAB menu, More, page structure | todo | | | Needs sign-off 5-C |
 | UI-4 | Home | todo | | | Needs sign-off 5-A |
 | UI-5 | Plan: Today, task row, timeline, Today habits | todo | | | |
@@ -433,5 +433,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Both themes passed keyboard, axe, narrow-width, larger-text and reduced-motion checks in Chromium. |
 | Restraint | 2 | Feedback stays at the activated control. The gallery has no page entrance effects or repeating success animation. |
 | Variety | 1 | The gallery covers the distinct action, selection and field anatomies. App screen compositions belong to later phases. |
+
+**Total — 15/16.**
+
+### UI-2b · Containment and feedback (2026-11-12)
+
+- **Branch / PR** — `chunk/ui-2b-containment-feedback` · [#94](https://github.com/theonlyrizal/sole-up/pull/94).
+- **Routes and components** — Added the Part D–F containment, overlays, feedback, states and page primitives, plus Part H `ActionConfirmation`, to the shared components and both themes of `/dev/ui`. The gallery exercises them with local workshop and habit fixtures.
+- **Data paths and contracts** — App paths, query parameters, anchors, mutations and live announcement owners retain their existing contracts. Legacy dialogs keep their props, including `onCloseAutoFocus`. Confirmations stay open through pending and failed actions. The existing `toast()` API, Escape, F8, Undo and announcements continue through Radix.
+- **Decisions** — Followed D-23 to D-27. The compact form keeps the title and Save visible around one independently scrolling fields area. Its viewport follows keyboard resize and pan where the browser exposes them. Centred dialogs stay nearly opaque through the transition to preserve contrast. Escape reaches the focused dialog even when a snackbar arrives after it opens. Snackbars use the current shell offsets.
+- **Checks run** — `pnpm verify` passed with 1,184 unit and 831 integration tests. `pnpm build` passed on Next.js 16.4.3 with Turbopack. `CI=1 pnpm test:e2e --workers 5` passed 159 tests on the first attempt, including the production gallery guard and existing dialog and toast behavior. Ten visual-only cases ran separately with `pnpm test:visual --workers 4`, which passed all ten.
+- **Screenshots** — 48 UI-2b captures in `test-results/visual/ui-2b/`. The full examples are `gallery-390-light.png`, `gallery-390-dark.png`, `gallery-1280-light.png` and `gallery-1280-dark.png`. See also `form-dialog-390-dark.png`, `form-dialog-1280-light.png`, `form-failure-390-light.png`, `menu-keyboard-1280-light.png` and `snackbar-390-dark.png`. The `confirmation-pending-*`, `confirmation-failure-*`, `confirmation-retry-*`, `confirmation-correction-*` and `confirmation-reduced-motion-*` captures show the exercised states in both themes and sizes. The retry captures sample the real halo 35 ms into its animation.
+- **Accessibility and interaction evidence** — Axe reported zero violations in both themed gallery columns and each open form at 390 × 844 and 1280 × 800. The gallery fit at 320–1280 px and at 200% text size. Chromium verified segmented corner sizes and independent row controls, Disclosure's grid transition, keyboard menu navigation, sheet Close/Escape/drag, and focus restoration. The compact form kept its Save bounds as fields scrolled and retained the draft after failure. Confirm stayed open through pending and failure and closed after retry. Snackbar Undo worked after F8 and Tab, with one Radix status announcement. The quantity preview showed one 600 ms halo for a new confirmed save, stable button bounds, no replay on mount or repeated results, and no halo after failure, correction or under reduced motion.
+- **Unverified** — Soft-keyboard resize on a physical phone, manual screen-reader playback and browser engines beyond the configured Chromium runner.
+- **Follow-ups** — UI-3 owns shell integration. UI-5 and UI-9 own consuming the confirmation primitive in existing actions.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | The feature card has one Forest action. The compact form gives the title, fields and Save distinct positions. |
+| Character | 2 | Cream and opaque surfaces frame the Crisp Carrot feature card, rounded list groups and shaped empty-state art. |
+| Color | 2 | The paired roles and keyboard focus remain legible in the light and dark captures. The open form and resting gallery pass axe. |
+| Response | 2 | The form, confirmation and quantity previews expose pending, failure and recovery. The quantity preview also shows repeat and correction without replay. |
+| Truthfulness | 2 | The partial save reports 2 of 3 cups. The existing saved state appears immediately, and the new halo follows a successful fixture response. |
+| Accessibility | 2 | Both themes pass axe at the two capture sizes. Keyboard focus, dismissal alternatives, large text and reduced motion were exercised. |
+| Restraint | 2 | The halo stays around the glyph, settles without changing the control's bounds and clears on correction. |
+| Variety | 1 | The gallery exercises cards, lists, forms and overlays. Screen-level compositions are part of their respective phases. |
 
 **Total — 15/16.**

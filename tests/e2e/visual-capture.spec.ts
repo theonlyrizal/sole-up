@@ -90,6 +90,131 @@ async function openPage(page: Page, path: string) {
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-2b ${viewport.width} ${theme}`, async ({ page }) => {
+      test.setTimeout(60_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({
+        colorScheme: theme,
+        reducedMotion: "no-preference",
+      });
+      await page.addInitScript(() => {
+        // Hold the real halo near its start so screenshot timing is repeatable.
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (keyframes, options) {
+          const animation = animate.call(this, keyframes, options);
+          if (this.classList.contains("confirmation-halo")) {
+            animation.pause();
+            animation.currentTime = 35;
+          }
+          return animation;
+        };
+      });
+      await page.goto(`${galleryBaseURL}/dev/ui`);
+      await expect(
+        page.getByRole("radiogroup", { name: "Gallery appearance" }),
+      ).toHaveAttribute("tabindex", "0");
+      await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      const column = page.getByRole("region", {
+        name: theme === "light" ? "Light" : "Dark",
+        exact: true,
+      });
+      const path = (state: string) =>
+        `test-results/visual/ui-2b/${state}-${viewport.width}-${theme}.png`;
+      const style = "nextjs-portal { visibility: hidden !important; }";
+      const screenshot = (state: string) =>
+        page.screenshot({ path: path(state), animations: "disabled", style });
+      await column
+        .getByRole("region", { name: "Containment and feedback" })
+        .screenshot({
+          path: path("gallery"),
+          animations: "disabled",
+          style,
+        });
+
+      const edit = column.getByRole("button", { name: "Edit workshop form" });
+      await edit.focus();
+      await page.keyboard.press("Enter");
+      const form = page.getByRole("dialog", { name: "Edit workshop" });
+      await expect(form.getByRole("button", { name: "Close" })).toBeFocused();
+      await screenshot("form-dialog");
+      const save = form.getByRole("button", { name: "Save workshop" });
+      await save.click();
+      await expect(save).toHaveAttribute("aria-busy", "true");
+      await screenshot("form-pending");
+      const error = form.getByRole("alert");
+      await expect(error).toBeVisible();
+      await error.scrollIntoViewIfNeeded();
+      await screenshot("form-failure");
+      await save.click();
+      await expect(form).toBeHidden();
+      await expect(edit).toBeFocused();
+
+      const sheet = column.getByRole("button", { name: "Open bottom sheet" });
+      await sheet.click();
+      await expect(
+        page.getByRole("dialog", { name: "Workshop options" }),
+      ).toBeVisible();
+      await screenshot("bottom-sheet");
+      await page.keyboard.press("Escape");
+      await expect(sheet).toBeFocused();
+
+      const menu = column.getByRole("button", { name: "Workshop menu" });
+      await menu.focus();
+      await page.keyboard.press("Enter");
+      await page.keyboard.press("ArrowDown");
+      await expect(
+        page.getByRole("menuitem", { name: "Archive" }),
+      ).toBeFocused();
+      await screenshot("menu-keyboard");
+      await page.keyboard.press("Escape");
+      await expect(menu).toBeFocused();
+
+      await column
+        .getByRole("button", { name: "Show snackbar with action" })
+        .click();
+      await expect(
+        page.getByRole("status").filter({ hasText: "Outline archived." }),
+      ).toBeVisible();
+      await screenshot("snackbar");
+      await page.getByRole("button", { name: "Dismiss" }).click();
+
+      const owner = column.getByRole("group", { name: "Try logging water" });
+      const log = owner.getByRole("button", { name: "Log 2 cups" });
+      const state = owner.getByRole("status");
+      const captureOwner = (name: string) =>
+        owner.screenshot({ path: path(name), animations: "disabled" });
+      await log.click();
+      await expect(state).toHaveText("Saving 2 cups…");
+      await captureOwner("confirmation-pending");
+      await owner.getByRole("button", { name: "Resolve with error" }).click();
+      await expect(state).toContainText("Could not save");
+      await captureOwner("confirmation-failure");
+      await owner.getByRole("button", { name: "Retry log" }).click();
+      await owner.getByRole("button", { name: "Resolve save" }).click();
+      await expect(state).toHaveText("2 of 3 cups saved.");
+      await expect
+        .poll(() =>
+          log
+            .locator(".confirmation-halo")
+            .evaluate((el) => Number(getComputedStyle(el).opacity)),
+        )
+        .toBeGreaterThan(0);
+      await owner.screenshot({ path: path("confirmation-retry"), style });
+      await owner.getByRole("button", { name: "Correct to 1 cup" }).click();
+      await expect(state).toHaveText("Corrected to 1 of 3 cups.");
+      await captureOwner("confirmation-correction");
+
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await log.click();
+      await owner.getByRole("button", { name: "Resolve save" }).click();
+      await expect(state).toHaveText("2 of 3 cups saved.");
+      await captureOwner("confirmation-reduced-motion");
+    });
+  }
+}
+
 async function checkRenderedPage(
   page: Page,
   colorScheme: (typeof themes)[number],

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./ui-primitives.css";
+@import "./ui-surfaces.css";
 
 /* Both sources of dark mode use the same role pairs through light-dark(). */
 :root,

@@ -19,6 +19,9 @@ import { Switch, SwitchRow } from "@/components/ui/switch";
 import { Tabs } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useMediaQuery } from "@/components/hooks/use-media-query";
+import { OverlayContainer } from "@/components/ui/overlay-container";
+import { Toaster } from "@/components/ui/toast";
+import { SurfaceExamples } from "./surface-examples";
 
 type Theme = "light" | "dark";
 type View = "compare" | Theme;
@@ -50,6 +53,7 @@ const iconVariants = [
 
 export function Gallery() {
   const [view, setView] = useState<View>("compare");
+  const [toastTheme, setToastTheme] = useState<Theme>("light");
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   return (
     <main
@@ -61,8 +65,14 @@ export function Gallery() {
           <h1 className="text-headline-large">SoleUp component gallery</h1>
           <p className="mt-1 text-body-medium text-on-surface-variant">
             {reducedMotion ? "Reduced motion is on" : "Standard motion"} ·
-            Actions, selection and fields
+            Actions, fields, surfaces and feedback
           </p>
+          <a
+            href={view === "dark" ? "#dark-surfaces" : "#light-surfaces"}
+            className="inline-flex min-h-12 items-center text-label-large text-primary underline"
+          >
+            Jump to containment and feedback
+          </a>
         </div>
         <ConnectedButtonGroup
           label="Gallery appearance"
@@ -77,8 +87,15 @@ export function Gallery() {
           view === "compare" && "expanded:grid-cols-2",
         )}
       >
-        {view !== "dark" && <ThemeColumn theme="light" />}
-        {view !== "light" && <ThemeColumn theme="dark" />}
+        {view !== "dark" && (
+          <GalleryTheme theme="light" onToast={setToastTheme} />
+        )}
+        {view !== "light" && (
+          <GalleryTheme theme="dark" onToast={setToastTheme} />
+        )}
+      </div>
+      <div data-theme={toastTheme}>
+        <Toaster />
       </div>
     </main>
   );
@@ -95,7 +112,34 @@ function Example({ title, children }: { title: string; children: ReactNode }) {
 
 const row = "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1";
 
-function ThemeColumn({ theme }: { theme: Theme }) {
+function GalleryTheme({
+  theme,
+  onToast,
+}: {
+  theme: Theme;
+  onToast: (theme: Theme) => void;
+}) {
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+  return (
+    <OverlayContainer value={container}>
+      <ThemeColumn
+        theme={theme}
+        onToast={onToast}
+        registerContainer={setContainer}
+      />
+    </OverlayContainer>
+  );
+}
+
+function ThemeColumn({
+  theme,
+  onToast,
+  registerContainer,
+}: {
+  theme: Theme;
+  onToast: (theme: Theme) => void;
+  registerContainer: (element: HTMLElement | null) => void;
+}) {
   const title = theme === "light" ? "Light" : "Dark";
   const [range, setRange] = useState("week");
   const [filter, setFilter] = useState(false);
@@ -106,6 +150,7 @@ function ThemeColumn({ theme }: { theme: Theme }) {
 
   return (
     <section
+      ref={registerContainer}
       data-theme={theme}
       aria-labelledby={`${theme}-theme`}
       className="grid min-w-0 gap-4 rounded-xl border border-outline-variant bg-canvas p-3 text-on-surface medium:p-4"
@@ -406,6 +451,7 @@ function ThemeColumn({ theme }: { theme: Theme }) {
       <div id={`${theme}-fields`} className="min-w-0">
         <FieldExamples theme={theme} />
       </div>
+      <SurfaceExamples theme={theme} onToast={() => onToast(theme)} />
     </section>
   );
 }

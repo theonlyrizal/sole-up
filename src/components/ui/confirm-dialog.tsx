@@ -4,9 +4,13 @@ import { AlertDialog } from "radix-ui";
 import { useState, useTransition } from "react";
 
 import type { ActionResult } from "@/lib/result";
+import { Icon, type IconName } from "@/components/icons/icon";
 
 import { Button } from "./button";
-import { contentClass, overlayClass } from "./dialog";
+import { cx } from "./cx";
+import { closeDialogOnEscape, contentClass, overlayClass } from "./dialog";
+import { InlineBanner } from "./inline-banner";
+import { useOverlayContainer } from "./overlay-container";
 
 type ConfirmDialogProps = {
   /** The element that opens the dialog, usually a `<Button>`. */
@@ -24,6 +28,7 @@ type ConfirmDialogProps = {
   onConfirm: () => Promise<ActionResult<unknown> | void> | void;
   /** Destructive styling for the confirm button. Defaults to true. */
   destructive?: boolean;
+  icon?: IconName;
 };
 
 /**
@@ -38,7 +43,9 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   onConfirm,
   destructive = true,
+  icon = destructive ? "delete" : undefined,
 }: ConfirmDialogProps) {
+  const container = useOverlayContainer();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -68,29 +75,39 @@ export function ConfirmDialog({
   return (
     <AlertDialog.Root open={open} onOpenChange={changeOpen}>
       <AlertDialog.Trigger asChild>{trigger}</AlertDialog.Trigger>
-      <AlertDialog.Portal>
+      <AlertDialog.Portal container={container}>
         <AlertDialog.Overlay className={overlayClass} />
-        <AlertDialog.Content className={contentClass}>
-          <AlertDialog.Title className="text-lg font-semibold">
-            {title}
-          </AlertDialog.Title>
-          <AlertDialog.Description className="text-muted">
-            {description}
-          </AlertDialog.Description>
-          {error && (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
+        <AlertDialog.Content
+          className={cx(contentClass, "confirm-dialog")}
+          onKeyDown={closeDialogOnEscape}
+        >
+          <div className="grid justify-items-center gap-3 text-center">
+            {icon && (
+              <Icon
+                name={icon}
+                className={destructive ? "text-error" : "text-primary"}
+              />
+            )}
+            <AlertDialog.Title className="text-headline-small">
+              {title}
+            </AlertDialog.Title>
+            <AlertDialog.Description asChild>
+              <div className="text-body-medium text-on-surface-variant">
+                {description}
+              </div>
+            </AlertDialog.Description>
+          </div>
+          {error && <InlineBanner tone="error">{error}</InlineBanner>}
           <div className="flex flex-wrap justify-end gap-3">
             <AlertDialog.Cancel asChild>
-              <Button variant="secondary" disabled={pending}>
+              <Button data-dialog-close="" variant="text" disabled={pending}>
                 {cancelLabel}
               </Button>
             </AlertDialog.Cancel>
             <Button
-              variant={destructive ? "danger" : "primary"}
+              variant={destructive ? "danger" : "filled"}
               disabled={pending}
+              aria-busy={pending || undefined}
               onClick={confirm}
             >
               {pending ? "Working…" : confirmLabel}
