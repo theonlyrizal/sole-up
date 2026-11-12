@@ -488,7 +488,7 @@ Append one note per phase, newest last. Template:
 
 ### UI-4 · Home (2026-11-13)
 
-- **Branch** — `chunk/ui-4-home`.
+- **Branch / PR** — `chunk/ui-4-home` · [#96](https://github.com/theonlyrizal/sole-up/pull/96).
 - **Routes and components** — Rebuilt `/home` with a local greeting, linked week capsules, one featured card, a compact habit snap list, an expanded habit grid, the goals disclosure, a route skeleton and a retryable error state. Added the shared Home data components in `src/components/data/`.
 - **Data paths** — Home calls `nextCommitment`, `todayTaskCounts`, `goalsWithoutNextAction`, `listGoalsWithoutNextAction`, `deadlinesNextSevenDays` and `habitsSummary` at one instant using the user's saved preferences. `RefreshOnNewDay` remains mounted. The weekly habit counts feed the progress pills. UI-9 owns the day-level chart because it has the required day records.
 - **Contracts checked** — All seven date links use `gridHref` for Calendar Day. The featured title and calendar action use `calendarItemHref`. The Today counts keep their `#today-*` targets. The goal count keeps `#goals-without-next-action`, goal rows keep their detail paths, the deadlines link keeps `/plan?due=next7`, and habit titles keep their Track anchors.
