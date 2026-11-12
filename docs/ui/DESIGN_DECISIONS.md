@@ -155,7 +155,7 @@ The JS media queries in `time-grid-view.tsx` (`48rem`, `64rem`) move to `src/lib
 
 ### Data display and copy
 
-**D-16 · Metric transparency with progressive disclosure (needs sign-off: §5-A).** Every metric card shows:
+**D-16 · Metric transparency with progressive disclosure (5-A approved 2026-11-13).** Every metric card shows:
 - its **label**;
 - its **value** (or "Nothing yet");
 - a **visible range caption** ("Today, Fri 30 Oct" or "Oct 26 – Nov 1");
@@ -169,7 +169,7 @@ The button opens a popover on medium and wider, or a bottom sheet on compact, wi
 |---|---|---|
 | Segmented pill bar | Habit week progress with a real expected-unit denominator | "2 of 3 times so far this week" |
 | Week strip | Navigating dates | Each chip's `aria-label` is the full date |
-| Habit week chart (7 day pills) | Track and Home habit cards | Each day's `stateLabel` |
+| Habit week chart (7 day pills) | Track | Each day's `stateLabel` |
 | Dot matrix | Track, 12-week range | Each cell is a button whose label is `dateLabel: stateLabel` |
 | Milestone arc | Goal detail and goal cards | "3 of 5 milestones" |
 | Timeline | Today's schedule and the calendar | Times and titles as text |

@@ -2,8 +2,9 @@ import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
 import { galleryBaseURL } from "../../playwright.config";
-import { expectNoSeriousViolations } from "./helpers";
+import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 import {
+  createUnscheduledHabit,
   DAILY_HABIT,
   EVENT_TITLE,
   GOAL_TITLE,
@@ -20,6 +21,180 @@ const sizes = [
   { width: 1280, height: 800 },
 ] as const;
 const themes = ["light", "dark"] as const;
+
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-4 Home ${viewport.width} ${theme}`, async ({ page }) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      const capture = (state: string, fullPage = true) =>
+        page.screenshot({
+          path: `test-results/visual/ui-4/home-${state}-${viewport.width}-${theme}.png`,
+          fullPage,
+          animations: "disabled",
+        });
+      const region = (name: string) =>
+        page.getByRole("region", { name, exact: true });
+
+      await signInAndConfirm(page, "Alex Morgan");
+      await expect(region("Today")).toContainText("Nothing yet");
+      const todayColor = await region("Today").evaluate(
+        (element) => getComputedStyle(element).backgroundColor,
+      );
+      await page.evaluate(() => document.fonts.ready.then(() => null));
+      await checkRenderedPage(page, theme);
+      await capture("empty");
+      await expectNoSeriousViolations(page);
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = "200%";
+      });
+      await checkRenderedPage(page, theme);
+      await capture("empty-text-200");
+      await page.evaluate(() => {
+        document.documentElement.style.removeProperty("font-size");
+      });
+
+      const { userId, today } = await seedVisualData(page, { home: true });
+      await openPage(page, "/home");
+      const commitment = region("Next commitment");
+      const habits = region("Your habits this week");
+      const carousel = habits.getByRole("list", { name: "Active habits" });
+      await expect(
+        commitment.getByRole("link", { name: EVENT_TITLE }),
+      ).toBeVisible();
+      await expect(commitment).toHaveCSS("background-color", todayColor);
+      await expect(region("Today")).not.toHaveCSS(
+        "background-color",
+        todayColor,
+      );
+      await expect(
+        carousel.getByRole("img", { name: /^1 of 3 times so far this week/ }),
+      ).toBeVisible();
+      if (viewport.width === 390) {
+        await expect(
+          habits.getByRole("button", { name: "Next habits" }),
+        ).toBeEnabled();
+        await expect(
+          commitment.getByRole("link", { name: "Open in calendar" }),
+        ).toBeInViewport();
+        const bounds = (await commitment.boundingBox())!;
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(402);
+      } else {
+        await expect(carousel).toHaveCSS("display", "grid");
+        await expect(
+          habits.getByRole("button", { name: "Next habits" }),
+        ).toBeHidden();
+      }
+      await checkRenderedPage(page, theme);
+      await capture("populated");
+      await capture("first-screen", false);
+      await expectNoSeriousViolations(page);
+
+      const info = commitment.getByRole("button", {
+        name: "How this is counted: Next commitment",
+      });
+      await info.focus();
+      await info.press("Enter");
+      const panel = page.getByRole("dialog", { name: "How this is counted" });
+      await expect(panel.locator("time")).toBeVisible();
+      await capture("metric-info", false);
+      await expectNoSeriousViolations(page);
+      await page.keyboard.press("Escape");
+      await expect(info).toBeFocused();
+
+      const goals = region("Goals without a next action");
+      const showAll = goals.getByRole("button", { name: "View all 4" });
+      await expect(goals.getByRole("link")).toHaveCount(4); // The count and the first three rows.
+      await showAll.focus();
+      await showAll.press("Enter");
+      await expect(showAll).toHaveAttribute("aria-expanded", "true");
+      await expect(goals.getByRole("link")).toHaveCount(5);
+      await capture("goals-expanded");
+      await showAll.press("Enter");
+      await expect(goals.getByRole("link")).toHaveCount(4);
+
+      if (viewport.width === 390) {
+        const next = habits.getByRole("button", { name: "Next habits" });
+        const previous = habits.getByRole("button", {
+          name: "Previous habits",
+        });
+        await next.focus();
+        await next.press("Enter");
+        await expect(previous).toBeEnabled();
+        if (await next.isEnabled()) await next.press("Enter");
+        await expect(next).toBeDisabled();
+        await expect(next).toBeFocused();
+        await capture("habits-next");
+        await previous.press("Enter");
+        if (await previous.isEnabled()) await previous.press("Enter");
+        await expect(previous).toBeDisabled();
+      }
+
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = "200%";
+      });
+      await checkRenderedPage(page, theme);
+      await capture("text-200");
+
+      const repair = await createUnscheduledHabit(userId, today);
+      await page.goto("/home");
+      const alert = page
+        .getByRole("alert")
+        .filter({ hasText: "Home couldn't load" });
+      await expect(alert).toContainText(/Reference: \S+/);
+      await expect(alert).not.toContainText("Habit has no schedule");
+      await capture("error");
+      await expectNoSeriousViolations(page);
+
+      await repair();
+      const retry = alert.getByRole("button", { name: "Try again" });
+      const retryRequest = page.waitForRequest(
+        (request) =>
+          new URL(request.url()).pathname === "/home" &&
+          request.headers().rsc === "1",
+      );
+      const gate = Promise.withResolvers<void>();
+      const delayRetry = async (route: import("@playwright/test").Route) => {
+        if (route.request().headers().rsc === "1") await gate.promise;
+        await route.continue();
+      };
+      await page.route(/\/home(?:\?|$)/, delayRetry);
+      try {
+        await retry.click();
+        await retryRequest;
+        await expect(
+          alert.getByRole("button", { name: "Trying again…" }),
+        ).toBeDisabled();
+        await capture("retry-pending");
+      } finally {
+        gate.resolve();
+      }
+      await expect(
+        habits.getByRole("link", { name: "Water the herbs" }),
+      ).toBeVisible();
+      await expect(alert).toHaveCount(0);
+      await page.unroute(/\/home(?:\?|$)/, delayRetry);
+      await capture("retry-recovered");
+
+      await page.route("**/_next/static/**/*.js*", (route) => route.abort());
+      await openPage(page, "/home");
+      const progress = carousel.getByRole("img", {
+        name: /^1 of 3 times so far this week/,
+      });
+      await expect(progress).toBeVisible();
+      await expect(progress.locator("span > span").first()).toHaveAttribute(
+        "style",
+        "height:100%",
+      );
+      await capture("first-paint");
+    });
+  }
+}
 
 for (const viewport of sizes) {
   test(`@visual UI-2a component gallery ${viewport.width}`, async ({

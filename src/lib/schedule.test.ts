@@ -4,6 +4,7 @@ import type { CalendarEventOccurrence } from "./calendar-events";
 import { instantFromLocal } from "./dates";
 import {
   commitmentWhenLabel,
+  isCommitmentUnderWay,
   nextCommitmentOf,
   type ScheduleEntry,
   timelineEntries,
@@ -263,5 +264,23 @@ describe("labels", () => {
     expect(when([allDay("Trip", "2026-10-25", "2026-10-26")])).toBe(
       "Tomorrow · All day",
     );
+  });
+
+  it("uses the same Now branch for the chip and the timing label", () => {
+    const timed = entry([
+      event("Call", "2026-10-24 00:01", "2026-10-24 00:30"),
+    ]);
+    const untimed = entry([allDay("Trip", "2026-10-22", "2026-10-26")]);
+    for (const [item, now, expected] of [
+      [timed, NOW, true],
+      [timed, new Date(NOW.getTime() - 1), false],
+      [untimed, NOW, false],
+      [{ ...timed, end: null }, NOW, false],
+    ] as const) {
+      expect(isCommitmentUnderWay(item, now)).toBe(expected);
+      expect(
+        commitmentWhenLabel(item, now, TODAY, LOCALE, TOKYO).startsWith("Now,"),
+      ).toBe(expected);
+    }
   });
 });

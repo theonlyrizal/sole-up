@@ -17,6 +17,7 @@ type EmptyStateProps = {
   headingLevel?: 1 | 2 | 3 | 4;
   art?: StateArt;
   compact?: boolean;
+  className?: string;
 };
 
 /** Shown when a list or page has nothing in it yet. */
@@ -27,6 +28,7 @@ export function EmptyState({
   headingLevel = 2,
   art,
   compact = false,
+  className,
 }: EmptyStateProps) {
   const Heading = `h${headingLevel}` as const;
   return (
@@ -36,6 +38,7 @@ export function EmptyState({
         compact
           ? "flex flex-wrap p-4"
           : "grid justify-items-center p-6 text-center",
+        className,
       )}
     >
       {art && (
@@ -66,7 +69,12 @@ export function EmptyState({
           <Icon name={art.icon} size={compact ? 24 : 40} className="relative" />
         </span>
       )}
-      <div className={cx("grid gap-1", compact && "min-w-36 flex-1")}>
+      <div
+        className={cx(
+          "grid gap-1",
+          compact && "min-w-[min(100%,calc(var(--spacing)*36))] flex-1",
+        )}
+      >
         <Heading className={compact ? "text-title-medium" : "text-title-large"}>
           {title}
         </Heading>

@@ -296,7 +296,7 @@ test.describe("expanded rail", () => {
     await expect(rail).toHaveCSS("width", "96px");
     await expect(expand).toBeFocused();
     await expect(
-      page.getByRole("link", { name: "Search", exact: true }),
+      rail.getByRole("link", { name: "Search", exact: true }),
     ).toBeVisible();
 
     // External bundles are blocked, so this width comes from server markup and

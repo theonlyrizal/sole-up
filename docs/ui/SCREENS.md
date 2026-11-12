@@ -154,13 +154,13 @@ New pure helpers (unit tested): `greetingFor(clock, timeZone)` and `weekDays(tod
 |---|---|---|
 | Greeting | `greetingFor` + first word of `user.name` | No name → "Good morning" |
 | Date line | `clock.today` formatted `weekday long, day, month long` in `locale` | |
-| WeekStrip | `weekDays(clock.today, weekStart)`; `href = calendarHref({ view: "day", date })` from `src/lib/calendar-views.ts` (use the existing builder) | Today `aria-current="date"` |
+| WeekStrip | `weekDays(clock.today, weekStart, locale)`; `href = gridHref("day", date, clock.today)` from `src/lib/calendar-views.ts` | Today `aria-current="date"` |
 | Next commitment | `next.value` (`ScheduleEntry`): kind label `agendaEntryKind`, `title`, `commitmentWhenLabel(...)`, link `calendarItemHref(entry, today, zone)` | "Now" chip (`tertiary` / `on-tertiary`) when the commitment is under way. Add a pure `isCommitmentUnderWay(entry, now)` to `src/lib/schedule.ts` that mirrors `commitmentWhenLabel`'s `!allDay && end !== null && start <= now` branch, and unit-test the two together. Never parse the label string. `next.value === null` → "Nothing coming up in the next 30 days." with [Add an event] → `/plan/calendar` |
 | Today | `today.value.planned`, `.due`, `.decide`; anchors `todaySectionAnchor(...)`; labels `TODAY_SECTION_LABELS` | Zero counts show as outlined chips, still linked |
 | Habit cards | `habits.value[]`: `ShapeAvatar(id, title)`, `title`, `SegmentedPillBar(value = thisWeek.done, total = thisWeek.target, max = 12)` on compact, caption `weekProgressFigure(thisWeek, cadenceType, measure)`, second line `TRACK_RANGE_LABELS["4w"] + ": " + formatConsistency(consistency, cadenceType, measure)` | The card title links to `/track#habit-<id>` (`trackHabitAnchor`). No combined number anywhere |
 | Goals card | `goals.value` count, `goalList` (first 3; "View all {n}" expands in place with a `Disclosure`, keeping `id="goals-without-next-action"`) | Rows link to `/goals/<id>` |
 | Deadlines | `deadlines.value` → `/plan?due=next7` | |
-| Range captions and ⓘ | `metric.range` via `metricRangeLabel`, `metricAsOfLabel`, `metric.definition` | D-16 (needs sign-off 5-A; otherwise the definition shows as a visible `body-small` line) |
+| Range captions and ⓘ | `metric.range` via `metricRangeLabel`, `metricAsOfLabel`, `metric.definition` | D-16 (5-A approved) |
 
 **States:**
 - **Loading:** a page-shaped skeleton (greeting lines, 7 capsules, a hero card, a card, 3 carousel cards).

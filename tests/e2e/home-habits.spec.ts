@@ -17,7 +17,10 @@ function tokyoDate(days = 0): string {
 }
 
 function habitsCard(page: Page) {
-  return page.getByRole("region", { name: "Habits", exact: true });
+  return page.getByRole("region", {
+    name: "Your habits this week",
+    exact: true,
+  });
 }
 
 function toastSaying(page: Page, title: string) {
@@ -47,6 +50,7 @@ async function createHabit(page: Page, title: string, startDate: string) {
 test("Home lists each active habit's figure and links to it on Track", async ({
   page,
 }) => {
+  test.slow();
   await signInAndConfirm(page);
   await openHome(page);
 
@@ -72,13 +76,28 @@ test("Home lists each active habit's figure and links to it on Track", async ({
   const stretch = list.getByRole("listitem").filter({ hasText: "Stretch" });
   await expect(stretch).toContainText("Last 4 weeks: 1 of 1 day");
   await expect(stretch).toContainText(/1 of \d days? so far this week/);
+  await expect(
+    stretch.getByRole("img", { name: /1 of \d days? so far this week/ }),
+  ).toBeVisible();
   // Read isn't logged today, so nothing is expected of it yet.
   const read = list.getByRole("listitem").filter({ hasText: "Read" });
   await expect(read).toContainText(
     "Last 4 weeks: Nothing expected in this range",
   );
   await expect(read).toContainText(/0 of \d+ days? so far this week/);
-  await expect(card).toContainText("Each active habit on its own");
+  await card
+    .getByRole("button", { name: "How this is counted: Your habits this week" })
+    .click();
+  const panel = page.getByRole("dialog", { name: "How this is counted" });
+  await expect(panel).toContainText("Each active habit on its own");
+  await expect(panel).toContainText(/Range.+ to .+/);
+  await expect(panel.locator("time")).toHaveAttribute("datetime", /Z$/);
+  await panel.getByRole("button", { name: "Close" }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "View all" })).toHaveAttribute(
+    "href",
+    "/track",
+  );
   await expect(card.getByText("Nothing yet")).toHaveCount(0);
 
   // Each habit keeps its own figure: no percentage, score or total.
