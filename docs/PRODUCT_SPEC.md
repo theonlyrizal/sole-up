@@ -163,6 +163,8 @@ Initial destinations:
 
 Navigation can change after usability testing. Avoid making every domain a top-level destination if it creates clutter.
 
+On phones the bar shows Home, Plan, Goals, Track and More. More holds Notes, Review, Search and Settings.
+
 ## 8. Dashboard questions
 
 The Home screen should help answer:

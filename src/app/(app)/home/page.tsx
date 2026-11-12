@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { HomeView } from "@/components/home/home-view";
+import { PageFrame } from "@/components/shell/page-frame";
+import { MoreSheet } from "@/components/shell/more-sheet";
+import { TopAppBar } from "@/components/shell/top-app-bar";
+import { IconButton } from "@/components/ui/icon-button";
+import { ShapeAvatar } from "@/components/ui/shape-avatar";
 import { LoadingState } from "@/components/ui/skeleton";
 import { todayClock } from "@/lib/today";
 import { requireUser } from "@/server/auth/session";
@@ -19,18 +24,71 @@ export const metadata: Metadata = { title: "Home · SoleUp" };
 
 export default function HomePage() {
   return (
-    <div className="header-wash mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Home</h1>
-        <p className="text-muted">
-          What matters now: what&apos;s next on your calendar, today, goals that
-          need a next step, the week ahead, and how your habits are going.
-        </p>
-      </div>
+    <PageFrame
+      title="Home"
+      description={
+        "What matters now: what's next on your calendar, today, goals that need a next step, the week ahead, and how your habits are going."
+      }
+      wash
+      mobileHeader={
+        <Suspense fallback={<TopAppBar title="Home" />}>
+          <HomeAppBar />
+        </Suspense>
+      }
+    >
       <Suspense fallback={<LoadingState label="Loading home" />}>
         <Home />
       </Suspense>
-    </div>
+    </PageFrame>
+  );
+}
+
+async function HomeAppBar() {
+  const user = await requireUser();
+  const { timezone, locale } = await getUserPreferences(user.id);
+  const timeZone = timezone ?? "UTC";
+  const now = new Date();
+  const hour = Number(
+    new Intl.DateTimeFormat("en", {
+      timeZone,
+      hour: "numeric",
+      hourCycle: "h23",
+    }).format(now),
+  );
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  return (
+    <TopAppBar
+      title={`${greeting}, ${user.name}`}
+      greeting={{
+        date: new Intl.DateTimeFormat(locale, {
+          timeZone,
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        }).format(now),
+        avatar: (
+          <ShapeAvatar
+            id={user.id}
+            entityType="user"
+            label={user.name}
+            size={40}
+          />
+        ),
+      }}
+      actions={
+        <MoreSheet
+          account={{ id: user.id, name: user.name }}
+          trigger={
+            <IconButton
+              label="More destinations"
+              icon="more_horiz"
+              tooltip={false}
+            />
+          }
+        />
+      }
+    />
   );
 }
 

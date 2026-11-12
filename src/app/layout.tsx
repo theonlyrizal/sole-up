@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Google_Sans_Flex } from "next/font/google";
 import { headers } from "next/headers";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
+import { railInitScript } from "@/components/shell/rail-preference";
 import { CANVAS_COLORS, themeInitScript } from "@/lib/theme";
 
 import "./globals.css";
@@ -50,7 +51,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script
           nonce={nonce}
-          dangerouslySetInnerHTML={{ __html: themeInitScript() }}
+          dangerouslySetInnerHTML={{
+            __html: `${themeInitScript()}\n${railInitScript()}`,
+          }}
         />
       </head>
       <body className="flex min-h-full flex-col font-sans">

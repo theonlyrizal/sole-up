@@ -1,6 +1,10 @@
 import { expect, type Locator, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // Today's timeline and Home's next commitment (chunk 4.9): a timed event
 // and a time block on today's Tokyo date show at the top of Today in time
@@ -31,11 +35,7 @@ async function openDialog(page: Page, button: Locator, name: string) {
 /** Quick add on the Plan page. */
 async function addTask(page: Page, title: string) {
   await page.goto("/plan");
-  const quickAdd = await openDialog(
-    page,
-    page.getByRole("button", { name: "Add task" }),
-    "Add task",
-  );
+  const quickAdd = await openQuickAdd(page);
   await quickAdd.getByLabel("Title").fill(title);
   await quickAdd.getByLabel("Title").press("Enter");
   await expect(quickAdd).toHaveCount(0);

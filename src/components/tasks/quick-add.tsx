@@ -3,7 +3,7 @@
 import { useEffect, useId, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/form-error";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -18,8 +18,6 @@ import type { TaskParentOption } from "@/server/modules/tasks/queries";
 
 import { TaskParentSelect } from "./task-parent-select";
 
-const QUICK_ADD_SHORTCUT = "Alt+Enter";
-
 /** True when a key press is meant for the page, not for a field. */
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -30,14 +28,22 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Global quick add: an "Add task" button, and Alt+Enter outside a
+ * Global quick add: Create → New task, Q on Create, or Alt+Enter outside a
  * field or dialog. Only the title is needed; Enter adds the task. A goal or
  * milestone, a planned date and a due date are optional, behind "More
  * options". Priority and estimate are left for the edit form (ADR 0011).
  */
-export function QuickAdd() {
-  const [open, setOpen] = useState(false);
-
+export function QuickAdd({
+  open,
+  onOpenChange,
+  onShortcut,
+  onCloseAutoFocus,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onShortcut: () => void;
+  onCloseAutoFocus: (event: Event) => void;
+}) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (
@@ -49,30 +55,27 @@ export function QuickAdd() {
         event.shiftKey ||
         event.defaultPrevented ||
         isTypingTarget(event.target) ||
-        document.querySelector('[role="dialog"], [role="alertdialog"]')
+        document.querySelector(
+          '[role="dialog"], [role="alertdialog"], [role="menu"]',
+        )
       ) {
         return;
       }
       event.preventDefault();
-      setOpen(true);
+      onShortcut();
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [onShortcut]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          size="sm"
-          aria-keyshortcuts={QUICK_ADD_SHORTCUT}
-          title={`Add task (${QUICK_ADD_SHORTCUT})`}
-        >
-          Add task
-        </Button>
-      </DialogTrigger>
-      <DialogContent title="Add task">
-        <QuickAddForm onAdded={() => setOpen(false)} />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        title="Add task"
+        fitKeyboard
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        <QuickAddForm onAdded={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );

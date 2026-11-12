@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // The weekly review flow (chunk 7.3): opened from the navigation on last
 // week, four steps that save as they are left, adjustments through the
@@ -46,8 +50,7 @@ async function createGoal(page: Page, title: string) {
 }
 
 async function createTask(page: Page, title: string) {
-  await page.getByRole("button", { name: "Add task" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add task" });
+  const dialog = await openQuickAdd(page);
   await dialog.getByLabel("Title").fill(title);
   await dialog.getByLabel("Title").press("Enter");
   await expect(dialog).toHaveCount(0);

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { TrackView } from "@/components/habits/track-view";
+import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { parseTrackRange } from "@/lib/habits/track-range";
 import { requireUser } from "@/server/auth/session";
@@ -11,18 +12,16 @@ export const metadata: Metadata = { title: "Track · SoleUp" };
 
 export default function TrackPage({ searchParams }: PageProps<"/track">) {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Track</h1>
-        <p className="text-muted">
-          The habits you&apos;re building, how often you want to do them, and
-          how each has gone week by week.
-        </p>
-      </div>
+    <PageFrame
+      title="Track"
+      description={
+        "The habits you're building, how often you want to do them, and how each has gone week by week."
+      }
+    >
       <Suspense fallback={<LoadingState label="Loading habits" />}>
         <Habits searchParams={searchParams} />
       </Suspense>
-    </div>
+    </PageFrame>
   );
 }
 

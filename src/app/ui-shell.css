@@ -1,0 +1,217 @@
+:root {
+  --app-bar-height: 4rem;
+  --navigation-bar-height: 4rem;
+  --navigation-rail-width: 96px;
+  --navigation-rail-expanded-width: 256px;
+  --compact-create-clearance: 4.5rem;
+}
+
+.app-shell {
+  --rail-width: var(--navigation-rail-width);
+}
+
+.navigation-rail {
+  width: var(--rail-width);
+  padding-block: env(safe-area-inset-top) env(safe-area-inset-bottom);
+}
+
+.rail-scroll {
+  padding-block: 1rem;
+}
+
+.shell-nav-indicator {
+  width: 56px;
+  height: 32px;
+}
+
+.shell-nav-item,
+.rail-child {
+  color: var(--md-on-surface-variant);
+}
+
+.shell-nav-item[aria-current] .shell-nav-indicator,
+.rail-child[aria-current] {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.shell-nav-item[aria-current] .shell-nav-label {
+  color: var(--md-primary);
+  font-weight: 650;
+}
+
+@media (width < 1200px) {
+  .rail-expanded {
+    display: none;
+  }
+}
+
+[data-rail="collapsed"] .rail-expanded {
+  display: none;
+}
+
+@media (width >= 1200px) {
+  :root:not([data-rail="collapsed"]) .app-shell {
+    --rail-width: var(--navigation-rail-expanded-width);
+  }
+
+  :root:not([data-rail="collapsed"]) .navigation-rail {
+    background: var(--md-surface-container-low);
+
+    .rail-collapsed {
+      display: none;
+    }
+
+    .rail-create {
+      justify-content: flex-start;
+    }
+
+    .rail-link {
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 0.5rem;
+      padding-inline: 1rem;
+      font-size: var(--text-label-large);
+
+      &[aria-current] {
+        background-color: var(--md-secondary-container);
+        color: var(--md-on-secondary-container);
+      }
+
+      .shell-nav-indicator {
+        width: auto;
+        background: transparent;
+      }
+    }
+  }
+}
+
+@media (width < 1200px) {
+  .rail-scroll {
+    padding-inline: 12px;
+  }
+
+  .rail-create .fab {
+    width: 56px;
+    min-width: 56px;
+    min-height: 56px;
+    padding-inline: 0;
+
+    .fab-label {
+      display: none;
+    }
+  }
+}
+
+[data-rail="collapsed"] .rail-scroll {
+  padding-inline: 12px;
+}
+
+[data-rail="collapsed"] .rail-create .fab {
+  width: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  padding-inline: 0;
+
+  .fab-label {
+    display: none;
+  }
+}
+
+.app-header-wash {
+  background: linear-gradient(var(--md-canvas-mist), transparent) no-repeat
+    top / 100% 360px;
+}
+
+@media (prefers-contrast: more) {
+  .app-header-wash {
+    background: none;
+  }
+}
+
+.top-app-bar {
+  padding-block-start: env(safe-area-inset-top);
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  transition: background-color var(--duration-default-effects)
+    var(--ease-default-effects);
+}
+
+.navigation-bar {
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  padding-block-end: env(safe-area-inset-bottom);
+}
+
+.compact-create .fab-shell {
+  inset-inline-end: max(1rem, env(safe-area-inset-right));
+}
+
+@media (width < 600px) {
+  html:has(.app-shell) {
+    scroll-padding-block-start: calc(
+      var(--app-bar-height) + env(safe-area-inset-top)
+    );
+    scroll-padding-block-end: calc(
+      var(--navigation-bar-height) + var(--compact-create-clearance) +
+        env(safe-area-inset-bottom)
+    );
+  }
+
+  .app-shell {
+    --compact-bottom-clearance: calc(
+      var(--navigation-bar-height) + var(--compact-create-clearance) +
+        env(safe-area-inset-bottom)
+    );
+  }
+
+  .app-main {
+    padding-block-end: var(--compact-bottom-clearance, 0px);
+  }
+
+  .app-shell:has([data-hide-create]),
+  body:has([data-layout="fullscreen"][data-state="open"]) .app-shell {
+    --compact-create-clearance: 0px;
+    .compact-create {
+      display: none;
+    }
+  }
+
+  .app-shell[data-keyboard-open] {
+    --compact-bottom-clearance: 0px;
+    .navigation-bar,
+    .compact-create {
+      display: none;
+    }
+  }
+
+  html:has(.app-shell[data-keyboard-open]) {
+    scroll-padding-block-end: 0;
+  }
+}
+
+body:has(.app-shell) .toast-viewport {
+  bottom: calc(
+    var(--navigation-bar-height) + var(--compact-create-clearance) +
+      env(safe-area-inset-bottom)
+  );
+
+  @media (width >= 600px) {
+    inset-inline: var(--navigation-rail-width) auto;
+    bottom: env(safe-area-inset-bottom);
+    width: calc(100% - var(--navigation-rail-width));
+
+    /* Toast copy sits over the content column. Leave controls below it clickable. */
+    .snackbar {
+      pointer-events: none;
+    }
+    .snackbar-action,
+    .snackbar-close {
+      pointer-events: auto;
+    }
+  }
+}
+
+@media (width >= 1200px) {
+  html:not([data-rail="collapsed"]) body:has(.app-shell) .toast-viewport {
+    inset-inline-start: var(--navigation-rail-expanded-width);
+  }
+}

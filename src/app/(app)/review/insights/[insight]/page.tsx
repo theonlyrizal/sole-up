@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { PageContainer } from "@/components/shell/page-container";
+import { PageFrame } from "@/components/shell/page-frame";
 import { PlanTaskList } from "@/components/tasks/plan-task-list";
-import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/skeleton";
 import { addDays } from "@/lib/dates";
@@ -44,20 +44,15 @@ type InsightTaskPageProps = PageProps<"/review/insights/[insight]">;
 
 export default function InsightTaskPage(props: InsightTaskPageProps) {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <Link
-        href="/review/insights"
-        className={cx(
-          "self-start rounded-sm text-sm text-muted hover:text-fg",
-          focusRing,
-        )}
-      >
-        ← Insights
-      </Link>
-      <Suspense fallback={<LoadingState label="Loading insight tasks" />}>
-        <InsightTasks {...props} />
-      </Suspense>
-    </div>
+    <Suspense
+      fallback={
+        <PageContainer width="detail">
+          <LoadingState label="Loading insight tasks" />
+        </PageContainer>
+      }
+    >
+      <InsightTasks {...props} />
+    </Suspense>
   );
 }
 
@@ -83,17 +78,16 @@ async function InsightTasks({ params, searchParams }: InsightTaskPageProps) {
   const { title, description } = COPY[key];
 
   return (
-    <>
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <p className="text-sm text-muted">
-          {formatDateSpan(
-            { from: period.start, to: addDays(period.end, -1) },
-            locale,
-          )}
-        </p>
-        <p className="text-pretty text-muted">{description}</p>
-      </header>
+    <PageFrame
+      title={title}
+      width="detail"
+      back={{ href: "/review/insights", label: "Insights" }}
+      description={description}
+      eyebrow={formatDateSpan(
+        { from: period.start, to: addDays(period.end, -1) },
+        locale,
+      )}
+    >
       {tasks.length > 0 ? (
         <PlanTaskList
           tasks={tasks.sort(compareTasksBy("planned", timeZone))}
@@ -107,6 +101,6 @@ async function InsightTasks({ params, searchParams }: InsightTaskPageProps) {
           description="There are no current task records matching this period."
         />
       )}
-    </>
+    </PageFrame>
   );
 }

@@ -126,8 +126,7 @@ export function Toaster() {
           )}
         </ToastPrimitive.Root>
       ))}
-      {/* Keep the existing shell offsets until UI-3 replaces its navigation. */}
-      <ToastPrimitive.Viewport className="pointer-events-none fixed right-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex w-full max-w-[592px] flex-col gap-2 p-4 md:bottom-0" />
+      <ToastPrimitive.Viewport className="toast-viewport pointer-events-none fixed right-0 bottom-[env(safe-area-inset-bottom)] z-50 flex w-full max-w-[592px] flex-col gap-2 p-4" />
     </ToastPrimitive.Provider>
   );
 }

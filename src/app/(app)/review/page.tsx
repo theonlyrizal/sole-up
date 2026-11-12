@@ -8,6 +8,7 @@ import { PrioritiesStep } from "@/components/reviews/priorities-step";
 import { ReadOnlyReview } from "@/components/reviews/read-only-review";
 import { ReflectStep } from "@/components/reviews/reflect-step";
 import { ReviewFlow } from "@/components/reviews/review-flow";
+import { PageFrame } from "@/components/shell/page-frame";
 import { ReviewHeader } from "@/components/reviews/review-header";
 import { StartReview } from "@/components/reviews/start-review";
 import { cx, focusRing } from "@/components/ui/cx";
@@ -34,13 +35,10 @@ export const metadata: Metadata = { title: "Review · SoleUp" };
 
 export default function ReviewPage({ searchParams }: PageProps<"/review">) {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Weekly review</h1>
-        <p className="text-muted">
-          Look back on a week, note what you learned, make a few changes, and
-          choose what matters next week. Every step is optional.
-        </p>
+    <PageFrame
+      title="Weekly review"
+      description="Look back on a week, note what you learned, make a few changes, and choose what matters next week. Every step is optional."
+      subnav={
         <nav aria-label="Review pages" className="flex flex-wrap gap-4">
           {[
             { href: "/review/history", label: "Past reviews" },
@@ -58,11 +56,12 @@ export default function ReviewPage({ searchParams }: PageProps<"/review">) {
             </Link>
           ))}
         </nav>
-      </div>
+      }
+    >
       <Suspense fallback={<LoadingState label="Loading your review" />}>
         <Review searchParams={searchParams} />
       </Suspense>
-    </div>
+    </PageFrame>
   );
 }
 

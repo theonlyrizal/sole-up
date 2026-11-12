@@ -1,7 +1,11 @@
 import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 /** Settings' "Time and region" section (Reminders has its own Save). */
 const timeAndRegion = (page: Page) =>
@@ -71,7 +75,7 @@ async function addTaskDueAt(
   const quickAdd = page.getByRole("dialog", { name: "Add task" });
   await expect(async () => {
     if (!(await quickAdd.isVisible())) {
-      await page.getByRole("button", { name: "Add task" }).click();
+      await openQuickAdd(page);
     }
     await expect(quickAdd).toBeVisible({ timeout: 1_000 });
   }).toPass();

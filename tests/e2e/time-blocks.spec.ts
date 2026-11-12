@@ -1,6 +1,10 @@
 import { expect, type Locator, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // Time blocks UI (chunk 4.8): "Block time" from a task, blocks on Week, Day
 // and the Agenda, the block dialog's status actions and times, repeating
@@ -26,7 +30,7 @@ async function addTask(page: Page, title: string) {
   const quickAdd = page.getByRole("dialog", { name: "Add task" });
   await expect(async () => {
     if (!(await quickAdd.isVisible())) {
-      await page.getByRole("button", { name: "Add task" }).click();
+      await openQuickAdd(page);
     }
     await expect(quickAdd).toBeVisible({ timeout: 1_000 });
   }).toPass();

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { PlanSubnav } from "@/components/tasks/plan-subnav";
+import { PlanTabs } from "@/components/shell/plan-tabs";
 import { UpcomingView } from "@/components/tasks/upcoming-view";
+import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { todayFor } from "@/lib/dates";
 import { parseUpcomingRange, upcomingWindow } from "@/lib/upcoming";
@@ -16,18 +17,15 @@ export default function UpcomingPage({
   searchParams,
 }: PageProps<"/plan/upcoming">) {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Upcoming</h1>
-        <p className="text-muted">
-          What&apos;s planned or due in the days after today.
-        </p>
-      </div>
-      <PlanSubnav />
+    <PageFrame
+      title="Upcoming"
+      description={"What's planned or due in the days after today."}
+      subnav={<PlanTabs />}
+    >
       <Suspense fallback={<LoadingState label="Loading upcoming days" />}>
         <Upcoming searchParams={searchParams} />
       </Suspense>
-    </div>
+    </PageFrame>
   );
 }
 

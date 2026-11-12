@@ -116,7 +116,7 @@ export function ReviewFlow({
 
   return (
     <StepSaveContext value={save}>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6" data-hide-create>
         <nav aria-label="Review steps">
           <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {REVIEW_STEPS.map((item, itemIndex) => (

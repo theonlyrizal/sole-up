@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { z } from "zod";
 
 import { NoteEditor } from "@/components/notes/note-editor";
-import { NotePageHeader } from "@/components/notes/note-page-header";
+import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { requireUser } from "@/server/auth/session";
 import { getLinkTarget } from "@/server/modules/notes/queries";
@@ -18,12 +18,16 @@ export const metadata: Metadata = { title: "Note · SoleUp" };
  */
 export default function NewNotePage({ searchParams }: PageProps<"/notes/new">) {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">
-      <NotePageHeader />
+    <PageFrame
+      title="Note"
+      width="reading"
+      back={{ href: "/notes", label: "Notes" }}
+      hideCreate
+    >
       <Suspense fallback={<LoadingState label="Loading the editor" />}>
         <NewNote searchParams={searchParams} />
       </Suspense>
-    </div>
+    </PageFrame>
   );
 }
 
