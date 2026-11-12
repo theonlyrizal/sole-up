@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 
 import { InsightsView } from "@/components/reviews/insights-view";
-import { cx, focusRing } from "@/components/ui/cx";
+import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { insightPeriod } from "@/lib/insights";
 import { todayClock } from "@/lib/today";
@@ -22,27 +21,17 @@ export const metadata: Metadata = { title: "Insights · SoleUp" };
 
 export default function InsightsPage() {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <header className="flex flex-col gap-2">
-        <Link
-          href="/review"
-          className={cx(
-            "self-start rounded-sm text-sm text-muted hover:text-fg",
-            focusRing,
-          )}
-        >
-          ← Weekly review
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Insights</h1>
-        <p className="text-pretty text-muted">
-          See how your plans, goals and habits have gone, and what you have
-          coming up next week.
-        </p>
-      </header>
+    <PageFrame
+      title="Insights"
+      back={{ href: "/review", label: "Weekly review" }}
+      description={
+        "See how your plans, goals and habits have gone, and what you have coming up next week."
+      }
+    >
       <Suspense fallback={<LoadingState label="Loading insights" />}>
         <Insights />
       </Suspense>
-    </div>
+    </PageFrame>
   );
 }
 

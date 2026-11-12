@@ -86,10 +86,13 @@ test("axe scans the hovered primary and danger buttons", async ({ page }) => {
   for (const colorScheme of ["light", "dark"] as const) {
     await test.step(colorScheme, async () => {
       await page.emulateMedia({ colorScheme });
-      await scanHovered(
-        page,
-        page.getByRole("button", { name: "Add task", exact: true }),
-      );
+      const create = page.getByRole("button", { name: "Create", exact: true });
+      await create.hover();
+      await expectNoSeriousViolations(page);
+      await create.click();
+      await page.getByRole("menuitem", { name: "New task" }).hover();
+      await expectNoSeriousViolations(page);
+      await page.keyboard.press("Escape");
 
       await page.goto("/settings");
       await scanHovered(

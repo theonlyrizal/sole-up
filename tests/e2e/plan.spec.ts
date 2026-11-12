@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // The Plan page (chunk 2.4): filters and sorts in the URL, inline edit of
 // dates and parent, the edit form, and closed tasks behind a toggle.
@@ -27,7 +31,7 @@ async function addTask(page: Page, title: string) {
   // The button only opens the dialog once the page hydrates; retry until then.
   await expect(async () => {
     if (!(await dialog.isVisible())) {
-      await page.getByRole("button", { name: "Add task" }).click();
+      await openQuickAdd(page);
     }
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();

@@ -33,6 +33,12 @@ function navLink(page: Page, name: string) {
     .getByRole("link", { name, exact: true });
 }
 
+async function openPlanPage(page: Page, name: "Today" | "Inbox") {
+  const link = navLink(page, name);
+  if (!(await link.isVisible())) await activate(page, navLink(page, "Plan"));
+  await activate(page, link);
+}
+
 async function addGoal(
   page: Page,
   title: string,
@@ -56,18 +62,16 @@ async function addGoal(
 }
 
 async function captureTask(page: Page, title: string) {
-  await activate(
-    page,
-    page.getByRole("button", { name: "Add task", exact: true }),
-  );
+  const create = page.getByRole("button", { name: "Create", exact: true });
+  await activate(page, create);
+  await expect(page.getByRole("menuitem", { name: "New task" })).toBeFocused();
+  await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Add task" });
   await expect(dialog.getByLabel("Title")).toBeFocused();
   await page.keyboard.type(title);
   await page.keyboard.press("Enter");
   await expect(dialog).toBeHidden();
-  await expect(
-    page.getByRole("button", { name: "Add task", exact: true }),
-  ).toBeFocused();
+  await expect(create).toBeFocused();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -134,7 +138,7 @@ test("keyboard journey A turns an ambition into a plan", async ({ page }) => {
     page.getByRole("list", { name: `Tasks under ${milestone}` }),
   ).toContainText(task);
 
-  await activate(page, navLink(page, "Today"));
+  await openPlanPage(page, "Today");
   await activate(page, page.getByRole("button", { name: "Add to today" }));
   const picker = page.getByRole("dialog", { name: "Add to today" });
   await expect(
@@ -173,7 +177,7 @@ test("keyboard journey B plans and adjusts the day", async ({ page }) => {
   await captureTask(page, firstTask);
   await captureTask(page, secondTask);
 
-  await activate(page, navLink(page, "Inbox"));
+  await openPlanPage(page, "Inbox");
   const inbox = page.getByRole("list", { name: "Inbox tasks" });
   for (const name of [firstTask, secondTask]) {
     const checkbox = inbox.getByRole("checkbox", { name });
@@ -190,7 +194,7 @@ test("keyboard journey B plans and adjusts the day", async ({ page }) => {
     page.getByText("2 tasks planned for today", { exact: true }),
   ).toBeVisible();
 
-  await activate(page, navLink(page, "Today"));
+  await openPlanPage(page, "Today");
   await expect(
     page.getByRole("region", { name: "Schedule", exact: true }),
   ).toBeVisible();
@@ -238,7 +242,7 @@ test("keyboard journey C creates, logs, corrects and pauses a habit", async ({
   await activate(page, dialog.getByRole("button", { name: "Add habit" }));
   await expect(dialog).toBeHidden();
 
-  await activate(page, navLink(page, "Today"));
+  await openPlanPage(page, "Today");
   await activate(
     page,
     page.getByRole("button", { name: `Done: ${habit}` }),

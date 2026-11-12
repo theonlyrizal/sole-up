@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 function inboxList(page: Page) {
   return page.getByRole("list", { name: "Inbox tasks" });
@@ -51,10 +55,9 @@ test("a task is captured with one field and Enter, and lands in the inbox", asyn
     inboxList(page).getByRole("checkbox", { name: "Book the dentist" }),
   ).toBeVisible();
 
-  const dialog = page.getByRole("dialog", { name: "Add task" });
-  // A bare character on the page is available to assistive technology.
+  // A bare character away from Create is available to assistive technology.
   await page.keyboard.press("q");
-  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Add task" })).toBeHidden();
 
   // It's stored, not just shown.
   await page.reload();
@@ -62,9 +65,7 @@ test("a task is captured with one field and Enter, and lands in the inbox", asyn
     inboxList(page).getByRole("checkbox", { name: "Book the dentist" }),
   ).toBeVisible();
 
-  const addTask = page.getByRole("button", { name: "Add task" });
-  await expect(addTask).toHaveAttribute("aria-keyshortcuts", "Alt+Enter");
-  await addTask.click();
+  const dialog = await openQuickAdd(page);
   await page.keyboard.type("quiet");
   await expect(dialog.getByLabel("Title")).toHaveValue("quiet");
   await expectNoSeriousViolations(page);
@@ -79,8 +80,7 @@ test("quick add from any page can file a task under a goal with a plan", async (
   await createGoal(page, "Run a 10k");
 
   // The button works on any page; "More options" holds the optional fields.
-  await page.getByRole("button", { name: "Add task" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add task" });
+  const dialog = await openQuickAdd(page);
   await dialog.getByLabel("Title").fill("Buy running shoes");
   await dialog.getByRole("button", { name: "More options" }).click();
   const parent = dialog.getByLabel("Goal or milestone");
@@ -167,7 +167,9 @@ test.describe("mobile", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Inbox" }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Add task" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Create", exact: true }),
+    ).toBeVisible();
     await expectNoSeriousViolations(page);
   });
 });

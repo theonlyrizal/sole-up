@@ -27,6 +27,15 @@ export async function signInAndConfirm(page: Page, name?: string) {
   return userId;
 }
 
+/** Opens Quick Add from either shell's Create menu. */
+export async function openQuickAdd(page: Page) {
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("menuitem", { name: "New task" }).click();
+  const dialog = page.getByRole("dialog", { name: "Add task", exact: true });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
 /** Waits for the page's service worker to be active; its scope and script. */
 export async function activeServiceWorker(page: Page) {
   return page.evaluate(async () => {

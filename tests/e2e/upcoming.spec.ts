@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // The Upcoming view (chunk 2.6): the next week by local date (14 or 30 days
 // on their tabs), plans and deadlines merged, the range in the URL. The
@@ -39,7 +43,7 @@ async function addTask(
   // The button only opens the dialog once the page hydrates; retry until then.
   await expect(async () => {
     if (!(await dialog.isVisible())) {
-      await page.getByRole("button", { name: "Add task" }).click();
+      await openQuickAdd(page);
     }
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();
@@ -127,9 +131,12 @@ test("an empty window is calm, and the range tabs live in the URL", async ({
   ).toHaveAttribute("aria-current", "page");
 
   // Upcoming sits under Plan, between Today and Calendar.
-  await expect(
-    page.getByRole("navigation", { name: "Plan" }).getByRole("link"),
-  ).toHaveText(["All tasks", "Today", "Upcoming", "Calendar", "Inbox"]);
+  const tabs = page.getByRole("navigation", { name: "Plan" }).getByRole("link");
+  const labels = ["Today", "Upcoming", "Calendar", "Inbox", "All tasks"];
+  await expect(tabs).toHaveCount(labels.length);
+  for (const [index, label] of labels.entries()) {
+    await expect(tabs.nth(index)).toHaveAccessibleName(label);
+  }
 });
 
 test("plans and deadlines land on their local days, a timed one included", async ({

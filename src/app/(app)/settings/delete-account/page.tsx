@@ -10,6 +10,7 @@ import {
   VerifyAccountButtons,
 } from "@/components/settings/delete-account-form";
 import { buttonClass } from "@/components/ui/button";
+import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { ACCOUNT_RECOVERY_DAYS } from "@/lib/account-deletion";
 import { auth } from "@/server/auth/auth";
@@ -29,8 +30,11 @@ export default function DeleteAccountPage({
   searchParams,
 }: PageProps<"/settings/delete-account">) {
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight">Delete account</h1>
+    <PageFrame
+      title="Delete account"
+      width="reading"
+      back={{ href: "/settings", label: "Settings" }}
+    >
       <p className="text-muted-fg text-sm">
         This suspends your account, signs you out on every device, and pauses
         push reminders. Sign in within {ACCOUNT_RECOVERY_DAYS} days to restore
@@ -49,7 +53,7 @@ export default function DeleteAccountPage({
       >
         Back to Settings
       </Link>
-    </div>
+    </PageFrame>
   );
 }
 

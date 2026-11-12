@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // Search (chunk 8.4): notes, goal titles and task titles from the shell's
 // field and the search page, with stemming, highlights rendered as text,
@@ -39,8 +43,7 @@ async function createGoal(page: Page, title: string) {
 }
 
 async function createTask(page: Page, title: string) {
-  await page.getByRole("button", { name: "Add task" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add task" });
+  const dialog = await openQuickAdd(page);
   await dialog.getByLabel("Title").fill(title);
   await dialog.getByLabel("Title").press("Enter");
   await expect(dialog).toHaveCount(0);

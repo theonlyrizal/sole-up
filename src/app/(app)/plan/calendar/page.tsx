@@ -5,8 +5,8 @@ import { AgendaView } from "@/components/calendar/agenda-view";
 import { AreaColumnsView } from "@/components/calendar/area-columns-view";
 import { AreaTimelineView } from "@/components/calendar/area-timeline-view";
 import { TimeGridView } from "@/components/calendar/time-grid-view";
-import { PlanSubnav } from "@/components/tasks/plan-subnav";
-import { cx } from "@/components/ui/cx";
+import { PageFrame } from "@/components/shell/page-frame";
+import { PlanTabs } from "@/components/shell/plan-tabs";
 import { LoadingState } from "@/components/ui/skeleton";
 import { parseAgendaRange } from "@/lib/agenda";
 import { parseTimelineRange } from "@/lib/area-timeline";
@@ -35,9 +35,15 @@ export default function CalendarPage({
   searchParams,
 }: PageProps<"/plan/calendar">) {
   return (
-    <Suspense fallback={<LoadingState label="Loading the calendar" />}>
-      <CalendarPageBody searchParams={searchParams} />
-    </Suspense>
+    <PageFrame
+      title="Calendar"
+      description="Appointments, time blocks, planned tasks and deadlines, day by day."
+      subnav={<PlanTabs />}
+    >
+      <Suspense fallback={<LoadingState label="Loading the calendar" />}>
+        <CalendarPageBody searchParams={searchParams} />
+      </Suspense>
+    </PageFrame>
   );
 }
 
@@ -46,33 +52,7 @@ async function CalendarPageBody({
 }: {
   searchParams: PageProps<"/plan/calendar">["searchParams"];
 }) {
-  const params = await searchParams;
-  const view = parseCalendarView(params);
-  return (
-    // The time grids need the room for seven day columns, By area for a
-    // column per life area, the Timeline for its time axis.
-    <div
-      className={cx(
-        "mx-auto flex w-full flex-col gap-6 px-4 py-10",
-        view === "agenda"
-          ? "max-w-2xl"
-          : view === "week" || view === "areas" || view === "timeline"
-            ? "max-w-5xl lg:max-w-7xl"
-            : "max-w-5xl",
-      )}
-    >
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
-        <p className="text-muted">
-          Appointments, time blocks, planned tasks and deadlines, day by day.
-        </p>
-      </div>
-      <PlanSubnav />
-      <Suspense fallback={<LoadingState label="Loading the calendar" />}>
-        <Calendar params={params} />
-      </Suspense>
-    </div>
-  );
+  return <Calendar params={await searchParams} />;
 }
 
 async function Calendar({

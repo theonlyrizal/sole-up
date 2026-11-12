@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // The Today view (chunk 2.5): the calm empty state, the "Add to today"
 // picker, the four sections and their one-tap actions. The browser (and so
@@ -48,7 +52,7 @@ async function addTask(
   // The button only opens the dialog once the page hydrates; retry until then.
   await expect(async () => {
     if (!(await dialog.isVisible())) {
-      await page.getByRole("button", { name: "Add task" }).click();
+      await openQuickAdd(page);
     }
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();

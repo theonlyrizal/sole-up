@@ -14,7 +14,7 @@ import {
 test.skip(!process.env.SOLEUP_VISUAL, "visual capture only");
 test.use({ timezoneId: VISUAL_ZONE, locale: "en-US" });
 
-const output = "test-results/visual/ui-1";
+const output = "test-results/visual/ui-3";
 const sizes = [
   { width: 390, height: 844 },
   { width: 1280, height: 800 },
@@ -242,7 +242,7 @@ async function checkRenderedPage(
 
 for (const viewport of sizes) {
   for (const colorScheme of themes) {
-    test(`@visual UI-1 ${viewport.width} ${colorScheme}`, async ({ page }) => {
+    test(`@visual UI-3 ${viewport.width} ${colorScheme}`, async ({ page }) => {
       test.setTimeout(150_000);
       await page.setViewportSize(viewport);
       await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
@@ -326,12 +326,7 @@ for (const viewport of sizes) {
             );
           await checkRenderedPage(page, colorScheme);
           await capture(name);
-          if (
-            core.some(([coreName]) => coreName === name) ||
-            name.startsWith("calendar") ||
-            name === "goals-areas"
-          )
-            await expectNoSeriousViolations(page);
+          await expectNoSeriousViolations(page);
         });
       }
 
@@ -385,20 +380,44 @@ for (const viewport of sizes) {
       });
 
       await openPage(page, "/home");
-      await page.getByRole("link", { name: "SoleUp", exact: true }).focus();
+      if (viewport.width === 390) {
+        const more = page
+          .getByRole("navigation", { name: "Main", exact: true })
+          .getByRole("button", { name: "More", exact: true });
+        await more.click();
+        await expect(
+          page.getByRole("dialog", { name: "More", exact: true }),
+        ).toBeVisible();
+        await capture("more-open");
+        await page.keyboard.press("Escape");
+        await expect(more).toBeFocused();
+      } else {
+        await page
+          .getByRole("button", { name: "Collapse navigation rail" })
+          .click();
+        await expect(page.getByRole("complementary")).toHaveCSS(
+          "width",
+          "96px",
+        );
+        await capture("home-rail-collapsed");
+        await page
+          .getByRole("button", { name: "Expand navigation rail" })
+          .click();
+      }
+      const add = page.getByRole("button", { name: "Create", exact: true });
+      await add.focus();
+      await page.keyboard.press("Shift+Tab");
       await page.keyboard.press("Tab");
-      const add = page.getByRole("button", { name: "Add task", exact: true });
       await expect(add).toBeFocused();
       await expect(add).toHaveCSS("outline-width", "3px");
       await expect(add).toHaveCSS("outline-offset", "2px");
-      await expect
-        .poll(() =>
-          add.evaluate(
-            (button) => getComputedStyle(button, "::after").boxShadow,
-          ),
-        )
-        .toMatch(/inset/);
+      await expect(add).toHaveCSS("box-shadow", /inset/);
       await capture("home-keyboard-focus");
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("menuitem", { name: "New task" }),
+      ).toBeFocused();
+      await capture("home-create-menu");
       await page.keyboard.press("Enter");
       const dialog = page.getByRole("dialog", { name: "Add task" });
       await expect(dialog.getByLabel("Title")).toBeFocused();
@@ -414,7 +433,7 @@ for (const viewport of sizes) {
           reducedMotion: "reduce",
           contrast: "more",
         });
-        await expect(page.locator("body")).toHaveCSS(
+        await expect(page.locator(".app-header-wash")).toHaveCSS(
           "background-image",
           "none",
         );
@@ -442,7 +461,7 @@ for (const viewport of sizes) {
             postData: JSON.stringify([{ ...input, title: "" }]),
           });
         });
-        await page.keyboard.press("Enter");
+        await add.press("q");
         const title = dialog.getByLabel("Title");
         await title.fill("Pack an extra water bottle");
         await dialog
@@ -467,6 +486,7 @@ for (const viewport of sizes) {
         await expect(
           page.getByText("Task added to your inbox", { exact: true }),
         ).toBeVisible();
+        await capture("home-quick-add-retry-saved");
 
         // Exercise the existing save and correction path while motion is reduced.
         await openPage(page, "/plan/today");

@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // Home's summaries (chunk 3.2): each card shows its definition and range,
 // says "Nothing yet" with no data, and every number links to the list it
@@ -45,7 +49,7 @@ async function addTask(
   // The button only opens the dialog once the page hydrates; retry until then.
   await expect(async () => {
     if (!(await dialog.isVisible())) {
-      await page.getByRole("button", { name: "Add task" }).click();
+      await openQuickAdd(page);
     }
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();

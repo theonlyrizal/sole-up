@@ -83,7 +83,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-1 | Foundations: tokens, type, theme, icons, shapes, motion, breakpoints | done | chunk/ui-1-foundations | 2026-11-12 | Verified both themes and the 16.4.3 font fix |
 | UI-2a | Components: actions, selection, inputs, gallery | done | chunk/ui-2a-action-input-components | 2026-11-12 | Parts A–C, gallery, and finish-line checks verified |
 | UI-2b | Components: containment, navigation primitives, feedback, states | done | chunk/ui-2b-containment-feedback | 2026-11-12 | Parts D–F and H, gallery and finish-line checks verified |
-| UI-3 | App shell: nav bar, rail, app bar, FAB menu, More, page structure | todo | | | Needs sign-off 5-C |
+| UI-3 | App shell: nav bar, rail, app bar, FAB menu, More, page structure | done | chunk/ui-3-app-shell | 2026-11-12 | 5-C approved. Shell and finish-line checks verified |
 | UI-4 | Home | todo | | | Needs sign-off 5-A |
 | UI-5 | Plan: Today, task row, timeline, Today habits | todo | | | |
 | UI-6 | Plan: All tasks, Upcoming, Inbox, task dialog, Quick Add | todo | | | |
@@ -458,5 +458,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Both themes pass axe at the two capture sizes. Keyboard focus, dismissal alternatives, large text and reduced motion were exercised. |
 | Restraint | 2 | The halo stays around the glyph, settles without changing the control's bounds and clears on correction. |
 | Variety | 1 | The gallery exercises cards, lists, forms and overlays. Screen-level compositions are part of their respective phases. |
+
+**Total — 15/16.**
+
+### UI-3 · App shell and navigation (2026-11-12)
+
+- **Branch / PR** — `chunk/ui-3-app-shell` · [#95](https://github.com/theonlyrizal/sole-up/pull/95).
+- **Decision 5-C** — The user approved Home · Plan · Goals · Track · More on phones, with Notes, Review, Search and Settings in More. Updated PRODUCT_SPEC §7 and the README shell guide.
+- **Routes and components** — Added compact and rail navigation, the More sheet, the Create menu, and shared page framing on the authenticated routes. Plan links use the same paths in the tabs and expanded rail. The time-zone gate uses the shared card and monogram. The compact chrome clears the page end and yields to the keyboard.
+- **Data paths and contracts** — Existing queries, actions, deep links and note exit guards supply the same flows. The expanded search field sends terms to `/notes/search` through the existing in-memory handoff. The same user ID supplies the avatar in the greeting, More, the rail and the time-zone gate.
+- **Decisions** — The nonce-backed head script applies `soleup.rail` before paint, and the 96 px and 256 px layouts switch immediately. Quick Add accepts Q when Create has focus and preserves the existing global Alt+Enter shortcut. Focus-scoping Q preserves single-letter commands for assistive technology elsewhere. Desktop snackbar copy allows pointer input to reach controls beneath it, while Undo and Dismiss remain interactive. The test server clears the Next development indicator from the bottom-left target.
+- **Checks run** — `pnpm verify` passed with 1,194 unit and 831 integration tests. `pnpm build` passed. `CI=1 pnpm test:e2e --workers 5 --output test-results/ui-3-e2e` passed 166 tests with 10 visual-only cases skipped. `CI=1 pnpm test:visual --workers 4` passed all 10 cases. Browser and integration runs used separate local test databases.
+- **Screenshots** — 176 PNGs in `test-results/visual/ui-3/` at 390 × 844 and 1280 × 800 in light and dark. Start with `more-open-390-dark.png`, `home-rail-collapsed-1280-light.png`, `plan-today-1280-dark.png` and `home-create-menu-1280-light.png`. The `home-quick-add-pending-*`, `home-quick-add-error-*` and `home-quick-add-retry-saved-*` captures show the request, inline validation with the draft retained, and the successful retry under reduced motion.
+- **Interaction and accessibility evidence** — The bar and More reached every destination at 390 px. The expanded rail reached every destination and each Plan child at 1280 px. More closed on Escape and restored focus. The saved rail measured 96 px after reload with hydration bundles blocked and 256 px after expanding and reloading. Quick Add moved focus to Title and returned it to Create. The 420 px simulated keyboard viewport hid the compact bar and FAB and kept Add task above its lower edge. Axe reported zero serious or critical violations on the captured authenticated routes in both themes and sizes. The visual harness checked reflow at 320, 375, 390, 414, 768 and 1280 px, including 200% text at 1280 px.
+- **Unverified** — A physical soft keyboard, installed PWA safe areas, manual screen readers and browser engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | Page titles and Plan tabs provide location context. Create groups both capture actions in one control. |
+| Character | 2 | The Home wash and paired light and dark surfaces frame the same account avatar in the greeting, More and rail. |
+| Color | 2 | The Kiwi indicator, filled symbol and emphasized label identify the selected section. Both themes passed the captured route and overlay scans. |
+| Response | 2 | Quick Add exposed pending, retained the title on real server validation failure, and confirmed the saved retry. Escape restored focus in More and Quick Add. |
+| Truthfulness | 2 | Exact links mark the current page and group links mark the current section. The Inbox showed the task saved through Create after navigation. |
+| Accessibility | 2 | Chromium verified target sizes, keyboard navigation, skip focus, Escape, responsive reflow, reduced motion and simulated keyboard clearance. |
+| Restraint | 2 | Navigation keeps the shell stable. The scroll sentinel changes only the app bar tint, and feedback stays with the active control or overlay. |
+| Variety | 1 | The rail and bar adapt to their width classes. Page compositions retain their existing bodies for their owning phases. |
 
 **Total — 15/16.**

@@ -1,16 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ColorSwatch } from "@/components/life-areas/life-area-colors";
 import { LinkedNotesList } from "@/components/notes/linked-notes";
 import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
 import { toast } from "@/components/ui/toast";
 import {
-  GOAL_LIST_STATUSES,
   GOAL_PRIORITY_LABELS,
   GOAL_STATUS_LABELS,
   goalStatusActions,
@@ -29,7 +26,13 @@ import { MilestoneList } from "./milestone-list";
  * The goal's own page: header, reason, milestones, tasks, linked notes and
  * history.
  */
-export function GoalDetailView({ detail }: { detail: GoalDetail }) {
+export function GoalDetailView({
+  detail,
+  backHref,
+}: {
+  detail: GoalDetail;
+  backHref: string;
+}) {
   const {
     goal,
     area,
@@ -59,16 +62,6 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
     });
   }
 
-  // Back to the filter this goal is listed under, or the archive view.
-  const listStatus = GOAL_LIST_STATUSES.find(
-    (status) => status === goal.status,
-  );
-  const backHref =
-    goal.status === "archived"
-      ? "/goals/archived"
-      : listStatus && listStatus !== "active"
-        ? `/goals?status=${listStatus}`
-        : "/goals";
   const dates = [
     goal.startDateLabel && `Starts ${goal.startDateLabel}`,
     goal.targetDateLabel && `Target ${goal.targetDateLabel}`,
@@ -78,19 +71,7 @@ export function GoalDetailView({ detail }: { detail: GoalDetail }) {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
-        <Link
-          href={backHref}
-          className={cx(
-            "self-start rounded-sm text-sm text-muted hover:text-fg",
-            focusRing,
-          )}
-        >
-          ← Goals
-        </Link>
         <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight break-words">
-            {goal.title}
-          </h1>
           <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <div className="flex gap-1">
               <dt className="text-muted">Status</dt>

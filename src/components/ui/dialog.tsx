@@ -2,6 +2,8 @@
 
 import { Dialog as DialogPrimitive } from "radix-ui";
 
+import { useDialogViewport } from "@/components/hooks/use-dialog-viewport";
+import { useMediaQuery } from "@/components/hooks/use-media-query";
 import { cx } from "./cx";
 import { IconButton } from "./icon-button";
 import { useOverlayContainer } from "./overlay-container";
@@ -112,6 +114,7 @@ type DialogContentProps = {
   description?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
+  fitKeyboard?: boolean;
   /**
    * Where focus goes on close. Call `preventDefault()` and move focus
    * yourself when the opening element may have been re-rendered (a dialog
@@ -126,12 +129,17 @@ export function DialogContent({
   description,
   children,
   className,
+  fitKeyboard,
   onCloseAutoFocus,
 }: DialogContentProps) {
+  const medium = useMediaQuery("medium");
+  const compact = Boolean(fitKeyboard && medium === false);
+  const trackViewport = useDialogViewport(compact);
   return (
     <DialogSurface
+      ref={trackViewport}
       data-size={size}
-      className={cx(contentClass, className)}
+      className={cx(contentClass, compact && "dialog-fit-keyboard", className)}
       onCloseAutoFocus={onCloseAutoFocus}
       description={description}
     >

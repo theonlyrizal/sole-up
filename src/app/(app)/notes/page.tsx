@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { NoteList } from "@/components/notes/note-list";
 import { TagFilter } from "@/components/notes/tag-filter";
+import { PageFrame } from "@/components/shell/page-frame";
 import { buttonClass } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
@@ -16,12 +17,10 @@ export const metadata: Metadata = { title: "Notes · SoleUp" };
 
 export default function NotesPage({ searchParams }: PageProps<"/notes">) {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Notes</h1>
-          <p className="text-muted">Most recently updated first.</p>
-        </div>
+    <PageFrame
+      title="Notes"
+      description="Most recently updated first."
+      actions={
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/notes/search"
@@ -54,11 +53,12 @@ export default function NotesPage({ searchParams }: PageProps<"/notes">) {
             New note
           </Link>
         </div>
-      </div>
+      }
+    >
       <Suspense fallback={<LoadingState label="Loading your notes" />}>
         <Notes searchParams={searchParams} />
       </Suspense>
-    </div>
+    </PageFrame>
   );
 }
 

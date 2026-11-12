@@ -134,6 +134,13 @@
   padding: 0;
 }
 
+.dialog-fit-keyboard {
+  top: calc(
+    var(--form-viewport-top, 0px) + var(--form-viewport-height, 100dvh) / 2
+  );
+  max-height: min(85dvh, calc(var(--form-viewport-height, 100dvh) - 2rem));
+}
+
 .form-dialog-header {
   flex-shrink: 0;
   padding: 1rem 1.5rem 0.75rem;

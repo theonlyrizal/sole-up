@@ -15,6 +15,10 @@ test("Review Insights shows evidence and links to the relevant work", async ({
   const userId = await signInAndConfirm(page);
   await page
     .getByRole("navigation", { name: "Main" })
+    .getByRole("button", { name: "More", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "More", exact: true })
     .getByRole("link", { name: "Review", exact: true })
     .click();
   await page

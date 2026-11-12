@@ -7,6 +7,7 @@ import { PushNotifications } from "@/components/push/push-notifications";
 import { ReminderSettingsForm } from "@/components/reminders/reminder-settings-form";
 import { InstallHelp } from "@/components/pwa/install-help";
 import { buttonClass } from "@/components/ui/button";
+import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { DELETE_ACCOUNT_PATH } from "@/lib/account-deletion";
 import { formatInstant } from "@/lib/dates";
@@ -24,8 +25,7 @@ export const metadata: Metadata = { title: "Settings · SoleUp" };
 
 export default function SettingsPage() {
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+    <PageFrame title="Settings" width="reading">
       <section
         aria-labelledby="preferences-heading"
         className="flex flex-col gap-4"
@@ -118,7 +118,7 @@ export default function SettingsPage() {
           Privacy notes
         </Link>
       </section>
-    </div>
+    </PageFrame>
   );
 }
 

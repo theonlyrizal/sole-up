@@ -25,6 +25,8 @@ export function ListItem({
   meta,
   trailing,
   href,
+  onNavigate,
+  current,
   onClick,
   selected,
   lines = supporting ? 2 : 1,
@@ -35,6 +37,8 @@ export function ListItem({
   meta?: ReactNode;
   trailing?: ReactNode;
   href?: string;
+  onNavigate?: React.ComponentProps<typeof Link>["onNavigate"];
+  current?: "page" | "true";
   onClick?: MouseEventHandler<HTMLButtonElement>;
   selected?: boolean;
   lines?: 1 | 2 | 3;
@@ -57,7 +61,8 @@ export function ListItem({
             <Link
               className="stretched-link"
               href={href}
-              aria-current={selected ? "page" : undefined}
+              aria-current={current ?? (selected ? "page" : undefined)}
+              onNavigate={onNavigate}
             >
               {headline}
             </Link>

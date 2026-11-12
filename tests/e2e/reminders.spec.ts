@@ -1,6 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // Reminder UI and preferences (chunk 5.6): the reminder fields in the task
 // and event forms, the item dialog's reminder status, Settings' Reminders
@@ -46,8 +50,7 @@ const reminderField = (scope: Locator) =>
 /** A task due `minutes` from now, added and given its deadline on Plan. */
 async function addTaskDueSoon(page: Page, title: string, minutes: number) {
   await page.goto("/plan");
-  const add = page.getByRole("dialog", { name: "Add task" });
-  await openWith(page.getByRole("button", { name: "Add task" }), add);
+  const add = await openQuickAdd(page);
   await add.getByLabel("Title").fill(title);
   await add.getByLabel("Title").press("Enter");
   await expect(add).toHaveCount(0);

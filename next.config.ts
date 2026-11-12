@@ -61,6 +61,10 @@ const nextConfig: NextConfig = {
 export default function config(phase: string): NextConfig {
   return {
     ...nextConfig,
+    // The test browser needs the bottom-left destination clear of dev tools.
+    ...(process.env.SOLEUP_TEST_SIGN_IN === "1"
+      ? { devIndicators: false }
+      : {}),
     async rewrites() {
       return {
         // Route to the 404 before rendering can stream a 200 response.

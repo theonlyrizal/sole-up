@@ -1,7 +1,11 @@
 import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 
 // The Agenda (chunk 4.5): events, planned tasks and timed deadlines in date
 // order on the user's local days, the range in the URL, and each item
@@ -49,7 +53,7 @@ async function addTask(page: Page, title: string, plannedDate?: string) {
   // The button only opens the dialog once the page hydrates; retry until then.
   await expect(async () => {
     if (!(await dialog.isVisible())) {
-      await page.getByRole("button", { name: "Add task" }).click();
+      await openQuickAdd(page);
     }
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();
