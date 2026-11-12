@@ -27,8 +27,46 @@ export const DAILY_HABIT = "Morning stretch";
 export const GOAL_TITLE = "Make space for a longer weekend walk";
 export const EVENT_TITLE = "Walk and coffee with a friend";
 
+/** Force the real Home query to fail for one test user until its schedule exists. */
+export async function createUnscheduledHabit(userId: string, today: string) {
+  const pool = new Pool({
+    connectionString: assertTestDatabaseUrl(testDatabaseUrl),
+  });
+  const db = drizzle({ client: pool, casing: "snake_case" });
+  const habitId = randomUUID();
+  try {
+    await db.insert(habits).values({
+      id: habitId,
+      userId,
+      title: "Water the herbs",
+      measure: "check",
+      startDate: today,
+    });
+  } finally {
+    await pool.end();
+  }
+  return async () => {
+    const pool = new Pool({
+      connectionString: assertTestDatabaseUrl(testDatabaseUrl),
+    });
+    try {
+      await drizzle({ client: pool, casing: "snake_case" })
+        .insert(habitSchedules)
+        .values({
+          userId,
+          habitId,
+          effectiveFrom: today,
+          cadenceType: "daily",
+          cadenceConfig: {},
+        });
+    } finally {
+      await pool.end();
+    }
+  };
+}
+
 /** Give a fresh test account a populated UI without relying on clicks to seed it. */
-export async function seedVisualData(page: Page) {
+export async function seedVisualData(page: Page, { home = false } = {}) {
   const userId = await signInAndConfirm(page, "Alex Morgan");
   const pool = new Pool({
     connectionString: assertTestDatabaseUrl(testDatabaseUrl),
@@ -68,6 +106,18 @@ export async function seedVisualData(page: Page) {
           reason: "A little more time outside each week.",
           priority: "medium",
         });
+        if (home) {
+          await db
+            .insert(goals)
+            .values(
+              [
+                "Learn to mend clothes",
+                "Make a small herb garden",
+                "Plan a weekend away",
+                "Read more fiction",
+              ].map((title) => ({ userId, title })),
+            );
+        }
         await db.insert(milestones).values([
           {
             userId,

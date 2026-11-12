@@ -117,10 +117,14 @@ test("today's event and block show on Today and Home, and link to the calendar",
   const next = card(page, "Next commitment");
   await expect(next).toContainText("Event");
   await expect(next).toContainText("Now, until 11:59 PM");
+  await expect(next.getByText("Now", { exact: true })).toBeVisible();
   await expect(next).toContainText(/Range:.+ to .+/);
   await expectNoSeriousViolations(page);
   const link = next.getByRole("link", { name: "Conference" });
   await expect(link).toHaveAttribute("href", /view=day&item=event%3A/);
+  await expect(
+    next.getByRole("link", { name: "Open in calendar" }),
+  ).toHaveAttribute("href", (await link.getAttribute("href"))!);
 
   // The link opens the event's dialog on today's Day view, then drops
   // `item` from the URL so a refresh doesn't open it again.

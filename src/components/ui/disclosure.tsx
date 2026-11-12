@@ -33,7 +33,11 @@ export function Disclosure({
       <Collapsible.Content forceMount>
         {/* Radix measures its content with transitions disabled. */}
         <div className="disclosure-content">
-          <div inert={!expanded} className="min-h-0 overflow-hidden">
+          <div
+            inert={!expanded}
+            aria-hidden={!expanded || undefined}
+            className="min-h-0 overflow-hidden"
+          >
             {children}
           </div>
         </div>

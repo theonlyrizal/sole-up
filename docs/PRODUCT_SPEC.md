@@ -177,7 +177,7 @@ The Home screen should help answer:
 
 Avoid a single opaque “life score.” Use small, explainable measures such as overdue commitments, goal activity, habit consistency, and planned-versus-completed work.
 
-Home v1 (chunk 3.2) has three cards: today's planned, due and needs-a-decision counts; active goals without a next action, each named and linked; and deadlines in the next 7 days. Each card shows its definition, range and the time it was worked out, every number links to the list it counts, and a card with no data says "Nothing yet". There is no overall score.
+Home v1 (chunk 3.2) has three cards: today's planned, due and needs-a-decision counts; active goals without a next action, each named and linked; and deadlines in the next 7 days. Each card shows its range. Its “How this is counted” button opens the definition, range and “As of” time. Every number links to the list it counts, and a card with no data says “Nothing yet”. There is no overall score.
 
 Chunk 4.9 adds a "Next commitment" card above them: the first event or time block that hasn't ended (one under way counts), from today through the next 30 days, with what it is, when, and a link that opens it on the calendar's Day view. Today gains a "Schedule" timeline at the top: today's events and time blocks, all-day events first, then by start, each linking to the item the same way.
 
@@ -189,7 +189,7 @@ Chunk 6.6 adds a "Habits" card at the bottom of Home: each active habit by name,
 
 ## 9. Analytics and insight rules
 
-- Show the time range and definition for every metric.
+- Show the time range for every metric. Give each metric a labelled “How this is counted” button for its definition and “As of” time when the card uses progressive disclosure.
 - Distinguish missing data from zero activity.
 - Avoid claiming causation from correlation.
 - Do not penalize users for paused goals, rest, illness, or changed priorities.

@@ -45,6 +45,7 @@ export function CardHeader({
   id,
   icon,
   actions,
+  supporting,
   href,
   size = "m",
   headingLevel = 2,
@@ -53,6 +54,7 @@ export function CardHeader({
   id?: string;
   icon?: IconName;
   actions?: ReactNode;
+  supporting?: ReactNode;
   href?: string;
   size?: "m" | "l";
   headingLevel?: 2 | 3 | 4;
@@ -65,21 +67,21 @@ export function CardHeader({
           <Icon name={icon} />
         </span>
       )}
-      <Heading
-        id={id}
-        className={cx(
-          "min-w-0 flex-1 wrap-anywhere",
-          size === "l" ? "text-title-large" : "text-title-medium",
-        )}
-      >
-        {href ? (
-          <Link className="stretched-link" href={href}>
-            {title}
-          </Link>
-        ) : (
-          title
-        )}
-      </Heading>
+      <div className="min-w-0 flex-1 wrap-anywhere">
+        <Heading
+          id={id}
+          className={size === "l" ? "text-title-large" : "text-title-medium"}
+        >
+          {href ? (
+            <Link className="stretched-link" href={href}>
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
+        </Heading>
+        {supporting}
+      </div>
       {actions && <div className="relative z-10 shrink-0">{actions}</div>}
     </div>
   );

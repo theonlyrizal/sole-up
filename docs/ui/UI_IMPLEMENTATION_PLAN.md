@@ -84,7 +84,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-2a | Components: actions, selection, inputs, gallery | done | chunk/ui-2a-action-input-components | 2026-11-12 | Parts A–C, gallery, and finish-line checks verified |
 | UI-2b | Components: containment, navigation primitives, feedback, states | done | chunk/ui-2b-containment-feedback | 2026-11-12 | Parts D–F and H, gallery and finish-line checks verified |
 | UI-3 | App shell: nav bar, rail, app bar, FAB menu, More, page structure | done | chunk/ui-3-app-shell | 2026-11-12 | 5-C approved. Shell and finish-line checks verified |
-| UI-4 | Home | todo | | | Needs sign-off 5-A |
+| UI-4 | Home | done | chunk/ui-4-home | 2026-11-13 | 5-A approved. Home contracts and finish-line checks verified |
 | UI-5 | Plan: Today, task row, timeline, Today habits | todo | | | |
 | UI-6 | Plan: All tasks, Upcoming, Inbox, task dialog, Quick Add | todo | | | |
 | UI-7 | Calendar and event/block dialogs | todo | | | |
@@ -221,7 +221,7 @@ Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scop
 **Gate:** ask for sign-off on **5-A**. Fallback: MetricCard shows the definition as a visible `body-small` line under the value, plus the range caption, and puts only "As of" behind the info button.
 
 **Build:**
-- Build the listed data components. Use one Crisp Carrot feature card, with Today taking that role when there is no next commitment. Present habit previews as a snap list on compact and a grid on expanded.
+- Build the Home data components. Use one Crisp Carrot feature card, with Today taking that role when there is no next commitment. Present habit previews as a snap list on compact and a grid on expanded. Home uses `SegmentedPillBar` with weekly summary counts. `HabitWeekChart` belongs to UI-9, where day-level data is available.
 - Pure helpers `src/lib/greeting.ts` (`greetingFor(now, timeZone)`) and `src/lib/week-strip.ts` (`weekDays`), plus `isCommitmentUnderWay` in `src/lib/schedule.ts` (additive).
 - Rebuild `home-view.tsx` (split it into `home/greeting.tsx`, `home/next-commitment-card.tsx`, `home/today-card.tsx`, `home/habit-carousel.tsx`, `home/goals-card.tsx`, `home/deadlines-card.tsx`) and `home/page.tsx` (pass `user.name` and `weekStart`).
 - `home/loading` skeleton and `error.tsx` restyle.
@@ -483,5 +483,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Chromium verified target sizes, keyboard navigation, skip focus, Escape, responsive reflow, reduced motion and simulated keyboard clearance. |
 | Restraint | 2 | Navigation keeps the shell stable. The scroll sentinel changes only the app bar tint, and feedback stays with the active control or overlay. |
 | Variety | 1 | The rail and bar adapt to their width classes. Page compositions retain their existing bodies for their owning phases. |
+
+**Total — 15/16.**
+
+### UI-4 · Home (2026-11-13)
+
+- **Branch / PR** — `chunk/ui-4-home` · [#96](https://github.com/theonlyrizal/sole-up/pull/96).
+- **Routes and components** — Rebuilt `/home` with a local greeting, linked week capsules, one featured card, a compact habit snap list, an expanded habit grid, the goals disclosure, a route skeleton and a retryable error state. Added the shared Home data components in `src/components/data/`.
+- **Data paths** — Home calls `nextCommitment`, `todayTaskCounts`, `goalsWithoutNextAction`, `listGoalsWithoutNextAction`, `deadlinesNextSevenDays` and `habitsSummary` at one instant using the user's saved preferences. `RefreshOnNewDay` remains mounted. The weekly habit counts feed the progress pills. UI-9 owns the day-level chart because it has the required day records.
+- **Contracts checked** — All seven date links use `gridHref` for Calendar Day. The featured title and calendar action use `calendarItemHref`. The Today counts keep their `#today-*` targets. The goal count keeps `#goals-without-next-action`, goal rows keep their detail paths, the deadlines link keeps `/plan?due=next7`, and habit titles keep their Track anchors.
+- **Decision 5-A** — Approved. Each card shows its range and offers its definition, range and as-of time through the labelled “How this is counted” control. It opens a compact sheet or an anchored popover. Updated PRODUCT_SPEC §§8–9 and the UI specifications.
+- **Checks run** — `pnpm verify` passed with 1,217 unit and 831 integration tests. The first run overlapped multiple browser and build jobs and hit reminder test timeouts. The rerun used a separate local test database and passed. `pnpm build` passed on Next.js 16.4.3. `CI=1 pnpm test:e2e --workers 5 --reporter list` passed 167 tests, with the 14 visual-only cases run separately. `CI=1 pnpm test:visual --workers 4 --reporter list` passed all 14 cases.
+- **Screenshots** — 46 captures in `test-results/visual/ui-4/`. Start with `home-first-screen-390-dark.png`, `home-populated-1280-light.png`, `home-empty-390-light.png` and `home-empty-1280-dark.png`. Both themes and sizes include metric details, enlarged text, goals disclosure, first paint and error recovery. The `home-habits-next-390-*` captures show compact overflow after keyboard navigation.
+- **Interaction and accessibility evidence** — Home, its metric details and its error state passed the serious and critical axe checks at 390 × 844 and 1280 × 800 in both themes. Enter opened the metric details and goals disclosure. Escape restored focus to the info trigger. The compact carousel reached both ends with the keyboard and kept focus on its control. A missing schedule in an isolated fixture triggered the real route error. Holding the retry request showed its disabled busy state and releasing it after repair restored Home. The saved weekly fill was present with hydration bundles blocked. The browser checked reflow at 320, 375, 390, 414, 768 and 1280 px and at 200% text size at the two capture widths.
+- **Unverified** — Physical touch devices, manual screen-reader use and engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | The 390 px fixture ends the featured card at 400 px with the calendar action visible. Today is the sole feature on the empty dashboard. |
+| Character | 2 | The week capsules, warm wash, opaque tiles and habit avatars carry the Home composition in both themes. Habit colours and shapes use the stable entity ID. |
+| Color | 2 | Crisp Carrot marks the feature, Forest marks the current day and progress, and Kiwi supports secondary actions. The paired roles and focus states were reviewed in both themes. |
+| Response | 2 | A real Home query failure showed a safe reference. The held retry disabled the button and showed a busy state, then recovered after the fixture was repaired. The metric overlay and goals disclosure responded to keyboard input. |
+| Truthfulness | 2 | The browser showed 1 of 3 times and a fully filled first segment with hydration bundles blocked. Partial quantity progress matched the fixture. The Today counts remain independent links and missing data has its own state. |
+| Accessibility | 2 | Chromium axe found zero serious or critical violations in the checked Home states and metric overlays at both sizes and themes. Keyboard dismissal restored focus. Both populated and empty layouts reflowed at 200% text size. |
+| Restraint | 2 | Weekly fills render immediately. Reduced motion preserved carousel navigation, disclosure, metric information and retry. |
+| Variety | 1 | Home combines a date strip, a featured commitment and browseable habit tiles. Cross-route composition remains with the other screen phases. |
 
 **Total — 15/16.**

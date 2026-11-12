@@ -154,7 +154,7 @@ export function commitmentWhenLabel(
   }
   const start = new Date(entry.start);
   const end = new Date(entry.end);
-  if (start <= now) {
+  if (isCommitmentUnderWay(entry, now)) {
     const until =
       localDateOf(end, timeZone) === today
         ? formatTimeOfDay(end, locale, timeZone)
@@ -162,4 +162,9 @@ export function commitmentWhenLabel(
     return `Now, until ${until}`;
   }
   return `${dayWord(localDateOf(start, timeZone), today, locale)} · ${timeRangeLabel(start, end, locale, timeZone)}`;
+}
+
+/** The timed “Now” branch for a commitment already selected by nextCommitmentOf. */
+export function isCommitmentUnderWay(entry: ScheduleEntry, now: Date): boolean {
+  return !entry.allDay && entry.end !== null && new Date(entry.start) <= now;
 }
