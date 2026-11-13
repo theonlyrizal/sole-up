@@ -85,7 +85,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-2b | Components: containment, navigation primitives, feedback, states | done | chunk/ui-2b-containment-feedback | 2026-11-12 | Parts D–F and H, gallery and finish-line checks verified |
 | UI-3 | App shell: nav bar, rail, app bar, FAB menu, More, page structure | done | chunk/ui-3-app-shell | 2026-11-12 | 5-C approved. Shell and finish-line checks verified |
 | UI-4 | Home | done | chunk/ui-4-home | 2026-11-13 | 5-A approved. Home contracts and finish-line checks verified |
-| UI-5 | Plan: Today, task row, timeline, Today habits | todo | | | |
+| UI-5 | Plan: Today, task row, timeline, Today habits | done | chunk/ui-5-today | 2026-11-13 | Today contracts, confirmed feedback and finish-line checks verified |
 | UI-6 | Plan: All tasks, Upcoming, Inbox, task dialog, Quick Add | todo | | | |
 | UI-7 | Calendar and event/block dialogs | todo | | | |
 | UI-8 | Goals, goal detail, life areas, archived goals | todo | | | |
@@ -508,5 +508,31 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Chromium axe found zero serious or critical violations in the checked Home states and metric overlays at both sizes and themes. Keyboard dismissal restored focus. Both populated and empty layouts reflowed at 200% text size. |
 | Restraint | 2 | Weekly fills render immediately. Reduced motion preserved carousel navigation, disclosure, metric information and retry. |
 | Variety | 1 | Home combines a date strip, a featured commitment and browseable habit tiles. Cross-route composition remains with the other screen phases. |
+
+**Total — 15/16.**
+
+### UI-5 · Plan, Today (2026-11-13)
+
+- **Branch / PR** — `chunk/ui-5-today` · [#97](https://github.com/theonlyrizal/sole-up/pull/97). UI-4 [#96](https://github.com/theonlyrizal/sole-up/pull/96) merged before implementation.
+- **Routes and components** — Rebuilt `/plan/today` with shared `TaskRow`, `Timeline`, `PriorityMark` and `WeekStrip`. Schedule and Habits form the sticky supporting pane at large widths. Planned stays visible and owns the suggestions sheet. Moved Today date edits and the existing Plan dates-and-goal editor into responsive sheets. Added the route skeleton and neutral retry card. Updated the Today interaction description in PRODUCT_SPEC.
+- **Data paths** — `listTodayTasks`, `listTodayTimeline`, `listTodaySuggestions`, `getTodayHabits` and the saved preferences supply the page. The existing task, habit and time-block actions handle writes. The header's Block time picker uses open tasks from Today and its suggestion groups.
+- **Contracts checked** — The four task groups still use `TODAY_SECTIONS`, their original labels, hints, counts and `plannedSummary`. Home links retain their `#today-*` targets. Week capsules open Calendar Day through the existing builder. Schedule links still open the same event or block dialog in Calendar Day. Timed deadline edits retain the original time and zone. Task completion stays visible in the original row through the mutation and leaves the list on the normal refresh. Focus follows a moved task, an adjacent task in the same group, or the Planned heading. The keyboard test exercised the heading fallback for completion and rescheduling.
+- **Decisions** — Followed D-20, D-23, D-24 and D-28. The optimistic habit draft stays distinct from the persisted caption. A changed, confirmed log triggers the shared halo. Partial quantities use an edit glyph and the actual saved amount. The existing snackbar owns the saved announcement and Undo. The completion checkbox uses the existing local feedback and refresh, with no artificial dwell time. UI-6 can adopt the shared row on its own routes.
+- **Checks run** — `pnpm verify` passed with 1,220 unit and 831 integration tests and one existing lint warning in the habit validation test. `pnpm build` passed on Next.js 16.4.3. `CI=1 pnpm test:e2e --workers 5 --reporter list` passed 169 tests. The habit spec passed all three tests again after pinning its compact-to-medium layout assertion at 900 px. `CI=1 pnpm test:visual --workers 4 --reporter list` passed all 18 cases, including the four Today captures.
+- **Screenshots** — 48 Playwright PNGs in `test-results/visual/ui-5/`. Start with `today-populated-390-light.png`, `today-populated-1280-dark.png`, `today-keyboard-menu-390-dark.png`, `today-amount-error-390-dark.png`, `today-amount-retry-saved-1280-light.png` and `today-error-1280-dark.png`. Each state has both themes and sizes.
+- **Interaction and accessibility evidence** — Chromium axe reported zero serious or critical violations on the empty and populated Today route, suggestions sheet, date sheet and route error in both themes at 390 × 844 and 1280 × 800. The browser checked document reflow at 320, 375, 390, 414, 768 and 1280 px and at 200% text in both capture sizes. Tab and Space reached and completed a task. Enter and ArrowDown opened the due-date editor, keyboard input saved a different date, and Escape returned focus to the origin. Browser checks also exercised title-to-edit, Block time, confirmed-delete dismissal and the desktop Quick Add trigger.
+- **Feedback evidence** — A held quantity request exposed Saving and disabled duplicate submission. A real validation rejection kept the draft in the form and the prior saved quantity on the row. Retry saved 4.5 of 12 pages and triggered one local halo. Undo restored 6 of 12 under reduced motion. The E2E test verified zero halo on failure, repeat, correction under reduced motion and reload. An isolated missing-schedule fixture forced the route error. Repair and Try again recovered Today.
+- **Unverified** — Physical touch devices, manual screen-reader playback and browser engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | Planned owns Add to today, and the schedule and habit cards sit beside the task groups on large screens. |
+| Character | 2 | Cream and opaque surfaces frame the segmented rows. Current-day capsules and stable habit avatars are visible in the captures. |
+| Color | 2 | Forest marks the current date, Kiwi marks secondary actions, Carrot marks Now and Sunshine is local to a confirmed log. |
+| Response | 2 | The browser exercised pending, validation failure, retained input, retry and Undo. Focus returned to the originating control or a visible heading. |
+| Truthfulness | 2 | The amount shows 4.5 of 12 pages with a distinct logged state. A repeated save, failure and reload produced no halo. |
+| Accessibility | 2 | Axe, keyboard completion and rescheduling, both viewport and theme pairs, 200% text and reduced motion passed in Chromium. |
+| Restraint | 2 | The confirmed effect stays within the action glyph. Resting quantities and the current-day marker appear at their real values. |
+| Variety | 1 | Today pairs segmented action rows with a timeline and a compact date strip. Broader cross-route review belongs to UI-13. |
 
 **Total — 15/16.**

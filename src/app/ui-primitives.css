@@ -463,6 +463,15 @@ textarea.field-control {
   outline-offset: -2px;
 }
 
+.today-quiet-form .filled-field:has(.field-control[aria-invalid="true"]) {
+  outline-color: var(--md-outline);
+}
+
+.today-quiet-form
+  .filled-field:has(.field-control[aria-invalid="true"]):focus-within {
+  outline-color: var(--md-focus);
+}
+
 .filled-field[data-invalid="true"] {
   padding-inline-end: 3rem;
 }
@@ -592,6 +601,54 @@ textarea.field-control {
 
 .selection-control:disabled :is(.check-mark, .radio-mark, .switch-track) {
   opacity: 0.38;
+}
+
+.task-complete .check-indicator {
+  transition:
+    scale var(--duration-expressive-fast-spatial)
+      var(--ease-expressive-fast-spatial),
+    visibility var(--duration-expressive-fast-spatial) allow-discrete;
+}
+
+.habit-done:is(.habit-logged, .habit-pending)[aria-disabled="true"] {
+  --action-fg: var(--md-success);
+  --action-bg: transparent;
+  cursor: default;
+}
+
+.today-habit-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: 0.5rem;
+  padding-inline: 0;
+}
+
+.habit-done {
+  gap: 0;
+  padding-inline: 0.125rem 0.625rem;
+}
+
+@container (width < 16rem) {
+  .today-habit-row > :last-child {
+    grid-column: 2 / -1;
+    justify-self: end;
+  }
+}
+
+.habit-done.habit-pending[aria-disabled="true"] {
+  --action-fg: var(--md-on-surface-variant);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .habit-done:not([aria-disabled="true"]):active .confirmation-glyph {
+    scale: var(--feedback-press-scale);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-complete .check-indicator {
+    transition: none;
+  }
 }
 
 .switch-track {

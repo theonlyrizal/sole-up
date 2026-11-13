@@ -5,7 +5,13 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { testDatabaseUrl } from "../../playwright.config";
-import { addDays, dayOfWeek, startOfWeek, todayFor } from "../../src/lib/dates";
+import {
+  addDays,
+  dayOfWeek,
+  localDayRange,
+  startOfWeek,
+  todayFor,
+} from "../../src/lib/dates";
 import { DEFAULT_WEEK_START } from "../../src/lib/preferences";
 import {
   calendarEvents,
@@ -17,6 +23,7 @@ import {
   milestones,
   notes,
   tasks,
+  timeBlocks,
   weeklyReviews,
 } from "../../src/server/db/schema";
 import { assertTestDatabaseUrl } from "../integration/helpers/database";
@@ -24,11 +31,16 @@ import { signInAndConfirm } from "./helpers";
 
 export const VISUAL_ZONE = "UTC";
 export const DAILY_HABIT = "Morning stretch";
+export const QUANTITY_HABIT = "Read a few pages before the afternoon commute";
 export const GOAL_TITLE = "Make space for a longer weekend walk";
 export const EVENT_TITLE = "Walk and coffee with a friend";
 
-/** Force the real Home query to fail for one test user until its schedule exists. */
-export async function createUnscheduledHabit(userId: string, today: string) {
+/** Force a real habit query to fail for one test user until its schedule exists. */
+export async function createUnscheduledHabit(
+  userId: string,
+  today: string,
+  loggedToday = false,
+) {
   const pool = new Pool({
     connectionString: assertTestDatabaseUrl(testDatabaseUrl),
   });
@@ -42,6 +54,11 @@ export async function createUnscheduledHabit(userId: string, today: string) {
       measure: "check",
       startDate: today,
     });
+    if (loggedToday) {
+      await db
+        .insert(habitLogs)
+        .values({ userId, habitId, localDate: today, status: "completed" });
+    }
   } finally {
     await pool.end();
   }
@@ -66,7 +83,10 @@ export async function createUnscheduledHabit(userId: string, today: string) {
 }
 
 /** Give a fresh test account a populated UI without relying on clicks to seed it. */
-export async function seedVisualData(page: Page, { home = false } = {}) {
+export async function seedVisualData(
+  page: Page,
+  { home = false, todaySchedule = false } = {},
+) {
   const userId = await signInAndConfirm(page, "Alex Morgan");
   const pool = new Pool({
     connectionString: assertTestDatabaseUrl(testDatabaseUrl),
@@ -83,6 +103,7 @@ export async function seedVisualData(page: Page, { home = false } = {}) {
   const noteId = randomUUID();
   const pastReviewId = randomUUID();
   const eventId = randomUUID();
+  const plannedTaskId = randomUUID();
   const dailyId = randomUUID();
   const weekdaysId = randomUUID();
   const flexibleId = randomUUID();
@@ -132,6 +153,7 @@ export async function seedVisualData(page: Page, { home = false } = {}) {
         ]);
         await db.insert(tasks).values([
           {
+            id: plannedTaskId,
             userId,
             goalId,
             title: "Pick a route and pack a rain jacket",
@@ -175,6 +197,33 @@ export async function seedVisualData(page: Page, { home = false } = {}) {
           endAt: new Date(`${tomorrow}T15:00:00Z`),
           tz: VISUAL_ZONE,
         });
+        if (todaySchedule) {
+          const day = localDayRange(today, VISUAL_ZONE);
+          await db.insert(calendarEvents).values([
+            {
+              userId,
+              title: "Library book sale",
+              allDay: true,
+              startDate: today,
+              endDate: tomorrow,
+            },
+            {
+              userId,
+              title: "Community garden open day",
+              allDay: false,
+              startAt: day.start,
+              endAt: day.end,
+              tz: VISUAL_ZONE,
+            },
+          ]);
+          await db.insert(timeBlocks).values({
+            userId,
+            taskId: plannedTaskId,
+            startAt: new Date(`${today}T15:00:00Z`),
+            endAt: new Date(`${today}T15:20:00Z`),
+            tz: VISUAL_ZONE,
+          });
+        }
         await db.insert(habits).values([
           {
             id: dailyId,
@@ -186,7 +235,7 @@ export async function seedVisualData(page: Page, { home = false } = {}) {
           {
             id: weekdaysId,
             userId,
-            title: "Read a few pages before the afternoon commute",
+            title: QUANTITY_HABIT,
             measure: "quantity",
             unit: "pages",
             startDate: habitStart,

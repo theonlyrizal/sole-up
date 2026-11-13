@@ -1,14 +1,12 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { FormError } from "@/components/ui/form-error";
+import { ResponsiveSheet } from "@/components/ui/bottom-sheet";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/toast";
 import { formatInstant, formatLocalDate } from "@/lib/dates";
-import type { ActionError } from "@/lib/result";
 import { planTasksToday } from "@/server/modules/tasks/actions";
 import type {
   PlanTaskItem,
@@ -34,19 +32,19 @@ const tasksLabel = (count: number) =>
 export function AddToToday(props: AddToTodayProps) {
   const [open, setOpen] = useState(false);
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="secondary">
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <Button size="xs" variant="tonal" icon="add">
           Add to today
         </Button>
-      </DialogTrigger>
-      <DialogContent
-        title="Add to today"
-        description="Tasks with no plan yet: those due in the next 7 days, and the next steps under your active goals."
-      >
-        <AddToTodayForm {...props} onAdded={() => setOpen(false)} />
-      </DialogContent>
-    </Dialog>
+      }
+      title="Add to today"
+      description="Tasks with no plan yet: those due in the next 7 days, and the next steps under your active goals."
+    >
+      <AddToTodayForm {...props} onAdded={() => setOpen(false)} />
+    </ResponsiveSheet>
   );
 }
 
@@ -57,7 +55,7 @@ function AddToTodayForm({
   onAdded,
 }: AddToTodayProps & { onAdded: () => void }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [error, setError] = useState<ActionError | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const groups = [
@@ -95,17 +93,22 @@ function AddToTodayForm({
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending || selected.size === 0) return;
     startTransition(async () => {
       setError(null);
-      const result = await planTasksToday({ ids: [...selected] });
-      if (result.ok) {
-        toast({
-          title: `${tasksLabel(result.data.count)} planned for today`,
-          variant: "success",
-        });
-        onAdded();
-      } else {
-        setError(result.error);
+      try {
+        const result = await planTasksToday({ ids: [...selected] });
+        if (result.ok) {
+          toast({
+            title: `${tasksLabel(result.data.count)} planned for today`,
+            variant: "success",
+          });
+          onAdded();
+        } else {
+          setError(result.error.message);
+        }
+      } catch {
+        setError("Couldn't add the tasks. Try again.");
       }
     });
   }
@@ -116,6 +119,7 @@ function AddToTodayForm({
       onSubmit={submit}
       noValidate
       aria-label="Suggestions for today"
+      aria-busy={pending || undefined}
       className="flex flex-col gap-4"
     >
       {groups.map((group) => (
@@ -140,12 +144,20 @@ function AddToTodayForm({
           ))}
         </fieldset>
       ))}
-      <FormError error={error} />
+      {error && (
+        <p role="alert" className="text-body-medium text-on-surface-variant">
+          {error}
+        </p>
+      )}
       <div className="flex items-center justify-end gap-3">
         <span aria-live="polite" className="text-sm text-muted">
           {count === 0 ? "None selected" : `${count} selected`}
         </span>
-        <Button type="submit" disabled={pending || count === 0}>
+        <Button
+          type="submit"
+          disabled={count === 0}
+          aria-disabled={pending || undefined}
+        >
           {pending ? "Adding…" : "Add to today"}
         </Button>
       </div>
@@ -166,29 +178,14 @@ function SuggestionOption({
   detail: string | null;
   onChange: (checked: boolean) => void;
 }) {
-  const detailId = useId();
   return (
-    <div className="flex items-start gap-3">
-      <input
-        id={`${detailId}-box`}
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        aria-describedby={detail ? detailId : undefined}
-        onChange={(event) => onChange(event.target.checked)}
-        className={cx("mt-1 size-4 shrink-0 accent-accent", focusRing)}
-      />
-      <div className="flex min-w-0 flex-col">
-        <label htmlFor={`${detailId}-box`} className="break-words">
-          {task.title}
-        </label>
-        {detail && (
-          <span id={detailId} className="text-sm text-muted">
-            {detail}
-          </span>
-        )}
-      </div>
-    </div>
+    <Checkbox
+      label={task.title}
+      description={detail ?? undefined}
+      checked={checked}
+      disabled={disabled}
+      onCheckedChange={(checked) => onChange(checked === true)}
+    />
   );
 }
 

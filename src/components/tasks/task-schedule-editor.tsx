@@ -3,6 +3,7 @@
 import { useId, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ResponsiveSheet } from "@/components/ui/bottom-sheet";
 import { FormError } from "@/components/ui/form-error";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,6 @@ type TaskScheduleEditorProps = {
   parentOptions: TaskParentOption[];
   /** The user's zone: a new deadline time is set in it. */
   timeZone: string;
-  onDone: () => void;
 };
 
 /** The task's current parent as the picker shows it. */
@@ -40,17 +40,40 @@ function currentParent(task: PlanTaskItem) {
 }
 
 /**
- * Inline edit of a task's planned date, deadline and goal or milestone,
+ * Edit a task's planned date, deadline and goal or milestone,
  * saved together. A deadline is all-day unless a time is given; the time is
  * in the deadline's own zone when it has one, otherwise the user's.
  * Escape cancels.
  */
-export function TaskScheduleEditor({
+export function TaskScheduleEditor(props: TaskScheduleEditorProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <ResponsiveSheet
+      title="Dates and goal"
+      description={props.task.title}
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <Button
+          variant="outlined"
+          size="xs"
+          aria-label={`Dates and goal: ${props.task.title}`}
+        >
+          Dates and goal
+        </Button>
+      }
+    >
+      <ScheduleForm {...props} onDone={() => setOpen(false)} />
+    </ResponsiveSheet>
+  );
+}
+
+function ScheduleForm({
   task,
   parentOptions,
   timeZone,
   onDone,
-}: TaskScheduleEditorProps) {
+}: TaskScheduleEditorProps & { onDone: () => void }) {
   const id = useId();
   const zone = task.dueTz ?? timeZone;
   const timedDue = task.dueAt ? localDateTimeOf(task.dueAt, zone) : null;
@@ -93,9 +116,9 @@ export function TaskScheduleEditor({
           onDone();
         }
       }}
-      className="flex flex-col gap-3 rounded-md border border-border bg-surface-muted p-3"
+      className="grid min-w-0 gap-3"
     >
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-3">
         <FormField
           id={`${id}-planned`}
           label="Plan for"
@@ -172,7 +195,7 @@ export function TaskScheduleEditor({
         )}
       </FormField>
       <FormError error={error} />
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="submit" size="sm" disabled={pending}>
           {pending ? "Saving…" : "Save"}
         </Button>

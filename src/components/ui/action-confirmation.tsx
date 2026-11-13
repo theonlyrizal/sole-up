@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { useMediaQuery } from "@/components/hooks/use-media-query";
-import { Icon } from "@/components/icons/icon";
+import { Icon, type IconName } from "@/components/icons/icon";
 import { LoadingIndicator } from "./loading-indicator";
 
 export type ConfirmationPhase = "idle" | "pending" | "confirmed" | "error";
@@ -18,11 +18,13 @@ function durationMs(tokens: CSSStyleDeclaration, property: string) {
 export function ActionConfirmation({
   phase,
   confirmationKey,
+  confirmedIcon = "check",
   status,
   children,
 }: {
   phase: ConfirmationPhase;
   confirmationKey?: ConfirmationKey;
+  confirmedIcon?: IconName;
   /** Optional accessible text. Keep the live region in the owner. */
   status?: string;
   children: ReactNode;
@@ -87,7 +89,7 @@ export function ActionConfirmation({
           {phase === "pending" && (
             <LoadingIndicator decorative size={18} className="text-inherit" />
           )}
-          {phase === "confirmed" && <Icon name="check" size={20} />}
+          {phase === "confirmed" && <Icon name={confirmedIcon} size={20} />}
           {phase === "error" && <Icon name="error" size={20} />}
         </span>
       </span>

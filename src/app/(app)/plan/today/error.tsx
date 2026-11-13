@@ -1,5 +1,9 @@
 "use client";
 
+import { useTransition } from "react";
+import { PageFrame } from "@/components/shell/page-frame";
+import { PlanTabs } from "@/components/shell/plan-tabs";
+import { Card } from "@/components/ui/card";
 import { ErrorReference, errorDigest } from "@/components/ui/error-reference";
 import { ErrorState } from "@/components/ui/error-state";
 
@@ -14,22 +18,26 @@ export default function TodayError({
   error: unknown;
   retry: () => void;
 }) {
+  const [retrying, startRetry] = useTransition();
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <ErrorState
-        headingLevel={1}
-        title="Today couldn't load"
-        description={
-          <>
-            <p>
-              Your data is safe. Try again, and if it keeps happening, reload
-              the page.
-            </p>
-            <ErrorReference id={errorDigest(error)} />
-          </>
-        }
-        onRetry={retry}
-      />
-    </div>
+    <PageFrame title="Today" subnav={<PlanTabs />}>
+      <Card as="div" className="mx-auto w-full max-w-2xl">
+        <ErrorState
+          tone="neutral"
+          title="Today couldn't load"
+          description={
+            <>
+              <p>
+                Your data is safe. Try again, and if it keeps happening, reload
+                the page.
+              </p>
+              <ErrorReference id={errorDigest(error)} />
+            </>
+          }
+          onRetry={() => startRetry(retry)}
+          retrying={retrying}
+        />
+      </Card>
+    </PageFrame>
   );
 }

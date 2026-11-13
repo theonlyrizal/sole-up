@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { PlanTabs } from "@/components/shell/plan-tabs";
-import { TodayView } from "@/components/tasks/today-view";
+import { TodayHeaderActions, TodayView } from "@/components/tasks/today-view";
 import { PageFrame } from "@/components/shell/page-frame";
-import { LoadingState } from "@/components/ui/skeleton";
 import { formatLocalDate } from "@/lib/dates";
 import { todayClock } from "@/lib/today";
+import { weekDays } from "@/lib/week-strip";
 import { requireUser } from "@/server/auth/session";
 import { listTodayTimeline } from "@/server/modules/calendar-events/queries";
 import { getTodayHabits } from "@/server/modules/habits/queries";
@@ -16,15 +16,15 @@ import {
   listTodayTasks,
 } from "@/server/modules/tasks/queries";
 
+import TodaySkeleton from "./loading";
+
 export const metadata: Metadata = { title: "Today · SoleUp" };
 
 export default function TodayPage() {
   return (
-    <PageFrame title="Today" subnav={<PlanTabs />}>
-      <Suspense fallback={<LoadingState label="Loading today" />}>
-        <Today />
-      </Suspense>
-    </PageFrame>
+    <Suspense fallback={<TodaySkeleton />}>
+      <Today />
+    </Suspense>
   );
 }
 
@@ -41,18 +41,42 @@ async function Today() {
     listTodaySuggestions(user.id, clock, timeZone),
     getTodayHabits(user.id, clock.now),
   ]);
+  const dateLabel = formatLocalDate(clock.today, preferences.locale, "full");
+  const blockable = Object.values(sections).flat();
+  const tasks = [
+    ...blockable,
+    ...suggestions.dueSoon,
+    ...suggestions.goals.flatMap((goal) => goal.tasks),
+  ];
   return (
-    <TodayView
-      dateLabel={formatLocalDate(clock.today, preferences.locale, "full")}
-      today={clock.today}
-      nextDayStartsAt={clock.dayEnd.toISOString()}
-      now={clock.now.toISOString()}
-      timeline={timeline}
-      sections={sections}
-      suggestions={suggestions}
-      habits={habits}
-      locale={preferences.locale}
-      timeZone={timeZone}
-    />
+    <PageFrame
+      title="Today"
+      subnav={<PlanTabs />}
+      actions={
+        <TodayHeaderActions
+          tasks={tasks.map(({ id, title, estimatedMinutes }) => ({
+            id,
+            title,
+            estimatedMinutes,
+          }))}
+          locale={preferences.locale}
+          timeZone={timeZone}
+        />
+      }
+    >
+      <TodayView
+        today={clock.today}
+        dateLabel={dateLabel}
+        week={weekDays(clock.today, preferences.weekStart, preferences.locale)}
+        nextDayStartsAt={clock.dayEnd.toISOString()}
+        now={clock.now.toISOString()}
+        timeline={timeline}
+        sections={sections}
+        suggestions={suggestions}
+        habits={habits}
+        locale={preferences.locale}
+        timeZone={timeZone}
+      />
+    </PageFrame>
   );
 }

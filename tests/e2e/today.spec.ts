@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import {
   expectNoSeriousViolations,
@@ -85,6 +85,12 @@ async function openAddToToday(page: Page) {
   return dialog;
 }
 
+async function taskMenu(page: Page, title: string) {
+  const trigger = page.getByRole("button", { name: `Actions for ${title}` });
+  await trigger.click();
+  return { trigger, menu: page.getByRole("menu") };
+}
+
 test("an empty day is calm, and Add to today plans suggested tasks", async ({
   page,
 }) => {
@@ -135,7 +141,7 @@ test("an empty day is calm, and Add to today plans suggested tasks", async ({
   await expectNoSeriousViolations(page);
 
   // Complete in one tap: it leaves Today.
-  await planned.getByRole("checkbox", { name: "Complete: Long run" }).click();
+  await planned.getByRole("checkbox", { name: "Complete Long run" }).click();
   await expect(page.getByText("Task completed", { exact: true })).toBeVisible();
   await expect(planned.getByRole("listitem")).toHaveCount(1);
 
@@ -206,10 +212,8 @@ test("a plan from yesterday waits under Earlier, not done until you decide", asy
   }).toPass();
 
   // Pick a date: Escape cancels and returns focus, Save moves it off Today.
-  const pick = earlier.getByRole("button", {
-    name: "Pick a date: Water the plants",
-  });
-  await pick.click();
+  const { trigger: pick, menu } = await taskMenu(page, "Water the plants");
+  await menu.getByRole("menuitem", { name: "Pick a date" }).click();
   const editor = page.getByRole("form", {
     name: "Plan for: Water the plants",
   });
@@ -218,6 +222,7 @@ test("a plan from yesterday waits under Earlier, not done until you decide", asy
   await expect(editor).toHaveCount(0);
   await expect(pick).toBeFocused();
   await pick.click();
+  await menu.getByRole("menuitem", { name: "Pick a date" }).click();
   await editor.getByLabel("Plan for").fill(tokyoDate(3));
   await expectNoSeriousViolations(page);
   await editor.getByRole("button", { name: "Save" }).click();
@@ -232,9 +237,7 @@ test("a plan from yesterday waits under Earlier, not done until you decide", asy
   ).toBeVisible();
 
   // A new due date settles the decision.
-  await decide
-    .getByRole("button", { name: "New due date: Pay the rent" })
-    .click();
+  await decide.getByRole("button", { name: "New date: Pay the rent" }).click();
   const dueEditor = page.getByRole("form", {
     name: "New due date: Pay the rent",
   });
@@ -246,4 +249,71 @@ test("a plan from yesterday waits under Earlier, not done until you decide", asy
   await expect(
     page.getByRole("list", { name: "Inbox tasks" }).getByText("Call the bank"),
   ).toBeVisible();
+});
+
+async function tabTo(page: Page, control: Locator) {
+  for (let index = 0; index < 50; index++) {
+    await page.keyboard.press("Tab");
+    if (await control.evaluate((element) => element === document.activeElement))
+      return;
+  }
+  await expect(control).toBeFocused();
+}
+
+test("keyboard completes a task and gives another a new due date", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInAndConfirm(page);
+  await addTask(page, "Collect the parcel", { plannedDate: tokyoDate() });
+  await addTask(page, "Return the form", { dueDate: tokyoDate(-1) });
+  await openToday(page);
+
+  const checkbox = page.getByRole("checkbox", {
+    name: "Complete Collect the parcel",
+  });
+  await tabTo(page, checkbox);
+  await page.keyboard.press("Space");
+  const planned = page.getByRole("heading", {
+    name: "Planned for today",
+    exact: true,
+  });
+  await expect(planned).toBeFocused();
+  await expect(checkbox).toHaveCount(0);
+
+  const actions = page.getByRole("button", {
+    name: "Actions for Return the form",
+  });
+  await tabTo(page, actions);
+  await page.keyboard.press("Enter");
+  const dateAction = page.getByRole("menuitem", { name: "New due date" });
+  await page.keyboard.press("ArrowDown");
+  await expect(dateAction).toBeFocused();
+  await page.keyboard.press("Enter");
+  const editor = page.getByRole("form", {
+    name: "New due date: Return the form",
+  });
+  await expect(editor.getByLabel("New due date")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(actions).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("menuitem", { name: "Plan for today" }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(dateAction).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(editor.getByLabel("New due date")).toBeFocused();
+
+  const [year, month, day] = tokyoDate(3).split("-");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  for (const digit of month + day + year) await page.keyboard.press(digit);
+  await expect(editor.getByLabel("New due date")).toHaveValue(tokyoDate(3));
+  await tabTo(page, editor.getByRole("button", { name: "Save" }));
+  await page.keyboard.press("Enter");
+  await expect(editor).toHaveCount(0);
+  await expect(section(page, "Needs a decision")).toHaveCount(0);
+  await expect(planned).toBeFocused();
+  await expect(page.getByText(/^Now due /)).toBeVisible();
 });

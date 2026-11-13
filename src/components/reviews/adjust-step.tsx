@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useId, useRef, useState, useTransition } from "react";
 
-import { TodayDateEditor } from "@/components/tasks/today-view";
+import { TodayDateEditor } from "@/components/tasks/today-date-editor";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { FormField } from "@/components/ui/form-field";
