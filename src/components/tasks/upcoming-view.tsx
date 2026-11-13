@@ -3,25 +3,31 @@
 import Link from "next/link";
 import { useId } from "react";
 
+import { DateBadge } from "@/components/data/date-badge";
 import { buttonClass } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
+import { ConnectedButtonGroup } from "@/components/ui/button-group";
+import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { LocalDate } from "@/lib/dates";
-import { PRIORITY_LABELS } from "@/lib/priorities";
+import {
+  addDays,
+  formatLocalDate,
+  formatTimeOfDay,
+  type LocalDate,
+} from "@/lib/dates";
+import { ListGroup } from "@/components/ui/list";
 import {
   longerUpcomingRange,
   type UpcomingDay,
-  type UpcomingEntry,
   upcomingDayLabel,
   upcomingEmptyTitle,
   upcomingEntryDetails,
   upcomingHref,
   type UpcomingRange,
-  UPCOMING_RANGE_LABELS,
   UPCOMING_RANGES,
 } from "@/lib/upcoming";
 import type { PlanTaskItem } from "@/server/modules/tasks/queries";
 
+import { TaskListRow, TaskListScope } from "./plan-task-list";
 import { useRefreshOnNewDay } from "./use-refresh-on-new-day";
 
 type UpcomingViewProps = {
@@ -51,56 +57,57 @@ export function UpcomingView({
   const longer = longerUpcomingRange(range);
   return (
     <div className="flex flex-col gap-8">
-      <nav aria-label="Days to show">
-        <ul className="flex flex-wrap gap-1">
-          {UPCOMING_RANGES.map((option) => {
-            const current = option === range;
-            return (
-              <li key={option}>
-                <Link
-                  href={upcomingHref(option)}
-                  aria-current={current ? "page" : undefined}
-                  className={cx(
-                    "inline-flex rounded-md border px-3 py-1.5 text-sm",
-                    current
-                      ? "border-accent font-medium text-fg"
-                      : "border-border text-muted hover:text-fg",
-                    focusRing,
-                  )}
-                >
-                  {UPCOMING_RANGE_LABELS[option]}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-      {days.length === 0 ? (
-        <EmptyState
-          title={upcomingEmptyTitle(range)}
-          description="Tasks you plan for a day, or give a deadline, show here by day. Today's are on Today."
-          action={
-            longer ? (
-              <Link
-                href={upcomingHref(longer)}
-                className={buttonClass({ variant: "secondary" })}
-              >
-                Show the next {longer} days
-              </Link>
-            ) : null
-          }
+      <div className="grid min-w-0 gap-2">
+        <ConnectedButtonGroup
+          label="Days to show"
+          value={String(range)}
+          items={UPCOMING_RANGES.map((option) => ({
+            value: String(option),
+            label: `${option} days`,
+            href: upcomingHref(option),
+          }))}
         />
-      ) : (
-        days.map((day) => (
-          <UpcomingDayBlock
-            key={day.date}
-            day={day}
-            today={today}
-            locale={locale}
-            timeZone={timeZone}
+        <p
+          id="upcoming-date-range"
+          tabIndex={-1}
+          className="text-body-medium text-on-surface-variant"
+        >
+          {formatLocalDate(addDays(today, 1), locale)} –{" "}
+          {formatLocalDate(addDays(today, range), locale)}
+        </p>
+      </div>
+      <TaskListScope
+        locale={locale}
+        timeZone={timeZone}
+        fallbackId="upcoming-date-range"
+      >
+        {days.length === 0 ? (
+          <EmptyState
+            title={upcomingEmptyTitle(range)}
+            description="Tasks you plan for a day, or give a deadline, show here by day. Today's are on Today."
+            action={
+              longer ? (
+                <Link
+                  href={upcomingHref(longer)}
+                  className={buttonClass({ variant: "secondary" })}
+                >
+                  Show the next {longer} days
+                </Link>
+              ) : null
+            }
           />
-        ))
-      )}
+        ) : (
+          days.map((day) => (
+            <UpcomingDayBlock
+              key={day.date}
+              day={day}
+              today={today}
+              locale={locale}
+              timeZone={timeZone}
+            />
+          ))
+        )}
+      </TaskListScope>
     </div>
   );
 }
@@ -118,62 +125,46 @@ function UpcomingDayBlock({
 }) {
   const headingId = useId();
   const label = upcomingDayLabel(day.date, today, locale);
+  const relative = day.date === addDays(today, 1) ? "Tomorrow" : undefined;
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3">
-      <h2 id={headingId} className="text-lg font-semibold">
-        <time dateTime={day.date}>{label}</time>
+    <section
+      aria-labelledby={headingId}
+      className="grid min-w-0 gap-3 medium:grid-cols-[auto_minmax(0,1fr)] medium:gap-4"
+    >
+      <h2 id={headingId}>
+        <DateBadge
+          date={day.date}
+          today={today}
+          locale={locale}
+          label={label}
+          relative={relative}
+        />
       </h2>
-      <ul
-        aria-label={label}
-        className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface"
-      >
-        {day.entries.map((entry) => (
-          <UpcomingRow
-            key={entry.task.id}
-            entry={entry}
-            locale={locale}
-            timeZone={timeZone}
-          />
-        ))}
-      </ul>
+      <ListGroup label={label}>
+        {day.entries.map((entry) => {
+          const [, ...context] = upcomingEntryDetails(entry, locale, timeZone);
+          const due = entry.task.dueAt
+            ? `Due ${formatTimeOfDay(entry.task.dueAt, locale, timeZone)}`
+            : "Due";
+          return (
+            <TaskListRow
+              key={entry.task.id}
+              task={entry.task}
+              details={
+                <>
+                  {entry.planned && (
+                    <Chip type="status" label="Planned" tone="active" />
+                  )}
+                  {entry.due && <Chip type="status" label={due} />}
+                  {context.map((detail) => (
+                    <span key={detail}>{detail}</span>
+                  ))}
+                </>
+              }
+            />
+          );
+        })}
+      </ListGroup>
     </section>
-  );
-}
-
-function UpcomingRow({
-  entry,
-  locale,
-  timeZone,
-}: {
-  entry: UpcomingEntry<PlanTaskItem>;
-  locale: string;
-  timeZone: string;
-}) {
-  const { task } = entry;
-  return (
-    <li className="flex flex-col gap-1 p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="min-w-0 font-medium break-words">{task.title}</span>
-        {task.priority && (
-          <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs text-muted">
-            {PRIORITY_LABELS[task.priority]}
-          </span>
-        )}
-      </div>
-      {task.goal && (
-        <p className="text-sm break-words text-muted">
-          <Link
-            href={`/goals/${task.goal.id}`}
-            className={cx("rounded-sm hover:underline", focusRing)}
-          >
-            {task.goal.title}
-          </Link>
-          {task.milestone && <> › {task.milestone.title}</>}
-        </p>
-      )}
-      <p className="text-sm text-muted">
-        {upcomingEntryDetails(entry, locale, timeZone).join(" · ")}
-      </p>
-    </li>
   );
 }

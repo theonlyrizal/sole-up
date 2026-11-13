@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  chooseTaskAction,
   expectNoSeriousViolations,
   openQuickAdd,
   signInAndConfirm,
@@ -23,7 +24,7 @@ async function listedTitles(page: Page) {
   const names = await boxes.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("aria-label") ?? ""),
   );
-  return names.map((name) => name.replace(/^Complete: /, ""));
+  return names.map((name) => name.replace(/^Complete /, ""));
 }
 
 async function addTask(page: Page, title: string) {
@@ -35,8 +36,8 @@ async function addTask(page: Page, title: string) {
     }
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();
-  await dialog.getByLabel("Title").fill(title);
-  await dialog.getByLabel("Title").press("Enter");
+  await dialog.getByLabel("Task title").fill(title);
+  await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);
 }
 
@@ -51,11 +52,15 @@ async function chooseFilter(
   option: string,
   url: RegExp,
 ) {
-  const select = filters(page).getByLabel(label, { exact: true });
+  const chip = filters(page).getByRole("button", { name: label, exact: true });
+  const sheet = page.getByRole("dialog", { name: label, exact: true });
   await expect(async () => {
-    await select.selectOption({ label: option });
-    await expect(page).toHaveURL(url, { timeout: 1_000 });
+    if (!(await sheet.isVisible())) await chip.click();
+    await expect(sheet).toBeVisible({ timeout: 1_000 });
   }).toPass();
+  await sheet.getByRole("radio", { name: option, exact: true }).click();
+  await sheet.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(page).toHaveURL(url);
 }
 
 async function createGoal(page: Page, title: string) {
@@ -70,7 +75,7 @@ async function createGoal(page: Page, title: string) {
 async function openPlan(page: Page) {
   await page.goto("/plan");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Plan" }),
+    page.getByRole("heading", { level: 1, name: "All tasks" }),
   ).toBeVisible();
 }
 
@@ -82,11 +87,11 @@ async function setPriorityAndEstimate(
   estimate: string,
 ) {
   await taskList(page)
-    .getByRole("button", { name: `Edit: ${title}` })
+    .getByRole("button", { name: title, exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: "Edit task" });
-  await dialog.getByLabel("Priority").selectOption({ label: priority });
-  await dialog.getByLabel("Estimate (minutes)").fill(estimate);
+  await dialog.getByRole("radio", { name: priority, exact: true }).click();
+  await dialog.getByLabel("Estimate (minutes)", { exact: true }).fill(estimate);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
 }
@@ -104,20 +109,20 @@ test("filters and sort live in the URL and survive a reload", async ({
   for (const title of ["Call the bank", "Buy running shoes", "Stretch"]) {
     await addTask(page, title);
     await expect(
-      taskList(page).getByRole("checkbox", { name: `Complete: ${title}` }),
+      taskList(page).getByRole("checkbox", { name: `Complete ${title}` }),
     ).toBeVisible();
   }
 
   await setPriorityAndEstimate(page, "Stretch", "High", "90");
-  await expect(taskList(page).getByText("High priority")).toBeVisible();
+  await expect(
+    taskList(page).getByRole("img", { name: "High priority" }),
+  ).toBeVisible();
   await expect(taskList(page).getByText("1 h 30 min")).toBeVisible();
   await setPriorityAndEstimate(page, "Call the bank", "Low", "45");
   await expect(taskList(page).getByText("45 min")).toBeVisible();
 
   // Put one task under the goal, inline.
-  await taskList(page)
-    .getByRole("button", { name: "Dates and goal: Buy running shoes" })
-    .click();
+  await chooseTaskAction(page, "Buy running shoes", "Dates and goal");
   const editor = page.getByRole("form", {
     name: "Dates and goal for Buy running shoes",
   });
@@ -131,13 +136,19 @@ test("filters and sort live in the URL and survive a reload", async ({
   ).toBeVisible();
 
   // Sort by priority: high, low, then none.
-  await chooseFilter(page, "Sort by", "Priority", /\/plan\?sort=priority$/);
+  await chooseFilter(page, "Sort", "Priority", /\/plan\?sort=priority$/);
   await expect
     .poll(() => listedTitles(page))
     .toEqual(["Stretch", "Call the bank", "Buy running shoes"]);
 
   // Filter by the goal.
   await chooseFilter(page, "Goal", "Run a 10k", /goal=[0-9a-f-]{36}/);
+  await chooseFilter(
+    page,
+    "Priority",
+    "No priority",
+    /\/plan\?goal=[0-9a-f-]{36}&priority=none&sort=priority$/,
+  );
   await expect.poll(() => listedTitles(page)).toEqual(["Buy running shoes"]);
   await expect(page.getByText("1 task", { exact: true })).toBeVisible();
 
@@ -145,20 +156,29 @@ test("filters and sort live in the URL and survive a reload", async ({
   const url = page.url();
   await page.reload();
   await expect(page).toHaveURL(url);
-  await expect(filters(page).getByLabel("Goal")).toHaveValue(/[0-9a-f-]{36}/);
-  await expect(filters(page).getByLabel("Sort by")).toHaveValue("priority");
+  await expect(
+    filters(page).getByRole("button", { name: "Remove Goal: Run a 10k" }),
+  ).toBeVisible();
+  await expect(
+    filters(page).getByRole("button", { name: "Remove Priority: No priority" }),
+  ).toBeVisible();
+  await expect(
+    filters(page).getByRole("button", { name: "Remove Sort: Priority" }),
+  ).toBeVisible();
   await expect.poll(() => listedTitles(page)).toEqual(["Buy running shoes"]);
 
   // A priority filter that matches nothing, then clear everything.
-  await chooseFilter(page, "Goal", "Any goal", /\/plan\?sort=priority$/);
-  await chooseFilter(page, "Priority", "No priority", /priority=none/);
+  await filters(page)
+    .getByRole("button", { name: "Remove Goal: Run a 10k" })
+    .click();
+  await expect(page).toHaveURL(/\/plan\?priority=none&sort=priority$/);
   await expect.poll(() => listedTitles(page)).toEqual(["Buy running shoes"]);
   await chooseFilter(page, "Priority", "Medium priority", /priority=medium/);
   await expect(
     page.getByRole("heading", { name: "No tasks match these filters" }),
   ).toBeVisible();
   await expectNoSeriousViolations(page);
-  await filters(page).getByRole("link", { name: "Clear filters" }).click();
+  await filters(page).getByRole("button", { name: "Clear filters" }).click();
   await expect(page).toHaveURL(/\/plan$/);
   await expect.poll(() => listedTitles(page)).toHaveLength(3);
 });
@@ -172,10 +192,11 @@ test("dates and parent are edited inline; date windows filter them", async ({
   await addTask(page, "Renew passport");
   await addTask(page, "Buy a phrasebook");
 
-  const trigger = taskList(page).getByRole("button", {
-    name: "Dates and goal: Renew passport",
-  });
-  await trigger.click();
+  const trigger = await chooseTaskAction(
+    page,
+    "Renew passport",
+    "Dates and goal",
+  );
   const editor = page.getByRole("form", {
     name: "Dates and goal for Renew passport",
   });
@@ -189,7 +210,7 @@ test("dates and parent are edited inline; date windows filter them", async ({
   await expect(trigger).toBeFocused();
   await expect(taskList(page).getByText(/Planned/)).toHaveCount(0);
 
-  await trigger.click();
+  await chooseTaskAction(page, "Renew passport", "Dates and goal");
   await editor.getByLabel("Plan for").fill("2030-01-15");
   await editor.getByLabel("Due date").fill("2030-01-20");
   await editor.getByLabel("Due time").fill("17:30");
@@ -208,7 +229,7 @@ test("dates and parent are edited inline; date windows filter them", async ({
   await expect(row.getByRole("link", { name: "Learn Spanish" })).toBeVisible();
 
   // The editor reopens with the saved values.
-  await trigger.click();
+  await chooseTaskAction(page, "Renew passport", "Dates and goal");
   await expect(editor.getByLabel("Due time")).toHaveValue("17:30");
   await editor.getByRole("button", { name: "Cancel" }).click();
 
@@ -234,14 +255,14 @@ test("completed and cancelled tasks appear behind a toggle", async ({
   await addTask(page, "Old errand");
 
   const complete = taskList(page).getByRole("checkbox", {
-    name: "Complete: Water the plants",
+    name: "Complete Water the plants",
   });
   await complete.click();
   await expect(page.getByText("Task completed", { exact: true })).toBeVisible();
   await expect(complete).toHaveCount(0);
 
   await taskList(page)
-    .getByRole("button", { name: "Edit: Old errand" })
+    .getByRole("button", { name: "Old errand", exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: "Edit task" });
   await expectNoSeriousViolations(page);
@@ -250,7 +271,8 @@ test("completed and cancelled tasks appear behind a toggle", async ({
   await expect(page.getByText("Task cancelled", { exact: true })).toBeVisible();
   await expect.poll(() => listedTitles(page)).toEqual(["Book a table"]);
 
-  await filters(page).getByLabel("Show completed and cancelled").click();
+  const showClosed = filters(page).getByRole("button", { name: "Show closed" });
+  await showClosed.click();
   await expect(page).toHaveURL(/\/plan\?closed=1$/);
   await expect
     .poll(() => listedTitles(page))
@@ -265,20 +287,125 @@ test("completed and cancelled tasks appear behind a toggle", async ({
   await chooseFilter(page, "Status", "Cancelled", /closed=1&status=cancelled/);
   await expect.poll(() => listedTitles(page)).toEqual(["Old errand"]);
   await page.reload();
-  await expect(
-    filters(page).getByLabel("Show completed and cancelled"),
-  ).toBeChecked();
+  await expect(showClosed).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => listedTitles(page)).toEqual(["Old errand"]);
 
   // Reopen from the list; hiding closed tasks again drops the status filter.
   await chooseFilter(page, "Status", "Any status", /\/plan\?closed=1$/);
   await taskList(page)
-    .getByRole("checkbox", { name: "Complete: Water the plants" })
+    .getByRole("checkbox", { name: "Complete Water the plants" })
     .click();
   await expect(page.getByText("Task reopened", { exact: true })).toBeVisible();
-  await filters(page).getByLabel("Show completed and cancelled").click();
+  await showClosed.click();
   await expect(page).toHaveURL(/\/plan$/);
   await expect
     .poll(() => listedTitles(page))
     .toEqual(["Water the plants", "Book a table"]);
+});
+
+test("a rejected completion keeps the row and focus until a confirmed retry", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await signInAndConfirm(page);
+  await openPlan(page);
+  await addTask(page, "Mail the renewal form");
+  await addTask(page, "Pack the rain jacket");
+  const first = taskList(page).getByRole("checkbox", {
+    name: "Complete Mail the renewal form",
+  });
+  const next = taskList(page).getByRole("button", {
+    name: "Pack the rain jacket",
+    exact: true,
+  });
+  const requestHeld = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  let requests = 0;
+  await page.route("**/plan", async (route) => {
+    const request = route.request();
+    if (request.method() !== "POST" || !request.headers()["next-action"])
+      return route.continue();
+    requests++;
+    requestHeld.resolve();
+    await release.promise;
+    const [input] = request.postDataJSON() as [{ id: string; status: string }];
+    await route.continue({
+      postData: JSON.stringify([{ ...input, status: "invalid" }]),
+    });
+  });
+  await first.press("Space");
+  try {
+    await requestHeld.promise;
+    await expect(first).toHaveAttribute("aria-busy", "true");
+    await expect(first).toBeFocused();
+    await expect(first).not.toBeChecked();
+    await expect(page.getByText("Task completed", { exact: true })).toHaveCount(
+      0,
+    );
+    await first.press("Space");
+  } finally {
+    release.resolve();
+  }
+  await expect(taskList(page).getByRole("alert")).toBeVisible();
+  await expect(first).not.toBeChecked();
+  await expect(first).toBeFocused();
+  expect(requests).toBe(1);
+  await page.unroute("**/plan");
+  await first.press("Space");
+  await expect(page.getByText("Task completed", { exact: true })).toBeVisible();
+  await expect(first).toHaveCount(0);
+  await expect(next).toBeFocused();
+
+  await filters(page)
+    .getByRole("button", { name: "Show closed" })
+    .press("Space");
+  await expect(first).toBeChecked();
+  await page.reload();
+  await expect(first).toBeChecked();
+  await expect(page.getByText("Task completed", { exact: true })).toHaveCount(
+    0,
+  );
+  await first.press("Space");
+  await expect(first).not.toBeChecked();
+  await expect(first).toBeFocused();
+  await expect(page.getByText("Task reopened", { exact: true })).toBeVisible();
+});
+
+test("a failed detail save keeps its draft when the task moves out of the filter", async ({
+  page,
+}) => {
+  await signInAndConfirm(page);
+  await openPlan(page);
+  await addTask(page, "Draft the agenda");
+  await chooseFilter(page, "Planned", "Not planned", /\/plan\?planned=none$/);
+  await taskList(page)
+    .getByRole("button", { name: "Draft the agenda", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Edit task" });
+  const title = dialog.getByLabel("Title", { exact: true });
+  const plan = dialog.getByLabel("Planned date");
+  await title.fill(" ");
+  await plan.fill("2030-03-12");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(
+    dialog.getByText(
+      "Dates and goal were saved. Review the remaining fields and save again.",
+    ),
+  ).toBeVisible();
+  await expect(title).toHaveAttribute("aria-invalid", "true");
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue(" ");
+  await expect(plan).toHaveValue("2030-03-12");
+  await expect(page.getByText("Task saved", { exact: true })).toHaveCount(0);
+
+  await title.fill("Draft the meeting agenda");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("Task saved", { exact: true })).toBeVisible();
+  await expect(page.getByText("0 tasks", { exact: true })).toBeFocused();
+  await page.goto("/plan");
+  const row = taskList(page)
+    .getByRole("listitem")
+    .filter({ hasText: "Draft the meeting agenda" });
+  await expect(row).toContainText("Planned Mar 12, 2030");
 });

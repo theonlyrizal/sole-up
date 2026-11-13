@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  chooseTaskAction,
   expectNoSeriousViolations,
   openQuickAdd,
   signInAndConfirm,
@@ -47,7 +48,7 @@ async function addTask(
     }
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();
-  await dialog.getByLabel("Title").fill(title);
+  await dialog.getByLabel("Task title").fill(title);
   if (Object.keys(options).length > 0) {
     await dialog.getByRole("button", { name: "More options" }).click();
     if (options.plannedDate) {
@@ -55,7 +56,7 @@ async function addTask(
     }
     if (options.dueDate) await dialog.getByLabel("Due").fill(options.dueDate);
   }
-  await dialog.getByLabel("Title").press("Enter");
+  await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);
 }
 
@@ -73,9 +74,7 @@ async function setTimedDeadline(
   // The trigger only opens the editor once the page hydrates.
   await expect(async () => {
     if (!(await editor.isVisible())) {
-      await page
-        .getByRole("button", { name: `Dates and goal: ${title}` })
-        .click();
+      await chooseTaskAction(page, title, "Dates and goal");
     }
     await expect(editor).toBeVisible({ timeout: 1_000 });
   }).toPass();
@@ -94,13 +93,14 @@ test("an empty window is calm, and the range tabs live in the URL", async ({
   // Within a Week is the default.
   const ranges = page.getByRole("navigation", { name: "Days to show" });
   await expect(ranges.getByRole("link")).toHaveText([
-    "Within a Week",
-    "Next 14 days",
-    "Next 30 days",
+    "7 days",
+    "14 days",
+    "30 days",
   ]);
-  await expect(
-    ranges.getByRole("link", { name: "Within a Week" }),
-  ).toHaveAttribute("aria-current", "page");
+  await expect(ranges.getByRole("link", { name: "7 days" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await expect(
     page.getByRole("heading", { level: 2, name: "Nothing within a week" }),
   ).toBeVisible();
@@ -114,9 +114,10 @@ test("an empty window is calm, and the range tabs live in the URL", async ({
       name: "Nothing in the next 14 days",
     }),
   ).toBeVisible();
-  await expect(
-    ranges.getByRole("link", { name: "Next 14 days" }),
-  ).toHaveAttribute("aria-current", "page");
+  await expect(ranges.getByRole("link", { name: "14 days" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 
   await page.getByRole("link", { name: "Show the next 30 days" }).click();
   await expect(page).toHaveURL(/\/plan\/upcoming\?days=30$/);
@@ -126,9 +127,10 @@ test("an empty window is calm, and the range tabs live in the URL", async ({
       name: "Nothing in the next 30 days",
     }),
   ).toBeVisible();
-  await expect(
-    ranges.getByRole("link", { name: "Next 30 days" }),
-  ).toHaveAttribute("aria-current", "page");
+  await expect(ranges.getByRole("link", { name: "30 days" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 
   // Upcoming sits under Plan, between Today and Calendar.
   const tabs = page.getByRole("navigation", { name: "Plan" }).getByRole("link");
@@ -137,6 +139,13 @@ test("an empty window is calm, and the range tabs live in the URL", async ({
   for (const [index, label] of labels.entries()) {
     await expect(tabs.nth(index)).toHaveAccessibleName(label);
   }
+  await ranges.getByRole("link", { name: "7 days" }).click();
+  await expect(page).toHaveURL(/\/plan\/upcoming$/);
+  await page.goto("/plan/upcoming?days=invalid");
+  await expect(ranges.getByRole("link", { name: "7 days" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 });
 
 test("plans and deadlines land on their local days, a timed one included", async ({
@@ -175,14 +184,19 @@ test("plans and deadlines land on their local days, a timed one included", async
     day(page, tokyoDate(2)).getByText("Renew passport"),
   ).toBeVisible();
   await expect(
-    day(page, tokyoDate(2)).getByText(/^Planned · Due /),
+    day(page, tokyoDate(2)).getByText("Planned", { exact: true }),
   ).toBeVisible();
+  await expect(day(page, tokyoDate(2)).getByText(/^Due /)).toBeVisible();
+  await expect(day(page, tokyoDate(5)).getByText(/^Planned /)).toBeVisible();
   await expect(
-    day(page, tokyoDate(5)).getByText(/^Due · Planned /),
+    day(page, tokyoDate(5)).getByText("Due", { exact: true }),
   ).toBeVisible();
   await expect(day(page, tokyoDate(4)).getByRole("listitem")).toHaveCount(1);
   await expect(
-    day(page, tokyoDate(4)).getByText("Planned, due", { exact: true }),
+    day(page, tokyoDate(4)).getByText("Planned", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    day(page, tokyoDate(4)).getByText("Due", { exact: true }),
   ).toBeVisible();
 
   // Today's plan is on Today; day 10 is past the week, day 20 past 14 days.
@@ -192,7 +206,7 @@ test("plans and deadlines land on their local days, a timed one included", async
   await expectNoSeriousViolations(page);
 
   const ranges = page.getByRole("navigation", { name: "Days to show" });
-  await ranges.getByRole("link", { name: "Next 14 days" }).click();
+  await ranges.getByRole("link", { name: "14 days" }).click();
   await expect(page).toHaveURL(/\?days=14$/);
   await expect(
     day(page, tokyoDate(10)).getByText("Send the forms"),
@@ -200,7 +214,7 @@ test("plans and deadlines land on their local days, a timed one included", async
   await expect(page.getByText("Book flights")).toHaveCount(0);
 
   // The next 30 days include it, and the choice survives a reload.
-  await ranges.getByRole("link", { name: "Next 30 days" }).click();
+  await ranges.getByRole("link", { name: "30 days" }).click();
   await expect(page).toHaveURL(/\?days=30$/);
   await expect(
     day(page, tokyoDate(20)).getByText("Book flights"),

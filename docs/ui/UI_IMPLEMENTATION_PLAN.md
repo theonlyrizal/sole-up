@@ -86,7 +86,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-3 | App shell: nav bar, rail, app bar, FAB menu, More, page structure | done | chunk/ui-3-app-shell | 2026-11-12 | 5-C approved. Shell and finish-line checks verified |
 | UI-4 | Home | done | chunk/ui-4-home | 2026-11-13 | 5-A approved. Home contracts and finish-line checks verified |
 | UI-5 | Plan: Today, task row, timeline, Today habits | done | chunk/ui-5-today | 2026-11-13 | Today contracts, confirmed feedback and finish-line checks verified |
-| UI-6 | Plan: All tasks, Upcoming, Inbox, task dialog, Quick Add | todo | | | |
+| UI-6 | Plan: All tasks, Upcoming, Inbox, task dialog, Quick Add | done | chunk/ui-6-plan-task-lists | 2026-11-13 | URL contracts, task actions, both theme and size pairs, and finish-line checks verified |
 | UI-7 | Calendar and event/block dialogs | todo | | | |
 | UI-8 | Goals, goal detail, life areas, archived goals | todo | | | |
 | UI-9 | Track, habit form, archived habits | todo | | | Needs sign-off 5-B |
@@ -534,5 +534,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Axe, keyboard completion and rescheduling, both viewport and theme pairs, 200% text and reduced motion passed in Chromium. |
 | Restraint | 2 | The confirmed effect stays within the action glyph. Resting quantities and the current-day marker appear at their real values. |
 | Variety | 1 | Today pairs segmented action rows with a timeline and a compact date strip. Broader cross-route review belongs to UI-13. |
+
+**Total — 15/16.**
+
+### UI-6 · Plan, task lists, task dialog and Quick Add (2026-11-13)
+
+- **Branch / PR** — `chunk/ui-6-plan-task-lists`. UI-5 [#97](https://github.com/theonlyrizal/sole-up/pull/97) merged before implementation. [UI-6 pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-6-plan-task-lists).
+- **Routes and components** — All tasks uses filter chips, radio sheets, removable summaries and the shared segmented `TaskRow`. Upcoming pairs day badges with list groups and a URL-backed range. Inbox uses square selection controls and a contextual action bar. The responsive editor brings parent, dates, priority, estimate and reminder into the main form, with Notes, Time blocks, Linked notes and a scrolling task-actions section. Quick Add uses a keyboard-aware compact sheet and a 480 px centered dialog. Updated PRODUCT_SPEC's Plan entry.
+- **Data paths and contracts** — The existing Plan, Upcoming and Inbox queries, task status and bulk actions, reminder operations, and time-block and note paths supply the UI. All eight Plan filter keys use the existing parser and serializer. Goal and Priority plus Sort round-trip through reload with the same URL and row set. Upcoming's default link omits `days`, invalid input selects 7 days, and only days with entries render. The Dates and goal shortcut is in the row menu. Calendar item links and Search result dialogs passed the existing journeys.
+- **Decisions** — Followed D-23, D-24 and D-28. The editor keeps the task's Notes field and Quick Add keeps More options. Scheduling and task details use two existing actions. A schedule can save before a detail validation error, so the editor identifies the saved portion and keeps the draft available for retry even if the row leaves the current filter. The shared checkbox settles on confirmed status. When the row leaves on refresh, focus moves to a remaining row or the result count.
+- **Checks run** — `pnpm verify` passed with 1,229 unit and 831 integration tests. The existing unused-variable lint warning in habit validation remains. `pnpm build` passed on Next.js 16.4.3. The production-backed `pnpm test:e2e` run passed 172 tests. All 22 visual cases passed separately with `pnpm test:visual`.
+- **Screenshots** — 68 Playwright PNGs in `test-results/visual/ui-6/`. Start with `plan-390-light.png`, `upcoming-1280-dark.png`, `inbox-selection-390-dark.png`, `task-edit-actions-390-light.png` and `quick-add-1280-light.png`. The `task-completion-pending-*`, `task-completion-error-*` and `task-completion-retry-*` captures show the real action in both themes and sizes.
+- **Interaction and accessibility evidence** — Chromium reported zero serious or critical axe violations on the three populated routes and the filter, assignment, task, delete and Quick Add overlays at 390 × 844 and 1280 × 800 in both themes. Reflow passed from 320 to 1280 px and at 200% text in both capture sizes. Space selected multiple Inbox rows, Clear restored focus to Select all, and bulk planning returned focus to the updated count. Escape restored the trigger after sheet or confirmation dismissal. A simulated 420 px keyboard viewport kept Quick Add's submit control visible.
+- **Feedback evidence** — Holding completion showed the original unchecked row and busy state. A rejected request kept the row and focus, a duplicate press sent one request, retry removed the row on refresh, and Show closed offered correction by reopening it. Reload showed the saved state without replaying confirmation. A detail validation failure retained both drafts after scheduling removed the task from the active filter. Correction saved the title and focused the result count. The Quick Add validation capture exercised pending, retained input and retry under reduced motion.
+- **Unverified** — Physical soft keyboards and touch devices, manual screen-reader playback, and engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | All tasks gives filters and results distinct positions. Upcoming leads with the date range. Inbox gives selection its own action bar. |
+| Character | 2 | Cream and dark canvases support opaque task rows, paired date badges and the shared compact form. |
+| Color | 2 | Kiwi identifies selection, Forest leads the primary actions, and destructive actions use the error roles in both themes. |
+| Response | 2 | The browser exercised pending, failure, duplicate prevention, retry, retained drafts, correction and focus recovery. |
+| Truthfulness | 2 | Dates, results and checked states follow existing queries and confirmed actions. Upcoming includes only populated days. |
+| Accessibility | 2 | Chromium axe, keyboard multi-select, dismissal, focus recovery, reflow, enlarged text and reduced motion passed. |
+| Restraint | 2 | A completed task leaves on refresh. Saved feedback follows the explicit action and does not replay on reload. |
+| Variety | 1 | Filterable lists, dated groups and Inbox selection serve different tasks within the Plan shell. Cross-route composition remains for UI-13. |
 
 **Total — 15/16.**

@@ -36,7 +36,13 @@ type Found = Extract<SearchResults, { status: "results" }>;
  * The notes group can be narrowed to one tag (chunk 8.5), also sent only
  * as an action argument.
  */
-export function SearchView({ tags = [] }: { tags?: TagSummary[] }) {
+export function SearchView({
+  tags = [],
+  timeZone,
+}: {
+  tags?: TagSummary[];
+  timeZone: string;
+}) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -204,6 +210,7 @@ export function SearchView({ tags = [] }: { tags?: TagSummary[] }) {
 
       {openTask && (
         <TaskFormDialog
+          timeZone={timeZone}
           task={openTask}
           open={taskDialogOpen}
           onOpenChange={(open) => {

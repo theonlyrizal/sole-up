@@ -1,6 +1,7 @@
 import { expect, type Locator, test, type Page } from "@playwright/test";
 
 import {
+  chooseTaskAction,
   expectNoSeriousViolations,
   openQuickAdd,
   signInAndConfirm,
@@ -34,11 +35,11 @@ async function addTask(page: Page, title: string) {
     }
     await expect(quickAdd).toBeVisible({ timeout: 1_000 });
   }).toPass();
-  await quickAdd.getByLabel("Title").fill(title);
-  await quickAdd.getByLabel("Title").press("Enter");
+  await quickAdd.getByLabel("Task title").fill(title);
+  await quickAdd.getByLabel("Task title").press("Enter");
   await expect(quickAdd).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: `Block time: ${title}` }),
+    page.getByRole("button", { name: `Actions for ${title}`, exact: true }),
   ).toBeVisible();
 }
 
@@ -129,10 +130,10 @@ test("blocks time for a task by form, and completing the task marks the block do
   // The estimate is the new block's default length.
   const edit = await openDialog(
     page,
-    page.getByRole("button", { name: "Edit: Write report" }),
+    page.getByRole("button", { name: "Write report", exact: true }),
     "Edit task",
   );
-  await edit.getByLabel("Estimate (minutes)").fill("45");
+  await edit.getByLabel("Estimate (minutes)", { exact: true }).fill("45");
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(edit).toHaveCount(0);
   // The form reads the estimate when it opens: wait for the refreshed row.
@@ -140,11 +141,8 @@ test("blocks time for a task by form, and completing the task marks the block do
     page.getByRole("listitem").filter({ hasText: "Write report" }).last(),
   ).toContainText("45 min");
 
-  const form = await openDialog(
-    page,
-    page.getByRole("button", { name: "Block time: Write report" }),
-    "Block time",
-  );
+  await chooseTaskAction(page, "Write report", "Block time");
+  const form = page.getByRole("dialog", { name: "Block time" });
   await expect(form.getByLabel("Length (minutes)")).toHaveValue("45");
   await expect(
     form.getByText("Times are in your time zone, Asia/Tokyo."),
@@ -172,7 +170,7 @@ test("blocks time for a task by form, and completing the task marks the block do
 
   // Complete the task on the Plan page.
   await page.goto("/plan");
-  await page.getByRole("checkbox", { name: "Complete: Write report" }).click();
+  await page.getByRole("checkbox", { name: "Complete Write report" }).click();
   await expect(page.getByText("Task completed", { exact: true })).toBeVisible();
 
   // The block is now done; marking never needs the task again.
@@ -270,7 +268,7 @@ test("a block's dialog marks it, completes the task separately, and changes its 
   await page.goto("/plan");
   const task = await openDialog(
     page,
-    page.getByRole("button", { name: "Edit: Draft slides" }),
+    page.getByRole("button", { name: "Draft slides", exact: true }),
     "Edit task",
   );
   const blocks = task.getByRole("list", { name: "Upcoming time blocks" });
@@ -299,11 +297,8 @@ test("a repeating block asks for the scope when dragged, and a completed task's 
   const later = tokyoDate(2);
   await addTask(page, "Stretch");
 
-  const form = await openDialog(
-    page,
-    page.getByRole("button", { name: "Block time: Stretch" }),
-    "Block time",
-  );
+  await chooseTaskAction(page, "Stretch", "Block time");
+  const form = page.getByRole("dialog", { name: "Block time" });
   await form.getByLabel("Date").fill(today);
   await form.getByLabel("Start time").fill("00:00");
   await form.getByLabel("Length (minutes)").fill("30");
@@ -337,7 +332,7 @@ test("a repeating block asks for the scope when dragged, and a completed task's 
 
   // Completing the task marks today's started occurrence only.
   await page.goto("/plan");
-  await page.getByRole("checkbox", { name: "Complete: Stretch" }).click();
+  await page.getByRole("checkbox", { name: "Complete Stretch" }).click();
   await expect(page.getByText("Task completed", { exact: true })).toBeVisible();
 
   await openCalendar(page, `/plan/calendar?view=day&date=${today}`);

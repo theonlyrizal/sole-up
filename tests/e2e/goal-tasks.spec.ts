@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  chooseTaskAction,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 // Tasks on goal detail, the next action, and deleting a goal moving its
 // tasks to the inbox (chunk 2.7).
@@ -81,9 +85,7 @@ test("tasks on goal detail: add in context, next action, survives a reload", asy
   await expectNoSeriousViolations(page);
 
   // A due date makes the milestone's task the next action.
-  await milestoneList
-    .getByRole("button", { name: "Dates and goal: Call the music shop" })
-    .click();
+  await chooseTaskAction(page, "Call the music shop", "Dates and goal");
   const editor = page.getByRole("form", {
     name: "Dates and goal for Call the music shop",
   });
@@ -95,7 +97,7 @@ test("tasks on goal detail: add in context, next action, survives a reload", asy
 
   // Completing a task never touches the milestone or goal (ADR 0010).
   await directList
-    .getByRole("checkbox", { name: "Complete: Buy rosin" })
+    .getByRole("checkbox", { name: "Complete Buy rosin" })
     .click();
   await expect(directList.getByText("Buy rosin", { exact: true })).toHaveCount(
     0,

@@ -56,7 +56,7 @@ async function createNote(page: Page, title: string, text: string) {
 
 async function openTaskDialog(page: Page, title: string) {
   await tasksSection(page)
-    .getByRole("button", { name: `Edit: ${title}` })
+    .getByRole("button", { name: title, exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: "Edit task" });
   await expect(dialog).toBeVisible();
@@ -244,7 +244,7 @@ test("New note from a task links it on its first save, and the task delete keeps
     taskNotes.getByRole("link", { name: "Pad sizes" }),
   ).toBeVisible();
 
-  await reopened.getByRole("button", { name: "Delete task" }).click();
+  await reopened.getByRole("button", { name: "Delete…" }).click();
   const confirm = page.getByRole("alertdialog", {
     name: "Delete “Order brake pads”?",
   });

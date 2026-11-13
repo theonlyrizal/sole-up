@@ -48,10 +48,10 @@ export function TaskBlocks({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-2 border-t border-border pt-4"
+      className="flex flex-col gap-2 rounded-lg bg-resting-surface p-4 text-on-resting-surface"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id={headingId} className="font-semibold">
+        <h3 id={headingId} className="text-title-medium">
           Time blocks
         </h3>
         {task.status === "open" && data && (

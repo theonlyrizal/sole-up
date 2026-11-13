@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ResponsiveSheet } from "@/components/ui/bottom-sheet";
@@ -27,7 +27,7 @@ type TaskScheduleEditorProps = {
 };
 
 /** The task's current parent as the picker shows it. */
-function currentParent(task: PlanTaskItem) {
+export function currentParent(task: PlanTaskItem) {
   if (task.milestone) {
     return {
       value: taskParentChoice(task),
@@ -45,25 +45,32 @@ function currentParent(task: PlanTaskItem) {
  * in the deadline's own zone when it has one, otherwise the user's.
  * Escape cancels.
  */
-export function TaskScheduleEditor(props: TaskScheduleEditorProps) {
-  const [open, setOpen] = useState(false);
+export function TaskScheduleEditor({
+  open,
+  onOpenChange,
+  onCloseAutoFocus,
+  ...props
+}: TaskScheduleEditorProps & {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus: (event: Event) => void;
+}) {
+  const writingRef = useRef(false);
   return (
     <ResponsiveSheet
       title="Dates and goal"
       description={props.task.title}
       open={open}
-      onOpenChange={setOpen}
-      trigger={
-        <Button
-          variant="outlined"
-          size="xs"
-          aria-label={`Dates and goal: ${props.task.title}`}
-        >
-          Dates and goal
-        </Button>
-      }
+      onOpenChange={(next) => {
+        if (!writingRef.current) onOpenChange(next);
+      }}
+      onCloseAutoFocus={onCloseAutoFocus}
     >
-      <ScheduleForm {...props} onDone={() => setOpen(false)} />
+      <ScheduleForm
+        {...props}
+        writingRef={writingRef}
+        onDone={() => onOpenChange(false)}
+      />
     </ResponsiveSheet>
   );
 }
@@ -73,7 +80,11 @@ function ScheduleForm({
   parentOptions,
   timeZone,
   onDone,
-}: TaskScheduleEditorProps & { onDone: () => void }) {
+  writingRef,
+}: TaskScheduleEditorProps & {
+  onDone: () => void;
+  writingRef: React.RefObject<boolean>;
+}) {
   const id = useId();
   const zone = task.dueTz ?? timeZone;
   const timedDue = task.dueAt ? localDateTimeOf(task.dueAt, zone) : null;
@@ -86,20 +97,32 @@ function ScheduleForm({
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (writingRef.current) return;
+    writingRef.current = true;
+    setError(null);
     startTransition(async () => {
-      const result = await scheduleTask({
-        id: task.id,
-        plannedDate,
-        dueDate,
-        dueTime,
-        dueTz: dueTime ? zone : "",
-        ...parentFromChoice(parent),
-      });
-      if (result.ok) {
-        toast({ title: "Task updated", variant: "success" });
-        onDone();
-      } else {
-        setError(result.error);
+      try {
+        const result = await scheduleTask({
+          id: task.id,
+          plannedDate,
+          dueDate,
+          dueTime,
+          dueTz: dueTime ? zone : "",
+          ...parentFromChoice(parent),
+        });
+        if (result.ok) {
+          toast({ title: "Task updated", variant: "success" });
+          onDone();
+        } else {
+          setError(result.error);
+        }
+      } catch {
+        setError({
+          code: "INTERNAL",
+          message: "Couldn't save the dates and goal. Try again.",
+        });
+      } finally {
+        writingRef.current = false;
       }
     });
   }

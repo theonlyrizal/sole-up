@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import {
+  chooseTaskAction,
   expectNoSeriousViolations,
   openQuickAdd,
   signInAndConfirm,
@@ -51,12 +52,12 @@ const reminderField = (scope: Locator) =>
 async function addTaskDueSoon(page: Page, title: string, minutes: number) {
   await page.goto("/plan");
   const add = await openQuickAdd(page);
-  await add.getByLabel("Title").fill(title);
-  await add.getByLabel("Title").press("Enter");
+  await add.getByLabel("Task title").fill(title);
+  await add.getByLabel("Task title").press("Enter");
   await expect(add).toHaveCount(0);
 
   const due = tokyoInMinutes(minutes);
-  await page.getByRole("button", { name: `Dates and goal: ${title}` }).click();
+  await chooseTaskAction(page, title, "Dates and goal");
   const editor = page.getByRole("form", {
     name: `Dates and goal for ${title}`,
   });
@@ -68,7 +69,10 @@ async function addTaskDueSoon(page: Page, title: string, minutes: number) {
 
 async function openTask(page: Page, title: string) {
   const dialog = page.getByRole("dialog", { name: "Edit task" });
-  await openWith(page.getByRole("button", { name: `Edit: ${title}` }), dialog);
+  await openWith(
+    page.getByRole("button", { name: title, exact: true }),
+    dialog,
+  );
   return dialog;
 }
 

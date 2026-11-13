@@ -2,6 +2,7 @@ import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  chooseTaskAction,
   expectNoSeriousViolations,
   openQuickAdd,
   signInAndConfirm,
@@ -79,8 +80,8 @@ async function addTaskDueAt(
     }
     await expect(quickAdd).toBeVisible({ timeout: 1_000 });
   }).toPass();
-  await quickAdd.getByLabel("Title").fill(title);
-  await quickAdd.getByLabel("Title").press("Enter");
+  await quickAdd.getByLabel("Task title").fill(title);
+  await quickAdd.getByLabel("Task title").press("Enter");
   await expect(quickAdd).toHaveCount(0);
 
   const editor = page.getByRole("form", {
@@ -88,9 +89,7 @@ async function addTaskDueAt(
   });
   await expect(async () => {
     if (!(await editor.isVisible())) {
-      await page
-        .getByRole("button", { name: `Dates and goal: ${title}` })
-        .click();
+      await chooseTaskAction(page, title, "Dates and goal");
     }
     await expect(editor).toBeVisible({ timeout: 1_000 });
   }).toPass();

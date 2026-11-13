@@ -61,7 +61,9 @@ test.describe("compact shell", () => {
     for (const label of ["Goals", "Track", "Home", "Plan"]) {
       const link = nav.getByRole("link", { name: label, exact: true });
       await link.click();
-      await expect(heading(page, label)).toBeVisible();
+      await expect(
+        heading(page, label === "Plan" ? "All tasks" : label),
+      ).toBeVisible();
       await expect(link).toHaveAttribute("aria-current", "page");
     }
     const tabs = page.getByRole("navigation", { name: "Plan", exact: true });
@@ -73,9 +75,7 @@ test.describe("compact shell", () => {
       );
       const tab = tabs.getByRole("link", { name: label, exact: true });
       await tab.click();
-      await expect(
-        heading(page, label === "All tasks" ? "Plan" : label),
-      ).toBeVisible();
+      await expect(heading(page, label)).toBeVisible();
       await expect(tab).toHaveAttribute("aria-current", "page");
       await expect(
         nav.getByRole("link", { name: "Plan", exact: true }),
@@ -131,13 +131,13 @@ test.describe("compact shell", () => {
     await signInAndConfirm(page);
     const create = page.getByRole("button", { name: "Create", exact: true });
     const dialog = await openQuickAdd(page);
-    const title = dialog.getByLabel("Title");
+    const title = dialog.getByLabel("Task title");
     await expect(title).toBeFocused();
     await title.fill("Collect library holds");
     await title.press("Enter");
     await expect(dialog).toHaveCount(0);
     await expect(
-      page.getByText("Task added to your inbox", { exact: true }),
+      page.getByText("Added to Inbox", { exact: true }),
     ).toBeVisible();
     await expect(create).toBeFocused();
     await page.goto("/plan/inbox");
@@ -196,7 +196,7 @@ test.describe("compact shell", () => {
     );
 
     const dialog = await openQuickAdd(page);
-    await expect(dialog.getByLabel("Title")).toBeFocused();
+    await expect(dialog.getByLabel("Task title")).toBeFocused();
     await page.evaluate(() => {
       Object.defineProperty(visualViewport!, "height", {
         configurable: true,
@@ -207,7 +207,7 @@ test.describe("compact shell", () => {
     await expect(nav).toBeHidden();
     await expect(create).toBeHidden();
     const submit = (await dialog
-      .getByRole("button", { name: "Add task", exact: true })
+      .getByRole("button", { name: "Add", exact: true })
       .boundingBox())!;
     expect(submit.y + submit.height).toBeLessThanOrEqual(420);
     await page.evaluate(() => {
@@ -240,7 +240,7 @@ test.describe("expanded rail", () => {
       ["Review", "Weekly review"],
       ["Settings", "Settings"],
       ["Home", "Home"],
-      ["Plan", "Plan"],
+      ["Plan", "All tasks"],
     ]) {
       const link = nav.getByRole("link", { name: label, exact: true });
       await link.click();
@@ -259,9 +259,7 @@ test.describe("expanded rail", () => {
     ]) {
       const link = nav.getByRole("link", { name: label, exact: true });
       await link.click();
-      await expect(
-        heading(page, label === "All tasks" ? "Plan" : label),
-      ).toBeVisible();
+      await expect(heading(page, label)).toBeVisible();
       await expect(link).toHaveAttribute("aria-current", "page");
       await expect(
         nav.getByRole("link", { name: "Plan", exact: true }),

@@ -2,14 +2,20 @@ import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
 import { galleryBaseURL } from "../../playwright.config";
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  expectNoSeriousViolations,
+  openQuickAdd,
+  signInAndConfirm,
+} from "./helpers";
 import {
   createUnscheduledHabit,
   DAILY_HABIT,
   EVENT_TITLE,
   GOAL_TITLE,
+  INBOX_TASK,
   QUANTITY_HABIT,
   seedVisualData,
+  UPCOMING_TASK,
   VISUAL_ZONE,
 } from "./visual-data";
 
@@ -22,6 +28,177 @@ const sizes = [
   { width: 1280, height: 800 },
 ] as const;
 const themes = ["light", "dark"] as const;
+
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-6 task lists ${viewport.width} ${theme}`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      await seedVisualData(page, { plan: true });
+
+      const capture = (state: string, fullPage = true) =>
+        page.screenshot({
+          path: `test-results/visual/ui-6/${state}-${viewport.width}-${theme}.png`,
+          fullPage,
+          animations: "disabled",
+        });
+      for (const [route, name] of [
+        ["/plan", "plan"],
+        ["/plan/upcoming", "upcoming"],
+        ["/plan/inbox", "inbox"],
+      ] as const) {
+        await openPage(page, route);
+        await expect(
+          page.getByRole("main").getByRole("listitem").first(),
+        ).toBeVisible();
+        for (const width of [320, 375, 390, 414, 768, 1280]) {
+          await page.setViewportSize({ width, height: viewport.height });
+          await checkRenderedPage(page, theme);
+        }
+        await page.setViewportSize(viewport);
+        if (name === "plan") {
+          await expect(
+            page
+              .getByRole("navigation", { name: "Plan", exact: true })
+              .getByRole("link", { name: "All tasks" }),
+          ).toBeInViewport();
+        }
+        await expectNoSeriousViolations(page);
+        await capture(name);
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        await checkRenderedPage(page, theme);
+        await capture(`${name}-text-200`);
+        await page.evaluate(() => {
+          document.documentElement.style.removeProperty("font-size");
+        });
+      }
+
+      const inbox = page.getByRole("list", { name: "Inbox tasks" });
+      await inbox
+        .getByRole("checkbox", { name: `Select ${INBOX_TASK}` })
+        .press("Space");
+      await inbox
+        .getByRole("checkbox", { name: "Select Return the library books" })
+        .press("Space");
+      const selected = page.getByRole("group", { name: "Selected tasks" });
+      await expect(selected).toContainText("2 selected");
+      await capture("inbox-selection", false);
+      await expectNoSeriousViolations(page);
+      const assign = selected.getByRole("button", { name: "Assign to goal" });
+      await assign.press("Enter");
+      const assignment = page.getByRole("dialog", { name: "Assign to goal" });
+      await expect(assignment.getByLabel("Goal or milestone")).toBeFocused();
+      await capture("inbox-assign", false);
+      await expectNoSeriousViolations(page);
+      await page.keyboard.press("Escape");
+      await expect(assign).toBeFocused();
+
+      await openPage(page, "/plan");
+      const filters = page.getByRole("region", {
+        name: "Filter and sort tasks",
+      });
+      const due = filters.getByRole("button", { name: "Due", exact: true });
+      await due.press("Enter");
+      const dueSheet = page.getByRole("dialog", { name: "Due" });
+      await expect(dueSheet).toBeVisible();
+      await capture("plan-due-filter", false);
+      await expectNoSeriousViolations(page);
+      await dueSheet.getByRole("radio", { name: "Next 7 days" }).press("Space");
+      await dueSheet.getByRole("button", { name: "Apply" }).press("Enter");
+      await expect(page).toHaveURL(/\/plan\?due=next7$/);
+      await expect(due).toBeFocused();
+      await capture("plan-filtered");
+
+      const task = page.getByRole("button", {
+        name: UPCOMING_TASK,
+        exact: true,
+      });
+      await task.press("Enter");
+      const edit = page.getByRole("dialog", { name: "Edit task" });
+      const title = edit.getByLabel("Title", { exact: true });
+      await expect(title).toBeFocused();
+      await capture("task-edit", false);
+      await expectNoSeriousViolations(page);
+      await edit.getByRole("button", { name: "Delete…" }).focus();
+      await capture("task-edit-actions", false);
+      await expect(
+        edit.getByRole("button", { name: "Save", exact: true }),
+      ).toBeInViewport();
+      await edit.getByRole("button", { name: "Delete…" }).press("Enter");
+      const deletion = page.getByRole("alertdialog");
+      await expect(deletion).toContainText("It can't be undone.");
+      await capture("task-delete", false);
+      await expectNoSeriousViolations(page);
+      await page.keyboard.press("Escape");
+      await expect(edit.getByRole("button", { name: "Delete…" })).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(task).toBeFocused();
+
+      const finish = Promise.withResolvers<void>();
+      const requestStarted = Promise.withResolvers<void>();
+      const complete = page.getByRole("checkbox", {
+        name: `Complete ${UPCOMING_TASK}`,
+      });
+      const finishRoute = (url: URL) => url.pathname === "/plan";
+      await page.route(finishRoute, async (route) => {
+        const request = route.request();
+        if (request.method() !== "POST" || !request.headers()["next-action"])
+          return route.continue();
+        requestStarted.resolve();
+        await finish.promise;
+        const [input] = request.postDataJSON() as [
+          { id: string; status: string },
+        ];
+        await route.continue({
+          postData: JSON.stringify([{ ...input, status: "invalid" }]),
+        });
+      });
+      await complete.press("Space");
+      try {
+        await requestStarted.promise;
+        await expect(complete).toHaveAttribute("aria-busy", "true");
+        await expect(complete).not.toBeChecked();
+        await capture("task-completion-pending", false);
+      } finally {
+        finish.resolve();
+      }
+      await expect(
+        page.getByRole("list", { name: "Tasks" }).getByRole("alert"),
+      ).toBeVisible();
+      await expect(complete).toBeFocused();
+      await capture("task-completion-error", false);
+      await page.unroute(finishRoute);
+      await complete.press("Space");
+      await expect(
+        page.getByText("Task completed", { exact: true }),
+      ).toBeVisible();
+      await expect(complete).toHaveCount(0);
+      await capture("task-completion-retry", false);
+
+      await openPage(page, "/plan");
+      await openQuickAdd(page);
+      const quick = page.getByRole("dialog", { name: "Add task" });
+      await expect(quick.getByLabel("Task title")).toBeFocused();
+      if (viewport.width === 1280)
+        expect((await quick.boundingBox())?.width).toBe(480);
+      await capture("quick-add", false);
+      await expectNoSeriousViolations(page);
+      await page.keyboard.press("Escape");
+      await expect(
+        page.getByRole("button", { name: "Create", exact: true }),
+      ).toBeFocused();
+    });
+  }
+}
 
 for (const viewport of sizes) {
   for (const theme of themes) {
@@ -151,7 +328,9 @@ for (const viewport of sizes) {
         });
         await addTask.press("Enter");
         await expect(
-          page.getByRole("dialog", { name: "Add task" }).getByLabel("Title"),
+          page
+            .getByRole("dialog", { name: "Add task" })
+            .getByLabel("Task title"),
         ).toBeFocused();
         await page.keyboard.press("Escape");
         await expect(addTask).toBeFocused();
@@ -810,7 +989,7 @@ for (const viewport of sizes) {
       await capture("home-create-menu");
       await page.keyboard.press("Enter");
       const dialog = page.getByRole("dialog", { name: "Add task" });
-      await expect(dialog.getByLabel("Title")).toBeFocused();
+      await expect(dialog.getByLabel("Task title")).toBeFocused();
       await capture("home-quick-add");
       await page.keyboard.press("Escape");
       await expect(dialog).toHaveCount(0);
@@ -852,14 +1031,12 @@ for (const viewport of sizes) {
           });
         });
         await add.press("q");
-        const title = dialog.getByLabel("Title");
+        const title = dialog.getByLabel("Task title");
         await title.fill("Pack an extra water bottle");
-        await dialog
-          .getByRole("button", { name: "Add task", exact: true })
-          .click();
+        await dialog.getByRole("button", { name: "Add", exact: true }).click();
         try {
           await expect(
-            dialog.getByRole("button", { name: "Adding…" }),
+            dialog.getByRole("button", { name: "Add", exact: true }),
           ).toBeDisabled();
           await capture("home-quick-add-pending");
         } finally {
@@ -869,12 +1046,10 @@ for (const viewport of sizes) {
         await expect(title).toHaveValue("Pack an extra water bottle");
         await capture("home-quick-add-error");
         await page.unroute("**/home");
-        await dialog
-          .getByRole("button", { name: "Add task", exact: true })
-          .click();
+        await dialog.getByRole("button", { name: "Add", exact: true }).click();
         await expect(dialog).toHaveCount(0);
         await expect(
-          page.getByText("Task added to your inbox", { exact: true }),
+          page.getByText("Added to Inbox", { exact: true }),
         ).toBeVisible();
         await capture("home-quick-add-retry-saved");
 

@@ -36,6 +36,28 @@ export async function openQuickAdd(page: Page) {
   return dialog;
 }
 
+/** Use the same row overflow menu available to pointer and keyboard users. */
+export async function chooseTaskAction(
+  page: Page,
+  title: string,
+  action: string,
+) {
+  const trigger = page.getByRole("button", {
+    name: `Actions for ${title}`,
+    exact: true,
+  });
+  const item = page.getByRole("menuitem", {
+    name: `${action}: ${title}`,
+    exact: true,
+  });
+  await expect(async () => {
+    if (!(await item.isVisible())) await trigger.click();
+    await expect(item).toBeVisible({ timeout: 1_000 });
+  }).toPass();
+  await item.click();
+  return trigger;
+}
+
 /** Waits for the page's service worker to be active; its scope and script. */
 export async function activeServiceWorker(page: Page) {
   return page.evaluate(async () => {

@@ -1,18 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useOptimistic, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 
-import { buttonClass } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
-import { Select } from "@/components/ui/select";
+import { ResponsiveSheet } from "@/components/ui/bottom-sheet";
+import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
+import { RadioGroup, RadioRow } from "@/components/ui/radio-group";
 import { GOAL_STATUS_LABELS } from "@/lib/goals";
 import { PRIORITIES, PRIORITY_LABELS } from "@/lib/priorities";
 import {
   DEFAULT_TASK_LIST_FILTERS,
   DUE_WINDOW_LABELS,
-  hasActiveTaskFilters,
   PLANNED_WINDOW_LABELS,
   TASK_DATE_WINDOWS,
   TASK_SORT_LABELS,
@@ -29,8 +28,13 @@ type PlanFiltersProps = {
   options: TaskFilterOptions;
 };
 
-const labelClass = "text-sm font-medium";
-const selectClass = "py-1.5 text-sm";
+type FilterChoice = {
+  key: Exclude<keyof TaskListFilters, "showClosed">;
+  label: string;
+  value: string;
+  choices: { value: string; label: string }[];
+  onChange: (value: string) => void;
+};
 
 /**
  * The Plan page's filters and sort. Every change navigates to the matching
@@ -38,7 +42,7 @@ const selectClass = "py-1.5 text-sm";
  * the filters back from it.
  */
 export function PlanFilters({ filters, options }: PlanFiltersProps) {
-  const id = useId();
+  const bar = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   // Shows the new choice at once while the filtered list loads.
@@ -52,13 +56,7 @@ export function PlanFilters({ filters, options }: PlanFiltersProps) {
     });
   }
 
-  const selects: {
-    key: string;
-    label: string;
-    value: string;
-    choices: { value: string; label: string }[];
-    onChange: (value: string) => void;
-  }[] = [
+  const selects: FilterChoice[] = [
     {
       key: "goal",
       label: "Goal",
@@ -78,7 +76,7 @@ export function PlanFilters({ filters, options }: PlanFiltersProps) {
     },
     {
       key: "area",
-      label: "Life area",
+      label: "Area",
       value: shown.area ?? "",
       choices: [
         { value: "", label: "Any area" },
@@ -137,7 +135,7 @@ export function PlanFilters({ filters, options }: PlanFiltersProps) {
     },
     {
       key: "sort",
-      label: "Sort by",
+      label: "Sort",
       value: shown.sort,
       choices: TASK_SORTS.map((sort) => ({
         value: sort,
@@ -164,57 +162,121 @@ export function PlanFilters({ filters, options }: PlanFiltersProps) {
     });
   }
 
+  const active = selects.filter(
+    ({ key, value }) => value && value !== DEFAULT_TASK_LIST_FILTERS[key],
+  );
+  const canClear = active.length > 0 || shown.showClosed;
+
+  function focusChip(key: string) {
+    bar.current
+      ?.querySelector<HTMLButtonElement>(`[data-filter="${key}"] button`)
+      ?.focus();
+  }
+
   return (
     <section
       aria-label="Filter and sort tasks"
       aria-busy={pending || undefined}
-      className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3"
+      className="grid min-w-0 gap-1"
     >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div
+        ref={bar}
+        className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 py-1 expanded:flex-wrap"
+      >
         {selects.map((select) => (
-          <div key={select.key} className="flex flex-col gap-1">
-            <label htmlFor={`${id}-${select.key}`} className={labelClass}>
-              {select.label}
-            </label>
-            <Select
-              id={`${id}-${select.key}`}
-              className={selectClass}
-              value={select.value}
-              onChange={(event) => select.onChange(event.target.value)}
-            >
-              {select.choices.map((choice) => (
-                <option key={choice.value} value={choice.value}>
-                  {choice.label}
-                </option>
-              ))}
-            </Select>
+          <div key={select.key} data-filter={select.key} className="shrink-0">
+            <FilterSheet filter={select} selected={active.includes(select)} />
           </div>
         ))}
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={shown.showClosed}
-            onChange={(event) =>
-              change({ showClosed: event.target.checked, status: null })
+        <div className="shrink-0">
+          <Chip
+            type="filter"
+            label="Show closed"
+            selected={shown.showClosed}
+            onClick={() =>
+              change({ showClosed: !shown.showClosed, status: null })
             }
-            className={cx("size-4 shrink-0 accent-accent", focusRing)}
           />
-          Show completed and cancelled
-        </label>
-        {(hasActiveTaskFilters(shown) ||
-          shown.sort !== DEFAULT_TASK_LIST_FILTERS.sort ||
-          shown.showClosed) && (
-          <Link
-            href="/plan"
-            scroll={false}
-            className={buttonClass({ variant: "ghost", size: "sm" })}
+        </div>
+      </div>
+      {canClear && (
+        <div
+          className="flex flex-wrap items-center gap-x-2"
+          aria-label="Active filters"
+          role="group"
+        >
+          {active.map((filter) => (
+            <Chip
+              key={filter.key}
+              type="input"
+              label={`${filter.label}: ${filter.choices.find((choice) => choice.value === filter.value)?.label ?? "Unavailable"}`}
+              onRemove={() => {
+                focusChip(filter.key);
+                filter.onChange(
+                  filter.key === "sort" ? DEFAULT_TASK_LIST_FILTERS.sort : "",
+                );
+              }}
+            />
+          ))}
+          <Button
+            variant="text"
+            size="xs"
+            onClick={() => {
+              focusChip("goal");
+              change(DEFAULT_TASK_LIST_FILTERS);
+            }}
           >
             Clear filters
-          </Link>
-        )}
-      </div>
+          </Button>
+        </div>
+      )}
     </section>
+  );
+}
+
+function FilterSheet({
+  filter,
+  selected,
+}: {
+  filter: FilterChoice;
+  selected: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(filter.value);
+  return (
+    <ResponsiveSheet
+      title={filter.label}
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setDraft(filter.value);
+        setOpen(next);
+      }}
+      trigger={
+        <Chip
+          type="filter"
+          selected={selected}
+          label={filter.label}
+          icon="expand_more"
+        />
+      }
+    >
+      <form
+        className="grid min-w-0 gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setOpen(false);
+          if (draft !== filter.value) filter.onChange(draft);
+        }}
+      >
+        <RadioGroup label={filter.label} value={draft} onValueChange={setDraft}>
+          {filter.choices.map(({ value, label }) => (
+            <RadioRow key={value} value={value} label={label} />
+          ))}
+        </RadioGroup>
+        <Button type="submit" className="justify-self-end">
+          Apply
+        </Button>
+      </form>
+    </ResponsiveSheet>
   );
 }

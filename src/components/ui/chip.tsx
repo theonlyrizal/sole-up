@@ -15,21 +15,31 @@ type ChipKind =
   | { type: "assist" }
   | { type: "filter"; selected: boolean }
   | { type: "input"; onRemove: () => void }
-  | { type: "status"; tone?: "neutral" | "success" | "warning" | "error" }
+  | {
+      type: "status";
+      tone?:
+        "neutral" | "active" | "inactive" | "success" | "warning" | "error";
+    }
   | { type: "metric"; count: number };
 
 type ChipProps = ChipAction &
-  ChipKind & { label: string; icon?: IconName; className?: string };
+  ChipKind & { label: string; icon?: IconName; className?: string } & Pick<
+    React.ComponentProps<"button">,
+    "ref" | "id" | "aria-haspopup" | "aria-expanded" | "aria-controls"
+  >;
 
 const statusTones = {
   neutral: "bg-surface-container text-on-surface-variant",
+  active: "bg-secondary-container text-on-secondary-container",
+  inactive: "bg-surface-container-highest text-on-surface-variant",
   success: "bg-success-container text-on-success-container",
   warning: "bg-alert-container text-on-alert-container",
   error: "bg-error-container text-on-error-container",
 };
 
 export function Chip(props: ChipProps) {
-  const { type, icon, label, className, href, onClick, disabled } = props;
+  const { type, icon, label, className, href, onClick, disabled, ref, id } =
+    props;
   const interactive = Boolean(href || onClick || disabled || type === "filter");
   const selected = type === "filter" && props.selected;
   const metric = type === "metric";
@@ -78,8 +88,15 @@ export function Chip(props: ChipProps) {
   ) : interactive ? (
     <button
       type="button"
+      ref={ref}
+      id={id}
       className={classes}
-      aria-pressed={type === "filter" ? selected : undefined}
+      aria-haspopup={props["aria-haspopup"]}
+      aria-expanded={props["aria-expanded"]}
+      aria-controls={props["aria-controls"]}
+      aria-pressed={
+        type === "filter" && !props["aria-haspopup"] ? selected : undefined
+      }
       disabled={disabled}
       onClick={onClick}
     >

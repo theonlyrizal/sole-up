@@ -56,7 +56,7 @@ async function addTask(
     }
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();
-  await dialog.getByLabel("Title").fill(title);
+  await dialog.getByLabel("Task title").fill(title);
   if (Object.keys(options).length > 0) {
     await dialog.getByRole("button", { name: "More options" }).click();
     if (options.goal) {
@@ -69,7 +69,7 @@ async function addTask(
     }
     if (options.dueDate) await dialog.getByLabel("Due").fill(options.dueDate);
   }
-  await dialog.getByLabel("Title").press("Enter");
+  await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);
 }
 

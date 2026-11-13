@@ -17,7 +17,7 @@ const signedInPages = [
   ["/goals/areas", "Life areas"],
   ["/goals/archived", "Archived goals"],
   ["/goals/missing", "Goal not found"],
-  ["/plan", "Plan"],
+  ["/plan", "All tasks"],
   ["/plan/today", "Today"],
   ["/plan/upcoming", "Upcoming"],
   ["/plan/calendar", "Calendar"],

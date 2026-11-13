@@ -22,6 +22,7 @@ export function DeleteTaskDialog({
   open,
   onOpenChange,
   onCloseAutoFocus,
+  disabled,
 }: {
   task: Pick<Task, "id" | "title" | "status">;
   /** Notes linked to the task, archived too; null while not known. */
@@ -31,6 +32,7 @@ export function DeleteTaskDialog({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onCloseAutoFocus?: (event: Event) => void;
+  disabled?: boolean;
 }) {
   const notesKept =
     noteLinkCount === null
@@ -45,8 +47,8 @@ export function DeleteTaskDialog({
       icon="delete"
       trigger={
         open === undefined ? (
-          <Button variant="danger" size="sm">
-            Delete task
+          <Button variant="danger" size="sm" disabled={disabled}>
+            Delete…
           </Button>
         ) : undefined
       }

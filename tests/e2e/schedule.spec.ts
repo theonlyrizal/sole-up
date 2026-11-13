@@ -1,6 +1,7 @@
 import { expect, type Locator, test, type Page } from "@playwright/test";
 
 import {
+  chooseTaskAction,
   expectNoSeriousViolations,
   openQuickAdd,
   signInAndConfirm,
@@ -36,8 +37,8 @@ async function openDialog(page: Page, button: Locator, name: string) {
 async function addTask(page: Page, title: string) {
   await page.goto("/plan");
   const quickAdd = await openQuickAdd(page);
-  await quickAdd.getByLabel("Title").fill(title);
-  await quickAdd.getByLabel("Title").press("Enter");
+  await quickAdd.getByLabel("Task title").fill(title);
+  await quickAdd.getByLabel("Task title").press("Enter");
   await expect(quickAdd).toHaveCount(0);
 }
 
@@ -61,11 +62,8 @@ test("today's event and block show on Today and Home, and link to the calendar",
 
   // A block from midnight to 01:00 today, by form.
   await addTask(page, "Write report");
-  const form = await openDialog(
-    page,
-    page.getByRole("button", { name: "Block time: Write report" }),
-    "Block time",
-  );
+  await chooseTaskAction(page, "Write report", "Block time");
+  const form = page.getByRole("dialog", { name: "Block time" });
   await form.getByLabel("Date").fill(today);
   await form.getByLabel("Start time").fill("00:00");
   await form.getByLabel("Length (minutes)").fill("60");
