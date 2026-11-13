@@ -34,6 +34,8 @@ export const DAILY_HABIT = "Morning stretch";
 export const QUANTITY_HABIT = "Read a few pages before the afternoon commute";
 export const GOAL_TITLE = "Make space for a longer weekend walk";
 export const EVENT_TITLE = "Walk and coffee with a friend";
+export const INBOX_TASK = "Ask the library about weekend opening hours";
+export const UPCOMING_TASK = "Check the trail map and pack a thermos";
 
 /** Force a real habit query to fail for one test user until its schedule exists. */
 export async function createUnscheduledHabit(
@@ -85,7 +87,7 @@ export async function createUnscheduledHabit(
 /** Give a fresh test account a populated UI without relying on clicks to seed it. */
 export async function seedVisualData(
   page: Page,
-  { home = false, todaySchedule = false } = {},
+  { home = false, todaySchedule = false, plan = false } = {},
 ) {
   const userId = await signInAndConfirm(page, "Alex Morgan");
   const pool = new Pool({
@@ -186,6 +188,28 @@ export async function seedVisualData(
             completedAt: new Date(`${addDays(lastWeek, 1)}T12:00:00Z`),
           },
         ]);
+        if (plan) {
+          await db.insert(tasks).values([
+            { userId, title: INBOX_TASK },
+            {
+              userId,
+              goalId,
+              title: UPCOMING_TASK,
+              plannedDate: tomorrow,
+              dueAt: new Date(`${tomorrow}T17:00:00Z`),
+              dueTz: VISUAL_ZONE,
+              priority: "high",
+              estimatedMinutes: 45,
+            },
+            {
+              userId,
+              goalId,
+              title: "Choose a café for after the walk",
+              plannedDate: addDays(today, 11),
+              priority: "low",
+            },
+          ]);
+        }
         await db.insert(calendarEvents).values({
           id: eventId,
           userId,

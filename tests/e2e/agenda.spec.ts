@@ -2,6 +2,7 @@ import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  chooseTaskAction,
   expectNoSeriousViolations,
   openQuickAdd,
   signInAndConfirm,
@@ -57,12 +58,12 @@ async function addTask(page: Page, title: string, plannedDate?: string) {
     }
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();
-  await dialog.getByLabel("Title").fill(title);
+  await dialog.getByLabel("Task title").fill(title);
   if (plannedDate) {
     await dialog.getByRole("button", { name: "More options" }).click();
     await dialog.getByLabel("Plan for").fill(plannedDate);
   }
-  await dialog.getByLabel("Title").press("Enter");
+  await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);
 }
 
@@ -80,9 +81,7 @@ async function setTimedDeadline(
   // The trigger only opens the editor once the page hydrates.
   await expect(async () => {
     if (!(await editor.isVisible())) {
-      await page
-        .getByRole("button", { name: `Dates and goal: ${title}` })
-        .click();
+      await chooseTaskAction(page, title, "Dates and goal");
     }
     await expect(editor).toBeVisible({ timeout: 1_000 });
   }).toPass();

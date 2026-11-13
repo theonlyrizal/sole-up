@@ -88,6 +88,7 @@ export function ItemDialog({
       <TaskFormDialog
         key={selected.id}
         task={selected.task}
+        timeZone={context.userTimeZone}
         open={open}
         onOpenChange={onOpenChange}
         onCloseAutoFocus={returnFocus}

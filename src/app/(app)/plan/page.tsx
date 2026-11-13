@@ -5,10 +5,12 @@ import { Suspense } from "react";
 import { PlanFilters } from "@/components/tasks/plan-filters";
 import { PlanTabs } from "@/components/shell/plan-tabs";
 import { PlanTaskList } from "@/components/tasks/plan-task-list";
-import { buttonClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { buttonClass } from "@/components/ui/button";
 import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
+import { AddTaskButton } from "@/components/tasks/add-task-button";
+import { TopAppBar } from "@/components/shell/top-app-bar";
 import { todayFor } from "@/lib/dates";
 import { hasActiveTaskFilters, parseTaskListFilters } from "@/lib/task-list";
 import { requireUser } from "@/server/auth/session";
@@ -24,10 +26,10 @@ export const metadata: Metadata = { title: "Plan · SoleUp" };
 export default function PlanPage({ searchParams }: PageProps<"/plan">) {
   return (
     <PageFrame
-      title="Plan"
-      description={
-        "Your open tasks. Filter them, change their dates and goals, and set priorities and estimates."
-      }
+      title="All tasks"
+      mobileHeader={<TopAppBar title="Plan" />}
+      actions={<AddTaskButton />}
+      compactActions={false}
       subnav={<PlanTabs />}
     >
       <Suspense fallback={<LoadingState label="Loading your tasks" />}>
@@ -60,37 +62,43 @@ async function PlanTasks({
   return (
     <div className="flex flex-col gap-4">
       <PlanFilters filters={filters} options={filterOptions} />
-      <p aria-live="polite" className="text-sm text-muted">
+      <p
+        id="plan-task-count"
+        tabIndex={-1}
+        aria-live="polite"
+        className="text-body-medium text-on-surface-variant"
+      >
         {tasksLabel(tasks.length)}
       </p>
-      {tasks.length === 0 ? (
-        filtered ? (
-          <EmptyState
-            title="No tasks match these filters"
-            description="Try a wider date window, another goal, or clear the filters."
-            action={
-              <Link
-                href="/plan"
-                className={buttonClass({ variant: "secondary" })}
-              >
-                Clear filters
-              </Link>
-            }
-          />
-        ) : (
-          <EmptyState
-            title={filters.showClosed ? "No tasks yet" : "No open tasks"}
-            description="Press Alt+Enter or use Add task to capture one. Tasks you add show up here."
-          />
-        )
-      ) : (
-        <PlanTaskList
-          tasks={tasks}
-          parentOptions={parentOptions}
-          locale={preferences.locale}
-          timeZone={timeZone}
-        />
-      )}
+      <PlanTaskList
+        tasks={tasks}
+        parentOptions={parentOptions}
+        locale={preferences.locale}
+        timeZone={timeZone}
+        fallbackId="plan-task-count"
+        empty={
+          filtered ? (
+            <EmptyState
+              title="No tasks match these filters"
+              description="Try a wider date window, another goal, or clear the filters."
+              action={
+                <Link
+                  href="/plan"
+                  scroll={false}
+                  className={buttonClass({ variant: "tonal" })}
+                >
+                  Clear filters
+                </Link>
+              }
+            />
+          ) : (
+            <EmptyState
+              title={filters.showClosed ? "No tasks yet" : "No open tasks"}
+              description="Press Alt+Enter or use Add task to capture one. Tasks you add show up here."
+            />
+          )
+        }
+      />
     </div>
   );
 }

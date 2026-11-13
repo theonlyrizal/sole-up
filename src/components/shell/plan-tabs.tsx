@@ -13,14 +13,23 @@ export function PlanTabs() {
 
   useLayoutEffect(() => {
     const strip = wrapper.current?.querySelector("nav");
-    const current = strip?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!strip || !current) return;
-    const viewport = strip.getBoundingClientRect();
-    const link = current.getBoundingClientRect();
-    if (link.left < viewport.left)
-      strip.scrollLeft += link.left - viewport.left;
-    if (link.right > viewport.right)
-      strip.scrollLeft += link.right - viewport.right;
+    if (!strip) return;
+    function revealCurrent() {
+      const current = strip?.querySelector<HTMLElement>(
+        '[aria-current="page"]',
+      );
+      if (!strip || !current) return;
+      const viewport = strip.getBoundingClientRect();
+      const link = current.getBoundingClientRect();
+      if (link.left < viewport.left)
+        strip.scrollLeft += link.left - viewport.left;
+      if (link.right > viewport.right)
+        strip.scrollLeft += link.right - viewport.right;
+    }
+    revealCurrent();
+    const observer = new ResizeObserver(revealCurrent);
+    observer.observe(strip);
+    return () => observer.disconnect();
   }, [pathname]);
 
   return (

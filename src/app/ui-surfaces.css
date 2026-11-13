@@ -205,6 +205,15 @@
   transition: none;
 }
 
+.bottom-sheet[data-fit-keyboard] {
+  inset-block: auto
+    calc(
+      100dvh - var(--form-viewport-height, 100dvh) -
+        var(--form-viewport-top, 0px)
+    );
+  max-height: min(90dvh, var(--form-viewport-height, 100dvh));
+}
+
 .sheet-handle {
   cursor: grab;
 }
@@ -226,6 +235,11 @@
       var(--ease-standard-fast-spatial),
     panel-fade-out var(--duration-fast-effects) var(--ease-fast-effects)
       forwards;
+}
+
+:root:has(.app-shell[data-keyboard-open])
+  .bottom-sheet[data-fit-keyboard][data-state="open"] {
+  animation: none;
 }
 
 @keyframes sheet-enter {

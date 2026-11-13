@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { InboxView } from "@/components/tasks/inbox-view";
-import { PlanTabs } from "@/components/shell/plan-tabs";
 import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { requireUser } from "@/server/auth/session";
@@ -16,17 +15,15 @@ export const metadata: Metadata = { title: "Inbox · SoleUp" };
 
 export default function InboxPage() {
   return (
-    <PageFrame
-      title="Inbox"
-      description={
-        "Tasks with no goal and no plan yet. Decide when to do them, or put them under a goal."
+    <Suspense
+      fallback={
+        <PageFrame title="Inbox">
+          <LoadingState label="Loading your inbox" />
+        </PageFrame>
       }
-      subnav={<PlanTabs />}
     >
-      <Suspense fallback={<LoadingState label="Loading your inbox" />}>
-        <Inbox />
-      </Suspense>
-    </PageFrame>
+      <Inbox />
+    </Suspense>
   );
 }
 

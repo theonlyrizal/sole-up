@@ -2,12 +2,14 @@
 
 import { Dialog as Primitive } from "radix-ui";
 import {
+  useCallback,
   useRef,
   type PointerEvent,
   type ReactElement,
   type ReactNode,
 } from "react";
 import { useMediaQuery } from "@/components/hooks/use-media-query";
+import { useDialogViewport } from "@/components/hooks/use-dialog-viewport";
 import {
   Dialog,
   DialogClose,
@@ -34,6 +36,7 @@ type SheetProps = {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   onCloseAutoFocus?: (event: Event) => void;
+  fitKeyboard?: boolean;
   children: ReactNode;
 };
 
@@ -43,9 +46,18 @@ export function BottomSheet({
   trigger,
   children,
   onCloseAutoFocus,
+  fitKeyboard = false,
   ...root
 }: SheetProps) {
   const panel = useRef<HTMLDivElement>(null);
+  const trackViewport = useDialogViewport(fitKeyboard);
+  const setPanel = useCallback(
+    (element: HTMLDivElement | null) => {
+      panel.current = element;
+      return trackViewport(element);
+    },
+    [trackViewport],
+  );
   const close = useRef<HTMLButtonElement>(null);
   const drag = useRef<{
     id: number;
@@ -105,7 +117,8 @@ export function BottomSheet({
     <Dialog {...root}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogSurface
-        ref={panel}
+        ref={setPanel}
+        data-fit-keyboard={fitKeyboard || undefined}
         onCloseAutoFocus={onCloseAutoFocus}
         description={description}
         className="bottom-sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-2xl bg-surface-container-low text-on-surface shadow-3"

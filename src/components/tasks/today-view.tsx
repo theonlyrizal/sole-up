@@ -255,7 +255,11 @@ export function TodayView({
             </ResponsiveSheet>
           )}
           {overlay.kind === "edit" && (
-            <TaskFormDialog {...overlayProps} task={overlay.task} />
+            <TaskFormDialog
+              {...overlayProps}
+              task={overlay.task}
+              timeZone={timeZone}
+            />
           )}
           {overlay.kind === "block" && (
             <BlockTimeDialog

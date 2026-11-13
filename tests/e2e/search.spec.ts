@@ -44,8 +44,8 @@ async function createGoal(page: Page, title: string) {
 
 async function createTask(page: Page, title: string) {
   const dialog = await openQuickAdd(page);
-  await dialog.getByLabel("Title").fill(title);
-  await dialog.getByLabel("Title").press("Enter");
+  await dialog.getByLabel("Task title").fill(title);
+  await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);
 }
 

@@ -5,6 +5,7 @@ import { SearchView } from "@/components/search/search-view";
 import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { requireUser } from "@/server/auth/session";
+import { getUserPreferences } from "@/server/modules/preferences/service";
 import { listTags } from "@/server/modules/tags/queries";
 
 export const metadata: Metadata = { title: "Search · SoleUp" };
@@ -31,8 +32,14 @@ export default function SearchPage() {
 
 async function Search() {
   const user = await requireUser();
-  const tags = await listTags(user.id);
+  const [tags, preferences] = await Promise.all([
+    listTags(user.id),
+    getUserPreferences(user.id),
+  ]);
   return (
-    <SearchView tags={tags.map((tag) => ({ id: tag.id, name: tag.name }))} />
+    <SearchView
+      tags={tags.map((tag) => ({ id: tag.id, name: tag.name }))}
+      timeZone={preferences.timezone ?? "UTC"}
+    />
   );
 }

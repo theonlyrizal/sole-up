@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 
+import { useMediaQuery } from "@/components/hooks/use-media-query";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/form-error";
@@ -44,6 +46,8 @@ export function QuickAdd({
   onShortcut: () => void;
   onCloseAutoFocus: (event: Event) => void;
 }) {
+  const compact = useMediaQuery("medium") === false;
+  const writingRef = useRef(false);
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (
@@ -68,20 +72,42 @@ export function QuickAdd({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onShortcut]);
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+  function setOpen(next: boolean) {
+    if (!writingRef.current) onOpenChange(next);
+  }
+  const form = (
+    <QuickAddForm writingRef={writingRef} onAdded={() => onOpenChange(false)} />
+  );
+  return compact ? (
+    <BottomSheet
+      title="Add task"
+      open={open}
+      onOpenChange={setOpen}
+      onCloseAutoFocus={onCloseAutoFocus}
+      fitKeyboard
+    >
+      {form}
+    </BottomSheet>
+  ) : (
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         title="Add task"
-        fitKeyboard
+        className="max-w-120"
         onCloseAutoFocus={onCloseAutoFocus}
       >
-        <QuickAddForm onAdded={() => onOpenChange(false)} />
+        {form}
       </DialogContent>
     </Dialog>
   );
 }
 
-function QuickAddForm({ onAdded }: { onAdded: () => void }) {
+function QuickAddForm({
+  onAdded,
+  writingRef,
+}: {
+  onAdded: () => void;
+  writingRef: React.RefObject<boolean>;
+}) {
   const id = useId();
   const [title, setTitle] = useState("");
   const [showOptions, setShowOptions] = useState(false);
@@ -100,11 +126,16 @@ function QuickAddForm({ onAdded }: { onAdded: () => void }) {
   useEffect(() => {
     if (!showOptions || parentOptions) return;
     let cancelled = false;
-    getTaskParentOptions({}).then((result) => {
-      if (cancelled) return;
-      if (result.ok) setParentOptions(result.data);
-      else setOptionsError(true);
-    });
+    getTaskParentOptions({}).then(
+      (result) => {
+        if (cancelled) return;
+        if (result.ok) setParentOptions(result.data);
+        else setOptionsError(true);
+      },
+      () => {
+        if (!cancelled) setOptionsError(true);
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -112,32 +143,41 @@ function QuickAddForm({ onAdded }: { onAdded: () => void }) {
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (writingRef.current) return;
+    writingRef.current = true;
     startTransition(async () => {
       setError(null);
-      const result = await createTask({
-        title,
-        ...parentFromChoice(parent),
-        plannedDate,
-        dueDate,
-      });
-      if (result.ok) {
-        toast({
-          title: isInboxTask(result.data)
-            ? "Task added to your inbox"
-            : "Task added",
-          variant: "success",
+      try {
+        const result = await createTask({
+          title,
+          ...parentFromChoice(parent),
+          plannedDate,
+          dueDate,
         });
-        onAdded();
-      } else {
-        setError(result.error);
-        // Errors on the optional fields need those fields in view.
-        const { fieldErrors } =
-          result.error.code === "VALIDATION"
-            ? result.error
-            : { fieldErrors: {} };
-        if (Object.keys(fieldErrors).some((key) => key !== "title")) {
-          setShowOptions(true);
+        if (result.ok) {
+          toast({
+            title: isInboxTask(result.data) ? "Added to Inbox" : "Task added",
+            variant: "success",
+          });
+          onAdded();
+        } else {
+          setError(result.error);
+          // Errors on the optional fields need those fields in view.
+          const { fieldErrors } =
+            result.error.code === "VALIDATION"
+              ? result.error
+              : { fieldErrors: {} };
+          if (Object.keys(fieldErrors).some((key) => key !== "title")) {
+            setShowOptions(true);
+          }
         }
+      } catch {
+        setError({
+          code: "INTERNAL",
+          message: "Couldn't add the task. Try again.",
+        });
+      } finally {
+        writingRef.current = false;
       }
     });
   }
@@ -152,12 +192,12 @@ function QuickAddForm({ onAdded }: { onAdded: () => void }) {
       onSubmit={submit}
       noValidate
       aria-label="Add task"
+      aria-busy={pending || undefined}
       className="flex flex-col gap-4"
     >
       <FormField
         id={`${id}-title`}
-        label="Title"
-        hint="Press Enter to add it. With no goal and no plan, it goes to your inbox."
+        label="Task title"
         errors={fieldErrors.title}
       >
         {(control) => (
@@ -167,8 +207,8 @@ function QuickAddForm({ onAdded }: { onAdded: () => void }) {
             value={title}
             maxLength={TASK_TITLE_MAX}
             autoComplete="off"
+            readOnly={pending}
             autoFocus
-            placeholder="e.g. Book the dentist"
             onChange={(event) => setTitle(event.target.value)}
           />
         )}
@@ -243,9 +283,18 @@ function QuickAddForm({ onAdded }: { onAdded: () => void }) {
       </div>
 
       <FormError error={error} />
+      {pending && (
+        <span role="status" className="sr-only">
+          Adding task…
+        </span>
+      )}
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Adding…" : "Add task"}
+        <Button
+          type="submit"
+          pending={pending}
+          className="w-full medium:w-auto"
+        >
+          Add
         </Button>
       </div>
     </form>

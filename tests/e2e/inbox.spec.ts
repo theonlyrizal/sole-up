@@ -18,7 +18,7 @@ async function captureWithKeyboard(page: Page, title: string) {
     if (!(await dialog.isVisible())) await page.keyboard.press("Alt+Enter");
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();
-  await expect(dialog.getByLabel("Title")).toBeFocused();
+  await expect(dialog.getByLabel("Task title")).toBeFocused();
   await page.keyboard.type(title);
   await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
@@ -48,11 +48,9 @@ test("a task is captured with one field and Enter, and lands in the inbox", asyn
 
   await captureWithKeyboard(page, "Book the dentist");
 
+  await expect(page.getByText("Added to Inbox", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Task added to your inbox", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    inboxList(page).getByRole("checkbox", { name: "Book the dentist" }),
+    inboxList(page).getByRole("checkbox", { name: "Select Book the dentist" }),
   ).toBeVisible();
 
   // A bare character away from Create is available to assistive technology.
@@ -62,12 +60,12 @@ test("a task is captured with one field and Enter, and lands in the inbox", asyn
   // It's stored, not just shown.
   await page.reload();
   await expect(
-    inboxList(page).getByRole("checkbox", { name: "Book the dentist" }),
+    inboxList(page).getByRole("checkbox", { name: "Select Book the dentist" }),
   ).toBeVisible();
 
   const dialog = await openQuickAdd(page);
   await page.keyboard.type("quiet");
-  await expect(dialog.getByLabel("Title")).toHaveValue("quiet");
+  await expect(dialog.getByLabel("Task title")).toHaveValue("quiet");
   await expectNoSeriousViolations(page);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
@@ -81,14 +79,14 @@ test("quick add from any page can file a task under a goal with a plan", async (
 
   // The button works on any page; "More options" holds the optional fields.
   const dialog = await openQuickAdd(page);
-  await dialog.getByLabel("Title").fill("Buy running shoes");
+  await dialog.getByLabel("Task title").fill("Buy running shoes");
   await dialog.getByRole("button", { name: "More options" }).click();
   const parent = dialog.getByLabel("Goal or milestone");
   await expect(parent).toBeEnabled();
   await parent.selectOption({ label: "Run a 10k" });
   await dialog.getByLabel("Plan for").fill("2026-11-02");
   await dialog.getByLabel("Due").fill("2026-11-05");
-  await dialog.getByLabel("Title").press("Enter");
+  await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("Task added", { exact: true })).toBeVisible();
 
@@ -111,19 +109,19 @@ test("inbox tasks can be planned for today or assigned to a goal in bulk", async
   for (const title of ["Call the bank", "Renew passport", "Buy a phrasebook"]) {
     await captureWithKeyboard(page, title);
     await expect(
-      inboxList(page).getByRole("checkbox", { name: title }),
+      inboxList(page).getByRole("checkbox", { name: `Select ${title}` }),
     ).toBeVisible();
   }
 
   const actions = page.getByRole("group", { name: "Selected tasks" });
   const planToday = actions.getByRole("button", { name: "Plan for today" });
-  await expect(planToday).toBeDisabled();
+  await expect(planToday).toHaveCount(0);
 
   await inboxList(page)
-    .getByRole("checkbox", { name: "Call the bank" })
+    .getByRole("checkbox", { name: "Select Call the bank" })
     .click();
   await inboxList(page)
-    .getByRole("checkbox", { name: "Renew passport" })
+    .getByRole("checkbox", { name: "Select Renew passport" })
     .click();
   await expect(actions.getByText("2 selected")).toBeVisible();
   await expectNoSeriousViolations(page);
@@ -134,14 +132,16 @@ test("inbox tasks can be planned for today or assigned to a goal in bulk", async
   ).toBeVisible();
   await expect(inboxList(page).getByRole("checkbox")).toHaveCount(1);
   await expect(
-    inboxList(page).getByRole("checkbox", { name: "Buy a phrasebook" }),
+    inboxList(page).getByRole("checkbox", { name: "Select Buy a phrasebook" }),
   ).toBeVisible();
 
-  await actions.getByLabel("Select all").click();
-  await actions
+  await page.getByRole("checkbox", { name: "Select all" }).click();
+  await actions.getByRole("button", { name: "Assign to goal" }).click();
+  const assign = page.getByRole("dialog", { name: "Assign to goal" });
+  await assign
     .getByLabel("Goal or milestone")
     .selectOption({ label: "Learn Spanish" });
-  await actions.getByRole("button", { name: "Assign to goal" }).click();
+  await assign.getByRole("button", { name: "Assign to goal" }).click();
 
   await expect(
     page.getByText("1 task assigned", { exact: true }),
@@ -149,6 +149,50 @@ test("inbox tasks can be planned for today or assigned to a goal in bulk", async
   await expect(
     page.getByRole("heading", { name: "Your inbox is clear" }),
   ).toBeVisible();
+});
+
+test("keyboard selection keeps row focus and returns it after a bulk action", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInAndConfirm(page);
+  await page.goto("/plan/inbox");
+  for (const title of [
+    "Call the library",
+    "Pick up the parcel",
+    "Water the herbs",
+  ]) {
+    await captureWithKeyboard(page, title);
+  }
+  const checkboxes = inboxList(page).getByRole("checkbox");
+  await checkboxes.first().focus();
+  await page.keyboard.press("Space");
+  await expect(checkboxes.first()).toBeFocused();
+  await expect(checkboxes.first()).toBeChecked();
+  await page.keyboard.press("Tab"); // title
+  await page.keyboard.press("Tab"); // actions
+  await page.keyboard.press("Tab");
+  await expect(checkboxes.nth(1)).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(checkboxes.nth(1)).toBeChecked();
+  const actions = page.getByRole("group", { name: "Selected tasks" });
+  await expect(actions.getByText("2 selected")).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: "Select all" }),
+  ).toHaveAttribute("aria-checked", "mixed");
+  await actions.getByRole("button", { name: "Clear selection" }).press("Enter");
+  const selectAll = page.getByRole("checkbox", { name: "Select all" });
+  await expect(selectAll).toBeFocused();
+  await expect(checkboxes.first()).not.toBeChecked();
+  await page.keyboard.press("Space");
+  await expect(actions.getByText("3 selected")).toBeVisible();
+  await actions.getByRole("button", { name: "Plan for today" }).press("Enter");
+  await expect(
+    page.getByText("3 tasks planned for today", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("0 tasks with no goal and no plan"),
+  ).toBeFocused();
 });
 
 test.describe("mobile", () => {

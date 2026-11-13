@@ -67,7 +67,7 @@ async function captureTask(page: Page, title: string) {
   await expect(page.getByRole("menuitem", { name: "New task" })).toBeFocused();
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Add task" });
-  await expect(dialog.getByLabel("Title")).toBeFocused();
+  await expect(dialog.getByLabel("Task title")).toBeFocused();
   await page.keyboard.type(title);
   await page.keyboard.press("Enter");
   await expect(dialog).toBeHidden();
@@ -218,14 +218,14 @@ test("keyboard journey B plans and adjusts the day", async ({ page }) => {
   await activate(page, navLink(page, "Plan"));
   await activate(
     page,
-    page.getByRole("checkbox", { name: "Show completed and cancelled" }),
+    page.getByRole("button", { name: "Show closed" }),
     "Space",
   );
   await expect(
-    page.getByRole("checkbox", { name: `Complete: ${firstTask}` }),
+    page.getByRole("checkbox", { name: `Complete ${firstTask}` }),
   ).toBeChecked();
   await expect(
-    page.getByRole("checkbox", { name: `Complete: ${secondTask}` }),
+    page.getByRole("checkbox", { name: `Complete ${secondTask}` }),
   ).not.toBeChecked();
 });
 

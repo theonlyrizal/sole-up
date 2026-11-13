@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { StatusChip } from "@/components/data/status-chip";
 import { Icon, type IconName } from "@/components/icons/icon";
 import { Button, type ButtonVariant } from "@/components/ui/button";
 import { ConnectedButtonGroup } from "@/components/ui/button-group";
@@ -372,7 +373,8 @@ function ThemeColumn({
               Restore reading and research
             </Button>
           )}
-          <Chip type="status" label="Paused" icon="pause" />
+          <StatusChip status="active" />
+          <StatusChip status="paused" />
           <Chip type="status" label="Saved" tone="success" icon="check" />
           <Chip
             type="status"

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { buttonClass } from "@/components/ui/button";
+import { cx } from "@/components/ui/cx";
 import type { PageBackLink } from "./top-app-bar";
 
 export function PageHeader({
   title,
   description,
   actions,
+  compactActions = true,
   subnav,
   back,
   eyebrow,
@@ -15,6 +17,7 @@ export function PageHeader({
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
+  compactActions?: boolean;
   subnav?: React.ReactNode;
   back?: PageBackLink;
   eyebrow?: React.ReactNode;
@@ -35,7 +38,15 @@ export function PageHeader({
           </Link>
         </div>
       )}
-      <div className="flex flex-col items-start gap-3 medium:flex-row medium:flex-wrap medium:items-end medium:justify-between">
+      <div
+        className={cx(
+          "flex flex-col items-start gap-3 medium:flex-row medium:flex-wrap medium:items-end medium:justify-between",
+          !description &&
+            !eyebrow &&
+            (!actions || !compactActions) &&
+            "max-medium:contents",
+        )}
+      >
         <div className="w-full min-w-0 medium:w-auto medium:flex-1">
           {eyebrow && (
             <div className="mb-1 text-label-large text-on-surface-variant">
@@ -51,7 +62,16 @@ export function PageHeader({
             </p>
           )}
         </div>
-        {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+        {actions && (
+          <div
+            className={cx(
+              "flex flex-wrap gap-2",
+              !compactActions && "max-medium:hidden",
+            )}
+          >
+            {actions}
+          </div>
+        )}
       </div>
       {subnav}
     </header>
