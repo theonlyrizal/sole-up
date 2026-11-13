@@ -207,7 +207,7 @@ test("keyboard journey B plans and adjusts the day", async ({ page }) => {
   ).toBeVisible();
   await activate(
     page,
-    page.getByRole("checkbox", { name: `Complete: ${firstTask}` }),
+    page.getByRole("checkbox", { name: `Complete ${firstTask}` }),
     "Space",
   );
   await expect(page.getByText("Task completed", { exact: true })).toBeVisible();

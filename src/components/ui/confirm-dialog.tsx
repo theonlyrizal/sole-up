@@ -14,7 +14,10 @@ import { useOverlayContainer } from "./overlay-container";
 
 type ConfirmDialogProps = {
   /** The element that opens the dialog, usually a `<Button>`. */
-  trigger: React.ReactElement;
+  trigger?: React.ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   title: string;
   /** Say exactly what will happen, and whether it can be undone. */
   description: React.ReactNode;
@@ -37,6 +40,9 @@ type ConfirmDialogProps = {
  */
 export function ConfirmDialog({
   trigger,
+  open: controlledOpen,
+  onOpenChange,
+  onCloseAutoFocus,
   title,
   description,
   confirmLabel,
@@ -46,7 +52,9 @@ export function ConfirmDialog({
   icon = destructive ? "delete" : undefined,
 }: ConfirmDialogProps) {
   const container = useOverlayContainer();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -74,12 +82,13 @@ export function ConfirmDialog({
 
   return (
     <AlertDialog.Root open={open} onOpenChange={changeOpen}>
-      <AlertDialog.Trigger asChild>{trigger}</AlertDialog.Trigger>
+      {trigger && <AlertDialog.Trigger asChild>{trigger}</AlertDialog.Trigger>}
       <AlertDialog.Portal container={container}>
         <AlertDialog.Overlay className={overlayClass} />
         <AlertDialog.Content
           className={cx(contentClass, "confirm-dialog")}
           onKeyDown={closeDialogOnEscape}
+          onCloseAutoFocus={onCloseAutoFocus}
         >
           <div className="grid justify-items-center gap-3 text-center">
             {icon && (

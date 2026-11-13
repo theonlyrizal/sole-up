@@ -29,10 +29,12 @@ export function ListItem({
   current,
   onClick,
   selected,
+  className,
+  wrapSupporting,
   lines = supporting ? 2 : 1,
 }: {
   leading?: ReactNode;
-  headline: string;
+  headline: ReactNode;
   supporting?: ReactNode;
   meta?: ReactNode;
   trailing?: ReactNode;
@@ -41,6 +43,8 @@ export function ListItem({
   current?: "page" | "true";
   onClick?: MouseEventHandler<HTMLButtonElement>;
   selected?: boolean;
+  className?: string;
+  wrapSupporting?: boolean;
   lines?: 1 | 2 | 3;
 }) {
   return (
@@ -52,6 +56,7 @@ export function ListItem({
           : "rounded-xs bg-resting-surface text-on-resting-surface first:rounded-t-lg last:rounded-b-lg",
         lines === 1 ? "min-h-14" : lines === 2 ? "min-h-18" : "min-h-22",
         Boolean(href || onClick) && "list-interactive state-layer",
+        className,
       )}
     >
       {leading && <div className="relative z-10 shrink-0">{leading}</div>}
@@ -82,7 +87,8 @@ export function ListItem({
         {supporting && (
           <div
             className={cx(
-              "line-clamp-2 text-body-medium",
+              "text-body-medium",
+              !wrapSupporting && "line-clamp-2",
               !selected && "text-on-surface-variant",
             )}
           >

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 
 import { BlockTimeDialog } from "@/components/calendar/block-form";
 import { Button } from "@/components/ui/button";
@@ -69,12 +69,10 @@ function PlanTaskRow({
   timeZone,
   showGoal,
 }: PlanTaskRowProps) {
-  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   // The checkbox follows the click at once, not after the refresh.
   const [status, setStatus] = useOptimistic(task.status);
-  const scheduleButton = useRef<HTMLButtonElement>(null);
 
   function toggleComplete(checked: boolean) {
     const to: TaskStatus = checked ? "completed" : "open";
@@ -91,12 +89,6 @@ function PlanTaskRow({
         setError(result.error.message);
       }
     });
-  }
-
-  function closeEditor() {
-    setEditing(false);
-    // The editor unmounts; put focus back where it came from.
-    requestAnimationFrame(() => scheduleButton.current?.focus());
   }
 
   const details = taskDetails(task, locale, timeZone);
@@ -148,16 +140,11 @@ function PlanTaskRow({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1 pl-7">
-        <Button
-          ref={scheduleButton}
-          variant="secondary"
-          size="sm"
-          aria-expanded={editing}
-          aria-label={`Dates and goal: ${task.title}`}
-          onClick={() => (editing ? closeEditor() : setEditing(true))}
-        >
-          Dates and goal
-        </Button>
+        <TaskScheduleEditor
+          task={task}
+          parentOptions={parentOptions}
+          timeZone={timeZone}
+        />
         {status === "open" && (
           <BlockTimeDialog
             task={task}
@@ -190,16 +177,6 @@ function PlanTaskRow({
       <p role="alert" className="pl-7 text-sm text-danger empty:hidden">
         {error}
       </p>
-      {editing && (
-        <div className="pl-7">
-          <TaskScheduleEditor
-            task={task}
-            parentOptions={parentOptions}
-            timeZone={timeZone}
-            onDone={closeEditor}
-          />
-        </div>
-      )}
     </li>
   );
 }

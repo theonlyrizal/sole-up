@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { toast } from "@/components/ui/toast";
 import type { LocalDate } from "@/lib/dates";
@@ -42,16 +42,23 @@ const sameLog = (a: HabitLogValue | null, b: HabitLogValue | null) =>
 
 /** Puts the day back as it was before `result`, from the toast's Undo. */
 async function undo(result: HabitLogResult) {
-  const undone = await send({
-    habitId: result.habitId,
-    localDate: result.localDate,
-    log: result.previous,
-  });
-  if (undone.ok) toast({ title: "Undone", variant: "success" });
-  else {
+  try {
+    const undone = await send({
+      habitId: result.habitId,
+      localDate: result.localDate,
+      log: result.previous,
+    });
+    if (undone.ok) toast({ title: "Undone", variant: "success" });
+    else
+      toast({
+        title: "Couldn't undo",
+        description: logErrorMessage(undone.error),
+        variant: "error",
+      });
+  } catch {
     toast({
       title: "Couldn't undo",
-      description: logErrorMessage(undone.error),
+      description: "Please try again.",
       variant: "error",
     });
   }
@@ -65,6 +72,7 @@ async function undo(result: HabitLogResult) {
 export function useHabitLog() {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const writing = useRef(false);
 
   function write(
     change: HabitLogChange,
@@ -72,31 +80,43 @@ export function useHabitLog() {
       title: string;
       description?: string;
       onOptimistic?: () => void;
-      onSaved?: () => void;
+      onSaved?: (result: HabitLogResult, changed: boolean) => void;
+      onUndoStart?: () => void;
     },
   ) {
+    if (writing.current) return;
+    writing.current = true;
     startTransition(async () => {
       setError(null);
       options.onOptimistic?.();
-      const result = await send(change);
-      if (!result.ok) {
-        setError(logErrorMessage(result.error));
-        return;
+      try {
+        const result = await send(change);
+        if (!result.ok) {
+          setError(logErrorMessage(result.error));
+          return;
+        }
+        const changed = !sameLog(result.data.log, result.data.previous);
+        options.onSaved?.(result.data, changed);
+        toast({
+          title: options.title,
+          description: options.description,
+          variant: "success",
+          ...(changed && {
+            action: {
+              label: "Undo",
+              altText: "Undo this log. You can also change the day on Track.",
+              onClick: () => {
+                options.onUndoStart?.();
+                void undo(result.data);
+              },
+            },
+          }),
+        });
+      } catch {
+        setError("Couldn't save the log. Try again.");
+      } finally {
+        writing.current = false;
       }
-      options.onSaved?.();
-      const changed = !sameLog(result.data.log, result.data.previous);
-      toast({
-        title: options.title,
-        description: options.description,
-        variant: "success",
-        ...(changed && {
-          action: {
-            label: "Undo",
-            altText: "Undo this log. You can also change the day on Track.",
-            onClick: () => void undo(result.data),
-          },
-        }),
-      });
     });
   }
 

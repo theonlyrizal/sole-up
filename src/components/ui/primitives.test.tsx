@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { Button } from "./button";
+import { Checkbox } from "./checkbox";
 import { EmptyState } from "./empty-state";
 import { ErrorState } from "./error-state";
 import { FormField } from "./form-field";
@@ -60,6 +61,23 @@ describe("Button", () => {
     expect(render(<Button type="submit">Go</Button>)).toContain(
       'type="submit"',
     );
+  });
+});
+
+describe("Checkbox", () => {
+  it("exposes a standalone round checkbox with its action name", () => {
+    const html = render(
+      <Checkbox
+        labelHidden
+        shape="round"
+        label="Complete Pack the bag"
+        checked
+      />,
+    );
+    expect(html).toContain('role="checkbox"');
+    expect(html).toContain('aria-label="Complete Pack the bag"');
+    expect(html).toContain('aria-checked="true"');
+    expect(html).not.toContain("<label");
   });
 });
 

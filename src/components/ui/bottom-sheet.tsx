@@ -33,6 +33,7 @@ type SheetProps = {
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   children: ReactNode;
 };
 
@@ -41,6 +42,7 @@ export function BottomSheet({
   description,
   trigger,
   children,
+  onCloseAutoFocus,
   ...root
 }: SheetProps) {
   const panel = useRef<HTMLDivElement>(null);
@@ -104,6 +106,7 @@ export function BottomSheet({
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogSurface
         ref={panel}
+        onCloseAutoFocus={onCloseAutoFocus}
         description={description}
         className="bottom-sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-2xl bg-surface-container-low text-on-surface shadow-3"
       >
@@ -153,6 +156,7 @@ export function ResponsiveSheet({
   title,
   description,
   children,
+  onCloseAutoFocus,
   ...root
 }: SheetProps & { anchor?: ReactElement }) {
   const medium = useMediaQuery("medium");
@@ -163,6 +167,7 @@ export function ResponsiveSheet({
         title={title}
         description={description}
         trigger={trigger ?? anchor}
+        onCloseAutoFocus={onCloseAutoFocus}
       >
         {children}
       </BottomSheet>
@@ -173,7 +178,7 @@ export function ResponsiveSheet({
       <Popover {...root}>
         {trigger && <PopoverAnchor asChild>{anchor}</PopoverAnchor>}
         <PopoverTrigger asChild>{trigger ?? anchor}</PopoverTrigger>
-        <PopoverContent>
+        <PopoverContent onCloseAutoFocus={onCloseAutoFocus}>
           <div className="flex items-center justify-between gap-2">
             <PopoverTitle className="text-title-large">{title}</PopoverTitle>
             <PopoverClose asChild>
@@ -195,7 +200,11 @@ export function ResponsiveSheet({
   return (
     <Dialog {...root}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent title={title} description={description}>
+      <DialogContent
+        title={title}
+        description={description}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         {children}
       </DialogContent>
     </Dialog>

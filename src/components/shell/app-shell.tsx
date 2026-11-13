@@ -1,12 +1,24 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+} from "react";
 import { useKeyboardOpen } from "@/components/hooks/use-keyboard-open";
 import { QuickAdd } from "@/components/tasks/quick-add";
 import { CreateMenu, type OpenQuickAdd } from "./create-menu";
 import type { ShellAccount } from "./more-sheet";
 import { NavigationBar } from "./navigation-bar";
 import { NavigationRail } from "./navigation-rail";
+
+const QuickAddContext = createContext<OpenQuickAdd>(() => {});
+
+export function useOpenQuickAdd() {
+  return useContext(QuickAddContext);
+}
 
 export function AppShell({
   account,
@@ -45,7 +57,9 @@ export function AppShell({
       data-keyboard-open={keyboardOpen || undefined}
     >
       <NavigationRail account={account} onQuickAdd={openQuickAdd} />
-      {children}
+      <QuickAddContext.Provider value={openQuickAdd}>
+        {children}
+      </QuickAddContext.Provider>
       <NavigationBar account={account} />
       <div className="compact-create medium:hidden">
         <CreateMenu onQuickAdd={openQuickAdd} />

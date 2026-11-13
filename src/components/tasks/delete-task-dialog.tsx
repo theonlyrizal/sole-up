@@ -19,12 +19,18 @@ export function DeleteTaskDialog({
   task,
   noteLinkCount,
   onDeleted,
+  open,
+  onOpenChange,
+  onCloseAutoFocus,
 }: {
   task: Pick<Task, "id" | "title" | "status">;
   /** Notes linked to the task, archived too; null while not known. */
   noteLinkCount: number | null;
   /** Runs after the task is gone: close the dialog. */
   onDeleted: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const notesKept =
     noteLinkCount === null
@@ -32,10 +38,17 @@ export function DeleteTaskDialog({
       : linkedNotesKept(noteLinkCount);
   return (
     <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      onCloseAutoFocus={onCloseAutoFocus}
+      destructive={open === undefined}
+      icon="delete"
       trigger={
-        <Button variant="danger" size="sm">
-          Delete task
-        </Button>
+        open === undefined ? (
+          <Button variant="danger" size="sm">
+            Delete task
+          </Button>
+        ) : undefined
       }
       title={`Delete “${task.title}”?`}
       description={

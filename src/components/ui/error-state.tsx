@@ -10,6 +10,7 @@ type ErrorStateProps = {
   onRetry?: () => void;
   retrying?: boolean;
   headingLevel?: 1 | 2 | 3;
+  tone?: "neutral" | "error";
 };
 
 /** Shown when something failed to load or save. */
@@ -19,6 +20,7 @@ export function ErrorState({
   onRetry,
   retrying = false,
   headingLevel = 2,
+  tone = "error",
 }: ErrorStateProps) {
   return (
     <div role="alert">
@@ -26,7 +28,7 @@ export function ErrorState({
         title={title}
         description={description}
         headingLevel={headingLevel}
-        art={{ icon: "error", tone: "error" }}
+        art={{ icon: "error", tone }}
         action={
           <>
             {onRetry && (

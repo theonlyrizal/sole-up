@@ -1,27 +1,25 @@
 "use client";
 
-import Link from "next/link";
-import { useId, useOptimistic, useRef, useState, useTransition } from "react";
+import { useId, useLayoutEffect, useRef, useState, useTransition } from "react";
 
 import { BlockTimeDialog } from "@/components/calendar/block-form";
+import { Timeline } from "@/components/data/timeline";
+import { WeekStrip } from "@/components/data/week-strip";
 import { TodayHabits } from "@/components/habits/today-habits";
+import { useOpenQuickAdd } from "@/components/shell/app-shell";
+import { Badge } from "@/components/ui/badge";
+import { ResponsiveSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
+import { IconButton } from "@/components/ui/icon-button";
+import { ListGroup } from "@/components/ui/list";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { toast } from "@/components/ui/toast";
-import {
-  formatInstant,
-  formatLocalDate,
-  type LocalDate,
-  localDateTimeOf,
-} from "@/lib/dates";
-import { PRIORITY_LABELS } from "@/lib/priorities";
+import type { LocalDate } from "@/lib/dates";
 import type { ActionResult } from "@/lib/result";
 import type { ScheduleEntry } from "@/lib/schedule";
-import { formatEstimate } from "@/lib/task-list";
-import { isInboxTask, type Task, type TaskStatus } from "@/lib/tasks";
+import { isInboxTask, type Task } from "@/lib/tasks";
 import {
   plannedSummary,
   TODAY_SECTION_HINTS,
@@ -30,13 +28,9 @@ import {
   type TodaySection,
   todaySectionAnchor,
 } from "@/lib/today";
+import type { WeekStripDay } from "@/lib/week-strip";
 import type { TodayHabits as TodayHabitsData } from "@/server/modules/habits/queries";
-import {
-  changeTaskStatus,
-  planTask,
-  planTaskForDay,
-  rescheduleTaskDue,
-} from "@/server/modules/tasks/actions";
+import { planTask, planTaskForDay } from "@/server/modules/tasks/actions";
 import type {
   PlanTaskItem,
   TodaySuggestions,
@@ -44,16 +38,17 @@ import type {
 } from "@/server/modules/tasks/queries";
 
 import { AddToToday } from "./add-to-today";
-import { TodayTimeline } from "./today-timeline";
+import { DeleteTaskDialog } from "./delete-task-dialog";
+import { TaskFormDialog } from "./task-form";
+import { TaskRow } from "./task-row";
+import { TodayDateEditor } from "./today-date-editor";
 import { useRefreshOnNewDay } from "./use-refresh-on-new-day";
 
 type TodayViewProps = {
-  /** The user's today, such as "Friday, 23 October 2026". */
-  dateLabel: string;
   today: LocalDate;
-  /** When the user's tomorrow begins (ISO instant). */
+  dateLabel: string;
+  week: WeekStripDay[];
   nextDayStartsAt: string;
-  /** The instant the page was read at (ISO), for blocks' "Not marked". */
   now: string;
   timeline: ScheduleEntry[];
   sections: TodayTasks;
@@ -63,16 +58,39 @@ type TodayViewProps = {
   timeZone: string;
 };
 
-/**
- * Today (chunk 2.5): planned for today, due today, deadlines that need a
- * decision, and earlier plans not done. Each open task shows in one section
- * (see `todaySection`). Planned for today always shows; the others only
- * when they have tasks. Today's events and time blocks sit above them, as a
- * timeline (chunk 4.9), and the day's habits below them (chunk 6.4).
- */
+type TaskOverlay = "plan" | "due" | "edit" | "block" | "delete";
+
+export function TodayHeaderActions({
+  tasks,
+  locale,
+  timeZone,
+}: Pick<TodayViewProps, "locale" | "timeZone"> & {
+  tasks: Pick<Task, "id" | "title" | "estimatedMinutes">[];
+}) {
+  const openQuickAdd = useOpenQuickAdd();
+  return (
+    <div className="hidden flex-wrap gap-2 large:flex">
+      <Button icon="add" onClick={(event) => openQuickAdd(event.currentTarget)}>
+        Add task
+      </Button>
+      <BlockTimeDialog
+        tasks={tasks}
+        locale={locale}
+        timeZone={timeZone}
+        trigger={
+          <Button variant="tonal" icon="schedule">
+            Block time
+          </Button>
+        }
+      />
+    </div>
+  );
+}
+
 export function TodayView({
-  dateLabel,
   today,
+  dateLabel,
+  week,
   nextDayStartsAt,
   now,
   timeline,
@@ -83,157 +101,306 @@ export function TodayView({
   timeZone,
 }: TodayViewProps) {
   useRefreshOnNewDay(nextDayStartsAt);
+  const taskPane = useRef<HTMLDivElement>(null);
+  const [overlay, setOverlay] = useState<{
+    kind: TaskOverlay;
+    task: PlanTaskItem;
+    trigger: HTMLElement;
+  } | null>(null);
+  const lastTaskFocus = useRef<{
+    element: HTMLElement;
+    row: HTMLElement;
+    section: HTMLElement;
+    index: number;
+  } | null>(null);
+
+  function restoreTaskFocus() {
+    const last = lastTaskFocus.current;
+    if (
+      !last ||
+      last.element.isConnected ||
+      document.activeElement !== document.body
+    )
+      return;
+    const title = last.row.querySelector<HTMLElement>("[data-today-task]");
+    const moved = title?.dataset.todayTask;
+    const titles = Array.from(
+      taskPane.current?.querySelectorAll<HTMLElement>("[data-today-task]") ??
+        [],
+    );
+    const sameTask = titles.find((item) => item.dataset.todayTask === moved);
+    const remaining = titles.filter((item) => last.section.contains(item));
+    const next = remaining[Math.min(last.index, remaining.length - 1)];
+    const heading =
+      taskPane.current?.querySelector<HTMLElement>("#today-planned h2");
+    (sameTask ?? next ?? heading)?.focus();
+  }
+
+  useLayoutEffect(restoreTaskFocus, [sections]);
+
+  function closeOverlayFocus(event: Event) {
+    event.preventDefault();
+    if (
+      overlay?.trigger.isConnected &&
+      overlay.trigger.getClientRects().length
+    ) {
+      overlay.trigger.focus({ preventScroll: true });
+    } else {
+      restoreTaskFocus();
+    }
+  }
+
+  const overlayProps = {
+    open: true,
+    onOpenChange: (open: boolean) => {
+      if (!open) setOverlay(null);
+    },
+    onCloseAutoFocus: closeOverlayFocus,
+  };
+
   return (
-    <div className="flex flex-col gap-8">
-      <p className="-mt-2 text-muted">{dateLabel}</p>
-      <TodayTimeline
-        entries={timeline}
-        today={today}
-        now={new Date(now)}
-        locale={locale}
-        timeZone={timeZone}
-      />
-      {TODAY_SECTIONS.filter(
-        (section) => section === "planned" || sections[section].length > 0,
-      ).map((section) => (
-        <TodaySectionBlock
-          key={section}
-          section={section}
-          tasks={sections[section]}
-          action={
-            section === "planned" ? (
-              <AddToToday
-                suggestions={suggestions}
+    <div className="grid min-w-0 gap-6">
+      <div className="grid min-w-0 gap-3">
+        <p className="text-headline-small medium:text-body-large medium:text-on-surface-variant">
+          {dateLabel}
+        </p>
+        <div className="min-w-0 overflow-hidden large:hidden">
+          <WeekStrip days={week} today={today} />
+        </div>
+      </div>
+      <div className="grid min-w-0 gap-6 large:grid-cols-12 large:items-start">
+        <div
+          className="min-w-0 large:sticky large:top-4 large:col-span-5 large:col-start-8 large:row-start-1 large:max-h-[calc(100dvh-2rem)] large:overflow-y-auto large:overscroll-contain large:p-1"
+          aria-label="Schedule and habits"
+          role="region"
+        >
+          <div className="grid gap-6">
+            <Timeline
+              entries={timeline}
+              today={today}
+              now={new Date(now)}
+              locale={locale}
+              timeZone={timeZone}
+            />
+            <div className="hidden large:block">
+              <TodayHabits data={habits} locale={locale} />
+            </div>
+          </div>
+        </div>
+        <div
+          ref={taskPane}
+          className="grid min-w-0 gap-6 large:col-span-7 large:col-start-1 large:row-start-1"
+          onFocusCapture={(event) => {
+            const element = event.target;
+            const row = element.closest("li");
+            const section = row?.closest("section");
+            if (row && section) {
+              lastTaskFocus.current = {
+                element,
+                row,
+                section,
+                index: Array.from(row.parentElement?.children ?? []).indexOf(
+                  row,
+                ),
+              };
+            } else if (taskPane.current?.contains(element)) {
+              lastTaskFocus.current = null;
+            }
+          }}
+        >
+          {TODAY_SECTIONS.filter(
+            (section) => section === "planned" || sections[section].length > 0,
+          ).map((section) => (
+            <TodaySectionBlock
+              key={section}
+              section={section}
+              tasks={sections[section]}
+              action={
+                section === "planned" && (
+                  <AddToToday
+                    suggestions={suggestions}
+                    locale={locale}
+                    timeZone={timeZone}
+                  />
+                )
+              }
+              locale={locale}
+              timeZone={timeZone}
+              onOpen={(kind, task, trigger) =>
+                setOverlay({ kind, task, trigger })
+              }
+            />
+          ))}
+        </div>
+        <div className="large:hidden">
+          <TodayHabits data={habits} locale={locale} />
+        </div>
+      </div>
+      {overlay && (
+        <>
+          {(overlay.kind === "plan" || overlay.kind === "due") && (
+            <ResponsiveSheet
+              {...overlayProps}
+              title={overlay.kind === "plan" ? "Pick a date" : "New due date"}
+              description={overlay.task.title}
+            >
+              <TodayDateEditor
+                task={overlay.task}
+                kind={overlay.kind}
                 locale={locale}
                 timeZone={timeZone}
+                inSheet
+                onDone={() => setOverlay(null)}
               />
-            ) : null
-          }
-          today={today}
-          locale={locale}
-          timeZone={timeZone}
-        />
-      ))}
-      <TodayHabits data={habits} locale={locale} />
+            </ResponsiveSheet>
+          )}
+          {overlay.kind === "edit" && (
+            <TaskFormDialog {...overlayProps} task={overlay.task} />
+          )}
+          {overlay.kind === "block" && (
+            <BlockTimeDialog
+              {...overlayProps}
+              task={overlay.task}
+              locale={locale}
+              timeZone={timeZone}
+            />
+          )}
+          {overlay.kind === "delete" && (
+            <DeleteTaskDialog
+              {...overlayProps}
+              task={overlay.task}
+              noteLinkCount={null}
+              onDeleted={() => setOverlay(null)}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-type RowContext = { today: LocalDate; locale: string; timeZone: string };
+type OpenTaskOverlay = (
+  kind: TaskOverlay,
+  task: PlanTaskItem,
+  trigger: HTMLElement,
+) => void;
+type SectionProps = Pick<TodayViewProps, "locale" | "timeZone"> & {
+  section: TodaySection;
+  tasks: PlanTaskItem[];
+  action: React.ReactNode;
+  onOpen: OpenTaskOverlay;
+};
 
 function TodaySectionBlock({
   section,
   tasks,
   action,
-  ...context
-}: RowContext & {
-  section: TodaySection;
-  tasks: PlanTaskItem[];
-  action: React.ReactNode;
-}) {
-  const headingId = useId();
+  locale,
+  timeZone,
+  onOpen,
+}: SectionProps) {
+  const heading = useId();
   const label = TODAY_SECTION_LABELS[section];
   const hint =
     section === "planned" && tasks.length > 0
       ? plannedSummary(tasks)
       : TODAY_SECTION_HINTS[section];
+
   return (
     <section
       id={todaySectionAnchor(section)}
-      aria-labelledby={headingId}
-      className="flex scroll-mt-4 flex-col gap-3"
+      aria-labelledby={heading}
+      className="grid min-w-0 scroll-mt-20 gap-2 medium:scroll-mt-4"
     >
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <h2 id={headingId} className="text-lg font-semibold">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2
+            id={heading}
+            tabIndex={-1}
+            className="rounded-xs text-title-medium focus-visible:outline-3 focus-visible:outline-offset-2"
+          >
             {label}
           </h2>
-          <p className="text-sm text-muted">{hint}</p>
+          <Badge count={tasks.length} />
         </div>
         {action}
       </div>
+      <p className="text-body-medium text-on-surface-variant">{hint}</p>
       {tasks.length === 0 ? (
-        <EmptyState
-          headingLevel={3}
-          title="Nothing planned for today"
-          description="That's fine. Add a few things from your goals if you'd like a plan, or leave the day open."
-        />
+        <Card as="div">
+          <EmptyState
+            compact
+            headingLevel={3}
+            title="Nothing planned for today"
+            description="Add a task when you’re ready, or leave the day open."
+          />
+        </Card>
       ) : (
-        <ul
-          aria-label={label}
-          className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface"
-        >
+        <ListGroup label={label}>
           {tasks.map((task) => (
-            <TodayTaskRow
+            <TaskRow
               key={task.id}
               task={task}
-              section={section}
-              {...context}
+              locale={locale}
+              timeZone={timeZone}
+              onOpen={(trigger) => onOpen("edit", task, trigger)}
+              actions={
+                <TodayTaskActions
+                  task={task}
+                  section={section}
+                  onOpen={onOpen}
+                />
+              }
             />
           ))}
-        </ul>
+        </ListGroup>
       )}
     </section>
   );
 }
 
-type Editing = "plan" | "due" | null;
-
-function TodayTaskRow({
+function TodayTaskActions({
   task,
   section,
-  today,
-  locale,
-  timeZone,
-}: RowContext & { task: PlanTaskItem; section: TodaySection }) {
-  const [editing, setEditing] = useState<Editing>(null);
+  onOpen,
+}: Pick<SectionProps, "section" | "onOpen"> & {
+  task: PlanTaskItem;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  // The checkbox follows the click at once, not after the refresh.
-  const [status, setStatus] = useOptimistic(task.status);
-  const pickButton = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLButtonElement>(null);
+  const opening = useRef<{ kind: TaskOverlay; trigger: HTMLElement } | null>(
+    null,
+  );
+  const isPlanned = section === "planned";
+  const canUnplan = isPlanned || section === "earlier";
+  const dateKind = canUnplan ? "plan" : "due";
+  const dateLabel = canUnplan ? "Pick a date" : "New due date";
 
   function run(
     action: () => Promise<ActionResult<Task>>,
     message: (updated: Task) => string,
   ) {
+    if (pending) return;
     startTransition(async () => {
       setError(null);
-      const result = await action();
-      if (result.ok) {
-        toast({ title: message(result.data), variant: "success" });
-      } else {
-        setError(result.error.message);
+      try {
+        const result = await action();
+        if (result.ok) {
+          toast({ title: message(result.data), variant: "success" });
+        } else {
+          setError(result.error.message);
+        }
+      } catch {
+        setError("Couldn't update the task. Try again.");
       }
     });
   }
 
-  function toggleComplete(checked: boolean) {
-    const to: TaskStatus = checked ? "completed" : "open";
-    startTransition(async () => {
-      setError(null);
-      setStatus(to);
-      const result = await changeTaskStatus({ id: task.id, status: to });
-      if (result.ok) {
-        toast({
-          title: to === "completed" ? "Task completed" : "Task reopened",
-          variant: "success",
-        });
-      } else {
-        setError(result.error.message);
-      }
-    });
-  }
-
-  const planToday = () =>
+  const planFor = (day: "today" | "tomorrow") =>
     run(
-      () => planTaskForDay({ id: task.id, day: "today" }),
-      () => "Planned for today",
-    );
-  const moveToTomorrow = () =>
-    run(
-      () => planTaskForDay({ id: task.id, day: "tomorrow" }),
-      () => "Moved to tomorrow",
+      () => planTaskForDay({ id: task.id, day }),
+      () => (day === "today" ? "Planned for today" : "Moved to tomorrow"),
     );
   const unplan = () =>
     run(
@@ -241,280 +408,169 @@ function TodayTaskRow({
       (updated) =>
         isInboxTask(updated) ? "Unplanned, now in your inbox" : "Unplanned",
     );
-
-  function closeEditor() {
-    setEditing(null);
-    // The editor unmounts; put focus back where it came from.
-    requestAnimationFrame(() => pickButton.current?.focus());
+  function queueOverlay(kind: TaskOverlay) {
+    if (menu.current) opening.current = { kind, trigger: menu.current };
   }
 
-  const editKind: Exclude<Editing, null> =
-    section === "planned" || section === "earlier" ? "plan" : "due";
-  const pickLabel = editKind === "plan" ? "Pick a date" : "New due date";
-  const details = todayTaskDetails(task, today, locale, timeZone);
-
   return (
-    <li className="flex flex-col gap-3 p-3">
-      <div className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          aria-label={`Complete: ${task.title}`}
-          checked={status === "completed"}
-          disabled={pending}
-          onChange={(event) => toggleComplete(event.target.checked)}
-          className={cx("mt-1 size-4 shrink-0 accent-accent", focusRing)}
-        />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={cx(
-                "min-w-0 font-medium break-words",
-                status !== "open" && "text-muted line-through",
-              )}
-            >
-              {task.title}
-            </span>
-            {task.priority && (
-              <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs text-muted">
-                {PRIORITY_LABELS[task.priority]}
-              </span>
-            )}
-          </div>
-          {task.goal && (
-            <p className="text-sm break-words text-muted">
-              <Link
-                href={`/goals/${task.goal.id}`}
-                className={cx("rounded-sm hover:underline", focusRing)}
-              >
-                {task.goal.title}
-              </Link>
-              {task.milestone && <> › {task.milestone.title}</>}
-            </p>
-          )}
-          {details.length > 0 && (
-            <p className="text-sm text-muted">{details.join(" · ")}</p>
-          )}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-1 pl-7">
-        {section !== "planned" && (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={pending}
-            aria-label={`Plan for today: ${task.title}`}
-            onClick={planToday}
-          >
-            Plan for today
-          </Button>
-        )}
-        {section === "planned" && (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={pending}
-            aria-label={`Move to tomorrow: ${task.title}`}
-            onClick={moveToTomorrow}
-          >
-            Tomorrow
-          </Button>
-        )}
-        <Button
-          ref={pickButton}
-          variant="secondary"
-          size="sm"
-          disabled={pending}
-          aria-expanded={editing !== null}
-          aria-label={`${pickLabel}: ${task.title}`}
-          onClick={() => (editing ? closeEditor() : setEditing(editKind))}
-        >
-          {pickLabel}
-        </Button>
-        {status === "open" && (
-          <BlockTimeDialog
-            task={task}
-            timeZone={timeZone}
-            locale={locale}
-            trigger={
+    <div className="grid justify-items-end">
+      <div className="flex flex-wrap items-center justify-end gap-1">
+        <div className="hidden flex-wrap justify-end gap-1 medium:flex">
+          {section === "decide" && (
+            <>
               <Button
-                variant="secondary"
-                size="sm"
-                disabled={pending}
-                aria-label={`Block time: ${task.title}`}
+                variant="tonal"
+                size="xs"
+                aria-disabled={pending || undefined}
+                aria-label={`Do today: ${task.title}`}
+                onClick={() => planFor("today")}
               >
-                Block time
+                Do today
               </Button>
-            }
-          />
-        )}
-        {(section === "planned" || section === "earlier") && (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pending}
-            aria-label={`Unplan: ${task.title}`}
-            onClick={unplan}
-          >
-            Unplan
-          </Button>
-        )}
-      </div>
-      <p role="alert" className="pl-7 text-sm text-danger empty:hidden">
-        {error}
-      </p>
-      {editing && (
-        <div className="pl-7">
-          <TodayDateEditor
-            task={task}
-            kind={editing}
-            locale={locale}
-            timeZone={timeZone}
-            onDone={closeEditor}
-          />
+              <Button
+                variant="tonal"
+                size="xs"
+                aria-label={`New date: ${task.title}`}
+                onClick={(event) => onOpen("due", task, event.currentTarget)}
+              >
+                New date
+              </Button>
+            </>
+          )}
+          {section === "earlier" && (
+            <>
+              <Button
+                variant="tonal"
+                size="xs"
+                aria-disabled={pending || undefined}
+                aria-label={`Plan for today: ${task.title}`}
+                onClick={() => planFor("today")}
+              >
+                Today
+              </Button>
+              <Button
+                variant="tonal"
+                size="xs"
+                aria-disabled={pending || undefined}
+                aria-label={`Unplan: ${task.title}`}
+                onClick={unplan}
+              >
+                Unplan
+              </Button>
+            </>
+          )}
+          {section === "planned" && (
+            <>
+              <Button
+                variant="tonal"
+                size="xs"
+                aria-disabled={pending || undefined}
+                aria-label={`Move to tomorrow: ${task.title}`}
+                onClick={() => planFor("tomorrow")}
+              >
+                Tomorrow
+              </Button>
+              <Button
+                variant="tonal"
+                size="xs"
+                aria-disabled={pending || undefined}
+                aria-label={`Unplan: ${task.title}`}
+                onClick={unplan}
+              >
+                Unplan
+              </Button>
+            </>
+          )}
+          {section === "due" && (
+            <Button
+              variant="tonal"
+              size="xs"
+              aria-disabled={pending || undefined}
+              aria-label={`Plan for today: ${task.title}`}
+              onClick={() => planFor("today")}
+            >
+              Today
+            </Button>
+          )}
         </div>
-      )}
-    </li>
-  );
-}
-
-/** The planned date (unless it's today), deadline and estimate. */
-function todayTaskDetails(
-  task: PlanTaskItem,
-  today: LocalDate,
-  locale: string,
-  timeZone: string,
-): string[] {
-  const details: string[] = [];
-  if (task.plannedDate && task.plannedDate !== today) {
-    details.push(`Planned ${formatLocalDate(task.plannedDate, locale)}`);
-  }
-  if (task.dueAt) {
-    details.push(`Due ${formatInstant(task.dueAt, locale, timeZone)}`);
-  } else if (task.dueDate) {
-    details.push(`Due ${formatLocalDate(task.dueDate, locale)}`);
-  }
-  if (task.estimatedMinutes) {
-    details.push(formatEstimate(task.estimatedMinutes));
-  }
-  return details;
-}
-
-/**
- * Picks a new planned date ("plan") or a new deadline ("due") for one task.
- * A timed deadline keeps its time of day in its own zone. Escape cancels.
- */
-export function TodayDateEditor({
-  task,
-  kind,
-  locale,
-  timeZone,
-  onDone,
-}: {
-  task: PlanTaskItem;
-  kind: "plan" | "due";
-  locale: string;
-  timeZone: string;
-  onDone: () => void;
-}) {
-  const id = useId();
-  const zone = task.dueTz ?? timeZone;
-  const timedDue = task.dueAt ? localDateTimeOf(task.dueAt, zone) : null;
-  const [date, setDate] = useState(
-    kind === "plan"
-      ? (task.plannedDate ?? "")
-      : (timedDue?.date ?? task.dueDate ?? ""),
-  );
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!date) {
-      setError("Pick a date.");
-      return;
-    }
-    startTransition(async () => {
-      setError(null);
-      const result =
-        kind === "plan"
-          ? await planTask({ id: task.id, plannedDate: date })
-          : await rescheduleTaskDue({
-              id: task.id,
-              dueDate: date,
-              dueTime: timedDue?.time ?? "",
-              dueTz: timedDue ? zone : "",
-            });
-      if (result.ok) {
-        toast({
-          title:
-            kind === "plan"
-              ? `Planned for ${formatLocalDate(date, locale)}`
-              : `Now due ${formatLocalDate(date, locale)}`,
-          variant: "success",
-        });
-        onDone();
-      } else {
-        const fieldErrors =
-          result.error.code === "VALIDATION" ? result.error.fieldErrors : {};
-        setError(
-          [
-            ...(fieldErrors.plannedDate ?? []),
-            ...(fieldErrors.dueDate ?? []),
-          ].join(" ") || result.error.message,
-        );
-      }
-    });
-  }
-
-  const label = kind === "plan" ? "Plan for" : "New due date";
-  return (
-    <form
-      onSubmit={submit}
-      noValidate
-      aria-label={`${label}: ${task.title}`}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !pending) {
-          event.preventDefault();
-          onDone();
-        }
-      }}
-      className="flex flex-wrap items-end gap-2 rounded-md border border-border bg-surface-muted p-3"
-    >
-      <FormField
-        id={`${id}-date`}
-        label={label}
-        hint={
-          timedDue && kind === "due"
-            ? `Keeps the time, ${timedDue.time} (${zone}).`
-            : undefined
-        }
-        errors={error ? [error] : undefined}
-      >
-        {(control) => (
-          <Input
-            {...control}
-            type="date"
-            name="date"
-            className="py-1.5 text-sm"
-            value={date}
-            autoFocus
-            onChange={(event) => setDate(event.target.value)}
-          />
-        )}
-      </FormField>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={pending}
-          onClick={onDone}
-        >
-          Cancel
-        </Button>
+        <Menu>
+          <MenuTrigger asChild>
+            <IconButton
+              ref={menu}
+              label={`Actions for ${task.title}`}
+              icon="more_vert"
+              tooltip={false}
+              aria-busy={pending || undefined}
+            />
+          </MenuTrigger>
+          <MenuContent
+            align="end"
+            onCloseAutoFocus={(event) => {
+              if (!opening.current) return;
+              const { kind, trigger } = opening.current;
+              opening.current = null;
+              event.preventDefault();
+              // Keep a connected focus origin before the new overlay takes focus.
+              trigger.focus({ preventScroll: true });
+              onOpen(kind, task, trigger);
+            }}
+          >
+            <MenuItem
+              disabled={pending}
+              icon="today"
+              onSelect={() => planFor(isPlanned ? "tomorrow" : "today")}
+            >
+              {isPlanned ? "Tomorrow" : "Plan for today"}
+            </MenuItem>
+            <MenuItem
+              disabled={pending}
+              icon="event"
+              onSelect={() => queueOverlay(dateKind)}
+            >
+              {dateLabel}
+            </MenuItem>
+            {canUnplan && (
+              <MenuItem disabled={pending} onSelect={unplan}>
+                Unplan
+              </MenuItem>
+            )}
+            <MenuItem
+              disabled={pending}
+              icon="schedule"
+              onSelect={() => queueOverlay("block")}
+            >
+              Block time
+            </MenuItem>
+            <MenuItem
+              disabled={pending}
+              icon="edit"
+              onSelect={() => queueOverlay("edit")}
+            >
+              Edit task
+            </MenuItem>
+            <MenuItem
+              disabled={pending}
+              icon="delete"
+              onSelect={() => queueOverlay("delete")}
+            >
+              Delete task
+            </MenuItem>
+          </MenuContent>
+        </Menu>
       </div>
-    </form>
+      {pending && (
+        <span role="status" className="text-body-small text-on-surface-variant">
+          Saving…
+        </span>
+      )}
+      {error && (
+        <p
+          role="alert"
+          className="max-w-40 text-end text-body-small text-on-surface-variant"
+        >
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

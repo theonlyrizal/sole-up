@@ -157,7 +157,7 @@ test("area → goal → milestone → tasks → plan today → complete", async 
 
   // Complete it on Today: the day is clear again, and stays clear.
   await plannedToday(page)
-    .getByRole("checkbox", { name: `Complete: ${MILESTONE_TASK}` })
+    .getByRole("checkbox", { name: `Complete ${MILESTONE_TASK}` })
     .click();
   await expect(page.getByText("Task completed", { exact: true })).toBeVisible();
   await expect(

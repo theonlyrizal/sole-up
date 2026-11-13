@@ -8,6 +8,7 @@ import {
   DAILY_HABIT,
   EVENT_TITLE,
   GOAL_TITLE,
+  QUANTITY_HABIT,
   seedVisualData,
   VISUAL_ZONE,
 } from "./visual-data";
@@ -21,6 +22,220 @@ const sizes = [
   { width: 1280, height: 800 },
 ] as const;
 const themes = ["light", "dark"] as const;
+
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-5 Today ${viewport.width} ${theme}`, async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      await page.addInitScript(() => {
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (keyframes, options) {
+          const animation = animate.call(this, keyframes, options);
+          if (this.classList.contains("confirmation-halo")) {
+            animation.pause();
+            animation.currentTime = 35;
+          }
+          return animation;
+        };
+      });
+      const path = (state: string) =>
+        `test-results/visual/ui-5/today-${state}-${viewport.width}-${theme}.png`;
+      const capture = (state: string, fullPage = true) =>
+        page.screenshot({ path: path(state), fullPage, caret: "initial" });
+      const region = (name: string) =>
+        page.getByRole("region", { name, exact: true });
+
+      await signInAndConfirm(page);
+      await openPage(page, "/plan/today");
+      await expect(region("Planned for today")).toContainText(
+        "Nothing planned for today",
+      );
+      await capture("empty");
+      await expectNoSeriousViolations(page);
+
+      const { userId, today } = await seedVisualData(page, {
+        todaySchedule: true,
+      });
+      await openPage(page, "/plan/today");
+      await expect(
+        region("Schedule").getByText("Now", { exact: true }).first(),
+      ).toBeVisible();
+      await expect(region("Habits")).toContainText("6 of 12 pages");
+      for (const width of [320, 375, 390, 414, 768, 1280]) {
+        await page.setViewportSize({ width, height: viewport.height });
+        await checkRenderedPage(page, theme);
+      }
+      await page.setViewportSize(viewport);
+      await capture("populated");
+      await expectNoSeriousViolations(page);
+
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = "200%";
+      });
+      await checkRenderedPage(page, theme);
+      await capture("text-200");
+      await page.evaluate(() => {
+        document.documentElement.style.removeProperty("font-size");
+      });
+
+      const add = page.getByRole("button", {
+        name: "Add to today",
+        exact: true,
+      });
+      await add.press("Enter");
+      const picker = page.getByRole("dialog", { name: "Add to today" });
+      await expect(
+        picker.getByRole("group", { name: "Due soon" }),
+      ).toBeVisible();
+      await capture("suggestions", false);
+      await expectNoSeriousViolations(page);
+      await page.keyboard.press("Escape");
+      await expect(add).toBeFocused();
+
+      const earlier = region("Earlier, not done");
+      const taskActions = earlier.getByRole("button", {
+        name: /^Actions for /,
+      });
+      await taskActions.press("Enter");
+      await expect(
+        page.getByRole("menuitem", { name: "Plan for today" }),
+      ).toBeFocused();
+      await page.keyboard.press("ArrowDown");
+      await expect(
+        page.getByRole("menuitem", { name: "Pick a date" }),
+      ).toBeFocused();
+      await capture("keyboard-menu", false);
+      await page.keyboard.press("Enter");
+      const date = page.getByRole("dialog", { name: "Pick a date" });
+      await expect(date.getByLabel("Plan for", { exact: true })).toBeFocused();
+      await capture("date", false);
+      await expectNoSeriousViolations(page);
+      await page.keyboard.press("Escape");
+      await expect(taskActions).toBeFocused();
+
+      const title = earlier.getByRole("button", {
+        name: "Move the spare seedlings to the porch",
+        exact: true,
+      });
+      await title.press("Enter");
+      await expect(
+        page.getByRole("dialog", { name: "Edit task" }).getByLabel("Title"),
+      ).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(title).toBeFocused();
+      for (const [item, role, name] of [
+        ["Block time", "dialog", "Block time"],
+        [
+          "Delete task",
+          "alertdialog",
+          "Delete “Move the spare seedlings to the porch”?",
+        ],
+      ] as const) {
+        await taskActions.click();
+        await page.getByRole("menuitem", { name: item, exact: true }).click();
+        await expect(page.getByRole(role, { name, exact: true })).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(taskActions).toBeFocused();
+      }
+
+      if (viewport.width === 1280) {
+        const addTask = page.getByRole("button", {
+          name: "Add task",
+          exact: true,
+        });
+        await addTask.press("Enter");
+        await expect(
+          page.getByRole("dialog", { name: "Add task" }).getByLabel("Title"),
+        ).toBeFocused();
+        await page.keyboard.press("Escape");
+        await expect(addTask).toBeFocused();
+        const blockTime = page.getByRole("button", {
+          name: "Block time",
+          exact: true,
+        });
+        await blockTime.press("Enter");
+        await expect(
+          page.getByRole("dialog", { name: "Block time" }).getByLabel("Task"),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(blockTime).toBeFocused();
+      }
+
+      const amountActions = region("Habits").getByRole("button", {
+        name: `Actions for ${QUANTITY_HABIT}`,
+      });
+      await amountActions.click();
+      await page.getByRole("menuitem", { name: "Change amount" }).click();
+      const amount = page.getByRole("dialog", { name: "Change amount" });
+      const field = amount.getByLabel("Amount today (pages)");
+      await expect(field).toHaveValue("6");
+      await field.fill("4.555");
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const holdSave = async (route: import("@playwright/test").Route) => {
+        if (route.request().method() !== "POST") return route.fallback();
+        await gate;
+        await route.continue();
+      };
+      await page.route("**/plan/today", holdSave);
+      await amount.getByRole("button", { name: "Save" }).click();
+      await expect(
+        amount.getByRole("button", { name: "Saving…" }),
+      ).toHaveAttribute("aria-disabled", "true");
+      await capture("amount-pending", false);
+      release();
+      await expect(amount.getByRole("alert")).toBeVisible();
+      await expect(field).toHaveValue("4.555");
+      await capture("amount-error", false);
+      await page.unroute("**/plan/today", holdSave);
+
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      await field.fill("4.5");
+      await amount.getByRole("button", { name: "Save" }).click();
+      await expect(amount).toHaveCount(0);
+      await expect(amountActions).toBeFocused();
+      const row = region("Habits")
+        .getByRole("listitem")
+        .filter({ hasText: QUANTITY_HABIT });
+      await expect(row).toContainText("4.5 of 12 pages");
+      const halo = row.locator(".confirmation-halo");
+      await expect
+        .poll(() => halo.evaluate((element) => element.getAnimations().length))
+        .toBe(1);
+      await row.screenshot({ path: path("amount-retry-saved") });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page
+        .getByRole("region", { name: /^Notifications/ })
+        .getByRole("button", { name: "Undo" })
+        .click();
+      await expect(row).toContainText("6 of 12 pages");
+      await expect
+        .poll(() => halo.evaluate((element) => element.getAnimations().length))
+        .toBe(0);
+      await row.screenshot({ path: path("amount-undone-reduced-motion") });
+
+      const repair = await createUnscheduledHabit(userId, today, true);
+      await page.goto("/plan/today");
+      await expect(
+        page.getByRole("heading", { name: "Today couldn't load" }),
+      ).toBeVisible();
+      await capture("error");
+      await expectNoSeriousViolations(page);
+      await repair();
+      await page.getByRole("button", { name: "Try again" }).click();
+      await expect(region("Schedule")).toBeVisible();
+      await capture("recovered");
+    });
+  }
+}
 
 for (const viewport of sizes) {
   for (const theme of themes) {
