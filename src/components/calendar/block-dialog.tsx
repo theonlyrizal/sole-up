@@ -1,16 +1,11 @@
 "use client";
 
-import { AlertDialog } from "radix-ui";
 import { useId, useRef, useState, useTransition } from "react";
 
+import { InlineBanner } from "@/components/ui/inline-banner";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  contentClass,
-  Dialog,
-  DialogContent,
-  overlayClass,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { CalendarConfirmDialog } from "./calendar-confirm-dialog";
 import { FormError } from "@/components/ui/form-error";
 import { toast } from "@/components/ui/toast";
 import {
@@ -79,22 +74,32 @@ export function BlockDialog({
   onOpenChange,
   onCloseAutoFocus,
 }: BlockDialogProps) {
+  const formId = useId();
+  const [pending, startTransition] = useTransition();
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        title="Time block"
-        description={`For “${block.taskTitle}”.`}
-        className="max-w-xl"
-        onCloseAutoFocus={onCloseAutoFocus}
-      >
-        <BlockDetails
-          block={block}
-          userTimeZone={userTimeZone}
-          locale={locale}
-          onClose={() => onOpenChange(false)}
-        />
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Time block"
+      description={`For “${block.taskTitle}”.`}
+      formId={formId}
+      submitLabel={pending ? "Saving…" : "Save"}
+      pending={pending}
+      open={open}
+      onOpenChange={(next) => {
+        if (!pending) onOpenChange(next);
+      }}
+      onCloseAutoFocus={onCloseAutoFocus}
+    >
+      <BlockDetails
+        block={block}
+        userTimeZone={userTimeZone}
+        locale={locale}
+        formId={formId}
+        pending={pending}
+        startTransition={startTransition}
+        onClose={() => onOpenChange(false)}
+      />
+    </FormDialog>
   );
 }
 
@@ -110,11 +115,17 @@ function BlockDetails({
   block,
   userTimeZone,
   locale,
+  formId,
+  pending,
+  startTransition,
   onClose,
 }: {
   block: TimeBlockOccurrence;
   userTimeZone: string;
   locale: string;
+  formId: string;
+  pending: boolean;
+  startTransition: React.TransitionStartFunction;
   onClose: () => void;
 }) {
   const id = useId();
@@ -133,7 +144,6 @@ function BlockDetails({
   const [repeatErrors, setRepeatErrors] = useState<RepeatErrors>({});
   const [error, setError] = useState<ActionError | null>(null);
   const [step, setStep] = useState<Step>({ kind: "form" });
-  const [pending, startTransition] = useTransition();
   const [attempt, setAttempt] = useState(0);
   const formRef = useFocusFirstInvalid(attempt);
 
@@ -252,6 +262,7 @@ function BlockDetails({
     return (
       <BlockScopeStep
         id={`${id}-scope`}
+        formId={formId}
         intro="This block repeats."
         scope={step.scope}
         options={step.options}
@@ -341,7 +352,7 @@ function BlockDetails({
           </Button>
         )}
         {offersEndSeries(current, now) && originalStart !== null && (
-          <ConfirmDialog
+          <CalendarConfirmDialog
             trigger={
               <Button variant="secondary" size="sm" disabled={statusPending}>
                 End series here
@@ -372,6 +383,7 @@ function BlockDetails({
       )}
 
       <form
+        id={formId}
         ref={formRef}
         onSubmit={submit}
         noValidate
@@ -394,21 +406,13 @@ function BlockDetails({
             {otherErrors.join(" ")}
           </p>
         )}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Save"}
-          </Button>
-          <Button variant="secondary" disabled={pending} onClick={onClose}>
-            Close
-          </Button>
-          <span className="ml-auto">
-            <DeleteBlockDialog
-              block={block}
-              locale={locale}
-              timeZone={userTimeZone}
-              onDeleted={onClose}
-            />
-          </span>
+        <div className="border-t border-outline-variant pt-4">
+          <DeleteBlockDialog
+            block={block}
+            locale={locale}
+            timeZone={userTimeZone}
+            onDeleted={onClose}
+          />
         </div>
       </form>
     </div>
@@ -439,7 +443,7 @@ function DeleteBlockDialog({
   const originalStart = blockOriginalStart(block);
   if (originalStart === null) {
     return (
-      <ConfirmDialog
+      <CalendarConfirmDialog
         trigger={trigger}
         title="Delete this block?"
         description={`This deletes the time blocked for “${block.taskTitle}” and its history. The task is kept. It can't be undone.`}
@@ -483,7 +487,7 @@ function DeleteOccurrenceDialog({
   onDeleted: () => void;
 }) {
   const id = useId();
-  const contentRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLFormElement>(null);
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<TimeBlockScope>("this");
   const [options, setOptions] = useState<
@@ -535,64 +539,52 @@ function DeleteOccurrenceDialog({
   }
 
   return (
-    <AlertDialog.Root open={open} onOpenChange={changeOpen}>
-      <AlertDialog.Trigger asChild>{trigger}</AlertDialog.Trigger>
-      <AlertDialog.Portal>
-        <AlertDialog.Overlay className={overlayClass} />
-        <AlertDialog.Content
-          ref={contentRef}
-          className={contentClass}
-          onOpenAutoFocus={(focusEvent) => {
-            // Start on the choice rather than Cancel: it's the question.
-            const radio =
-              contentRef.current?.querySelector<HTMLInputElement>(
-                "input:checked",
-              );
-            if (radio) {
-              focusEvent.preventDefault();
-              radio.focus();
-            }
-          }}
-        >
-          <AlertDialog.Title className="text-lg font-semibold">
-            Delete this block?
-          </AlertDialog.Title>
-          <AlertDialog.Description className="text-muted">
-            {`This block for “${block.taskTitle}” repeats. Deleted blocks can't be brought back; the task is kept.`}
-          </AlertDialog.Description>
-          <ScopeChooser
-            id={`${id}-scope`}
-            noun="block"
-            legend="Delete"
-            action="delete"
-            value={scope}
-            onChange={setScope}
-            options={options}
-            loading={loading}
-            locale={locale}
-            timeZone={timeZone}
-          />
-          {error && (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-          <div className="flex flex-wrap justify-end gap-3">
-            <AlertDialog.Cancel asChild>
-              <Button variant="secondary" disabled={pending}>
-                Cancel
-              </Button>
-            </AlertDialog.Cancel>
-            <Button
-              variant="danger"
-              disabled={pending || loading}
-              onClick={confirm}
-            >
-              {pending ? "Deleting…" : "Delete"}
-            </Button>
-          </div>
-        </AlertDialog.Content>
-      </AlertDialog.Portal>
-    </AlertDialog.Root>
+    <FormDialog
+      alert
+      title={"Delete this block?"}
+      description={`This block for “${block.taskTitle}” repeats. Deleted blocks can’t be brought back; the task is kept.`}
+      trigger={trigger}
+      open={open}
+      onOpenChange={changeOpen}
+      formId={id}
+      submitLabel={pending ? "Deleting…" : "Delete"}
+      submitVariant="danger"
+      pending={pending}
+      submitDisabled={loading}
+      onOpenAutoFocus={(focusEvent) => {
+        // Start on the choice rather than Cancel: it's the question.
+        const radio =
+          contentRef.current?.querySelector<HTMLInputElement>("input:checked");
+        if (radio) {
+          focusEvent.preventDefault();
+          radio.focus();
+        }
+      }}
+    >
+      <form
+        id={id}
+        ref={contentRef}
+        className="grid gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!pending && !loading) confirm();
+        }}
+      >
+        <ScopeChooser
+          id={`${id}-scope`}
+          noun="block"
+          legend="Delete"
+          action="delete"
+          value={scope}
+          onChange={setScope}
+          options={options}
+          loading={loading}
+          locale={locale}
+          timeZone={timeZone}
+        />
+        {error && <InlineBanner tone="error">{error}</InlineBanner>}
+      </form>
+    </FormDialog>
   );
 }

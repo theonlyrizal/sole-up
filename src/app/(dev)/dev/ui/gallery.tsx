@@ -329,6 +329,7 @@ function ThemeColumn({
       <Example title="Connected button group">
         <ConnectedButtonGroup
           label={`${title} gallery sections`}
+          compactLabels
           value="actions"
           size="xs"
           items={[
@@ -419,6 +420,22 @@ function ThemeColumn({
           />
           <RadioRow label="Custom schedule" value="custom" disabled />
         </RadioGroup>
+        <fieldset>
+          <legend className="text-label-large">Apply to</legend>
+          <RadioRow
+            native
+            name={`${theme}-scope`}
+            label="This event"
+            value="this"
+            defaultChecked
+          />
+          <RadioRow
+            native
+            name={`${theme}-scope`}
+            label="All events"
+            value="all"
+          />
+        </fieldset>
       </Example>
       <Example title="Tabs">
         <Tabs

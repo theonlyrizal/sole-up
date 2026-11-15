@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useSyncExternalStore } from "react";
 
+import { AreaChip, type CalendarAreaColors } from "@/components/data/area-chip";
 import { useRefreshOnNewDay } from "@/components/tasks/use-refresh-on-new-day";
 import { cx, focusRing } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
@@ -18,22 +19,33 @@ import { blockStatusLabel } from "@/lib/block-form";
 import {
   type GridItemPosition,
   gridItemTarget,
+  gridHref,
   type GridRange,
   gridRangeLabel,
   isGridKey,
 } from "@/lib/calendar-views";
-import { formatTimeOfDay, type LocalDate } from "@/lib/dates";
+import { formatTimeOfDay, type LocalDate, type WeekStart } from "@/lib/dates";
 import { type ScheduleEntry, timelineTimeLabel } from "@/lib/schedule";
 
+import type { BlockableTask } from "./block-form";
+import { CalendarActions } from "./calendar-actions";
+import {
+  areaItemStyle,
+  BlockStatusIcon,
+  useNowOffset,
+} from "./calendar-presentation";
 import type { EventFormContext } from "./event-dialog";
 import { ItemDialog, useItemDialog } from "./item-dialog";
-import { GridMoveNav, ViewNav } from "./view-nav";
+import { CalendarHeader, GridMoveNav } from "./view-nav";
 
 type AreaColumnsViewProps = EventFormContext & {
   /** The day's events and time blocks (`listDaySchedule`). */
   entries: ScheduleEntry[];
   /** The user's life areas, in their order (archived ones included). */
   areas: ColumnArea[];
+  areaColors: CalendarAreaColors;
+  tasks: BlockableTask[];
+  weekStart: WeekStart;
   range: GridRange<"areas">;
   today: LocalDate;
   /** When the user's tomorrow begins (ISO instant). */
@@ -62,6 +74,9 @@ const noSubscription = () => () => {};
 export function AreaColumnsView({
   entries,
   areas,
+  areaColors,
+  tasks,
+  weekStart,
   range,
   today,
   nextDayStartsAt,
@@ -78,6 +93,7 @@ export function AreaColumnsView({
   const { userTimeZone: timeZone, locale } = context;
   const columns = areaColumns(entries, areas, range.date, timeZone);
   const rangeLabel = gridRangeLabel(range, locale);
+  const nowOffset = useNowOffset(range.start, range.end, timeZone);
   const hasActiveArea = areas.some((area) => area.status === "active");
 
   // Arrow keys move between items: up and down within a column, left and
@@ -106,23 +122,23 @@ export function AreaColumnsView({
 
   return (
     <div className="flex flex-col gap-6">
-      <ViewNav current="areas" date={range.date} today={today} />
-      <GridMoveNav range={range} today={today} />
-      <div className="flex flex-col gap-1">
-        <p className="text-muted">
-          <span className="sr-only">Showing </span>
-          {rangeLabel}
-        </p>
-        <p className="text-sm text-muted">
-          {entries.length === 0
-            ? "Nothing this day. Events and time blocks show here, each in its life area's column."
-            : "Tab or the arrow keys move between items; Enter opens one."}
-        </p>
-        <p className="text-sm text-muted">
-          {
-            "An event sits in its own life area, and a time block in its task's goal's area."
-          }
-        </p>
+      <CalendarHeader
+        current="areas"
+        date={range.date}
+        today={today}
+        locale={locale}
+        weekStart={weekStart}
+        dateLabel={rangeLabel}
+        dateHref={(date) => gridHref("areas", date, today)}
+        move={GridMoveNav(range, today)}
+        actions={<CalendarActions context={context} tasks={tasks} />}
+      />
+      <div className="empty:hidden">
+        {entries.length === 0 && (
+          <p className="text-body-medium text-on-surface-variant">
+            Nothing this day. Events and time blocks show here by area.
+          </p>
+        )}
         {!hasActiveArea && (
           <p className="text-sm text-muted">
             You have no active life areas yet, so everything is under No area.{" "}
@@ -145,7 +161,7 @@ export function AreaColumnsView({
           tabIndex={0}
           onKeyDown={moveFocus}
           className={cx(
-            "overflow-x-auto rounded-md border border-border bg-surface",
+            "overflow-x-auto overscroll-x-contain rounded-xl border border-outline-variant bg-resting-surface",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
           )}
         >
@@ -160,6 +176,8 @@ export function AreaColumnsView({
               <Column
                 key={column.key}
                 column={column}
+                color={areaColors[column.areaId ?? ""] ?? "gray"}
+                nowOffset={nowOffset}
                 // Zero-padded, so the keys sort in column order.
                 position={String(index).padStart(3, "0")}
                 date={range.date}
@@ -198,10 +216,12 @@ function TimeAxis({
   return (
     <div
       aria-hidden="true"
-      className="row-span-3 grid grid-rows-subgrid border-r border-border text-xs text-muted"
+      className="row-span-3 grid grid-rows-subgrid border-r border-outline-variant text-label-small text-on-surface-variant tabular-nums"
     >
-      <div className="border-b border-border" />
-      <div className="border-b border-border px-1 py-2 text-right">All day</div>
+      <div className="border-b border-outline-variant" />
+      <div className="border-b border-outline-variant px-1 py-2 text-right">
+        All day
+      </div>
       <div className="relative" style={{ height: dayHeight(date, timeZone) }}>
         {dayHourMarks(date, timeZone).map((mark) => (
           <span
@@ -220,12 +240,16 @@ function TimeAxis({
 /** One area's column: its heading, its all-day items, its timed items. */
 function Column({
   column,
+  color,
+  nowOffset,
   position,
   date,
   context,
   onOpen,
 }: {
   column: AreaColumn;
+  color: NonNullable<CalendarAreaColors[string]>;
+  nowOffset: number | null;
   position: string;
   date: LocalDate;
   context: EventFormContext;
@@ -239,25 +263,23 @@ function Column({
       aria-labelledby={headingId}
       data-column={position}
       data-area-id={column.areaId ?? ""}
-      className="row-span-3 grid min-w-0 grid-rows-subgrid border-r border-border last:border-r-0"
+      className="row-span-3 grid min-w-0 grid-rows-subgrid border-r border-outline-variant last:border-r-0"
     >
       <h2
         id={headingId}
-        className="border-b border-border px-2 py-2 text-sm font-semibold break-words"
+        className="border-b border-outline-variant px-2 py-2 text-sm font-semibold break-words"
       >
-        {column.name}
-        {column.archived && (
-          <span className="font-normal text-muted"> (archived area)</span>
-        )}
+        <AreaChip name={column.name} color={color} archived={column.archived} />
       </h2>
-      <div className="border-b border-border p-1">
+      <div className="border-b border-outline-variant p-1">
         {column.allDay.length > 0 && (
           <ul className="flex flex-col gap-1">
             {column.allDay.map((entry) => (
-              <li key={entry.id} className="min-h-6">
+              <li key={entry.id} className="min-h-12">
                 <ColumnItem
                   entry={entry}
                   area={column.name}
+                  color={color}
                   date={date}
                   context={context}
                   onOpen={onOpen}
@@ -272,10 +294,17 @@ function Column({
           <div
             key={mark.at.toISOString()}
             aria-hidden="true"
-            className="absolute inset-x-0 border-t border-border"
+            className="absolute inset-x-0 border-t border-outline-variant"
             style={{ top: `${mark.offset * 100}%` }}
           />
         ))}
+        {nowOffset !== null && (
+          <div
+            aria-hidden="true"
+            className="calendar-now-line absolute inset-x-0 z-10"
+            style={{ top: `${nowOffset * 100}%` }}
+          />
+        )}
         {column.timed.length > 0 && (
           <ul>
             {column.timed.map(({ entry, top, height, lane, lanes }) => (
@@ -292,6 +321,7 @@ function Column({
                 <ColumnItem
                   entry={entry}
                   area={column.name}
+                  color={color}
                   date={date}
                   context={context}
                   onOpen={onOpen}
@@ -305,33 +335,18 @@ function Column({
   );
 }
 
-/**
- * An item's box: events are filled, time blocks tinted with a strong left
- * edge (a done one's in the success colour, a skipped one's dashed), as on
- * Week and Day. The Timeline (chunk 4.11) draws its items the same way.
- */
-export function areaItemBoxClass(entry: ScheduleEntry): string {
-  return entry.kind === "block"
-    ? cx(
-        "border border-l-4 bg-secondary-container text-on-secondary-container",
-        entry.block.status === "done"
-          ? "border-success"
-          : "border-secondary-ink",
-        entry.block.status === "skipped" && "border-dashed",
-      )
-    : "bg-primary-container text-on-primary-container";
-}
-
 /** An item in a column, in its box. */
 function ColumnItem({
   entry,
   area,
+  color,
   date,
   context,
   onOpen,
 }: {
   entry: ScheduleEntry;
   area: string;
+  color: NonNullable<CalendarAreaColors[string]>;
   date: LocalDate;
   context: EventFormContext;
   onOpen: (entry: ScheduleEntry, opener: HTMLElement) => void;
@@ -343,9 +358,10 @@ function ColumnItem({
     <div
       data-kind={entry.kind}
       className={cx(
-        "flex h-full min-w-0 flex-col overflow-hidden rounded-sm px-1 py-0.5 text-xs leading-tight",
-        areaItemBoxClass(entry),
+        "calendar-area-item relative flex h-full min-w-0 flex-col overflow-hidden rounded-sm px-1 py-0.5 text-label-small leading-tight",
+        entry.allDay && "min-h-12 justify-center",
       )}
+      style={areaItemStyle(color)}
     >
       <button
         type="button"
@@ -355,13 +371,16 @@ function ColumnItem({
         aria-describedby={descriptionId}
         onClick={(click) => onOpen(entry, click.currentTarget)}
         className={cx(
-          "cursor-pointer rounded-sm text-left font-medium break-words",
-          "hover:underline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-current",
+          "stretched-link flex min-w-0 cursor-pointer items-center gap-0.5 rounded-sm text-left text-label-large leading-tight",
+          "hover:underline",
         )}
       >
-        {entry.title}
+        {entry.kind === "block" && (
+          <BlockStatusIcon status={entry.block.status} />
+        )}
+        <span className="truncate">{entry.title}</span>
       </button>
-      {!entry.allDay && <span>{time}</span>}
+      {!entry.allDay && <span className="truncate tabular-nums">{time}</span>}
       <span id={descriptionId} className="sr-only">
         {[
           agendaEntryKind(entry),

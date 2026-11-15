@@ -62,7 +62,7 @@ async function addEvent(
   await dialog.getByLabel("Title").fill(title);
   const today = tokyoDate();
   if (start === undefined) {
-    await dialog.getByLabel("All day").check();
+    await dialog.getByRole("switch", { name: "All day" }).click();
     await dialog.getByLabel("Start date").fill(today);
     await dialog.getByLabel("End date").fill(today);
   } else {

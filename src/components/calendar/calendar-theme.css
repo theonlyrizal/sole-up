@@ -53,36 +53,177 @@
   --fc-classic-strong-border: var(--md-outline);
 }
 
-/*
- * Week and Day (chunk 4.6): a timed task deadline is a quiet marker, a
- * dashed outline on the muted surface, rather than a filled block.
- */
-.soleup-calendar .soleup-deadline {
-  border: 1px dashed var(--md-outline);
+/* Keep the schedule surface opaque, with a quiet lattice between items. */
+.soleup-calendar {
+  min-width: 0;
+  overflow: clip;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--corner-lg);
+  background: var(--md-resting-surface);
 }
 
-/* Week's day headings are FullCalendar's nav links: the app's focus ring. */
+.soleup-calendar :is(.soleup-grid-hour, .soleup-grid-heading) {
+  color: var(--md-on-surface-variant);
+  font-size: var(--text-label-small);
+}
+
+.soleup-calendar .soleup-grid-heading {
+  padding-block: 0.375rem;
+}
+
+.soleup-calendar .soleup-grid-heading [role="link"] {
+  display: block;
+  min-block-size: 3rem;
+  align-content: center;
+}
+
 .soleup-calendar [role="link"]:focus-visible {
+  outline: 2px solid var(--md-focus);
   outline-offset: -3px;
   border-radius: var(--corner-sm);
 }
 
-/*
- * Time blocks (chunk 4.8): time set aside for a task, a tinted block with a
- * strong left edge, unlike an event's solid fill. A done block's edge is
- * the success colour; a skipped one is dashed.
- */
+.calendar-grid-date[data-selected] {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  padding-inline: 0.5rem;
+}
+
+.calendar-grid-date[data-today] {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  padding-inline: 0.5rem;
+}
+
+.calendar-grid-date[data-today][data-selected] {
+  box-shadow:
+    inset 0 0 0 2px var(--md-primary),
+    inset 0 0 0 3px var(--md-on-primary);
+}
+
+.soleup-calendar :is(.soleup-event, .soleup-block, .soleup-deadline) {
+  border-radius: var(--corner-sm);
+}
+
+.soleup-calendar .soleup-event {
+  border-inline-start: 3px solid var(--md-primary);
+}
+
 .soleup-calendar .soleup-block {
-  border: 1px solid var(--md-secondary-ink);
-  border-left-width: 4px;
+  border-inline-start: 3px solid var(--md-secondary-ink);
 }
 
 .soleup-calendar .soleup-block-done {
-  border-color: var(--md-success);
+  border-inline-start-color: var(--md-success);
 }
 
 .soleup-calendar .soleup-block-skipped {
-  border-style: dashed;
+  border-inline-start-style: dashed;
+}
+
+.soleup-calendar .soleup-deadline {
+  border: 1px dashed var(--md-outline);
+}
+
+.soleup-deadline [data-calendar-item] {
+  flex-shrink: 0;
+}
+
+.calendar-deadline-time {
+  position: absolute;
+  inset-inline-end: 0.375rem;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+}
+
+.soleup-calendar-week .calendar-deadline-time {
+  /* The label remains in the item's description at narrow column widths. */
+  clip-path: inset(50%);
+}
+
+.soleup-calendar-day .soleup-deadline [data-calendar-item] {
+  padding-inline-end: 6rem;
+}
+
+/* Stretched hit areas stay within the existing item placement. */
+:is(
+  .calendar-agenda-card,
+  .calendar-area-item,
+  .soleup-event,
+  .soleup-block,
+  .soleup-deadline
+):has(.stretched-link:focus-visible) {
+  outline: 2px solid var(--md-focus);
+  outline-offset: -2px;
+}
+
+.soleup-calendar .soleup-event-mirror {
+  box-shadow: var(--shadow-5);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .soleup-calendar .soleup-event-mirror {
+    scale: 1.02;
+  }
+}
+
+.calendar-area-item {
+  border-inline-start: 3px solid;
+}
+
+.calendar-now-line,
+.calendar-now-line-vertical {
+  pointer-events: none;
+  color: var(--md-feature-ink);
+}
+
+.soleup-calendar .calendar-now-line,
+.calendar-now-line {
+  border-top: 2px solid currentColor;
+}
+
+.calendar-now-line-vertical {
+  border-inline-start: 2px solid currentColor;
+}
+
+.soleup-calendar .calendar-now-dot {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--md-feature-ink);
+  translate: -50% -50%;
+}
+
+.soleup-calendar .soleup-agenda-default-marker {
+  display: none;
+}
+
+.soleup-calendar .soleup-agenda-heading {
+  padding: 0.5rem 0.75rem;
+  background: var(--md-surface-container-low);
+}
+
+.calendar-agenda-card[data-kind="event"] {
+  border-inline-start: 4px solid var(--md-primary);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.calendar-agenda-card[data-kind="block"] {
+  border-inline-start: 4px solid var(--md-secondary-ink);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.calendar-agenda-card[data-kind="task"] {
+  border: 1px dashed var(--md-outline);
+}
+
+@media (width < 37.5rem) {
+  .calendar-date-nav {
+    width: 100%;
+  }
 }
 
 /* The task panel's rows while one is dragged onto the grid. */

@@ -12,8 +12,7 @@ export function mediaQuery(name: Breakpoint): string {
   return `(min-width: ${BREAKPOINTS[name] / 16}rem)`;
 }
 
-/** Preserve Tailwind's md and lg boundaries until the Calendar redesign. */
+/** The calendar's original Week to Day cutoff. */
 export const CALENDAR_QUERIES = {
   week: "(min-width: 48rem)",
-  taskPanel: "(min-width: 64rem)",
 } as const;

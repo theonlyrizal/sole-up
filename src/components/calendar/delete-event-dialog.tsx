@@ -1,11 +1,11 @@
 "use client";
 
-import { AlertDialog } from "radix-ui";
 import { useId, useRef, useState, useTransition } from "react";
 
+import { InlineBanner } from "@/components/ui/inline-banner";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { contentClass, overlayClass } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { CalendarConfirmDialog } from "./calendar-confirm-dialog";
 import { toast } from "@/components/ui/toast";
 import type {
   CalendarEventOccurrence,
@@ -48,7 +48,7 @@ export function DeleteEventDialog({
   const originalStart = originalStartParam(event);
   if (originalStart === null) {
     return (
-      <ConfirmDialog
+      <CalendarConfirmDialog
         trigger={trigger}
         title={`Delete “${event.title}”?`}
         description="This permanently deletes the event and its history. It can't be undone."
@@ -92,7 +92,7 @@ function DeleteOccurrenceDialog({
   onDeleted?: () => void;
 }) {
   const id = useId();
-  const contentRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLFormElement>(null);
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<CalendarEventScope>("this");
   const [options, setOptions] = useState<
@@ -147,63 +147,52 @@ function DeleteOccurrenceDialog({
   }
 
   return (
-    <AlertDialog.Root open={open} onOpenChange={changeOpen}>
-      <AlertDialog.Trigger asChild>{trigger}</AlertDialog.Trigger>
-      <AlertDialog.Portal>
-        <AlertDialog.Overlay className={overlayClass} />
-        <AlertDialog.Content
-          ref={contentRef}
-          className={contentClass}
-          onOpenAutoFocus={(focusEvent) => {
-            // Start on the choice rather than Cancel: it's the question.
-            const radio =
-              contentRef.current?.querySelector<HTMLInputElement>(
-                "input:checked",
-              );
-            if (radio) {
-              focusEvent.preventDefault();
-              radio.focus();
-            }
-          }}
-        >
-          <AlertDialog.Title className="text-lg font-semibold">
-            {`Delete “${event.title}”?`}
-          </AlertDialog.Title>
-          <AlertDialog.Description className="text-muted">
-            This event repeats. Deleted events can&apos;t be brought back.
-          </AlertDialog.Description>
-          <ScopeChooser
-            id={`${id}-scope`}
-            legend="Delete"
-            action="delete"
-            value={scope}
-            onChange={setScope}
-            options={options}
-            loading={loading}
-            locale={locale}
-            timeZone={timeZone}
-          />
-          {error && (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-          <div className="flex flex-wrap justify-end gap-3">
-            <AlertDialog.Cancel asChild>
-              <Button variant="secondary" disabled={pending}>
-                Cancel
-              </Button>
-            </AlertDialog.Cancel>
-            <Button
-              variant="danger"
-              disabled={pending || loading}
-              onClick={confirm}
-            >
-              {pending ? "Deleting…" : "Delete"}
-            </Button>
-          </div>
-        </AlertDialog.Content>
-      </AlertDialog.Portal>
-    </AlertDialog.Root>
+    <FormDialog
+      alert
+      title={`Delete “${event.title}”?`}
+      description={"This event repeats. Deleted events can’t be brought back."}
+      trigger={trigger}
+      open={open}
+      onOpenChange={changeOpen}
+      formId={id}
+      submitLabel={pending ? "Deleting…" : "Delete"}
+      submitVariant="danger"
+      pending={pending}
+      submitDisabled={loading}
+      onOpenAutoFocus={(focusEvent) => {
+        // Start on the choice rather than Cancel: it's the question.
+        const radio =
+          contentRef.current?.querySelector<HTMLInputElement>("input:checked");
+        if (radio) {
+          focusEvent.preventDefault();
+          radio.focus();
+        }
+      }}
+    >
+      <form
+        id={id}
+        ref={contentRef}
+        className="grid gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!pending && !loading) confirm();
+        }}
+      >
+        <ScopeChooser
+          id={`${id}-scope`}
+          noun="event"
+          legend="Delete"
+          action="delete"
+          value={scope}
+          onChange={setScope}
+          options={options}
+          loading={loading}
+          locale={locale}
+          timeZone={timeZone}
+        />
+        {error && <InlineBanner tone="error">{error}</InlineBanner>}
+      </form>
+    </FormDialog>
   );
 }

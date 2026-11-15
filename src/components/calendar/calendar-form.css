@@ -1,0 +1,27 @@
+.calendar-time-fields {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+
+.calendar-time-group {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--corner-lg);
+}
+
+.calendar-time-group legend {
+  padding-inline: 0.25rem;
+  font-size: var(--text-title-medium);
+  font-weight: 600;
+}
+
+@media (width < 37.5rem) {
+  .calendar-time-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

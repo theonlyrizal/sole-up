@@ -3,6 +3,7 @@
 import { Draggable } from "@fullcalendar/react/interaction";
 import { useEffect, useRef } from "react";
 
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { defaultBlockMinutes } from "@/lib/block-form";
 import { formatEstimate } from "@/lib/task-list";
@@ -51,12 +52,13 @@ export function TaskPanel({
   }, [hasTasks]);
 
   return (
-    <aside
-      aria-labelledby="task-panel-heading"
+    <Card
+      as="aside"
+      headingId="task-panel-heading"
       // Sticky, so it stays in reach while the long day grid scrolls.
-      className="sticky top-4 flex flex-col gap-3 rounded-lg border border-border bg-surface p-3"
+      className="sticky top-4 flex flex-col gap-3 medium:p-4"
     >
-      <h2 id="task-panel-heading" className="font-semibold">
+      <h2 id="task-panel-heading" className="text-title-medium">
         Open tasks
       </h2>
       <p className="text-sm text-muted">
@@ -79,7 +81,7 @@ export function TaskPanel({
                 data-task-id={task.id}
                 data-title={task.title}
                 data-minutes={minutes}
-                className="soleup-task-drag flex flex-col gap-1 rounded-md border border-border bg-bg p-2 text-sm"
+                className="soleup-task-drag flex flex-col gap-1 rounded-lg bg-surface-container-low p-2 text-sm"
               >
                 <span className="font-medium break-words">{task.title}</span>
                 <span className="flex items-center justify-between gap-2">
@@ -104,6 +106,6 @@ export function TaskPanel({
           })}
         </ul>
       )}
-    </aside>
+    </Card>
   );
 }

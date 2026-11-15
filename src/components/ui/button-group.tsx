@@ -12,6 +12,7 @@ type Item = {
   icon?: IconName;
   href?: string;
   disabled?: boolean;
+  className?: string;
 };
 
 type ConnectedButtonGroupProps = {
@@ -20,6 +21,7 @@ type ConnectedButtonGroupProps = {
   value: string;
   onValueChange?: (value: string) => void;
   size?: "xs" | "s";
+  compactLabels?: boolean;
 };
 
 const groupClass =
@@ -31,6 +33,7 @@ export function ConnectedButtonGroup({
   value,
   onValueChange,
   size = "s",
+  compactLabels = false,
 }: ConnectedButtonGroupProps) {
   const group = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -48,19 +51,22 @@ export function ConnectedButtonGroup({
   }, [value]);
 
   const itemClass = cx(
-    "ui-action connected-item state-layer inline-flex min-w-12 shrink-0 items-center justify-center gap-2 px-4 text-label-large",
+    "ui-action connected-item state-layer inline-flex min-w-12 shrink-0 items-center justify-center gap-2 text-label-large",
+    compactLabels ? "connected-compact whitespace-nowrap" : "px-4",
     size === "xs" ? "action-xs" : "action-s",
   );
   const content = ({ icon, label, value: itemValue }: Item) => (
     <>
-      <span
-        className="grid size-5 shrink-0 place-items-center"
-        aria-hidden="true"
-      >
-        {(icon || itemValue === value) && (
-          <Icon name={icon ?? "check"} size={20} />
-        )}
-      </span>
+      {(!compactLabels || icon) && (
+        <span
+          className="grid size-5 shrink-0 place-items-center"
+          aria-hidden="true"
+        >
+          {(icon || itemValue === value) && (
+            <Icon name={icon ?? "check"} size={20} />
+          )}
+        </span>
+      )}
       {label}
     </>
   );
@@ -71,7 +77,7 @@ export function ConnectedButtonGroup({
           <Link
             key={item.value}
             href={item.href!}
-            className={itemClass}
+            className={cx(itemClass, item.className)}
             aria-current={item.value === value ? "page" : undefined}
           >
             {content(item)}
@@ -100,7 +106,7 @@ export function ConnectedButtonGroup({
           key={item.value}
           value={item.value}
           disabled={item.disabled}
-          className={itemClass}
+          className={cx(itemClass, item.className)}
         >
           {content(item)}
         </ToggleGroup.Item>

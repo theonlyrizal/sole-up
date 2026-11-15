@@ -8,6 +8,8 @@ import {
   signInAndConfirm,
 } from "./helpers";
 import {
+  CALENDAR_BLOCK_TITLE,
+  CALENDAR_SERIES_TITLE,
   createUnscheduledHabit,
   DAILY_HABIT,
   EVENT_TITLE,
@@ -28,6 +30,234 @@ const sizes = [
   { width: 1280, height: 800 },
 ] as const;
 const themes = ["light", "dark"] as const;
+
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-7 calendar ${viewport.width} ${theme}`, async ({
+      page,
+    }) => {
+      test.setTimeout(150_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      const { today } = await seedVisualData(page, { calendar: true });
+      const capture = (state: string, fullPage = true) =>
+        page.screenshot({
+          path: `test-results/visual/ui-7/${state}-${viewport.width}-${theme}.png`,
+          fullPage,
+          animations: "disabled",
+        });
+      const series = page.getByRole("button", {
+        name: CALENDAR_SERIES_TITLE,
+        exact: true,
+      });
+
+      for (const view of ["agenda", "week", "day", "areas", "timeline"]) {
+        await openPage(
+          page,
+          `/plan/calendar?view=${view}${view === "timeline" ? "&span=day" : ""}`,
+        );
+        if (view === "week" && viewport.width === 390) {
+          await expect(page).toHaveURL(/view=day$/);
+        }
+        await expect(series.first()).toBeVisible();
+        await checkRenderedPage(page, theme);
+        await capture(
+          view === "week" && viewport.width === 390
+            ? "week-fallback-day"
+            : view,
+        );
+        if (view === "week") continue;
+        for (const width of [320, 375, 390, 414, 768, 1280]) {
+          await page.setViewportSize({ width, height: viewport.height });
+          await checkRenderedPage(page, theme);
+        }
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        await checkRenderedPage(page, theme);
+        await page.evaluate(() => {
+          document.documentElement.style.removeProperty("font-size");
+        });
+      }
+
+      await openPage(page, "/plan/calendar?view=day");
+      const picker = page.getByRole("dialog", { name: "Go to date" });
+      await page.getByRole("button", { name: /^Go to date,/ }).press("Enter");
+      await expect(picker.getByRole("grid")).toBeVisible();
+      await capture("date-picker", false);
+      await page.keyboard.press("ArrowRight");
+      await expect(
+        picker.locator('[role="gridcell"][aria-selected="true"] button'),
+      ).not.toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(picker).toHaveCount(0);
+
+      const newEvent = page.getByRole("button", {
+        name: "New event",
+        exact: true,
+      });
+      await newEvent.press("Enter");
+      const event = page.getByRole("dialog", { name: "New event" });
+      const title = event.getByLabel("Title", { exact: true });
+      await expect(title).toBeFocused();
+      await title.fill("Pick up prints for the neighborhood exhibition");
+      await event.getByLabel("Start date").fill(today);
+      await event.getByLabel("Start time").fill("12:00");
+      await capture("event-form", false);
+
+      const release = Promise.withResolvers<void>();
+      const requested = Promise.withResolvers<void>();
+      const calendarRoute = (url: URL) => url.pathname === "/plan/calendar";
+      await page.route(calendarRoute, async (route) => {
+        const request = route.request();
+        if (request.method() !== "POST" || !request.headers()["next-action"])
+          return route.continue();
+        requested.resolve();
+        await release.promise;
+        const [input] = request.postDataJSON() as [{ title: string }];
+        await route.continue({
+          postData: JSON.stringify([{ ...input, title: "" }]),
+        });
+      });
+      const add = event.getByRole("button", { name: "Add event", exact: true });
+      await add.click();
+      try {
+        await requested.promise;
+        const saving = event.getByRole("button", { name: "Saving…" });
+        await expect(saving).toBeDisabled();
+        await expect(saving).toHaveAttribute("aria-busy", "true");
+        await capture("event-pending", false);
+      } finally {
+        release.resolve();
+      }
+      await expect(title).toHaveAttribute("aria-invalid", "true");
+      await expect(title).toHaveValue(
+        "Pick up prints for the neighborhood exhibition",
+      );
+      await expect(title).toBeFocused();
+      await capture("event-error", false);
+      await page.unroute(calendarRoute);
+      await add.click();
+      await expect(event).toHaveCount(0);
+      const saved = page.getByRole("button", {
+        name: "Pick up prints for the neighborhood exhibition",
+        exact: true,
+      });
+      await expect(saved).toBeVisible();
+      await saved.scrollIntoViewIfNeeded();
+      await capture("event-retry-saved", false);
+
+      await series.click();
+      const edit = page.getByRole("dialog", { name: "Edit event" });
+      await edit.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(
+        edit.getByRole("radio", { name: "This event", exact: true }),
+      ).toBeFocused();
+      await capture("event-scope", false);
+      await edit.getByRole("button", { name: "Back" }).click();
+      await edit
+        .getByRole("button", { name: `Delete: ${CALENDAR_SERIES_TITLE}` })
+        .click();
+      const removeEvent = page.getByRole("alertdialog");
+      await expect(
+        removeEvent.getByRole("radio", { name: "All events" }),
+      ).toHaveAccessibleDescription(/changed separately/);
+      await capture("event-delete-warning", false);
+      await page.keyboard.press("Escape");
+      await expect(removeEvent).toHaveCount(0);
+      await expect(
+        edit.getByRole("button", { name: `Delete: ${CALENDAR_SERIES_TITLE}` }),
+      ).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(series).toBeFocused();
+
+      const block = page.getByRole("button", {
+        name: CALENDAR_BLOCK_TITLE,
+        exact: true,
+      });
+      await block.click();
+      const details = page.getByRole("dialog", {
+        name: "Time block",
+        exact: true,
+      });
+      await expect(details).toBeVisible();
+      await capture("block-details", false);
+      await details.getByRole("button", { name: "Delete block" }).click();
+      await expect(
+        page
+          .getByRole("alertdialog")
+          .getByRole("radio", { name: "This block", exact: true }),
+      ).toBeFocused();
+      await capture("block-delete", false);
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("alertdialog")).toHaveCount(0);
+      await expect(
+        details.getByRole("button", { name: "Delete block" }),
+      ).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(block).toBeFocused();
+
+      // Drag the real block by one hour, then dismiss the scope prompt and verify reversion.
+      await block.scrollIntoViewIfNeeded();
+      const box = (await block.boundingBox())!;
+      const [slot, nextSlot] = await page
+        .locator(".soleup-calendar-day [data-time]")
+        .evaluateAll((slots) => {
+          const lanes = slots.filter((element) =>
+            element.getAttribute("data-time")?.startsWith("08:"),
+          );
+          return lanes
+            .map((element) => element.getBoundingClientRect().y)
+            .filter((y, index, all) => all.indexOf(y) === index);
+        });
+      const halfHour = Math.abs((nextSlot ?? 0) - (slot ?? 0));
+      expect(halfHour).toBeGreaterThan(0);
+      await page.mouse.move(box.x + 12, box.y + 8);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 12, box.y + 8 + halfHour * 2, {
+        steps: 10,
+      });
+      await page.mouse.up();
+      const move = page.getByRole("dialog", { name: "Move block" });
+      await expect(
+        move.getByRole("radio", { name: "This block", exact: true }),
+      ).toBeFocused();
+      await expect(
+        move.getByRole("button", { name: "Save", exact: true }),
+      ).toBeEnabled();
+      await capture("block-move", false);
+      await page.keyboard.press("Escape");
+      await expect(move).toHaveCount(0);
+      await expect(block).toHaveAccessibleDescription(/8:30 AM/);
+
+      const blockTrigger = page.getByRole("button", {
+        name: "Block time",
+        exact: true,
+      });
+      await blockTrigger.click();
+      const blockForm = page.getByRole("dialog", {
+        name: "Block time",
+        exact: true,
+      });
+      await blockForm
+        .getByLabel("Task", { exact: true })
+        .selectOption({ label: CALENDAR_BLOCK_TITLE });
+      await capture("block-form", false);
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = "200%";
+      });
+      await checkRenderedPage(page, theme);
+      await expect(
+        blockForm.getByRole("button", { name: "Block time", exact: true }),
+      ).toBeInViewport();
+    });
+  }
+}
 
 for (const viewport of sizes) {
   for (const theme of themes) {
@@ -805,7 +1035,7 @@ async function checkRenderedPage(
   expect(styles.scheme).toBe(colorScheme);
   expect(
     styles.overflow,
-    `page overflow at ${page.viewportSize()?.width}px on ${new URL(page.url()).pathname}`,
+    `page overflow at ${page.viewportSize()?.width}px on ${new URL(page.url()).pathname}${new URL(page.url()).search}`,
   ).toBeLessThanOrEqual(1);
 }
 

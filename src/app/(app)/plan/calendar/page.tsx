@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import type { BlockableTask } from "@/components/calendar/block-form";
 import { AgendaView } from "@/components/calendar/agenda-view";
 import { AreaColumnsView } from "@/components/calendar/area-columns-view";
 import { AreaTimelineView } from "@/components/calendar/area-timeline-view";
@@ -26,6 +27,7 @@ import {
   listEventLinkOptions,
   listSchedule,
 } from "@/server/modules/calendar-events/queries";
+import { getLifeAreasView } from "@/server/modules/life-areas/queries";
 import { getUserPreferences } from "@/server/modules/preferences/service";
 import { listPlanTasks } from "@/server/modules/tasks/queries";
 
@@ -35,11 +37,7 @@ export default function CalendarPage({
   searchParams,
 }: PageProps<"/plan/calendar">) {
   return (
-    <PageFrame
-      title="Calendar"
-      description="Appointments, time blocks, planned tasks and deadlines, day by day."
-      subnav={<PlanTabs />}
-    >
+    <PageFrame title="Calendar" subnav={<PlanTabs />}>
       <Suspense fallback={<LoadingState label="Loading the calendar" />}>
         <CalendarPageBody searchParams={searchParams} />
       </Suspense>
@@ -77,18 +75,36 @@ async function Calendar({
     timeZone,
   ).toISOString();
 
+  // The same open tasks supply Block time in every view and the Week panel.
+  const openTasks = listPlanTasks(user.id, parseTaskListFilters({}), {
+    today,
+    timeZone,
+  }).then((tasks): BlockableTask[] =>
+    tasks.map(({ id, title, estimatedMinutes }) => ({
+      id,
+      title,
+      estimatedMinutes,
+    })),
+  );
+  const navigation = {
+    today,
+    nextDayStartsAt,
+    weekStart: preferences.weekStart,
+  };
+
   if (view === "agenda") {
     const range = parseAgendaRange(params, today);
-    const [entries, options] = await Promise.all([
+    const [entries, options, tasks] = await Promise.all([
       listAgenda(user.id, range, timeZone),
       listEventLinkOptions(user.id),
+      openTasks,
     ]);
     return (
       <AgendaView
         entries={entries}
         range={range}
-        today={today}
-        nextDayStartsAt={nextDayStartsAt}
+        tasks={tasks}
+        {...navigation}
         options={options}
         {...context}
       />
@@ -97,9 +113,11 @@ async function Calendar({
 
   if (view === "areas") {
     const range = parseGridRange(view, params, today, preferences.weekStart);
-    const [entries, options] = await Promise.all([
+    const [entries, options, tasks, lifeAreas] = await Promise.all([
       listDaySchedule(user.id, range.date, timeZone),
       listEventLinkOptions(user.id),
+      openTasks,
+      getLifeAreasView(user.id),
     ]);
     return (
       <AreaColumnsView
@@ -107,9 +125,15 @@ async function Calendar({
         key={range.start}
         entries={entries}
         areas={options.areas}
+        areaColors={Object.fromEntries(
+          [...lifeAreas.active, ...lifeAreas.archived].map(({ id, color }) => [
+            id,
+            color,
+          ]),
+        )}
         range={range}
-        today={today}
-        nextDayStartsAt={nextDayStartsAt}
+        tasks={tasks}
+        {...navigation}
         options={options}
         {...context}
       />
@@ -118,9 +142,11 @@ async function Calendar({
 
   if (view === "timeline") {
     const range = parseTimelineRange(params, today, preferences.weekStart);
-    const [entries, options] = await Promise.all([
+    const [entries, options, tasks, lifeAreas] = await Promise.all([
       listSchedule(user.id, range, timeZone),
       listEventLinkOptions(user.id),
+      openTasks,
+      getLifeAreasView(user.id),
     ]);
     return (
       <AreaTimelineView
@@ -128,9 +154,15 @@ async function Calendar({
         key={`${range.span}:${range.start}`}
         entries={entries}
         areas={options.areas}
+        areaColors={Object.fromEntries(
+          [...lifeAreas.active, ...lifeAreas.archived].map(({ id, color }) => [
+            id,
+            color,
+          ]),
+        )}
         range={range}
-        today={today}
-        nextDayStartsAt={nextDayStartsAt}
+        tasks={tasks}
+        {...navigation}
         options={options}
         {...context}
       />
@@ -141,23 +173,16 @@ async function Calendar({
   const [entries, options, tasks] = await Promise.all([
     listCalendarGrid(user.id, range, timeZone),
     listEventLinkOptions(user.id),
-    // Open tasks, as the Plan page lists them by default: what a block can
-    // be made for from the grid.
-    listPlanTasks(user.id, parseTaskListFilters({}), { today, timeZone }),
+    openTasks,
   ]);
   return (
     <TimeGridView
       // A new key per range, so moving resets the grid's scroll and focus.
       key={`${range.view}:${range.start}`}
       entries={entries}
-      tasks={tasks.map(({ id, title, estimatedMinutes }) => ({
-        id,
-        title,
-        estimatedMinutes,
-      }))}
+      tasks={tasks}
       range={range}
-      today={today}
-      nextDayStartsAt={nextDayStartsAt}
+      {...navigation}
       openItemId={parseCalendarItem(params)}
       options={options}
       {...context}

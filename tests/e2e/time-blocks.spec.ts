@@ -302,7 +302,8 @@ test("a repeating block asks for the scope when dragged, and a completed task's 
   await form.getByLabel("Date").fill(today);
   await form.getByLabel("Start time").fill("00:00");
   await form.getByLabel("Length (minutes)").fill("30");
-  await form.getByLabel("Repeat", { exact: true }).selectOption("daily");
+  await form.getByRole("button", { name: "Repeat", exact: true }).click();
+  await form.getByLabel("Frequency").selectOption("daily");
   await form.getByRole("radio", { name: "After a number of times" }).check();
   await form.getByRole("spinbutton", { name: "Number of times" }).fill("3");
   await form.getByRole("button", { name: "Block time" }).click();

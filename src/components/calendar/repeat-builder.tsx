@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Disclosure } from "@/components/ui/disclosure";
 import { cx, focusRing } from "@/components/ui/cx";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -77,130 +79,61 @@ export function RepeatBuilder({
 }: RepeatBuilderProps) {
   const set = (patch: Partial<RepeatValues>) =>
     onChange({ ...value, ...patch });
+  const [open, setOpen] = useState(false);
+  const hasErrors =
+    Object.values(errors).some((messages) => messages?.length) ||
+    Boolean(ruleErrors?.length);
   const summary = repeatSummary(value, startDate, locale);
   const summaryId = `${id}-summary`;
   const ruleErrorId = `${id}-rule-error`;
 
   return (
-    <div className="flex flex-col gap-4 rounded-md border border-border p-4">
-      <FormField
-        id={`${id}-frequency`}
-        label="Repeat"
-        errors={errors.frequency}
-      >
-        {(control) => (
-          <Select
-            {...control}
-            aria-describedby={
-              [control["aria-describedby"], summary && summaryId]
-                .filter(Boolean)
-                .join(" ") || undefined
-            }
-            value={value.frequency}
-            onChange={(event) =>
-              set({ frequency: event.target.value as RepeatFrequency })
-            }
-          >
-            {(Object.keys(FREQUENCY_LABELS) as RepeatFrequency[]).map(
-              (frequency) => (
-                <option key={frequency} value={frequency}>
-                  {FREQUENCY_LABELS[frequency]}
-                </option>
-              ),
-            )}
-          </Select>
-        )}
-      </FormField>
-
-      {value.frequency !== "none" && (
-        <>
-          <FormField
-            id={`${id}-interval`}
-            label={`Repeat every (${REPEAT_UNITS[value.frequency][1]})`}
-            errors={errors.interval}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={RECURRENCE_INTERVAL_MAX}
-                step={1}
-                value={value.interval}
-                className="w-28"
-                onChange={(event) => set({ interval: event.target.value })}
-              />
-            )}
-          </FormField>
-
-          {value.frequency === "weekly" && (
-            <ChoiceGroup
-              id={`${id}-weekdays`}
-              legend="On these days"
-              errors={errors.weekdays}
+    <Disclosure
+      title={
+        open || hasErrors || value.frequency === "none" || !summary
+          ? "Repeat"
+          : `Repeat · ${summary}`
+      }
+      open={open || hasErrors}
+      onOpenChange={setOpen}
+      className="border-t border-outline-variant pt-2"
+    >
+      <div className="grid gap-4 pt-2 pb-1">
+        <FormField
+          id={`${id}-frequency`}
+          label="Frequency"
+          errors={errors.frequency}
+        >
+          {(control) => (
+            <Select
+              {...control}
+              aria-describedby={
+                [control["aria-describedby"], summary && summaryId]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
+              value={value.frequency}
+              onChange={(event) =>
+                set({ frequency: event.target.value as RepeatFrequency })
+              }
             >
-              <div className="flex flex-wrap gap-x-4 gap-y-2">
-                {RECURRENCE_WEEKDAYS.map((day) => (
-                  <label key={day} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={value.weekdays.includes(day)}
-                      aria-label={WEEKDAY_LABELS[day][1]}
-                      onChange={(event) =>
-                        set({
-                          weekdays: event.target.checked
-                            ? [...value.weekdays, day]
-                            : value.weekdays.filter((other) => other !== day),
-                        })
-                      }
-                      className={cx("size-4 accent-accent", focusRing)}
-                    />
-                    <span aria-hidden="true">{WEEKDAY_LABELS[day][0]}</span>
-                  </label>
-                ))}
-              </div>
-            </ChoiceGroup>
+              {(Object.keys(FREQUENCY_LABELS) as RepeatFrequency[]).map(
+                (frequency) => (
+                  <option key={frequency} value={frequency}>
+                    {FREQUENCY_LABELS[frequency]}
+                  </option>
+                ),
+              )}
+            </Select>
           )}
+        </FormField>
 
-          {value.frequency === "monthly" && (
-            <ChoiceGroup
-              id={`${id}-monthly`}
-              legend="Day of the month"
-              errors={errors.monthlyOn}
-            >
-              {monthlyOptions(startDate, value.monthlyOn).map((option) => {
-                const key = monthlyOnKey(option);
-                return (
-                  <Radio
-                    key={key}
-                    name={`${id}-monthly`}
-                    checked={key === monthlyOnKey(value.monthlyOn)}
-                    onChange={() => set({ monthlyOn: option })}
-                    label={monthlyOnLabel(option)}
-                  />
-                );
-              })}
-            </ChoiceGroup>
-          )}
-
-          <ChoiceGroup id={`${id}-ends`} legend="Ends">
-            {(Object.keys(ENDS_LABELS) as RepeatEnds[]).map((ends) => (
-              <Radio
-                key={ends}
-                name={`${id}-ends`}
-                checked={value.ends === ends}
-                onChange={() => set({ ends })}
-                label={ENDS_LABELS[ends]}
-              />
-            ))}
-          </ChoiceGroup>
-          {value.ends === "count" && (
+        {value.frequency !== "none" && (
+          <>
             <FormField
-              id={`${id}-count`}
-              label="Number of times"
-              hint="Including the first event."
-              errors={errors.count}
+              id={`${id}-interval`}
+              label={`Repeat every (${REPEAT_UNITS[value.frequency][1]})`}
+              errors={errors.interval}
             >
               {(control) => (
                 <Input
@@ -208,47 +141,134 @@ export function RepeatBuilder({
                   type="number"
                   inputMode="numeric"
                   min={1}
-                  max={RECURRENCE_COUNT_MAX}
+                  max={RECURRENCE_INTERVAL_MAX}
                   step={1}
-                  value={value.count}
+                  value={value.interval}
                   className="w-28"
-                  onChange={(event) => set({ count: event.target.value })}
+                  onChange={(event) => set({ interval: event.target.value })}
                 />
               )}
             </FormField>
-          )}
-          {value.ends === "until" && (
-            <FormField
-              id={`${id}-until`}
-              label="Last date"
-              hint="The last day an event can start on."
-              errors={errors.until}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  type="date"
-                  value={value.until}
-                  min={startDate || undefined}
-                  className="w-auto"
-                  onChange={(event) => set({ until: event.target.value })}
-                />
-              )}
-            </FormField>
-          )}
-        </>
-      )}
 
-      {summary && (
-        <p id={summaryId} className="text-sm text-muted">
-          {summary}
-        </p>
-      )}
-      {ruleErrors && ruleErrors.length > 0 && (
-        <p id={ruleErrorId} className="text-sm text-danger">
-          {ruleErrors.join(" ")}
-        </p>
-      )}
-    </div>
+            {value.frequency === "weekly" && (
+              <ChoiceGroup
+                id={`${id}-weekdays`}
+                legend="On these days"
+                errors={errors.weekdays}
+              >
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {RECURRENCE_WEEKDAYS.map((day) => (
+                    <label
+                      key={day}
+                      className="flex min-h-12 cursor-pointer items-center gap-2"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={value.weekdays.includes(day)}
+                        aria-label={WEEKDAY_LABELS[day][1]}
+                        onChange={(event) =>
+                          set({
+                            weekdays: event.target.checked
+                              ? [...value.weekdays, day]
+                              : value.weekdays.filter((other) => other !== day),
+                          })
+                        }
+                        className={cx("size-4 accent-accent", focusRing)}
+                      />
+                      <span aria-hidden="true">{WEEKDAY_LABELS[day][0]}</span>
+                    </label>
+                  ))}
+                </div>
+              </ChoiceGroup>
+            )}
+
+            {value.frequency === "monthly" && (
+              <ChoiceGroup
+                id={`${id}-monthly`}
+                legend="Day of the month"
+                errors={errors.monthlyOn}
+              >
+                {monthlyOptions(startDate, value.monthlyOn).map((option) => {
+                  const key = monthlyOnKey(option);
+                  return (
+                    <Radio
+                      key={key}
+                      name={`${id}-monthly`}
+                      checked={key === monthlyOnKey(value.monthlyOn)}
+                      onChange={() => set({ monthlyOn: option })}
+                      label={monthlyOnLabel(option)}
+                    />
+                  );
+                })}
+              </ChoiceGroup>
+            )}
+
+            <ChoiceGroup id={`${id}-ends`} legend="Ends">
+              {(Object.keys(ENDS_LABELS) as RepeatEnds[]).map((ends) => (
+                <Radio
+                  key={ends}
+                  name={`${id}-ends`}
+                  checked={value.ends === ends}
+                  onChange={() => set({ ends })}
+                  label={ENDS_LABELS[ends]}
+                />
+              ))}
+            </ChoiceGroup>
+            {value.ends === "count" && (
+              <FormField
+                id={`${id}-count`}
+                label="Number of times"
+                hint="Including the first event."
+                errors={errors.count}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={RECURRENCE_COUNT_MAX}
+                    step={1}
+                    value={value.count}
+                    className="w-28"
+                    onChange={(event) => set({ count: event.target.value })}
+                  />
+                )}
+              </FormField>
+            )}
+            {value.ends === "until" && (
+              <FormField
+                id={`${id}-until`}
+                label="Last date"
+                hint="The last day an event can start on."
+                errors={errors.until}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    type="date"
+                    value={value.until}
+                    min={startDate || undefined}
+                    className="w-auto"
+                    onChange={(event) => set({ until: event.target.value })}
+                  />
+                )}
+              </FormField>
+            )}
+          </>
+        )}
+
+        {summary && (
+          <p id={summaryId} className="text-sm text-muted">
+            {summary}
+          </p>
+        )}
+        {ruleErrors && ruleErrors.length > 0 && (
+          <p id={ruleErrorId} className="text-sm text-danger">
+            {ruleErrors.join(" ")}
+          </p>
+        )}
+      </div>
+    </Disclosure>
   );
 }

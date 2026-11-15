@@ -19,10 +19,19 @@ export function RadioGroup({ label, className, ...props }: RadioGroupProps) {
   );
 }
 
-type RadioRowProps = Omit<
+type RowLabel = { label: string; description?: string };
+type NativeRadioProps = Omit<
+  React.ComponentProps<"input">,
+  "type" | "children"
+> & {
+  native: true;
+};
+type RadixRadioProps = Omit<
   React.ComponentProps<typeof RadioPrimitive.Item>,
   "children"
-> & { label: string; description?: string };
+> & {
+  native?: false;
+};
 
 export function RadioRow({
   label,
@@ -30,9 +39,54 @@ export function RadioRow({
   id,
   className,
   ...props
-}: RadioRowProps) {
+}: RowLabel & (NativeRadioProps | RadixRadioProps)) {
   const generatedId = useId();
   const controlId = id ?? generatedId;
+  const aria = {
+    "aria-labelledby": `${controlId}-label`,
+    "aria-describedby": description
+      ? `${controlId}-description`
+      : props["aria-describedby"],
+  };
+  const controlClass = cx(
+    "selection-control state-layer grid size-12 place-items-center rounded-full disabled:cursor-not-allowed",
+    focusRing,
+  );
+  let control;
+  if (props.native) {
+    const { native, ...input } = props;
+    control = (
+      <span className="selection-control grid size-12 place-items-center">
+        <input
+          {...input}
+          {...aria}
+          id={controlId}
+          type={native ? "radio" : undefined}
+          className={cx(
+            "absolute inset-0 size-full cursor-pointer appearance-none rounded-full disabled:cursor-not-allowed",
+            focusRing,
+          )}
+        />
+        <span className="radio-mark pointer-events-none grid size-5 place-items-center rounded-full">
+          <span className="native-radio-indicator size-2.5 rounded-full bg-current" />
+        </span>
+      </span>
+    );
+  } else {
+    const { native, ...item } = props;
+    control = (
+      <RadioPrimitive.Item
+        {...item}
+        {...aria}
+        id={controlId}
+        className={native ? undefined : controlClass}
+      >
+        <span className="radio-mark grid size-5 place-items-center rounded-full">
+          <RadioPrimitive.Indicator className="size-2.5 rounded-full bg-current" />
+        </span>
+      </RadioPrimitive.Item>
+    );
+  }
   return (
     <SelectionRow
       id={controlId}
@@ -40,22 +94,7 @@ export function RadioRow({
       description={description}
       className={className}
     >
-      <RadioPrimitive.Item
-        {...props}
-        id={controlId}
-        aria-labelledby={`${controlId}-label`}
-        aria-describedby={
-          description ? `${controlId}-description` : props["aria-describedby"]
-        }
-        className={cx(
-          "selection-control state-layer grid size-12 place-items-center rounded-full disabled:cursor-not-allowed",
-          focusRing,
-        )}
-      >
-        <span className="radio-mark grid size-5 place-items-center rounded-full">
-          <RadioPrimitive.Indicator className="size-2.5 rounded-full bg-current" />
-        </span>
-      </RadioPrimitive.Item>
+      {control}
     </SelectionRow>
   );
 }

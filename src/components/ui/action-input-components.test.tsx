@@ -130,6 +130,20 @@ describe("ConnectedButtonGroup", () => {
     );
     expect(html.match(/aria-current/g)).toHaveLength(1);
   });
+  it("keeps accessible link names and selection with compact labels", () => {
+    const html = render(
+      <ConnectedButtonGroup
+        label="Calendar view"
+        items={links}
+        value="week"
+        compactLabels
+      />,
+    );
+    expect(html).toContain('aria-label="Calendar view"');
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain(">Week</a>");
+    expect(html).toContain(">Four weeks</a>");
+  });
   it("uses single-choice Radix radio semantics for toggle mode", () => {
     const html = render(
       <ConnectedButtonGroup
@@ -213,6 +227,26 @@ it("Switch and SwitchRow link visible labels and describe rows separately", () =
   expect(html).toContain('aria-labelledby="review-label"');
   expect(html).toMatch(/role="switch" aria-checked="false"/);
   expect(html).toMatch(/role="switch" aria-checked="true"[^>]*disabled=""/);
+});
+
+it("RadioRow can keep native checked state, grouping, and descriptions", () => {
+  const html = render(
+    <RadioRow
+      native
+      id="scope-this"
+      name="scope"
+      label="This event"
+      value="this"
+      checked
+      aria-describedby="scope-help"
+      onChange={noop}
+    />,
+  );
+  expect(html).toContain('for="scope-this"');
+  expect(html).toMatch(/<input[^>]*type="radio"/);
+  expect(html).toContain('name="scope"');
+  expect(html).toContain('checked=""');
+  expect(html).toContain('aria-describedby="scope-help"');
 });
 
 it("RadioGroup names its group and RadioRow links the choices", () => {

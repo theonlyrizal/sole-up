@@ -116,7 +116,7 @@ async function addEvent(
   }).toPass();
   await dialog.getByLabel("Title").fill(title);
   if (start === undefined) {
-    await dialog.getByLabel("All day").check();
+    await dialog.getByRole("switch", { name: "All day" }).click();
     await dialog.getByLabel("Start date").fill(date);
     await dialog.getByLabel("End date").fill(date);
   } else {
@@ -309,7 +309,11 @@ test("events by local time, the all-day row, deadline markers, side by side, and
     .getByRole("navigation", { name: "Move through the calendar" })
     .getByRole("link", { name: "Next week" })
     .focus();
-  for (let i = 0; i < 8; i += 1) await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("button", { name: /^Go to date,/ }),
+  ).toBeFocused();
+  for (let i = 0; i < 15; i += 1) await page.keyboard.press("Tab");
   await expect(item(page, today, "Conference")).toBeFocused();
 
   // Day shows the same items for one day, side by side as well.
@@ -333,7 +337,7 @@ test("events by local time, the all-day row, deadline markers, side by side, and
 test("a phone gets Day instead of Week, in the dark theme, without sideways scrolling", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(
     (key) => localStorage.setItem(key, "system"),
     THEME_STORAGE_KEY,
