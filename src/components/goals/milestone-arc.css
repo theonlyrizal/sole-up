@@ -1,0 +1,33 @@
+.milestone-arc-hatch {
+  opacity: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .milestone-arc:hover .milestone-arc-hatch {
+    opacity: 0.5;
+  }
+}
+
+.goal-progress:focus-within .milestone-arc-hatch {
+  opacity: 0.5;
+}
+
+.milestone-arc-change {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .milestone-arc-change {
+    animation: milestone-segment-confirmed var(--duration-default-effects)
+      var(--ease-default-effects);
+  }
+}
+
+@keyframes milestone-segment-confirmed {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

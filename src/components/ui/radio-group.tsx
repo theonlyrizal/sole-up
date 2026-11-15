@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import { RadioGroup as RadioPrimitive } from "radix-ui";
+import { Icon } from "@/components/icons/icon";
 import { cx, focusRing } from "./cx";
 import { SelectionRow } from "./selection-row";
 
@@ -16,6 +17,40 @@ export function RadioGroup({ label, className, ...props }: RadioGroupProps) {
       aria-label={label}
       className={cx("flex min-w-0 flex-col", className)}
     />
+  );
+}
+
+/** The painted swatch sits inside a separate 48 px radio target. */
+export function RadioSwatch({
+  label,
+  children,
+  style,
+  ...props
+}: React.ComponentProps<typeof RadioPrimitive.Item> & { label: string }) {
+  return (
+    <RadioPrimitive.Item
+      {...props}
+      aria-label={label}
+      title={label}
+      className={cx(
+        "group grid size-12 shrink-0 cursor-pointer place-items-center rounded-full disabled:cursor-not-allowed",
+        focusRing,
+        props.className,
+      )}
+    >
+      <span
+        aria-hidden="true"
+        style={style}
+        className="grid size-10 place-items-center rounded-full border border-outline group-data-[state=checked]:ring-2 group-data-[state=checked]:ring-focus group-data-[state=checked]:ring-offset-2 group-data-[state=checked]:ring-offset-surface-container-high"
+      >
+        <span className="col-start-1 row-start-1 group-data-[state=checked]:invisible">
+          {children}
+        </span>
+        <RadioPrimitive.Indicator className="col-start-1 row-start-1">
+          <Icon name="check" size={20} />
+        </RadioPrimitive.Indicator>
+      </span>
+    </RadioPrimitive.Item>
   );
 }
 

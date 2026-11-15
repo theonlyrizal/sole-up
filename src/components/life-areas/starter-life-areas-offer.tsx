@@ -3,7 +3,8 @@
 import { useId, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
+import { AreaChip } from "@/components/data/area-chip";
+import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
 import { STARTER_LIFE_AREAS, type StarterLifeArea } from "@/lib/life-areas";
 import {
@@ -49,30 +50,30 @@ export function StarterLifeAreasOffer() {
   }
 
   return (
-    <section
-      aria-labelledby={`${id}-title`}
-      className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5"
-    >
-      <h2 id={`${id}-title`} className="text-lg font-semibold">
+    <Card headingId={`${id}-title`} variant="tonal" className="grid gap-3">
+      <h2 id={`${id}-title`} className="text-title-large">
         Start with some suggestions?
       </h2>
       <form onSubmit={accept} className="flex flex-col gap-4">
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-muted">
+          <legend className="mb-2 text-body-medium text-on-surface-variant">
             Pick any that fit. You can rename, archive or delete them later.
           </legend>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
             {STARTER_LIFE_AREAS.map((name) => (
-              <label key={name} className="flex items-center gap-2">
+              <label
+                key={name}
+                className="flex min-h-12 cursor-pointer items-center gap-2"
+              >
                 <input
                   type="checkbox"
                   name="names"
                   value={name}
                   checked={chosen.includes(name)}
                   onChange={(event) => toggle(name, event.target.checked)}
-                  className={cx("size-4 accent-accent", focusRing)}
+                  className="size-5 shrink-0 accent-primary"
                 />
-                {name}
+                <AreaChip name={name} color={null} />
               </label>
             ))}
           </div>
@@ -83,7 +84,11 @@ export function StarterLifeAreasOffer() {
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={pending || chosen.length === 0}>
+          <Button
+            type="submit"
+            disabled={pending || chosen.length === 0}
+            aria-busy={pending || undefined}
+          >
             {pending ? "Adding…" : "Add selected"}
           </Button>
           <Button variant="secondary" disabled={pending} onClick={dismiss}>
@@ -91,6 +96,6 @@ export function StarterLifeAreasOffer() {
           </Button>
         </div>
       </form>
-    </section>
+    </Card>
   );
 }

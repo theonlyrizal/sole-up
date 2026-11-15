@@ -162,7 +162,7 @@ export function TaskListRow({
   ...props
 }: Pick<
   React.ComponentProps<typeof TaskRow>,
-  "selection" | "details" | "showGoal"
+  "selection" | "details" | "showGoal" | "wrapActions"
 > & {
   task: PlanTaskItem;
   schedule?: boolean;
@@ -239,6 +239,7 @@ export function PlanTaskList({
   tasks,
   label = "Tasks",
   showGoal = true,
+  wrapActions,
   empty,
   ...context
 }: RowContext & {
@@ -246,6 +247,7 @@ export function PlanTaskList({
   parentOptions: TaskParentOption[];
   label?: string;
   showGoal?: boolean;
+  wrapActions?: boolean;
   empty?: React.ReactNode;
   fallbackId?: string;
 }) {
@@ -258,6 +260,7 @@ export function PlanTaskList({
               key={task.id}
               task={task}
               showGoal={showGoal}
+              wrapActions={wrapActions}
               schedule
             />
           ))}

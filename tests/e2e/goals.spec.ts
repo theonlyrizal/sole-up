@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  chooseGoalMenuItem,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 async function openGoals(page: Page) {
   await page.getByRole("link", { name: "Goals", exact: true }).click();
@@ -40,14 +44,14 @@ test("a goal can be created with only a title, in under 30 seconds", async ({
   await expect(goalTitles(page, "No area")).toHaveText(["Learn Spanish"]);
   expect(Date.now() - started).toBeLessThan(30_000);
   await expect(page.getByRole("status").getByText("Goal added")).toBeVisible();
-  await expect(filter(page, "Active")).toHaveText("Active(1)");
+  await expect(filter(page, "Active")).toHaveText("Active (1)");
 
   await page.reload();
   await expect(goalTitles(page, "No area")).toHaveText(["Learn Spanish"]);
 
   // A new goal made from another filter opens Active to show it.
   await filter(page, "Paused").click();
-  await expect(page.getByText("Nothing paused")).toBeVisible();
+  await expect(page.getByText("No paused goals")).toBeVisible();
   await page.getByRole("button", { name: "New goal" }).first().click();
   await page.keyboard.type("Call grandma weekly");
   await page.keyboard.press("Enter");
@@ -62,7 +66,9 @@ test("create with every field, and edit", async ({ page }) => {
   await signInAndConfirm(page);
   await page.goto("/goals/areas");
   await page.getByRole("button", { name: "Add selected" }).click();
-  await expect(page.getByRole("button", { name: "Edit Health" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Actions for Health" }),
+  ).toBeVisible();
   await openGoals(page);
 
   // A target before the start is a field error; the input is kept.
@@ -91,9 +97,9 @@ test("create with every field, and edit", async ({ page }) => {
   await expect(goalTitles(page, "Health")).toHaveText(["Run a half marathon"]);
   await expect(health.getByText("High priority")).toBeVisible();
   await expect(health.getByText("I want to feel strong again.")).toBeVisible();
-  await expect(
-    health.getByText("Starts May 1, 2027 · Target Oct 12, 2027"),
-  ).toBeVisible();
+  await expect(health.getByText("Target Oct 12, 2027")).toBeVisible();
+
+  await expect(health.getByText("Starts May 1, 2027")).toBeVisible();
 
   // A second goal with no area is grouped after the areas.
   await page.getByRole("button", { name: "New goal" }).first().click();
@@ -105,8 +111,11 @@ test("create with every field, and edit", async ({ page }) => {
   await expectNoSeriousViolations(page);
 
   // Edit: Escape cancels and returns focus; saving moves it to another area.
-  const edit = page.getByRole("button", { name: "Edit: Run a half marathon" });
-  await edit.click();
+  const edit = await chooseGoalMenuItem(
+    page,
+    "Edit",
+    "Actions for Run a half marathon",
+  );
   const editDialog = page.getByRole("dialog", { name: "Edit goal" });
   await expect(editDialog.getByLabel("Title")).toHaveValue(
     "Run a half marathon",
@@ -114,7 +123,7 @@ test("create with every field, and edit", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(editDialog).toHaveCount(0);
   await expect(edit).toBeFocused();
-  await edit.click();
+  await chooseGoalMenuItem(page, "Edit", "Actions for Run a half marathon");
   await editDialog.getByLabel("Title").fill("Run a 10k");
   await editDialog.getByLabel("Life area").selectOption({ label: "Career" });
   await editDialog.getByRole("button", { name: "Save" }).click();
@@ -132,7 +141,7 @@ test("status actions move a goal between filters", async ({ page }) => {
   await expect(goalTitles(page, "No area")).toHaveText(["Run a 10k"]);
 
   // Pause → Paused; Resume → Active.
-  await page.getByRole("button", { name: "Pause: Run a 10k" }).click();
+  await chooseGoalMenuItem(page, "Pause", "Actions for Run a 10k");
   await expect(
     page.getByRole("status").getByText("Paused. Pick it up again"),
   ).toBeVisible();
@@ -140,32 +149,32 @@ test("status actions move a goal between filters", async ({ page }) => {
   await filter(page, "Paused").click();
   await expect(filter(page, "Paused")).toHaveAttribute("aria-current", "page");
   await expect(goalTitles(page, "No area")).toHaveText(["Run a 10k"]);
-  await page.getByRole("button", { name: "Resume: Run a 10k" }).click();
-  await expect(page.getByText("Nothing paused")).toBeVisible();
+  await chooseGoalMenuItem(page, "Resume", "Actions for Run a 10k");
+  await expect(page.getByText("No paused goals")).toBeVisible();
 
   // Complete → Completed; Reopen → Active.
   await filter(page, "Active").click();
-  await page.getByRole("button", { name: "Mark complete: Run a 10k" }).click();
+  await chooseGoalMenuItem(page, "Mark complete", "Actions for Run a 10k");
   await filter(page, "Completed").click();
   await expect(goalTitles(page, "No area")).toHaveText(["Run a 10k"]);
-  await page.getByRole("button", { name: "Reopen: Run a 10k" }).click();
+  await chooseGoalMenuItem(page, "Reopen", "Actions for Run a 10k");
   await expect(page.getByText("No completed goals")).toBeVisible();
 
   // Drop → Dropped; Reopen → Active.
   await filter(page, "Active").click();
-  await page.getByRole("button", { name: "Drop: Run a 10k" }).click();
+  await chooseGoalMenuItem(page, "Drop", "Actions for Run a 10k");
   await expect(
     page.getByRole("status").getByText("Priorities change"),
   ).toBeVisible();
   await filter(page, "Dropped").click();
   await expect(goalTitles(page, "No area")).toHaveText(["Run a 10k"]);
   await expectNoSeriousViolations(page);
-  await page.getByRole("button", { name: "Reopen: Run a 10k" }).click();
-  await expect(page.getByText("Nothing dropped")).toBeVisible();
+  await chooseGoalMenuItem(page, "Reopen", "Actions for Run a 10k");
+  await expect(page.getByText("No dropped goals")).toBeVisible();
 
   // Archive: gone from every filter (the archive view is chunk 1.6).
   await filter(page, "Active").click();
-  await page.getByRole("button", { name: "Archive: Run a 10k" }).click();
+  await chooseGoalMenuItem(page, "Archive", "Actions for Run a 10k");
   await expect(page.getByRole("region", { name: "No area" })).toHaveCount(0);
   for (const [label, count] of [
     ["Active", 0],
@@ -173,6 +182,6 @@ test("status actions move a goal between filters", async ({ page }) => {
     ["Completed", 0],
     ["Dropped", 0],
   ] as const) {
-    await expect(filter(page, label)).toHaveText(`${label}(${count})`);
+    await expect(filter(page, label)).toHaveText(`${label} (${count})`);
   }
 });

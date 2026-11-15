@@ -1,7 +1,11 @@
 import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, type Locator, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  addLifeArea,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 // The Timeline view (chunk 4.11): a row per active life area plus "No
 // area" across a week (the default) or a day on a horizontal time axis,
@@ -56,15 +60,12 @@ async function addAreas(page: Page, names: string[]) {
   ).toBeVisible();
   await page.getByRole("button", { name: "No thanks" }).click();
   await expect(page.getByText("No life areas yet")).toBeVisible();
-  const newArea = page.getByLabel("New area");
   const active = page
     .getByRole("region", { name: "Active" })
     .getByRole("listitem")
-    .locator("span.font-medium");
+    .locator("span.text-title-medium");
   for (const [index, name] of names.entries()) {
-    await expect(newArea).toBeEnabled();
-    await newArea.fill(name);
-    await newArea.press("Enter");
+    await addLifeArea(page, name);
     await expect(active).toHaveText(names.slice(0, index + 1));
   }
 }

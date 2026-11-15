@@ -2,16 +2,20 @@
 
 import {
   useEffect,
-  useId,
   useOptimistic,
   useRef,
   useState,
   useTransition,
 } from "react";
 
+import { PageFrame } from "@/components/shell/page-frame";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Disclosure } from "@/components/ui/disclosure";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconButton } from "@/components/ui/icon-button";
+import { ListGroup, ListItem } from "@/components/ui/list";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { toast } from "@/components/ui/toast";
 import type { LifeArea } from "@/lib/life-areas";
 import type { ActionResult } from "@/lib/result";
@@ -24,44 +28,47 @@ import {
 import type { LifeAreasView } from "@/server/modules/life-areas/queries";
 
 import { ColorSwatch } from "./life-area-colors";
-import { CreateLifeAreaForm, EditLifeAreaForm } from "./life-area-form";
+import { LifeAreaForm } from "./life-area-form";
 import { StarterLifeAreasOffer } from "./starter-life-areas-offer";
 
 type Direction = "up" | "down";
 
 export function LifeAreasManager({ view }: { view: LifeAreasView }) {
-  const archivedListId = useId();
   const [active, setOptimisticActive] = useOptimistic(view.active);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [create, setCreate] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const listRef = useRef<HTMLDivElement>(null);
-  // Where focus goes once a row action re-renders the list.
+  const list = useRef<HTMLDivElement>(null);
+  const newArea = useRef<HTMLButtonElement>(null);
   const focusTarget = useRef<string | null>(null);
 
   useEffect(() => {
     if (!focusTarget.current || pending) return;
-    listRef.current
-      ?.querySelector<HTMLElement>(
-        `[data-focus="${focusTarget.current}"]:not(:disabled)`,
-      )
-      ?.focus();
+    const target = list.current?.querySelector<HTMLElement>(
+      `[data-focus="${focusTarget.current}"]:not(:disabled)`,
+    );
+    if (target) target.focus();
+    else if (document.activeElement === document.body) newArea.current?.focus();
     focusTarget.current = null;
-  }, [pending, active, editingId]);
+  }, [pending, active, view.archived]);
 
-  /** Runs a row action; shows its error above the list. */
   function run(
     action: () => Promise<ActionResult<unknown>>,
     success?: string,
     before?: () => void,
   ) {
+    if (pending) return;
     startTransition(async () => {
       setError(null);
       before?.();
-      const result = await action();
-      if (!result.ok) setError(result.error.message);
-      else if (success) toast({ title: success, variant: "success" });
+      try {
+        const result = await action();
+        if (!result.ok) setError(result.error.message);
+        else if (success) toast({ title: success, variant: "success" });
+      } catch {
+        setError("Couldn't save the change. Try again.");
+      }
     });
   }
 
@@ -70,203 +77,235 @@ export function LifeAreasManager({ view }: { view: LifeAreasView }) {
     const next = [...active];
     [next[index], next[target]] = [next[target]!, next[index]!];
     const moved = active[index]!;
-    // Keep focus on the pressed button, or its partner at either end.
     const other = direction === "up" ? "down" : "up";
     const atEnd = target === 0 || target === next.length - 1;
     focusTarget.current = `${moved.id}:${atEnd ? other : direction}`;
     run(
-      () => reorderLifeAreas({ ids: next.map((area) => area.id) }),
+      async () => {
+        const result = await reorderLifeAreas({
+          ids: next.map((area) => area.id),
+        });
+        if (!result.ok) focusTarget.current = `${moved.id}:${direction}`;
+        return result;
+      },
       undefined,
       () => setOptimisticActive(next),
     );
   }
 
   return (
-    <div ref={listRef} className="flex flex-col gap-6">
-      {view.offerStarters && <StarterLifeAreasOffer />}
-
-      <p role="alert" className="text-sm text-danger empty:hidden">
-        {error}
-      </p>
-
-      <section aria-labelledby="active-areas" className="flex flex-col gap-4">
-        <h2 id="active-areas" className="text-lg font-semibold">
-          Active
-        </h2>
-        {active.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="No life areas yet"
-            description="Add the parts of your life you want to keep in balance, like Health or Career. Goals can belong to an area."
-          />
-        ) : (
-          <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
-            {active.map((area, index) => (
-              <li key={area.id} className="p-3">
-                {editingId === area.id ? (
-                  <EditLifeAreaForm
-                    area={area}
-                    onDone={() => {
-                      setEditingId(null);
-                      focusTarget.current = `${area.id}:edit`;
-                    }}
-                  >
-                    <DeleteAreaButton area={area} />
-                  </EditLifeAreaForm>
-                ) : (
-                  <AreaSummary area={area}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Move ${area.name} up`}
-                      data-focus={`${area.id}:up`}
-                      disabled={pending || index === 0}
-                      onClick={() => move(index, "up")}
-                    >
-                      <Arrow direction="up" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Move ${area.name} down`}
-                      data-focus={`${area.id}:down`}
-                      disabled={pending || index === active.length - 1}
-                      onClick={() => move(index, "down")}
-                    >
-                      <Arrow direction="down" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      aria-label={`Edit ${area.name}`}
-                      data-focus={`${area.id}:edit`}
-                      onClick={() => setEditingId(area.id)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      aria-label={`Archive ${area.name}`}
-                      disabled={pending}
-                      onClick={() =>
-                        run(() => archiveLifeArea({ id: area.id }), "Archived")
-                      }
-                    >
-                      Archive
-                    </Button>
-                  </AreaSummary>
-                )}
-              </li>
-            ))}
-          </ul>
+    <PageFrame
+      width="detail"
+      title="Life areas"
+      back={{ href: "/goals", label: "Goals" }}
+      actions={
+        <LifeAreaForm
+          open={create}
+          onOpenChange={setCreate}
+          trigger={<Button ref={newArea}>New area</Button>}
+        />
+      }
+    >
+      <div ref={list} className="grid gap-5">
+        {view.offerStarters && <StarterLifeAreasOffer />}
+        {error && (
+          <p role="alert" className="text-body-medium text-error">
+            {error}
+          </p>
         )}
-        <CreateLifeAreaForm />
-      </section>
-
-      {view.archived.length > 0 && (
-        <section aria-label="Archived" className="flex flex-col gap-4">
-          <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-expanded={showArchived}
-              aria-controls={archivedListId}
-              onClick={() => setShowArchived((shown) => !shown)}
-            >
-              {showArchived ? "Hide" : "Show"} archived ({view.archived.length})
-            </Button>
-          </div>
-          <ul
-            id={archivedListId}
-            hidden={!showArchived}
-            className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface"
-          >
-            {view.archived.map((area) => (
-              <li key={area.id} className="p-3">
-                <AreaSummary area={area} muted>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    aria-label={`Restore ${area.name}`}
-                    disabled={pending}
-                    onClick={() =>
-                      run(() => unarchiveLifeArea({ id: area.id }), "Restored")
-                    }
-                  >
-                    Restore
-                  </Button>
-                  <DeleteAreaButton area={area} />
-                </AreaSummary>
-              </li>
-            ))}
-          </ul>
+        <section aria-labelledby="active-areas" className="grid gap-3">
+          <h2 id="active-areas" className="text-title-large">
+            Active
+          </h2>
+          {active.length === 0 ? (
+            <EmptyState
+              headingLevel={3}
+              title="No life areas yet"
+              description="Add the parts of your life you want to keep in balance, like Health or Career. Goals can belong to an area."
+              compact
+            />
+          ) : (
+            <ListGroup label="Active life areas">
+              {active.map((area, index) => (
+                <AreaRow
+                  key={area.id}
+                  area={area}
+                  fallbackFocus={() => newArea.current?.focus()}
+                  archive={() => {
+                    focusTarget.current = `${area.id}:menu`;
+                    run(() => archiveLifeArea({ id: area.id }), "Archived");
+                  }}
+                  reorder={
+                    <>
+                      <IconButton
+                        icon="arrow_upward"
+                        label={`Move ${area.name} up`}
+                        data-focus={`${area.id}:up`}
+                        disabled={pending || index === 0}
+                        onClick={() => move(index, "up")}
+                      />
+                      <IconButton
+                        icon="arrow_downward"
+                        label={`Move ${area.name} down`}
+                        data-focus={`${area.id}:down`}
+                        disabled={pending || index === active.length - 1}
+                        onClick={() => move(index, "down")}
+                      />
+                    </>
+                  }
+                  pending={pending}
+                />
+              ))}
+            </ListGroup>
+          )}
         </section>
-      )}
-    </div>
-  );
-}
 
-function AreaSummary({
-  area,
-  muted,
-  children,
-}: {
-  area: LifeArea;
-  muted?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <ColorSwatch color={area.color} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className={muted ? "text-muted" : "font-medium"}>
-          {area.name}
-        </span>
-        {area.description && (
-          <span className="text-sm break-words text-muted">
-            {area.description}
-          </span>
+        {view.archived.length > 0 && (
+          <Disclosure
+            title={`Archived (${view.archived.length})`}
+            open={showArchived}
+            onOpenChange={setShowArchived}
+          >
+            <ListGroup label="Archived life areas">
+              {view.archived.map((area) => (
+                <AreaRow
+                  key={area.id}
+                  area={area}
+                  fallbackFocus={() => newArea.current?.focus()}
+                  pending={pending}
+                  restore={() => {
+                    focusTarget.current = `${area.id}:menu`;
+                    run(() => unarchiveLifeArea({ id: area.id }), "Restored");
+                  }}
+                />
+              ))}
+            </ListGroup>
+          </Disclosure>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-1">{children}</div>
-    </div>
+    </PageFrame>
   );
 }
 
-function DeleteAreaButton({ area }: { area: LifeArea }) {
+function AreaRow({
+  area,
+  reorder,
+  pending,
+  archive,
+  restore,
+  fallbackFocus,
+}: {
+  area: LifeArea;
+  reorder?: React.ReactNode;
+  pending: boolean;
+  archive?: () => void;
+  restore?: () => void;
+  fallbackFocus: () => void;
+}) {
+  const [dialog, setDialog] = useState<"edit" | "delete" | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const openingDialog = useRef(false);
+  const deleted = useRef(false);
+
+  function openDialog(kind: "edit" | "delete") {
+    openingDialog.current = true;
+    setDialog(kind);
+  }
+
+  function restoreFocus(event: Event) {
+    event.preventDefault();
+    if (deleted.current || !trigger.current) fallbackFocus();
+    else trigger.current.focus();
+  }
+
   return (
-    <ConfirmDialog
-      trigger={
-        <Button variant="danger" size="sm" aria-label={`Delete ${area.name}`}>
-          Delete
-        </Button>
+    <ListItem
+      className="gap-2 px-2 medium:gap-4 medium:px-4"
+      wrapActions
+      leading={<ColorSwatch color={area.color} size={16} />}
+      headline={<span className="text-title-medium">{area.name}</span>}
+      supporting={area.description}
+      wrapSupporting
+      trailing={
+        <div className="flex flex-wrap items-center justify-end">
+          {reorder}
+          {restore && (
+            <Button
+              variant="tonal"
+              size="xs"
+              aria-label={`Restore ${area.name}`}
+              onClick={restore}
+              disabled={pending}
+            >
+              Restore
+            </Button>
+          )}
+          <Menu modal={false}>
+            <MenuTrigger asChild>
+              <IconButton
+                ref={trigger}
+                icon="more_vert"
+                label={`Actions for ${area.name}`}
+                data-focus={`${area.id}:menu`}
+                tooltip={false}
+              />
+            </MenuTrigger>
+            <MenuContent
+              align="end"
+              onCloseAutoFocus={(event) => {
+                if (openingDialog.current) event.preventDefault();
+                openingDialog.current = false;
+              }}
+            >
+              {archive && (
+                <>
+                  <MenuItem icon="edit" onSelect={() => openDialog("edit")}>
+                    Edit
+                  </MenuItem>
+                  <MenuItem
+                    icon="archive"
+                    disabled={pending}
+                    onSelect={archive}
+                  >
+                    Archive
+                  </MenuItem>
+                </>
+              )}
+              <MenuItem
+                icon="delete"
+                destructive
+                onSelect={() => openDialog("delete")}
+              >
+                Delete…
+              </MenuItem>
+            </MenuContent>
+          </Menu>
+          {archive && (
+            <LifeAreaForm
+              area={area}
+              open={dialog === "edit"}
+              onOpenChange={(open) => setDialog(open ? "edit" : null)}
+              onCloseAutoFocus={restoreFocus}
+            />
+          )}
+          <ConfirmDialog
+            open={dialog === "delete"}
+            onOpenChange={(open) => setDialog(open ? "delete" : null)}
+            onCloseAutoFocus={restoreFocus}
+            title={`Delete “${area.name}”?`}
+            description="This permanently deletes the area and its history. Its goals are kept and move to No area. It can't be undone. To keep it out of the way instead, archive it."
+            confirmLabel="Delete area"
+            onConfirm={async () => {
+              const result = await deleteLifeArea({ id: area.id });
+              if (result.ok) {
+                deleted.current = true;
+                toast({ title: "Area deleted", variant: "success" });
+              }
+              return result;
+            }}
+          />
+        </div>
       }
-      title={`Delete “${area.name}”?`}
-      description="This permanently deletes the area and its history. Its goals are kept and move to No area. It can't be undone. To keep it out of the way instead, archive it."
-      confirmLabel="Delete area"
-      onConfirm={async () => {
-        const result = await deleteLifeArea({ id: area.id });
-        if (result.ok) toast({ title: "Area deleted", variant: "success" });
-        return result;
-      }}
     />
-  );
-}
-
-function Arrow({ direction }: { direction: Direction }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      className="size-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d={direction === "up" ? "M5 12l5-5 5 5" : "M5 8l5 5 5-5"} />
-    </svg>
   );
 }

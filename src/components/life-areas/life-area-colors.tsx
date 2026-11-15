@@ -19,13 +19,20 @@ export function colorLabel(color: LifeAreaColor) {
 }
 
 /** A small dot in the area's color. Decorative: the name carries meaning. */
-export function ColorSwatch({ color }: { color: LifeAreaColor | null }) {
+export function ColorSwatch({
+  color,
+  size = 12,
+}: {
+  color: LifeAreaColor | null;
+  size?: 12 | 16;
+}) {
   return (
     <span
       aria-hidden="true"
       className={cx(
-        "size-3 shrink-0 rounded-full",
-        color ? swatchClasses[color] : "border border-border",
+        "inline-block shrink-0 rounded-full",
+        size === 16 ? "size-4" : "size-3",
+        color ? swatchClasses[color] : "border border-outline",
       )}
     />
   );

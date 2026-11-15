@@ -2,141 +2,132 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 
-import { ColorSwatch } from "@/components/life-areas/life-area-colors";
+import { AreaChip } from "@/components/data/area-chip";
+import { PageFrame } from "@/components/shell/page-frame";
+import { TopAppBar } from "@/components/shell/top-app-bar";
 import { Button, buttonClass } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
+import { ConnectedButtonGroup } from "@/components/ui/button-group";
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { toast } from "@/components/ui/toast";
+import { IconButton } from "@/components/ui/icon-button";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
+import { ShapeAvatar } from "@/components/ui/shape-avatar";
 import {
   GOAL_LIST_STATUSES,
   GOAL_PRIORITY_LABELS,
   GOAL_STATUS_LABELS,
-  goalStatusActions,
   type GoalListStatus,
-  type GoalStatusAction,
 } from "@/lib/goals";
 import type { LifeArea } from "@/lib/life-areas";
-import { milestoneProgressLabel } from "@/lib/milestones";
-import { changeGoalStatus } from "@/server/modules/goals/actions";
 import type {
   GoalGroup,
-  GoalListItem,
   GoalsView as GoalsViewData,
 } from "@/server/modules/goals/queries";
 
+import { GoalActions } from "./goal-actions";
 import { GoalFormDialog } from "./goal-form";
+import { MilestoneArc } from "./milestone-arc";
 
-const EMPTY_STATES: Record<
-  GoalListStatus,
-  { title: string; description: string }
-> = {
-  active: {
-    title: "No active goals",
-    description:
-      "A goal only needs a title to start. Add why it matters, dates or an area whenever you like.",
-  },
-  paused: {
-    title: "Nothing paused",
-    description:
-      "Goals you pause wait here, unchanged, until you want to resume them.",
-  },
-  completed: {
-    title: "No completed goals",
-    description: "Goals you mark complete are kept here.",
-  },
-  dropped: {
-    title: "Nothing dropped",
-    description:
-      "When priorities change, dropped goals are kept here. You can reopen them any time.",
-  },
+const EMPTY_TITLES: Record<GoalListStatus, string> = {
+  active: "No active goals",
+  paused: "No paused goals",
+  completed: "No completed goals",
+  dropped: "No dropped goals",
 };
 
 function filterHref(status: GoalListStatus) {
   return status === "active" ? "/goals" : `/goals?status=${status}`;
 }
 
+function GoalsMenu({ archivedCount }: { archivedCount: number }) {
+  const router = useRouter();
+  return (
+    <Menu>
+      <MenuTrigger asChild>
+        <IconButton icon="more_vert" label="Goals options" tooltip={false} />
+      </MenuTrigger>
+      <MenuContent align="end">
+        <MenuItem onSelect={() => router.push("/goals/areas")}>
+          Life areas
+        </MenuItem>
+        <MenuItem
+          onSelect={() => router.push("/goals/archived")}
+          icon="archive"
+        >
+          Archived goals ({archivedCount})
+        </MenuItem>
+      </MenuContent>
+    </Menu>
+  );
+}
+
 export function GoalsView({ view }: { view: GoalsViewData }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function changeStatus(goal: GoalListItem, action: GoalStatusAction) {
-    startTransition(async () => {
-      setError(null);
-      const result = await changeGoalStatus({ id: goal.id, status: action.to });
-      if (result.ok) toast({ title: action.done, variant: "success" });
-      else setError(result.error.message);
-    });
-  }
-
-  const newGoalButton = (
+  const newGoal = (
     <GoalFormDialog
       areas={view.areas}
-      trigger={<Button>New goal</Button>}
-      // A new goal is active; show it if another filter is open.
+      trigger={
+        <Button size="xs" className="shrink-0">
+          New goal
+        </Button>
+      }
       onSaved={() => {
         if (view.status !== "active") router.push(filterHref("active"));
       }}
     />
   );
-
+  const options = <GoalsMenu archivedCount={view.archivedCount} />;
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-2">
-        {newGoalButton}
-        <Link href="/goals/areas" className={buttonClass({ variant: "ghost" })}>
-          Life areas
-        </Link>
-        <Link
-          href="/goals/archived"
-          className={buttonClass({ variant: "ghost" })}
-        >
-          Archived
-          <span className="text-muted tabular-nums">
-            ({view.archivedCount})
-          </span>
-        </Link>
-      </div>
-
-      <nav aria-label="Filter goals by status">
-        <ul className="flex flex-wrap gap-1 border-b border-border">
-          {GOAL_LIST_STATUSES.map((status) => {
-            const current = status === view.status;
-            return (
-              <li key={status}>
-                <Link
-                  href={filterHref(status)}
-                  aria-current={current ? "page" : undefined}
-                  className={cx(
-                    "-mb-px inline-flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-sm",
-                    current
-                      ? "border-accent font-medium text-fg"
-                      : "border-transparent text-muted hover:text-fg",
-                    focusRing,
-                  )}
-                >
-                  {GOAL_STATUS_LABELS[status]}
-                  <span className="text-muted tabular-nums">
-                    ({view.counts[status]})
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      <p role="alert" className="text-sm text-danger empty:hidden">
-        {error}
-      </p>
-
+    <PageFrame
+      title="Goals"
+      compactActions={false}
+      mobileHeader={<TopAppBar title="Goals" actions={options} />}
+      actions={
+        <>
+          {newGoal}
+          {options}
+        </>
+      }
+      subnav={
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <ConnectedButtonGroup
+            label="Filter goals by status"
+            size="xs"
+            compactLabels
+            items={GOAL_LIST_STATUSES.map((status) => ({
+              value: status,
+              href: filterHref(status),
+              label: `${GOAL_STATUS_LABELS[status]} (${view.counts[status]})`,
+              className: "max-medium:px-1.5! max-medium:text-label-medium",
+            }))}
+            value={view.status}
+          />
+          <div className="medium:hidden">{newGoal}</div>
+        </div>
+      }
+    >
       {view.groups.length === 0 ? (
         <EmptyState
-          title={EMPTY_STATES[view.status].title}
-          description={EMPTY_STATES[view.status].description}
-          action={view.status === "active" ? newGoalButton : undefined}
+          title={EMPTY_TITLES[view.status]}
+          art={{ icon: "flag" }}
+          description={
+            view.status === "active"
+              ? "Goals you set show here, grouped by life area."
+              : undefined
+          }
+          action={
+            view.status === "active" ? (
+              newGoal
+            ) : (
+              <Link
+                href={filterHref("active")}
+                className={buttonClass({ variant: "tonal" })}
+              >
+                Back to Active
+              </Link>
+            )
+          }
         />
       ) : (
         view.groups.map((group) => (
@@ -144,112 +135,77 @@ export function GoalsView({ view }: { view: GoalsViewData }) {
             key={group.area?.id ?? "none"}
             group={group}
             areas={view.areas}
-            pending={pending}
-            onChangeStatus={changeStatus}
           />
         ))
       )}
-    </div>
+    </PageFrame>
   );
 }
-
-type GroupProps = {
-  group: GoalGroup;
-  areas: LifeArea[];
-  pending: boolean;
-  onChangeStatus: (goal: GoalListItem, action: GoalStatusAction) => void;
-};
 
 function GoalGroupSection({
   group,
   areas,
-  pending,
-  onChangeStatus,
-}: GroupProps) {
+}: {
+  group: GoalGroup;
+  areas: LifeArea[];
+}) {
   const headingId = `goal-group-${group.area?.id ?? "none"}`;
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3">
-      <h2
-        id={headingId}
-        className="flex items-center gap-2 text-lg font-semibold"
-      >
-        {group.area && <ColorSwatch color={group.area.color} />}
-        {group.area?.name ?? "No area"}
-        {group.area?.status === "archived" && (
-          <span className="text-sm font-normal text-muted">
-            (archived area)
-          </span>
-        )}
+    <section aria-labelledby={headingId} className="grid gap-3">
+      <h2 id={headingId}>
+        <AreaChip
+          name={group.area?.name ?? "No area"}
+          color={group.area?.color ?? null}
+          archived={group.area?.status === "archived"}
+        />
       </h2>
-      <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
+      <ul className="grid min-w-0 gap-3 expanded:grid-cols-2 expanded:gap-4 large:grid-cols-3">
         {group.goals.map((goal) => (
-          <li key={goal.id} className="flex flex-col gap-3 p-4">
-            <GoalSummary goal={goal} />
-            <div className="flex flex-wrap items-center gap-1">
-              {goalStatusActions(goal.status).map((action) => (
-                <Button
-                  key={action.to + action.label}
-                  variant="secondary"
-                  size="sm"
-                  aria-label={`${action.label}: ${goal.title}`}
-                  disabled={pending}
-                  onClick={() => onChangeStatus(goal, action)}
-                >
-                  {action.label}
-                </Button>
-              ))}
-              <GoalFormDialog
-                goal={goal}
-                areas={areas}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Edit: ${goal.title}`}
-                  >
-                    Edit
-                  </Button>
-                }
-              />
-            </div>
+          <li key={goal.id} className="min-w-0">
+            <Card
+              as="article"
+              className="state-layer flex h-full flex-col gap-3"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <ShapeAvatar
+                  id={goal.id}
+                  entityType="goal"
+                  label={goal.title}
+                  area={group.area?.color}
+                  size={40}
+                />
+                <h3 className="min-w-0 flex-1 text-title-medium wrap-anywhere">
+                  <Link href={`/goals/${goal.id}`} className="stretched-link">
+                    {goal.title}
+                  </Link>
+                </h3>
+                <div className="relative z-10 max-w-1/3 self-start">
+                  <GoalActions goal={goal} areas={areas} />
+                </div>
+              </div>
+              {goal.reason && (
+                <p className="line-clamp-2 text-body-medium wrap-anywhere whitespace-pre-line text-on-surface-variant">
+                  {goal.reason}
+                </p>
+              )}
+              <div className="mt-auto grid gap-2 empty:hidden">
+                <MilestoneArc progress={goal.progress} size="mini" />
+                <p className="flex flex-wrap gap-x-2 gap-y-1 text-body-small text-on-surface-variant empty:hidden">
+                  {goal.startDateLabel && (
+                    <span>Starts {goal.startDateLabel}</span>
+                  )}
+                  {goal.targetDateLabel && (
+                    <span>Target {goal.targetDateLabel}</span>
+                  )}
+                  {goal.priority && (
+                    <span>{GOAL_PRIORITY_LABELS[goal.priority]}</span>
+                  )}
+                </p>
+              </div>
+            </Card>
           </li>
         ))}
       </ul>
     </section>
-  );
-}
-
-function GoalSummary({ goal }: { goal: GoalListItem }) {
-  const details = [
-    goal.startDateLabel && `Starts ${goal.startDateLabel}`,
-    goal.targetDateLabel && `Target ${goal.targetDateLabel}`,
-    milestoneProgressLabel(goal.progress),
-  ].filter(Boolean);
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="font-medium break-words">
-          <Link
-            href={`/goals/${goal.id}`}
-            className={cx("rounded-sm hover:underline", focusRing)}
-          >
-            {goal.title}
-          </Link>
-        </h3>
-        {goal.priority && (
-          <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs text-muted">
-            {GOAL_PRIORITY_LABELS[goal.priority]}
-          </span>
-        )}
-      </div>
-      {goal.reason && (
-        <p className="line-clamp-2 text-sm break-words whitespace-pre-line text-muted">
-          {goal.reason}
-        </p>
-      )}
-      {details.length > 0 && (
-        <p className="text-sm text-muted">{details.join(" · ")}</p>
-      )}
-    </div>
   );
 }

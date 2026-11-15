@@ -13,7 +13,7 @@ import { FormField } from "@/components/ui/form-field";
 import { IconButton, IconLink } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { NumberStepper } from "@/components/ui/number-stepper";
-import { RadioGroup, RadioRow } from "@/components/ui/radio-group";
+import { RadioGroup, RadioRow, RadioSwatch } from "@/components/ui/radio-group";
 import { Select } from "@/components/ui/select";
 import { ShapeAvatar } from "@/components/ui/shape-avatar";
 import { Switch, SwitchRow } from "@/components/ui/switch";
@@ -398,6 +398,33 @@ function ThemeColumn({
         <Checkbox label="Morning reading" shape="round" defaultChecked />
         <Checkbox label="Walk after lunch" shape="round" />
         <Checkbox label="Imported task" disabled defaultChecked />
+      </Example>
+      <Example title="Colour swatches">
+        <RadioGroup
+          label={`${title} area colour`}
+          defaultValue="teal"
+          className="flex-row flex-wrap gap-1"
+        >
+          <RadioSwatch
+            value="teal"
+            label="Teal"
+            style={{
+              backgroundColor: "var(--area-teal-container)",
+              color: "var(--area-teal-on)",
+            }}
+          />
+          <RadioSwatch
+            value="violet"
+            label="Violet"
+            style={{
+              backgroundColor: "var(--area-violet-container)",
+              color: "var(--area-violet-on)",
+            }}
+          />
+          <RadioSwatch value="none" label="No colour">
+            <Icon name="block" size={20} />
+          </RadioSwatch>
+        </RadioGroup>
       </Example>
       <Example title="Switch and radio">
         <Switch label="Reminders" />

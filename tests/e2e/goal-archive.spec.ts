@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  chooseGoalMenuItem,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 function milestoneSection(page: Page) {
   return page.getByRole("region", { name: "Milestones" });
@@ -40,7 +44,7 @@ test("create → milestone → archive → restore to Active → delete", async 
   await addMilestone(page, "Play a scale");
 
   // Archive from the detail page; the goal leaves the Goals list.
-  await page.getByRole("button", { name: "Archive", exact: true }).click();
+  await chooseGoalMenuItem(page, "Archive", "Actions for Learn the cello");
   await expect(
     page.getByRole("definition").getByText("Archived", { exact: true }),
   ).toBeVisible();
@@ -69,7 +73,11 @@ test("create → milestone → archive → restore to Active → delete", async 
 
   // It's back in Active, with its milestones.
   await page.goto("/goals");
-  await expect(page.getByRole("link", { name: "Archived (0)" })).toBeVisible();
+  await page.getByRole("button", { name: "Goals options" }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Archived goals (0)" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByText("0 of 3 milestones")).toBeVisible();
   await page.getByRole("link", { name: "Learn the cello" }).click();
   await expect(
@@ -77,7 +85,7 @@ test("create → milestone → archive → restore to Active → delete", async 
   ).toBeVisible();
 
   // Delete states exactly what goes, then leaves the gone page.
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await chooseGoalMenuItem(page, "Delete…", "Actions for Learn the cello");
   const confirm = page.getByRole("alertdialog", {
     name: "Delete “Learn the cello”?",
   });
@@ -98,19 +106,27 @@ test("archived goals show their completed date and can be deleted from the archi
 }) => {
   await signInAndConfirm(page);
   await createGoalAndOpen(page, "Finish the quilt");
-  await page.getByRole("button", { name: "Mark complete" }).click();
-  await expect(page.getByText(/Completed on /)).toBeVisible();
-  await page.getByRole("button", { name: "Archive", exact: true }).click();
+  await chooseGoalMenuItem(
+    page,
+    "Mark complete",
+    "Actions for Finish the quilt",
+  );
+  await expect(
+    page
+      .getByRole("region", { name: "Details" })
+      .getByText("Completed on", { exact: true }),
+  ).toBeVisible();
+  await chooseGoalMenuItem(page, "Archive", "Actions for Finish the quilt");
   await expect(
     page.getByRole("definition").getByText("Archived", { exact: true }),
   ).toBeVisible();
 
   await page.goto("/goals");
-  await page.getByRole("link", { name: "Archived (1)" }).click();
+  await chooseGoalMenuItem(page, "Archived goals (1)", "Goals options");
   await expect(page.getByText(/Completed on .* · Archived on /)).toBeVisible();
 
   // Cancel keeps it; confirming removes it.
-  await page.getByRole("button", { name: "Delete: Finish the quilt" }).click();
+  await chooseGoalMenuItem(page, "Delete…", "Actions for Finish the quilt");
   const confirm = page.getByRole("alertdialog", {
     name: "Delete “Finish the quilt”?",
   });
@@ -122,7 +138,7 @@ test("archived goals show their completed date and can be deleted from the archi
     page.getByRole("link", { name: "Finish the quilt" }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete: Finish the quilt" }).click();
+  await chooseGoalMenuItem(page, "Delete…", "Actions for Finish the quilt");
   await confirm.getByRole("button", { name: "Delete goal" }).click();
   await expect(
     page.getByRole("heading", { level: 2, name: "Nothing archived" }),

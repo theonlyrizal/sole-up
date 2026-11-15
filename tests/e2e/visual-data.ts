@@ -22,6 +22,7 @@ import {
   habitSchedules,
   lifeAreas,
   milestones,
+  noteGoals,
   notes,
   tasks,
   timeBlocks,
@@ -90,7 +91,13 @@ export async function createUnscheduledHabit(
 /** Give a fresh test account a populated UI without relying on clicks to seed it. */
 export async function seedVisualData(
   page: Page,
-  { home = false, todaySchedule = false, plan = false, calendar = false } = {},
+  {
+    home = false,
+    todaySchedule = false,
+    plan = false,
+    calendar = false,
+    goalsUI = false,
+  } = {},
 ) {
   const userId = await signInAndConfirm(page, "Alex Morgan");
   const pool = new Pool({
@@ -105,6 +112,7 @@ export async function seedVisualData(
   const habitStart = addDays(today, -18);
   const areaId = randomUUID();
   const goalId = randomUUID();
+  const archivedGoalId = randomUUID();
   const noteId = randomUUID();
   const pastReviewId = randomUUID();
   const eventId = randomUUID();
@@ -131,7 +139,71 @@ export async function seedVisualData(
           title: GOAL_TITLE,
           reason: "A little more time outside each week.",
           priority: "medium",
+          ...(goalsUI && { startDate: today, targetDate: addDays(today, 45) }),
         });
+        if (goalsUI) {
+          await db.insert(lifeAreas).values([
+            { userId, name: "Learning", color: "violet", sortOrder: 1 },
+            {
+              userId,
+              name: "Neighborhood projects",
+              color: "amber",
+              sortOrder: 2,
+            },
+            {
+              userId,
+              name: "Studio",
+              color: "pink",
+              sortOrder: 3,
+              status: "archived",
+            },
+          ]);
+          await db.insert(goals).values([
+            {
+              userId,
+              lifeAreaId: areaId,
+              title: "Swim at the community pool",
+              reason: "Have a regular place to move and unwind.",
+            },
+            {
+              userId,
+              lifeAreaId: areaId,
+              title:
+                "Build a weekday routine that leaves time for dinner with friends",
+              reason:
+                "I want a little more breathing room at the end of the day.",
+              targetDate: addDays(today, 30),
+            },
+            {
+              userId,
+              title: "Learn to mend clothes",
+              reason: "Keep wearing the pieces I reach for most.",
+            },
+            { userId, title: "Make a small herb garden", status: "paused" },
+            {
+              id: archivedGoalId,
+              userId,
+              lifeAreaId: areaId,
+              title: "Organize the winter walking group",
+              status: "archived",
+              completedAt: now,
+            },
+            { userId, title: "Read more fiction", status: "archived" },
+          ]);
+          await db.insert(milestones).values({
+            userId,
+            goalId: archivedGoalId,
+            title: "Share the route",
+            status: "completed",
+            completedAt: now,
+            sortOrder: 0,
+          });
+          await db.insert(tasks).values({
+            userId,
+            goalId: archivedGoalId,
+            title: "Print spare maps",
+          });
+        }
         if (home) {
           await db
             .insert(goals)
@@ -417,6 +489,12 @@ export async function seedVisualData(
             ],
           },
         });
+        if (goalsUI) {
+          await db.insert(noteGoals).values([
+            { userId, noteId, goalId },
+            { userId, noteId, goalId: archivedGoalId },
+          ]);
+        }
         await db.insert(weeklyReviews).values([
           {
             userId,

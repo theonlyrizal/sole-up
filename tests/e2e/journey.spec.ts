@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { signInAndConfirm } from "./helpers";
+import { chooseGoalMenuItem, signInAndConfirm } from "./helpers";
 
 // The Phase 2 journey end to end (chunk 2.8): a life area, a goal with its
 // reason, a milestone, two tasks, one planned for today and completed there.
@@ -42,7 +42,7 @@ async function openGoal(page: Page) {
 /** The goal's progress, status and milestone as the journey leaves them. */
 async function expectGoalProgressUnchanged(page: Page) {
   await expect(
-    milestonesSection(page).getByText("0 of 1 milestone", { exact: true }),
+    page.getByRole("img", { name: "0 of 1 milestone completed" }),
   ).toBeVisible();
   await expect(
     milestonesSection(page).getByRole("checkbox", { name: MILESTONE }),
@@ -60,14 +60,17 @@ test("area → goal → milestone → tasks → plan today → complete", async 
   test.slow();
   await signInAndConfirm(page);
 
-  // A life area, created inline after declining the starters.
+  // A life area, created after declining the starters.
   await page.getByRole("link", { name: "Goals" }).click();
-  await page.getByRole("link", { name: "Life areas" }).click();
+  await chooseGoalMenuItem(page, "Life areas", "Goals options");
   await expect(
     page.getByRole("heading", { level: 1, name: "Life areas" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "No thanks" }).click();
-  const newArea = page.getByLabel("New area");
+  await page.getByRole("button", { name: "New area" }).click();
+  const newArea = page
+    .getByRole("dialog", { name: "New life area" })
+    .getByLabel("Name");
   await newArea.fill(AREA);
   await newArea.press("Enter");
   await expect(
@@ -91,7 +94,7 @@ test("area → goal → milestone → tasks → plan today → complete", async 
 
   await openGoal(page);
   await expect(
-    page.getByRole("region", { name: "Why it matters" }).getByText(REASON),
+    page.getByRole("region", { name: "Why this matters" }).getByText(REASON),
   ).toBeVisible();
 
   // A milestone.
@@ -101,7 +104,7 @@ test("area → goal → milestone → tasks → plan today → complete", async 
   await newMilestone.fill(MILESTONE);
   await newMilestone.press("Enter");
   await expect(
-    milestonesSection(page).getByText("0 of 1 milestone", { exact: true }),
+    page.getByRole("img", { name: "0 of 1 milestone completed" }),
   ).toBeVisible();
 
   // Two tasks: one under the milestone, one directly under the goal.

@@ -28,6 +28,7 @@ type TaskRowProps = {
   };
   details?: React.ReactNode;
   showGoal?: boolean;
+  wrapActions?: boolean;
 };
 
 export function TaskRow({
@@ -41,6 +42,7 @@ export function TaskRow({
     <span key={detail}>{detail}</span>
   )),
   showGoal = true,
+  wrapActions,
 }: TaskRowProps) {
   const status = task.status;
   const [pending, startTransition] = useTransition();
@@ -75,6 +77,7 @@ export function TaskRow({
   return (
     <ListItem
       className="gap-2 px-2 medium:gap-3"
+      wrapActions={wrapActions}
       leading={
         selection ? (
           <Checkbox

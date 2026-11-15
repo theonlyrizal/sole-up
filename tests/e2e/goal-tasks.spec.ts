@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  chooseGoalMenuItem,
   chooseTaskAction,
   expectNoSeriousViolations,
   signInAndConfirm,
@@ -13,7 +14,7 @@ const tasksSection = (page: Page) =>
   page.getByRole("region", { name: "Tasks", exact: true });
 
 const nextAction = (page: Page) =>
-  tasksSection(page).getByRole("region", { name: "Next action" });
+  page.getByRole("region", { name: "Next action" });
 
 async function createGoalAndOpen(page: Page, title: string) {
   await page.goto("/goals");
@@ -123,6 +124,15 @@ test("tasks on goal detail: add in context, next action, survives a reload", asy
   await expect(
     directList.getByText("Completed", { exact: true }),
   ).toBeVisible();
+
+  // Completing the last next action keeps focus in its own card.
+  await nextAction(page)
+    .getByRole("checkbox", { name: "Complete Call the music shop" })
+    .press("Space");
+  await expect(nextAction(page)).toContainText("No next action yet");
+  await expect(
+    nextAction(page).getByRole("button", { name: "Add a task" }),
+  ).toBeFocused();
 });
 
 test("deleting a goal states its task count and moves the tasks to the inbox", async ({
@@ -150,7 +160,7 @@ test("deleting a goal states its task count and moves the tasks to the inbox", a
     tasksSection(page).getByText("Find a running route", { exact: true }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await chooseGoalMenuItem(page, "Delete…", "Actions for Run a marathon");
   const confirm = page.getByRole("alertdialog", {
     name: "Delete “Run a marathon”?",
   });

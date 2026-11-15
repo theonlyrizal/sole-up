@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import { GoalDetailView } from "@/components/goals/goal-detail";
 import { PageContainer } from "@/components/shell/page-container";
-import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { GOAL_LIST_STATUSES } from "@/lib/goals";
 import { requireUser } from "@/server/auth/session";
@@ -51,13 +50,5 @@ async function Goal({
       : listStatus && listStatus !== "active"
         ? `/goals?status=${listStatus}`
         : "/goals";
-  return (
-    <PageFrame
-      title={detail.goal.title}
-      width="detail"
-      back={{ href: backHref, label: "Goals" }}
-    >
-      <GoalDetailView detail={detail} backHref={backHref} />
-    </PageFrame>
-  );
+  return <GoalDetailView detail={detail} backHref={backHref} />;
 }

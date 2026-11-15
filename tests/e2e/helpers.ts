@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** Creates a test user and sets the browser's session cookie without OAuth. */
 export async function signInForTest(
@@ -56,6 +56,53 @@ export async function chooseTaskAction(
   }).toPass();
   await item.click();
   return trigger;
+}
+
+export async function chooseGoalMenuItem(
+  page: Page,
+  itemName: string,
+  triggerName: string,
+): Promise<Locator> {
+  const trigger = page.getByRole("button", { name: triggerName, exact: true });
+  const item = page.getByRole("menuitem", { name: itemName, exact: true });
+  await expect(async () => {
+    if (!(await item.isVisible())) await trigger.click();
+    await expect(item).toBeVisible({ timeout: 1_000 });
+  }).toPass();
+  await item.click();
+  return trigger;
+}
+
+export async function addLifeArea(page: Page, name: string) {
+  await page.getByRole("button", { name: "New area", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "New life area" });
+  const input = dialog.getByRole("textbox", { name: "Name", exact: true });
+  await expect(input).toBeEnabled();
+  await input.fill(name);
+  await input.press("Enter");
+  await expect(dialog).toHaveCount(0);
+}
+
+/** Hold the real Server Action, then let it fail the existing ID validation. */
+export async function holdMilestoneSave(page: Page, path: string) {
+  const requested = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const matches = (url: URL) => url.pathname === path;
+  await page.route(matches, async (route) => {
+    const request = route.request();
+    if (request.method() !== "POST" || !request.headers()["next-action"]) {
+      return route.continue();
+    }
+    requested.resolve();
+    await release.promise;
+    const [input] = request.postDataJSON() as [{ id: string; status: string }];
+    await route.continue({ postData: JSON.stringify([{ ...input, id: "" }]) });
+  });
+  return {
+    requested: requested.promise,
+    release: release.resolve,
+    stop: () => page.unroute(matches),
+  };
 }
 
 /** Waits for the page's service worker to be active; its scope and script. */
