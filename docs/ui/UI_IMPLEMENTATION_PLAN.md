@@ -87,7 +87,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-4 | Home | done | chunk/ui-4-home | 2026-11-13 | 5-A approved. Home contracts and finish-line checks verified |
 | UI-5 | Plan: Today, task row, timeline, Today habits | done | chunk/ui-5-today | 2026-11-13 | Today contracts, confirmed feedback and finish-line checks verified |
 | UI-6 | Plan: All tasks, Upcoming, Inbox, task dialog, Quick Add | done | chunk/ui-6-plan-task-lists | 2026-11-13 | URL contracts, task actions, both theme and size pairs, and finish-line checks verified |
-| UI-7 | Calendar and event/block dialogs | todo | | | |
+| UI-7 | Calendar and event/block dialogs | done | chunk/ui-7-calendar | 2026-11-15 | All five views, keyboard date navigation, theme and size pairs, and finish-line checks verified |
 | UI-8 | Goals, goal detail, life areas, archived goals | todo | | | |
 | UI-9 | Track, habit form, archived habits | todo | | | Needs sign-off 5-B |
 | UI-10 | Weekly review, history, detail | todo | | | Uses 5-A |
@@ -559,5 +559,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Chromium axe, keyboard multi-select, dismissal, focus recovery, reflow, enlarged text and reduced motion passed. |
 | Restraint | 2 | A completed task leaves on refresh. Saved feedback follows the explicit action and does not replay on reload. |
 | Variety | 1 | Filterable lists, dated groups and Inbox selection serve different tasks within the Plan shell. Cross-route composition remains for UI-13. |
+
+**Total — 15/16.**
+
+### UI-7 · Calendar (2026-11-15)
+
+- **Branch / PR** — `chunk/ui-7-calendar`. UI-6 [#98](https://github.com/theonlyrizal/sole-up/pull/98) was merged before implementation. [UI-7 pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-7-calendar).
+- **Routes and components** — `/plan/calendar` uses a shared toolbar in all five views. Go to date opens a navigation-only month grid in a compact sheet or anchored popover. Day and Agenda share the compact WeekStrip. Agenda uses DateBadge headers and kind chips. Week and Day use quiet FullCalendar grids with a feature-ink Now line. By area and Timeline use the stored life-area palette and AreaChip headings. Event, block, move, scope and delete screens use FormDialog, with Start and End groups, Repeat disclosure and warning banners.
+- **Data paths and contracts** — Existing calendar queries and actions remain the source for schedule items, recurrence, reminders and mutations. The page reuses `listPlanTasks` for Block time across views and `getLifeAreasView` for the stored area palette. Agenda retains `start` and `days`. The grid views retain `date`, Timeline retains `span`, and links with `item` still open the original dialog. Existing placement calculations, DST, day-heading links, arrow movement and item focus return are covered by the calendar tests.
+- **Decisions** — Followed D-23, D-28 and D-34. Week falls back to Day below 768 px and the Week task panel appears at the design system's 1200 px large breakpoint. Block End previews the end derived from its existing duration field. Scope RadioRows use native radios to retain one Tab stop and reliable arrow selection. Compact week capsules retain the current-day treatment and show a distinct selected date.
+- **Checks run** — `pnpm verify` passed with 1,234 unit and 831 integration tests. The existing unused-variable lint warning in habit validation remains. `pnpm build` passed on Next.js 16.4.3. The production-backed `pnpm test:e2e --workers 5 --reporter list --output test-results/ui-7-e2e` passed 177 tests. `pnpm test:visual --workers 4 --reporter list` passed all 26 cases.
+- **Screenshots** — 64 Playwright PNGs in `test-results/visual/ui-7/` at 390 × 844 and 1280 × 800 in both themes. Start with `agenda-390-light.png`, `week-1280-dark.png`, `week-fallback-day-390-dark.png`, `areas-1280-light.png`, `timeline-1280-dark.png` and `date-picker-390-dark.png`. See `event-form-390-light.png`, `block-form-1280-light.png`, `block-move-390-dark.png` and `event-delete-warning-1280-light.png` for dialogs.
+- **Accessibility and interaction evidence** — Chromium axe reported zero serious or critical violations on the populated views and the checked overlays at 390 × 844 and 1280 × 800 in both themes. The compact Week request resolved to Day. The picker used local overflow and disjoint 48 px day targets at 320 px. Arrow keys, Home/End, PageUp/PageDown, Enter and Escape were exercised, including the February leap-day jump and the Agenda URL. The four views available at small widths reflowed at 320, 375, 390, 414, 768 and 1280 px and at 200% text for both capture sizes. Escape restored focus through nested confirmations and back to the item.
+- **Feedback evidence** — A held event submission exposed a disabled, busy Save action. Server validation retained the entered title and focused the invalid field. Retrying saved the event through the real action. The `event-pending-*`, `event-error-*` and `event-retry-saved-*` captures show those states under reduced motion. The browser also cancelled a recurring-block drag and verified that the original time returned.
+- **Unverified** — Physical touch devices, manual screen readers and engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | Range, selected view and New event lead the toolbar. Compact forms keep the primary action in the footer. |
+| Character | 2 | Opaque schedule surfaces, circular date marks and filled week capsules carry the Calendar composition in both themes. |
+| Color | 2 | Forest marks dates and events, Kiwi marks blocks, Crisp Carrot marks Now, and Tomato Burst marks scope consequences. Stored area colours carry through the two area layouts. |
+| Response | 2 | Chromium exercised pending, validation, retained input, retry, focus return and block-move reversion. |
+| Truthfulness | 2 | The date grid shows dates only. The schedule, warnings and block-end preview derive from the selected date, existing items or form values. |
+| Accessibility | 2 | Axe, grid keys, native scope selection, focus return, local date overflow and enlarged text passed in Chromium. |
+| Restraint | 2 | Empty time stays quiet and confirmed event feedback uses the existing snackbar. |
+| Variety | 1 | Agenda, time grids and area layouts answer different scheduling questions within the shared toolbar. |
 
 **Total — 15/16.**

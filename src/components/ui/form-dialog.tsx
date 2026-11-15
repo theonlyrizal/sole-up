@@ -3,7 +3,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { useDialogViewport } from "@/components/hooks/use-dialog-viewport";
 import { useMediaQuery } from "@/components/hooks/use-media-query";
-import { Button } from "./button";
+import { Button, type ButtonVariant } from "./button";
 import { cx } from "./cx";
 import {
   Dialog,
@@ -20,6 +20,10 @@ type FormDialogProps = {
   formId: string;
   submitLabel: string;
   pending?: boolean;
+  submitVariant?: ButtonVariant;
+  submitDisabled?: boolean;
+  alert?: boolean;
+  onOpenAutoFocus?: (event: Event) => void;
   destructive?: ReactNode;
   trigger?: ReactElement;
   open?: boolean;
@@ -35,6 +39,10 @@ export function FormDialog({
   formId,
   submitLabel,
   pending = false,
+  submitVariant,
+  submitDisabled,
+  alert = false,
+  onOpenAutoFocus,
   destructive,
   trigger,
   open,
@@ -56,6 +64,11 @@ export function FormDialog({
         className={cx(contentClass, "form-dialog")}
         description={description}
         onCloseAutoFocus={onCloseAutoFocus}
+        onOpenAutoFocus={onOpenAutoFocus}
+        {...(alert && {
+          role: "alertdialog",
+          onInteractOutside: (event: Event) => event.preventDefault(),
+        })}
       >
         <DialogHeading
           title={title}
@@ -71,16 +84,20 @@ export function FormDialog({
           )}
         </div>
         <footer className="form-dialog-footer sticky bottom-0 flex shrink-0 flex-wrap items-center justify-end gap-2 bg-surface-container-high">
-          {!compact && (
+          {(!compact || alert) && (
             <DialogClose asChild>
-              <Button variant="text">Cancel</Button>
+              <Button variant="text" data-form-cancel="" disabled={pending}>
+                Cancel
+              </Button>
             </DialogClose>
           )}
           <Button
             type="submit"
             form={formId}
+            variant={submitVariant}
             pending={pending}
-            fullWidth={compact}
+            disabled={submitDisabled}
+            fullWidth={compact && !alert}
           >
             {submitLabel}
           </Button>

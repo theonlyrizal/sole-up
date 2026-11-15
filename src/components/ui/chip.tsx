@@ -25,7 +25,7 @@ type ChipKind =
 type ChipProps = ChipAction &
   ChipKind & { label: string; icon?: IconName; className?: string } & Pick<
     React.ComponentProps<"button">,
-    "ref" | "id" | "aria-haspopup" | "aria-expanded" | "aria-controls"
+    "ref" | "id" | "style" | "aria-haspopup" | "aria-expanded" | "aria-controls"
   >;
 
 const statusTones = {
@@ -38,8 +38,18 @@ const statusTones = {
 };
 
 export function Chip(props: ChipProps) {
-  const { type, icon, label, className, href, onClick, disabled, ref, id } =
-    props;
+  const {
+    type,
+    icon,
+    label,
+    className,
+    href,
+    onClick,
+    disabled,
+    ref,
+    id,
+    style,
+  } = props;
   const interactive = Boolean(href || onClick || disabled || type === "filter");
   const selected = type === "filter" && props.selected;
   const metric = type === "metric";
@@ -81,6 +91,7 @@ export function Chip(props: ChipProps) {
     <Link
       href={href}
       className={classes}
+      style={style}
       aria-current={selected ? "page" : undefined}
     >
       {content}
@@ -91,6 +102,7 @@ export function Chip(props: ChipProps) {
       ref={ref}
       id={id}
       className={classes}
+      style={style}
       aria-haspopup={props["aria-haspopup"]}
       aria-expanded={props["aria-expanded"]}
       aria-controls={props["aria-controls"]}
@@ -103,7 +115,9 @@ export function Chip(props: ChipProps) {
       {content}
     </button>
   ) : (
-    <span className={classes}>{content}</span>
+    <span className={classes} style={style}>
+      {content}
+    </span>
   );
 
   if (type !== "input") return chip;

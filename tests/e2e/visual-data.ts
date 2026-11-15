@@ -14,6 +14,7 @@ import {
 } from "../../src/lib/dates";
 import { DEFAULT_WEEK_START } from "../../src/lib/preferences";
 import {
+  calendarEventExceptions,
   calendarEvents,
   goals,
   habitLogs,
@@ -33,6 +34,8 @@ export const VISUAL_ZONE = "UTC";
 export const DAILY_HABIT = "Morning stretch";
 export const QUANTITY_HABIT = "Read a few pages before the afternoon commute";
 export const GOAL_TITLE = "Make space for a longer weekend walk";
+export const CALENDAR_BLOCK_TITLE = "Pick a route and pack a rain jacket";
+export const CALENDAR_SERIES_TITLE = "Morning planning";
 export const EVENT_TITLE = "Walk and coffee with a friend";
 export const INBOX_TASK = "Ask the library about weekend opening hours";
 export const UPCOMING_TASK = "Check the trail map and pack a thermos";
@@ -87,7 +90,7 @@ export async function createUnscheduledHabit(
 /** Give a fresh test account a populated UI without relying on clicks to seed it. */
 export async function seedVisualData(
   page: Page,
-  { home = false, todaySchedule = false, plan = false } = {},
+  { home = false, todaySchedule = false, plan = false, calendar = false } = {},
 ) {
   const userId = await signInAndConfirm(page, "Alex Morgan");
   const pool = new Pool({
@@ -158,7 +161,7 @@ export async function seedVisualData(
             id: plannedTaskId,
             userId,
             goalId,
-            title: "Pick a route and pack a rain jacket",
+            title: CALENDAR_BLOCK_TITLE,
             plannedDate: today,
             priority: "high",
             estimatedMinutes: 20,
@@ -221,6 +224,74 @@ export async function seedVisualData(
           endAt: new Date(`${tomorrow}T15:00:00Z`),
           tz: VISUAL_ZONE,
         });
+        if (calendar) {
+          const seriesId = randomUUID();
+          const archivedId = randomUUID();
+          const time = (date: string, at: string) =>
+            new Date(`${date}T${at}:00Z`);
+          await db.insert(lifeAreas).values({
+            id: archivedId,
+            userId,
+            name: "Studio",
+            color: "violet",
+            status: "archived",
+            sortOrder: 1,
+          });
+          await db.insert(calendarEvents).values([
+            {
+              id: seriesId,
+              userId,
+              lifeAreaId: areaId,
+              title: CALENDAR_SERIES_TITLE,
+              allDay: false,
+              startAt: time(today, "08:00"),
+              endAt: time(today, "09:30"),
+              tz: VISUAL_ZONE,
+              rrule: "FREQ=DAILY;COUNT=5",
+            },
+            {
+              userId,
+              lifeAreaId: archivedId,
+              title:
+                "Review the first print proofs and return notes to the studio",
+              allDay: false,
+              startAt: time(today, "10:00"),
+              endAt: time(today, "11:30"),
+              tz: VISUAL_ZONE,
+            },
+            {
+              userId,
+              title: "Library book sale",
+              allDay: true,
+              startDate: today,
+              endDate: tomorrow,
+            },
+          ]);
+          await db.insert(calendarEventExceptions).values({
+            userId,
+            eventId: seriesId,
+            kind: "modified",
+            lifeAreaId: areaId,
+            originalStartAt: time(tomorrow, "08:00"),
+            startAt: time(tomorrow, "09:00"),
+            endAt: time(tomorrow, "10:30"),
+            title: "Planning after the school run",
+          });
+          await db.insert(timeBlocks).values({
+            userId,
+            taskId: plannedTaskId,
+            startAt: time(today, "08:30"),
+            endAt: time(today, "10:00"),
+            tz: VISUAL_ZONE,
+            rrule: "FREQ=DAILY;COUNT=4",
+          });
+          await db.insert(tasks).values({
+            userId,
+            title: "Send the revised route",
+            dueAt: time(today, "11:30"),
+            dueTz: VISUAL_ZONE,
+          });
+        }
         if (todaySchedule) {
           const day = localDayRange(today, VISUAL_ZONE);
           await db.insert(calendarEvents).values([

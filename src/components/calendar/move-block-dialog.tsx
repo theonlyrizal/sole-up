@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState, useTransition } from "react";
 
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { toast } from "@/components/ui/toast";
 import {
   type BlockTimesPayload,
@@ -50,29 +50,14 @@ export function MoveBlockDialog({
   onDone: () => void;
 }) {
   return (
-    <Dialog
-      open={move !== null}
-      onOpenChange={(open) => {
-        if (open || !move) return;
-        move.revert();
-        onDone();
-      }}
-    >
-      {move && (
-        <DialogContent
-          title={move.kind === "move" ? "Move block" : "Change block length"}
-          description={`For “${move.block.taskTitle}”.`}
-          className="max-w-xl"
-        >
-          <MoveBlockScope
-            move={move}
-            locale={locale}
-            timeZone={timeZone}
-            onDone={onDone}
-          />
-        </DialogContent>
-      )}
-    </Dialog>
+    move && (
+      <MoveBlockScope
+        move={move}
+        locale={locale}
+        timeZone={timeZone}
+        onDone={onDone}
+      />
+    )
   );
 }
 
@@ -142,23 +127,35 @@ function MoveBlockScope({
   }
 
   return (
-    <BlockScopeStep
-      id={`${id}-scope`}
-      intro="This block repeats."
-      scope={scope}
-      options={options}
-      loading={loading}
-      pending={pending}
-      error={error}
-      locale={locale}
-      timeZone={timeZone}
-      onChange={setScope}
-      backLabel="Cancel"
-      onBack={() => {
+    <FormDialog
+      open
+      onOpenChange={(open) => {
+        if (open || pending) return;
         move.revert();
         onDone();
       }}
-      onSave={save}
-    />
+      title={move.kind === "move" ? "Move block" : "Change block length"}
+      description={`For “${block.taskTitle}”.`}
+      formId={id}
+      submitLabel={pending ? "Saving…" : "Save"}
+      pending={pending}
+      submitDisabled={loading}
+    >
+      <BlockScopeStep
+        id={`${id}-scope`}
+        formId={id}
+        intro="This block repeats."
+        scope={scope}
+        options={options}
+        loading={loading}
+        pending={pending}
+        error={error}
+        locale={locale}
+        timeZone={timeZone}
+        onChange={setScope}
+        showBack={false}
+        onSave={save}
+      />
+    </FormDialog>
   );
 }

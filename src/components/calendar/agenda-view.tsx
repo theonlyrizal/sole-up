@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 
 import { useRefreshOnNewDay } from "@/components/tasks/use-refresh-on-new-day";
-import { Button } from "@/components/ui/button";
+import { DateBadge } from "@/components/data/date-badge";
+import { Chip } from "@/components/ui/chip";
+import { ConnectedButtonGroup } from "@/components/ui/button-group";
 import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -20,27 +21,37 @@ import {
 import { blockStatusLabel } from "@/lib/block-form";
 import type { CalendarEventOccurrence } from "@/lib/calendar-events";
 import { calendarDayLabel } from "@/lib/calendar-list";
-import { formatTimeOfDay, type LocalDate, localDateOf } from "@/lib/dates";
+import {
+  addDays,
+  formatTimeOfDay,
+  type LocalDate,
+  localDateOf,
+  type WeekStart,
+} from "@/lib/dates";
 import { timeRangeLabel } from "@/lib/event-form";
 import { PRIORITY_LABELS } from "@/lib/priorities";
 import { describeRecurrence } from "@/lib/recurrence-rules";
 import type { TimeBlockOccurrence } from "@/lib/time-blocks";
 import type { PlanTaskItem } from "@/server/modules/tasks/queries";
 
-import { type EventFormContext, EventFormDialog } from "./event-dialog";
+import type { BlockableTask } from "./block-form";
+import { CalendarActions } from "./calendar-actions";
+import type { EventFormContext } from "./event-dialog";
 import {
   Calendar,
   type CalendarFeedItem,
   type CalendarItemSegment,
 } from "./full-calendar";
 import { type CalendarEntry, ItemDialog, useItemDialog } from "./item-dialog";
-import { pillClass, ViewNav } from "./view-nav";
+import { CalendarHeader } from "./view-nav";
 
 type Entry = CalendarEntry;
 
 type AgendaViewProps = EventFormContext & {
   entries: Entry[];
   range: AgendaRange;
+  tasks: BlockableTask[];
+  weekStart: WeekStart;
   today: LocalDate;
   /** When the user's tomorrow begins (ISO instant). */
   nextDayStartsAt: string;
@@ -54,6 +65,8 @@ type AgendaViewProps = EventFormContext & {
 export function AgendaView({
   entries,
   range,
+  tasks,
+  weekStart,
   today,
   nextDayStartsAt,
   ...context
@@ -85,16 +98,28 @@ export function AgendaView({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <ViewNav current="agenda" date={range.start} today={today} />
-        <EventFormDialog {...context} trigger={<Button>New event</Button>} />
-      </div>
-      <RangeNav range={range} today={today} />
-      <DayCountNav range={range} today={today} />
-      <p className="text-muted">
-        <span className="sr-only">Showing </span>
-        {rangeLabel}
-      </p>
+      <CalendarHeader
+        current="agenda"
+        date={range.start}
+        today={today}
+        locale={context.locale}
+        weekStart={weekStart}
+        dateLabel={rangeLabel}
+        end={addDays(agendaEnd(range), -1)}
+        dateHref={(start) => agendaHref({ ...range, start }, today)}
+        move={{
+          label: "Move through the agenda",
+          previousLabel: `Previous ${range.days} days`,
+          nextLabel: `Next ${range.days} days`,
+          todayLabel: "From today",
+          previousHref: agendaHref(shiftAgendaRange(range, -1), today),
+          todayHref: agendaHref({ ...range, start: today }, today),
+          nextHref: agendaHref(shiftAgendaRange(range, 1), today),
+          atToday: range.start === today,
+        }}
+        actions={<CalendarActions context={context} tasks={tasks} />}
+        rangeControl={<DayCountNav range={range} today={today} />}
+      />
       <div ref={containerRef}>
         <Calendar
           view="agenda"
@@ -103,10 +128,20 @@ export function AgendaView({
           items={items}
           label={`Agenda, ${rangeLabel}`}
           renderDayHeader={(date) => (
-            <h2 className="text-base font-semibold">
-              <time dateTime={date}>
-                {calendarDayLabel(date, today, context.locale)}
-              </time>
+            <h2 className="flex items-center gap-3 text-title-medium">
+              <DateBadge
+                date={date}
+                today={today}
+                locale={context.locale}
+                label={calendarDayLabel(date, today, context.locale)}
+                relative={date === today ? "Today" : undefined}
+              />
+              <span aria-hidden="true" className="hidden medium:inline">
+                {new Date(`${date}T12:00:00Z`).toLocaleDateString(
+                  context.locale,
+                  { weekday: "long", timeZone: "UTC" },
+                )}
+              </span>
             </h2>
           )}
           renderItem={(entry, segment) => (
@@ -130,41 +165,6 @@ export function AgendaView({
   );
 }
 
-function RangeNav({ range, today }: { range: AgendaRange; today: LocalDate }) {
-  const isToday = range.start === today;
-  return (
-    <nav aria-label="Move through the agenda">
-      <ul className="flex flex-wrap gap-1">
-        <li>
-          <Link
-            href={agendaHref(shiftAgendaRange(range, -1), today)}
-            className={pillClass(false)}
-          >
-            Previous {range.days} days
-          </Link>
-        </li>
-        <li>
-          <Link
-            href={agendaHref({ ...range, start: today }, today)}
-            aria-current={isToday ? "page" : undefined}
-            className={pillClass(isToday)}
-          >
-            From today
-          </Link>
-        </li>
-        <li>
-          <Link
-            href={agendaHref(shiftAgendaRange(range, 1), today)}
-            className={pillClass(false)}
-          >
-            Next {range.days} days
-          </Link>
-        </li>
-      </ul>
-    </nav>
-  );
-}
-
 function DayCountNav({
   range,
   today,
@@ -173,24 +173,16 @@ function DayCountNav({
   today: LocalDate;
 }) {
   return (
-    <nav aria-label="Days to show">
-      <ul className="flex flex-wrap gap-1">
-        {AGENDA_DAY_COUNTS.map((days) => {
-          const current = days === range.days;
-          return (
-            <li key={days}>
-              <Link
-                href={agendaHref({ ...range, days }, today)}
-                aria-current={current ? "page" : undefined}
-                className={pillClass(current)}
-              >
-                {AGENDA_DAY_COUNT_LABELS[days]}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <ConnectedButtonGroup
+      label="Days to show"
+      compactLabels
+      value={String(range.days)}
+      items={AGENDA_DAY_COUNTS.map((days) => ({
+        value: String(days),
+        label: AGENDA_DAY_COUNT_LABELS[days],
+        href: agendaHref({ ...range, days }, today),
+      }))}
+    />
   );
 }
 
@@ -213,30 +205,35 @@ function AgendaItem({
         ? blockDetails(entry.block, context)
         : taskDetails(entry.task);
   return (
-    <div className="flex w-full min-w-0 flex-col gap-1 py-1 sm:flex-row sm:gap-4">
-      <p className="shrink-0 text-sm text-muted sm:w-36">
+    <div className="grid w-full min-w-0 items-start gap-1 p-2 medium:grid-cols-[10rem_minmax(0,1fr)] medium:gap-3">
+      <p className="px-2 pt-1 text-label-large text-on-surface-variant tabular-nums">
         {timeLabel(entry, segment, context)}
       </p>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <h3 className="font-medium break-words">
+      <div
+        data-kind={entry.kind}
+        className="calendar-agenda-card relative flex min-w-0 flex-wrap items-start justify-between gap-x-3 rounded-sm py-1 ps-3 pe-2"
+      >
+        <h3 className="min-w-0 flex-1 text-label-large">
           <button
             type="button"
             data-agenda-item=""
             onClick={(click) => onOpen(click.currentTarget)}
             className={cx(
-              "cursor-pointer rounded-sm text-left underline-offset-2 hover:underline",
+              "stretched-link min-h-12 cursor-pointer rounded-sm text-left wrap-anywhere hover:underline",
               focusRing,
             )}
           >
             {entry.title}
           </button>
         </h3>
-        <p className="text-sm text-muted">{agendaEntryKind(entry)}</p>
-        {details.map((detail) => (
-          <p key={detail} className="text-sm break-words text-muted">
-            {detail}
-          </p>
-        ))}
+        <Chip type="status" label={agendaEntryKind(entry)} className="my-2" />
+        {details.length > 0 && (
+          <div className="w-full pb-2 text-body-small wrap-anywhere">
+            {details.map((detail) => (
+              <p key={detail}>{detail}</p>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

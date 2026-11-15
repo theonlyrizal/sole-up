@@ -1,12 +1,14 @@
 "use client";
 
+import "./calendar-form.css";
+
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { ReminderSelect } from "@/components/reminders/reminder-select";
 import { ReminderStatus } from "@/components/reminders/reminder-status";
 import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { Switch } from "@/components/ui/switch";
 import { FormError } from "@/components/ui/form-error";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -90,26 +92,32 @@ export function EventFormDialog({
   onCloseAutoFocus,
   ...context
 }: EventFormDialogProps) {
+  const formId = useId();
+  const [pending, startTransition] = useTransition();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent
-        title={event ? "Edit event" : "New event"}
-        className="max-w-xl"
-        onCloseAutoFocus={onCloseAutoFocus}
-      >
-        <EventForm
-          event={event}
-          {...context}
-          onCancel={() => setOpen(false)}
-          onSaved={() => setOpen(false)}
-        />
-        {event && <ReminderStatus item={{ kind: "event", id: event.id }} />}
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title={event ? "Edit event" : "New event"}
+      formId={formId}
+      submitLabel={pending ? "Saving…" : event ? "Save" : "Add event"}
+      pending={pending}
+      trigger={trigger}
+      open={open}
+      onOpenChange={(next) => {
+        if (!pending) setOpen(next);
+      }}
+      onCloseAutoFocus={onCloseAutoFocus}
+    >
+      <EventForm
+        formId={formId}
+        event={event}
+        {...context}
+        startTransition={startTransition}
+        onSaved={() => setOpen(false)}
+      />
+    </FormDialog>
   );
 }
 
@@ -140,7 +148,8 @@ type Step =
 
 type EventFormProps = EventFormContext & {
   event?: CalendarEventOccurrence;
-  onCancel: () => void;
+  formId: string;
+  startTransition: React.TransitionStartFunction;
   onSaved: () => void;
 };
 
@@ -150,7 +159,8 @@ function EventForm({
   timeZones,
   userTimeZone,
   locale,
-  onCancel,
+  formId,
+  startTransition,
   onSaved,
 }: EventFormProps) {
   const id = useId();
@@ -168,7 +178,6 @@ function EventForm({
   const [repeatErrors, setRepeatErrors] = useState<RepeatErrors>({});
   const [error, setError] = useState<ActionError | null>(null);
   const [step, setStep] = useState<Step>({ kind: "form" });
-  const [pending, startTransition] = useTransition();
   // Bumped on each failed save, so focus moves to the first invalid field.
   const [attempt, setAttempt] = useState(0);
 
@@ -296,7 +305,7 @@ function EventForm({
       <ScopeStep
         id={`${id}-scope`}
         step={step}
-        pending={pending}
+        formId={formId}
         error={error}
         locale={locale}
         timeZone={userTimeZone}
@@ -340,6 +349,7 @@ function EventForm({
 
   return (
     <form
+      id={formId}
       ref={formRef}
       onSubmit={submit}
       noValidate
@@ -361,22 +371,18 @@ function EventForm({
       </FormField>
 
       <div className="flex flex-col gap-1.5">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="allDay"
-            checked={values.allDay}
-            aria-invalid={fieldErrors.allDay ? true : undefined}
-            aria-describedby={
-              fieldErrors.allDay ? `${id}-all-day-error` : undefined
-            }
-            onChange={(change) =>
-              setValues((current) => withAllDay(current, change.target.checked))
-            }
-            className={cx("size-4 accent-accent", focusRing)}
-          />
-          <span className="font-medium">All day</span>
-        </label>
+        <Switch
+          label="All day"
+          name="allDay"
+          checked={values.allDay}
+          aria-invalid={fieldErrors.allDay ? true : undefined}
+          aria-describedby={
+            fieldErrors.allDay ? `${id}-all-day-error` : undefined
+          }
+          onCheckedChange={(checked) =>
+            setValues((current) => withAllDay(current, checked))
+          }
+        />
         {fieldErrors.allDay && (
           <p id={`${id}-all-day-error`} className="text-sm text-danger">
             {fieldErrors.allDay.join(" ")}
@@ -384,81 +390,87 @@ function EventForm({
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField
-          id={`${id}-start-date`}
-          label="Start date"
-          errors={fieldErrors.startDate}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              name="startDate"
-              value={values.startDate}
-              onChange={(change) =>
-                setValues((current) =>
-                  withStart(current, { startDate: change.target.value }),
-                )
-              }
-            />
-          )}
-        </FormField>
-        {!values.allDay && (
+      <div className="calendar-time-fields">
+        <fieldset className="calendar-time-group">
+          <legend>Start</legend>
           <FormField
-            id={`${id}-start-time`}
-            label="Start time"
-            errors={fieldErrors.startTime}
+            id={`${id}-start-date`}
+            label="Start date"
+            errors={fieldErrors.startDate}
           >
             {(control) => (
               <Input
                 {...control}
-                type="time"
-                name="startTime"
-                value={values.startTime}
+                type="date"
+                name="startDate"
+                value={values.startDate}
                 onChange={(change) =>
                   setValues((current) =>
-                    withStart(current, { startTime: change.target.value }),
+                    withStart(current, { startDate: change.target.value }),
                   )
                 }
               />
             )}
           </FormField>
-        )}
-        <FormField
-          id={`${id}-end-date`}
-          label="End date"
-          hint={values.allDay ? "The last day of the event." : undefined}
-          errors={fieldErrors.endDate}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              name="endDate"
-              value={values.endDate}
-              min={values.startDate || undefined}
-              onChange={(change) => set({ endDate: change.target.value })}
-            />
+          {!values.allDay && (
+            <FormField
+              id={`${id}-start-time`}
+              label="Start time"
+              errors={fieldErrors.startTime}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  type="time"
+                  name="startTime"
+                  value={values.startTime}
+                  onChange={(change) =>
+                    setValues((current) =>
+                      withStart(current, { startTime: change.target.value }),
+                    )
+                  }
+                />
+              )}
+            </FormField>
           )}
-        </FormField>
-        {!values.allDay && (
+        </fieldset>
+        <fieldset className="calendar-time-group">
+          <legend>End</legend>
           <FormField
-            id={`${id}-end-time`}
-            label="End time"
-            errors={fieldErrors.endTime}
+            id={`${id}-end-date`}
+            label="End date"
+            hint={values.allDay ? "The last day of the event." : undefined}
+            errors={fieldErrors.endDate}
           >
             {(control) => (
               <Input
                 {...control}
-                type="time"
-                name="endTime"
-                value={values.endTime}
-                onChange={(change) => set({ endTime: change.target.value })}
+                type="date"
+                name="endDate"
+                value={values.endDate}
+                min={values.startDate || undefined}
+                onChange={(change) => set({ endDate: change.target.value })}
               />
             )}
           </FormField>
-        )}
+          {!values.allDay && (
+            <FormField
+              id={`${id}-end-time`}
+              label="End time"
+              errors={fieldErrors.endTime}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  type="time"
+                  name="endTime"
+                  value={values.endTime}
+                  onChange={(change) => set({ endTime: change.target.value })}
+                />
+              )}
+            </FormField>
+          )}
+        </fieldset>
       </div>
 
       {!values.allDay &&
@@ -514,18 +526,22 @@ function EventForm({
       />
 
       {!values.allDay && (
-        <ReminderSelect
-          id={`${id}-reminder`}
-          value={values.reminder}
-          onChange={(reminder) => set({ reminder })}
-          errors={fieldErrors.reminderOffsetMinutes}
-          note={
-            values.repeat.frequency !== "none"
-              ? "Applies to every event in the series."
-              : undefined
-          }
-        />
+        <section className="grid gap-2 border-t border-outline-variant pt-4">
+          <ReminderSelect
+            id={`${id}-reminder`}
+            value={values.reminder}
+            onChange={(reminder) => set({ reminder })}
+            errors={fieldErrors.reminderOffsetMinutes}
+            note={
+              values.repeat.frequency !== "none"
+                ? "Applies to every event in the series."
+                : undefined
+            }
+          />
+        </section>
       )}
+
+      {event && <ReminderStatus item={{ kind: "event", id: event.id }} />}
 
       <FormField
         id={`${id}-location`}
@@ -543,72 +559,88 @@ function EventForm({
         )}
       </FormField>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField
-          id={`${id}-goal`}
-          label="Goal"
-          hint="Choosing a goal fills in its life area."
-          errors={fieldErrors.goalId}
-        >
-          {(control) => (
-            <Select
-              {...control}
-              name="goalId"
-              value={values.goalId}
-              onChange={(change) => chooseGoal(change.target.value)}
-            >
-              <option value="">No goal</option>
-              {goalOptions.map((goal) => (
-                <option key={goal.id} value={goal.id}>
-                  {goal.status === "active" || goal.status === "paused"
-                    ? goal.title
-                    : `${goal.title} (${goal.status})`}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-        <FormField
-          id={`${id}-area`}
-          label="Life area"
-          errors={fieldErrors.lifeAreaId}
-        >
-          {(control) => (
-            <Select
-              {...control}
-              name="lifeAreaId"
-              value={values.lifeAreaId}
-              onChange={(change) => set({ lifeAreaId: change.target.value })}
-            >
-              <option value="">No area</option>
-              {areaOptions.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.status === "archived"
-                    ? `${area.name} (archived)`
-                    : area.name}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-      </div>
-
-      <FormField
-        id={`${id}-description`}
-        label="Description"
-        errors={fieldErrors.description}
+      <section
+        className="grid gap-3 border-t border-outline-variant pt-4"
+        aria-labelledby={`${id}-links`}
       >
-        {(control) => (
-          <Textarea
-            {...control}
-            name="description"
-            rows={3}
-            value={values.description}
-            maxLength={CALENDAR_EVENT_DESCRIPTION_MAX}
-            onChange={(change) => set({ description: change.target.value })}
-          />
-        )}
-      </FormField>
+        <h3 id={`${id}-links`} className="text-title-medium">
+          Goal / area
+        </h3>
+        <div className="grid gap-4 medium:grid-cols-2">
+          <FormField
+            id={`${id}-goal`}
+            label="Goal"
+            hint="Choosing a goal fills in its life area."
+            errors={fieldErrors.goalId}
+          >
+            {(control) => (
+              <Select
+                {...control}
+                name="goalId"
+                value={values.goalId}
+                onChange={(change) => chooseGoal(change.target.value)}
+              >
+                <option value="">No goal</option>
+                {goalOptions.map((goal) => (
+                  <option key={goal.id} value={goal.id}>
+                    {goal.status === "active" || goal.status === "paused"
+                      ? goal.title
+                      : `${goal.title} (${goal.status})`}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+          <FormField
+            id={`${id}-area`}
+            label="Life area"
+            errors={fieldErrors.lifeAreaId}
+          >
+            {(control) => (
+              <Select
+                {...control}
+                name="lifeAreaId"
+                value={values.lifeAreaId}
+                onChange={(change) => set({ lifeAreaId: change.target.value })}
+              >
+                <option value="">No area</option>
+                {areaOptions.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.status === "archived"
+                      ? `${area.name} (archived)`
+                      : area.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+        </div>
+      </section>
+
+      <section
+        className="grid gap-3 border-t border-outline-variant pt-4"
+        aria-labelledby={`${id}-notes`}
+      >
+        <h3 id={`${id}-notes`} className="text-title-medium">
+          Notes
+        </h3>
+        <FormField
+          id={`${id}-description`}
+          label="Description"
+          errors={fieldErrors.description}
+        >
+          {(control) => (
+            <Textarea
+              {...control}
+              name="description"
+              rows={3}
+              value={values.description}
+              maxLength={CALENDAR_EVENT_DESCRIPTION_MAX}
+              onChange={(change) => set({ description: change.target.value })}
+            />
+          )}
+        </FormField>
+      </section>
 
       <FormError error={error} />
       {otherErrors.length > 0 && (
@@ -616,24 +648,16 @@ function EventForm({
           {otherErrors.join(" ")}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : event ? "Save" : "Add event"}
-        </Button>
-        <Button variant="secondary" disabled={pending} onClick={onCancel}>
-          Cancel
-        </Button>
-        {event && (
-          <span className="ml-auto">
-            <DeleteEventDialog
-              event={event}
-              locale={locale}
-              timeZone={userTimeZone}
-              onDeleted={onSaved}
-            />
-          </span>
-        )}
-      </div>
+      {event && (
+        <div className="border-t border-outline-variant pt-4">
+          <DeleteEventDialog
+            event={event}
+            locale={locale}
+            timeZone={userTimeZone}
+            onDeleted={onSaved}
+          />
+        </div>
+      )}
     </form>
   );
 }
@@ -641,7 +665,7 @@ function EventForm({
 function ScopeStep({
   id,
   step,
-  pending,
+  formId,
   error,
   locale,
   timeZone,
@@ -651,7 +675,7 @@ function ScopeStep({
 }: {
   id: string;
   step: Extract<Step, { kind: "scope" }>;
-  pending: boolean;
+  formId: string;
   error: ActionError | null;
   locale: string;
   timeZone: string;
@@ -659,12 +683,20 @@ function ScopeStep({
   onBack: () => void;
   onSave: () => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     ref.current?.querySelector<HTMLInputElement>("input:checked")?.focus();
   }, []);
   return (
-    <div ref={ref} className="flex flex-col gap-4">
+    <form
+      id={formId}
+      ref={ref}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave();
+      }}
+      className="flex flex-col gap-4"
+    >
       <p className="text-muted">This event repeats.</p>
       <ScopeChooser
         id={id}
@@ -678,14 +710,9 @@ function ScopeStep({
         timeZone={timeZone}
       />
       <FormError error={error} />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button disabled={pending} onClick={onSave}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        <Button variant="secondary" disabled={pending} onClick={onBack}>
-          Back
-        </Button>
-      </div>
-    </div>
+      <Button variant="text" className="self-start" onClick={onBack}>
+        Back
+      </Button>
+    </form>
   );
 }

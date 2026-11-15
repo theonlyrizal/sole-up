@@ -73,7 +73,9 @@ test("Tab reaches every gallery tab stop and arrows reach the other group contro
       (element) =>
         element.getClientRects().length > 0 &&
         !element.matches(":disabled") &&
-        element.tabIndex >= 0,
+        element.tabIndex >= 0 &&
+        // Tab enters a native radio group on its checked option.
+        !element.matches('input[type="radio"][name]:not(:checked)'),
     );
     candidates.forEach((element, index) => {
       const first =
@@ -122,6 +124,16 @@ test("Tab reaches every gallery tab stop and arrows reach the other group contro
     await page.keyboard.down("ArrowUp");
     await expect(frequency.getByRole("radio", { name: "Daily" })).toBeChecked();
     await page.keyboard.up("ArrowUp");
+
+    const scope = column.getByRole("group", { name: "Apply to" });
+    await scope.getByRole("radio", { name: "This event" }).focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(
+      scope.getByRole("radio", { name: "All events" }),
+    ).toBeFocused();
+    await expect(
+      scope.getByRole("radio", { name: "All events" }),
+    ).toBeChecked();
 
     await column.getByRole("tab", { name: "Today" }).focus();
     await page.keyboard.press("ArrowRight");

@@ -1,13 +1,14 @@
 "use client";
 
+import { InlineBanner } from "@/components/ui/inline-banner";
+import { RadioRow } from "@/components/ui/radio-group";
+
 import {
   CALENDAR_EVENT_SCOPES,
   type CalendarEventScope,
 } from "@/lib/calendar-events";
 import { formatInstant, formatLocalDate } from "@/lib/dates";
 import type { DroppedException } from "@/server/modules/calendar-events/service";
-
-import { ChoiceGroup, Radio } from "./choices";
 
 /** What repeats: an event (chunk 4.4) or a time block (chunk 4.8). */
 export type ScopeNoun = "event" | "block";
@@ -67,39 +68,47 @@ export function ScopeChooser({
   noun = "event",
 }: ScopeChooserProps) {
   return (
-    <ChoiceGroup id={id} legend={legend}>
+    <fieldset className="grid min-w-0 gap-2">
+      <legend className="text-title-medium">{legend}</legend>
       {CALENDAR_EVENT_SCOPES.map((scope) => {
-        const option = options[scope] ?? {};
+        const option = options[scope];
+        const dropped = option?.dropped ?? [];
+        const warningId =
+          dropped.length > 0 ? `${id}-${scope}-warning` : undefined;
         return (
-          <Radio
-            key={scope}
-            name={id}
-            value={scope}
-            checked={value === scope}
-            disabled={Boolean(option.blocker)}
-            onChange={() => onChange(scope)}
-            label={SCOPE_LABELS[noun][scope]}
-            description={
-              option.blocker ? (
-                <p className="text-sm text-muted">{option.blocker}</p>
-              ) : scope === "this" ? null : loading ? (
-                <p className="text-sm text-muted">
-                  {`Checking for ${noun}s you changed separately…`}
-                </p>
-              ) : (
+          <div key={scope}>
+            <RadioRow
+              native
+              name={id}
+              value={scope}
+              checked={value === scope}
+              onChange={() => onChange(scope)}
+              disabled={Boolean(option?.blocker)}
+              label={SCOPE_LABELS[noun][scope]}
+              description={option?.blocker || undefined}
+              aria-describedby={warningId}
+            />
+            {warningId && (
+              <div className="mb-2" id={warningId}>
                 <DroppedList
                   noun={noun}
                   action={action}
-                  dropped={option.dropped ?? []}
+                  dropped={dropped}
                   locale={locale}
                   timeZone={timeZone}
                 />
-              )
-            }
-          />
+              </div>
+            )}
+          </div>
         );
       })}
-    </ChoiceGroup>
+      {loading && (
+        <p
+          role="status"
+          className="text-body-medium text-on-surface-variant"
+        >{`Checking for ${noun}s you changed separately…`}</p>
+      )}
+    </fieldset>
   );
 }
 
@@ -120,20 +129,20 @@ function DroppedList({
   const events =
     dropped.length === 1 ? `1 ${noun}` : `${dropped.length} ${noun}s`;
   return (
-    <div className="flex flex-col gap-1 text-sm text-muted">
+    <InlineBanner tone="warning" role="status">
       <p>
         {action === "change"
           ? `${events} you changed separately won't keep those changes:`
           : `This also removes ${events} you changed separately:`}
       </p>
-      <ul className="list-disc pl-5">
+      <ul className="mt-1 list-disc ps-5">
         {dropped.map((exception) => (
           <li key={exception.id}>
             {droppedLabel(exception, locale, timeZone)}
           </li>
         ))}
       </ul>
-    </div>
+    </InlineBanner>
   );
 }
 

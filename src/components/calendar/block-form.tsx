@@ -1,9 +1,11 @@
 "use client";
 
+import "./calendar-form.css";
+
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { FormError } from "@/components/ui/form-error";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -17,6 +19,7 @@ import {
   newBlockValues,
   withBlockStartDate,
 } from "@/lib/block-form";
+import { formatInstant, instantFromLocal, isLocalDate } from "@/lib/dates";
 import { readRepeat, type RepeatErrors } from "@/lib/event-form";
 import type { ActionError } from "@/lib/result";
 import { formatEstimate } from "@/lib/task-list";
@@ -104,74 +107,86 @@ export function BlockTimesFields({
     minutes <= TIME_BLOCK_MAX_MINUTES
       ? `${formatEstimate(minutes)}. Up to 24 hours.`
       : "Up to 24 hours (1440 minutes).";
+  const end = blockEnd(values);
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <FormField
-          id={`${id}-date`}
-          label="Date"
-          errors={fieldErrors.startDate}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              name="startDate"
-              value={values.startDate}
-              onChange={(change) =>
-                onChange((current) =>
-                  withBlockStartDate(current, change.target.value),
-                )
-              }
-            />
+      <div className="calendar-time-fields">
+        <fieldset className="calendar-time-group">
+          <legend>Start</legend>
+          <FormField
+            id={`${id}-date`}
+            label="Date"
+            errors={fieldErrors.startDate}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                type="date"
+                name="startDate"
+                value={values.startDate}
+                onChange={(change) =>
+                  onChange((current) =>
+                    withBlockStartDate(current, change.target.value),
+                  )
+                }
+              />
+            )}
+          </FormField>
+          <FormField
+            id={`${id}-start`}
+            label="Start time"
+            errors={fieldErrors.startTime}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                type="time"
+                name="startTime"
+                value={values.startTime}
+                onChange={(change) =>
+                  onChange((current) => ({
+                    ...current,
+                    startTime: change.target.value,
+                  }))
+                }
+              />
+            )}
+          </FormField>
+        </fieldset>
+        <fieldset className="calendar-time-group">
+          <legend>End</legend>
+          <FormField
+            id={`${id}-length`}
+            label="Length (minutes)"
+            hint={lengthHint}
+            errors={fieldErrors.durationMinutes}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                type="number"
+                inputMode="numeric"
+                name="durationMinutes"
+                min={TIME_BLOCK_MIN_MINUTES}
+                max={TIME_BLOCK_MAX_MINUTES}
+                step={1}
+                value={values.duration}
+                onChange={(change) => {
+                  onDurationChange?.();
+                  onChange((current) => ({
+                    ...current,
+                    duration: change.target.value,
+                  }));
+                }}
+              />
+            )}
+          </FormField>
+          {end && (
+            <p className="text-body-medium">
+              Ends {formatInstant(end, locale, values.tz)}
+            </p>
           )}
-        </FormField>
-        <FormField
-          id={`${id}-start`}
-          label="Start time"
-          errors={fieldErrors.startTime}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="time"
-              name="startTime"
-              value={values.startTime}
-              onChange={(change) =>
-                onChange((current) => ({
-                  ...current,
-                  startTime: change.target.value,
-                }))
-              }
-            />
-          )}
-        </FormField>
-        <FormField
-          id={`${id}-length`}
-          label="Length (minutes)"
-          hint={lengthHint}
-          errors={fieldErrors.durationMinutes}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="number"
-              inputMode="numeric"
-              name="durationMinutes"
-              min={TIME_BLOCK_MIN_MINUTES}
-              max={TIME_BLOCK_MAX_MINUTES}
-              step={1}
-              value={values.duration}
-              onChange={(change) => {
-                onDurationChange?.();
-                onChange((current) => ({
-                  ...current,
-                  duration: change.target.value,
-                }));
-              }}
-            />
-          )}
-        </FormField>
+        </fieldset>
       </div>
       <p className="text-sm text-muted">
         {values.tz === userTimeZone
@@ -195,6 +210,25 @@ export function BlockTimesFields({
       />
     </>
   );
+}
+
+/** Preview the end in the block's zone from its elapsed length. */
+function blockEnd({ startDate, startTime, duration, tz }: BlockFormValues) {
+  const minutes = Number(duration);
+  if (
+    !isLocalDate(startDate) ||
+    !startTime ||
+    !Number.isInteger(minutes) ||
+    minutes < TIME_BLOCK_MIN_MINUTES ||
+    minutes > TIME_BLOCK_MAX_MINUTES
+  )
+    return null;
+  try {
+    const start = instantFromLocal(startDate, startTime, tz);
+    return new Date(start.getTime() + minutes * 60_000);
+  } catch {
+    return null;
+  }
 }
 
 /** Reads the form's rule, or returns the builder's errors. */
@@ -246,32 +280,39 @@ export function BlockTimeDialog({
   onCloseAutoFocus,
   ...props
 }: BlockTimeDialogProps) {
+  const formId = useId();
+  const [pending, startTransition] = useTransition();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent
-        title="Block time"
-        description={
-          props.task
-            ? `For “${props.task.title}”.`
-            : "Set time aside for one of your tasks."
-        }
-        className="max-w-xl"
-        onCloseAutoFocus={onCloseAutoFocus}
-      >
-        <BlockTimeForm
-          {...props}
-          onCancel={() => setOpen(false)}
-          onSaved={() => {
-            setOpen(false);
-            props.onCreated?.();
-          }}
-        />
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Block time"
+      description={
+        props.task
+          ? `For “${props.task.title}”.`
+          : "Set time aside for one of your tasks."
+      }
+      formId={formId}
+      submitLabel={pending ? "Saving…" : "Block time"}
+      pending={pending}
+      open={open}
+      onOpenChange={(next) => {
+        if (!pending) setOpen(next);
+      }}
+      onCloseAutoFocus={onCloseAutoFocus}
+      trigger={trigger}
+    >
+      <BlockTimeForm
+        {...props}
+        formId={formId}
+        startTransition={startTransition}
+        onSaved={() => {
+          setOpen(false);
+          props.onCreated?.();
+        }}
+      />
+    </FormDialog>
   );
 }
 
@@ -282,10 +323,12 @@ function BlockTimeForm({
   tasks = [],
   slot,
   initialTaskId,
-  onCancel,
+  formId,
+  startTransition,
   onSaved,
 }: Omit<BlockTimeDialogProps, "trigger" | "open" | "onOpenChange"> & {
-  onCancel: () => void;
+  formId: string;
+  startTransition: React.TransitionStartFunction;
   onSaved: () => void;
 }) {
   const id = useId();
@@ -301,7 +344,6 @@ function BlockTimeForm({
   const [lengthTouched, setLengthTouched] = useState(slot !== undefined);
   const [repeatErrors, setRepeatErrors] = useState<RepeatErrors>({});
   const [error, setError] = useState<ActionError | null>(null);
-  const [pending, startTransition] = useTransition();
   const [attempt, setAttempt] = useState(0);
   const formRef = useFocusFirstInvalid(attempt);
 
@@ -347,6 +389,7 @@ function BlockTimeForm({
   const otherErrors = otherBlockErrors(error);
   return (
     <form
+      id={formId}
       ref={formRef}
       onSubmit={submit}
       noValidate
@@ -398,14 +441,6 @@ function BlockTimeForm({
           {otherErrors.join(" ")}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Block time"}
-        </Button>
-        <Button variant="secondary" disabled={pending} onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
     </form>
   );
 }
@@ -421,13 +456,14 @@ export function BlockScopeStep({
   scope,
   options,
   loading,
+  formId,
   pending,
   error,
   locale,
   timeZone,
   onChange,
   onBack,
-  backLabel = "Back",
+  showBack = true,
   onSave,
 }: {
   id: string;
@@ -435,21 +471,30 @@ export function BlockScopeStep({
   scope: TimeBlockScope;
   options: Partial<Record<TimeBlockScope, ScopeOption>>;
   loading: boolean;
+  formId: string;
   pending: boolean;
   error: ActionError | null;
   locale: string;
   timeZone: string;
   onChange: (scope: TimeBlockScope) => void;
-  onBack: () => void;
-  backLabel?: string;
+  onBack?: () => void;
+  showBack?: boolean;
   onSave: () => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     ref.current?.querySelector<HTMLInputElement>("input:checked")?.focus();
   }, []);
   return (
-    <div ref={ref} className="flex flex-col gap-4">
+    <form
+      id={formId}
+      ref={ref}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!pending && !loading) onSave();
+      }}
+      className="flex flex-col gap-4"
+    >
       <p className="text-muted">{intro}</p>
       <ScopeChooser
         id={id}
@@ -464,14 +509,16 @@ export function BlockScopeStep({
         timeZone={timeZone}
       />
       <FormError error={error} />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button disabled={pending || loading} onClick={onSave}>
-          {pending ? "Saving…" : "Save"}
+      {showBack && (
+        <Button
+          variant="text"
+          className="self-start"
+          disabled={pending}
+          onClick={onBack}
+        >
+          Back
         </Button>
-        <Button variant="secondary" disabled={pending} onClick={onBack}>
-          {backLabel}
-        </Button>
-      </div>
-    </div>
+      )}
+    </form>
   );
 }

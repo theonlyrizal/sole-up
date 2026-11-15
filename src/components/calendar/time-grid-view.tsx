@@ -5,7 +5,6 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useMediaQuery } from "@/components/hooks/use-media-query";
 import { useRefreshOnNewDay } from "@/components/tasks/use-refresh-on-new-day";
-import { Button } from "@/components/ui/button";
 import { cx } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
@@ -28,10 +27,12 @@ import {
   type TimeGridType,
 } from "@/lib/calendar-views";
 import {
+  addDays,
   formatLocalDate,
   formatTimeOfDay,
   type LocalDate,
   localDateOf,
+  type WeekStart,
 } from "@/lib/dates";
 import { timeRangeLabel } from "@/lib/event-form";
 import {
@@ -40,7 +41,9 @@ import {
 } from "@/server/modules/time-blocks/actions";
 
 import { type BlockableTask, BlockTimeDialog } from "./block-form";
-import { type EventFormContext, EventFormDialog } from "./event-dialog";
+import { BlockStatusIcon } from "./calendar-presentation";
+import { CalendarActions } from "./calendar-actions";
+import type { EventFormContext } from "./event-dialog";
 import {
   Calendar,
   type CalendarFeedItem,
@@ -50,7 +53,7 @@ import {
 import { type CalendarEntry, ItemDialog, useItemDialog } from "./item-dialog";
 import { MoveBlockDialog, type PendingBlockMove } from "./move-block-dialog";
 import { droppedTaskId, TaskPanel } from "./task-panel";
-import { GridMoveNav, ViewNav } from "./view-nav";
+import { CalendarHeader, GridMoveNav } from "./view-nav";
 
 type TimeGridViewProps = EventFormContext & {
   entries: CalendarEntry[];
@@ -58,6 +61,7 @@ type TimeGridViewProps = EventFormContext & {
   tasks: BlockableTask[];
   range: GridRange<TimeGridType>;
   today: LocalDate;
+  weekStart: WeekStart;
   /** When the user's tomorrow begins (ISO instant). */
   nextDayStartsAt: string;
   /**
@@ -85,6 +89,7 @@ function itemStyle(
       return {
         color: "var(--md-primary-container)",
         contrastColor: "var(--md-on-primary-container)",
+        className: "soleup-event",
       };
     // Time blocks are tinted with a strong edge, and can be dragged.
     case "block":
@@ -97,7 +102,7 @@ function itemStyle(
     // Deadlines are quiet markers.
     case "task":
       return {
-        color: "var(--md-surface-container)",
+        color: "var(--md-resting-surface)",
         contrastColor: "var(--md-on-surface)",
         className: "soleup-deadline",
       };
@@ -123,6 +128,7 @@ export function TimeGridView({
   tasks,
   range,
   today,
+  weekStart,
   nextDayStartsAt,
   openItemId = null,
   ...context
@@ -130,7 +136,7 @@ export function TimeGridView({
   useRefreshOnNewDay(nextDayStartsAt);
   const router = useRouter();
   const isWide = useMediaQuery(CALENDAR_QUERIES.week);
-  const isDesktop = useMediaQuery(CALENDAR_QUERIES.taskPanel);
+  const isDesktop = useMediaQuery("large");
   const tooNarrow = range.view === "week" && isWide === false;
   const showPanel = range.view === "week" && isDesktop === true;
   const [slot, setSlot] = useState<{ start: Date; end: Date } | null>(null);
@@ -285,34 +291,25 @@ export function TimeGridView({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <ViewNav current={range.view} date={range.date} today={today} />
-        <div className="flex flex-wrap gap-2">
-          <BlockTimeDialog
-            tasks={tasks}
-            timeZone={userTimeZone}
-            locale={locale}
-            trigger={<Button variant="secondary">Block time</Button>}
-          />
-          <EventFormDialog {...context} trigger={<Button>New event</Button>} />
-        </div>
-      </div>
-      <GridMoveNav range={range} today={today} />
-      <div className="flex flex-col gap-1">
-        <p className="text-muted">
-          <span className="sr-only">Showing </span>
-          {rangeLabel}
+      <CalendarHeader
+        current={range.view}
+        date={range.date}
+        today={today}
+        locale={locale}
+        weekStart={weekStart}
+        dateLabel={rangeLabel}
+        start={range.start}
+        end={range.view === "week" ? addDays(range.end, -1) : undefined}
+        dateHref={(date) => gridHref(range.view, date, today)}
+        move={GridMoveNav(range, today)}
+        actions={<CalendarActions context={context} tasks={tasks} />}
+      />
+      {entries.length === 0 && (
+        <p className="text-body-medium text-on-surface-variant">
+          Nothing this {unit}. Events, time blocks and tasks due at a set time
+          show here.
         </p>
-        <p className="text-sm text-muted">
-          {entries.length === 0
-            ? `Nothing this ${unit}. Events, time blocks and tasks due at a set time show here.`
-            : "Tab or the arrow keys move between items; Enter opens one."}
-        </p>
-        <p className="text-sm text-muted">
-          Select a time on the grid to block it for a task; drag a block to move
-          it, or its bottom edge to change its length.
-        </p>
-      </div>
+      )}
       {tooNarrow ? (
         <LoadingState label="Loading the day" />
       ) : (
@@ -408,7 +405,9 @@ function DayHeading({
   return (
     <time
       dateTime={date}
-      className="rounded-sm text-sm font-semibold hover:underline"
+      data-today={date === today || undefined}
+      data-selected={date === range.date || undefined}
+      className="calendar-grid-date inline-grid min-h-8 place-items-center rounded-full px-1 text-label-medium"
     >
       {range.view === "week"
         ? gridDayShortLabel(date, locale)
@@ -433,7 +432,12 @@ function GridItem({
   const time = timeLabel(entry, segment, context);
   const day = segmentDay(entry, segment, context.userTimeZone);
   return (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden px-1 py-0.5 text-xs leading-tight">
+    <div
+      className={cx(
+        "relative flex h-full min-w-0 flex-col overflow-hidden px-1.5 text-label-small leading-tight",
+        entry.kind === "task" ? "justify-center" : "py-0.5",
+      )}
+    >
       <button
         type="button"
         data-calendar-item=""
@@ -442,13 +446,30 @@ function GridItem({
         aria-describedby={descriptionId}
         onClick={(click) => onOpen(click.currentTarget)}
         className={cx(
-          "cursor-pointer rounded-sm text-left font-medium break-words",
-          "hover:underline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-current",
+          "stretched-link flex min-w-0 cursor-pointer items-center gap-1 rounded-sm text-left",
+          entry.kind === "task"
+            ? "text-label-small leading-none"
+            : "text-label-large leading-tight",
+          "hover:underline",
         )}
       >
-        {entry.title}
+        {entry.kind === "block" && (
+          <BlockStatusIcon status={entry.block.status} />
+        )}
+        <span className="truncate" title={entry.title}>
+          {entry.title}
+        </span>
       </button>
-      {time && <span>{time}</span>}
+      {time && (
+        <span
+          className={cx(
+            "truncate tabular-nums",
+            entry.kind === "task" && "calendar-deadline-time",
+          )}
+        >
+          {time}
+        </span>
+      )}
       <span id={descriptionId} className="sr-only">
         {[
           agendaEntryKind(entry),

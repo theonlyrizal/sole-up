@@ -91,7 +91,8 @@ async function addWeekly(page: Page, title: string) {
   await dialog.getByLabel("Title").fill(title);
   await dialog.getByLabel("Start date").fill(tokyoDate(1));
   await dialog.getByLabel("Start time").fill("09:00");
-  await dialog.getByLabel("Repeat", { exact: true }).selectOption("weekly");
+  await dialog.getByRole("button", { name: "Repeat", exact: true }).click();
+  await dialog.getByLabel("Frequency").selectOption("weekly");
   await dialog.getByRole("button", { name: "Add event" }).click();
   await expect(dialog).toHaveCount(0);
 }
@@ -142,7 +143,8 @@ test("a repeating event from the keyboard, with field errors in the builder", as
   ).toBeVisible();
 
   // Weekly starts on the start's weekday. Break the builder on purpose.
-  await dialog.getByLabel("Repeat", { exact: true }).selectOption("weekly");
+  await dialog.getByRole("button", { name: "Repeat", exact: true }).click();
+  await dialog.getByLabel("Frequency").selectOption("weekly");
   const weekday = dialog.getByRole("checkbox", { name: longWeekday(1) });
   await expect(weekday).toBeChecked();
   await weekday.focus();
@@ -224,13 +226,13 @@ test("all-day with an inclusive end, goal → area, and another time zone", asyn
   await openCalendar(page);
   const dialog = await newEventDialog(page);
   await dialog.getByLabel("Title").fill("Race weekend");
-  await dialog.getByRole("checkbox", { name: "All day" }).check();
+  await dialog.getByRole("switch", { name: "All day" }).click();
   await expect(dialog.getByLabel("Start time")).toHaveCount(0);
   await dialog.getByLabel("Start date").fill(tokyoDate(3));
   await expect(dialog.getByLabel("End date")).toHaveValue(tokyoDate(3));
   await dialog.getByLabel("End date").fill(tokyoDate(4));
   await dialog
-    .getByLabel("Goal")
+    .getByLabel("Goal", { exact: true })
     .selectOption({ label: "Run a half marathon" });
   await expect(dialog.getByLabel("Life area")).toHaveValue(/.+/);
   await expect(
@@ -254,7 +256,7 @@ test("all-day with an inclusive end, goal → area, and another time zone", asyn
   // York: the dialog shows its times in the user's zone too.
   const edit = await editDialog(page, tokyoDate(3), "Race weekend");
   await expect(edit.getByLabel("End date")).toHaveValue(tokyoDate(4));
-  await edit.getByRole("checkbox", { name: "All day" }).uncheck();
+  await edit.getByRole("switch", { name: "All day" }).click();
   await edit.getByLabel("Start time").fill("09:00");
   await expect(edit.getByLabel("End time")).toHaveValue("10:00");
   await edit.getByLabel("End date").fill(tokyoDate(3));
@@ -309,6 +311,7 @@ test("occurrences ask which events to change or delete, naming what's dropped", 
   // Every other week from the first one: "this event" can't take a new
   // repeat, and "all events" names the moved one it would drop.
   dialog = await editDialog(page, tokyoDate(1), "Standup");
+  await dialog.getByRole("button", { name: /^Repeat · / }).click();
   await dialog.getByLabel("Repeat every (weeks)").fill("2");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(thisEvent).toBeDisabled();

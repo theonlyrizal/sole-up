@@ -189,6 +189,11 @@ export function Calendar<Data>({
         eventInteractive={false}
         eventOrder="start,-duration,allDay,order,title"
         eventsHint="Items on this day"
+        eventClass={(info) => (info.isMirror ? "soleup-event-mirror" : "")}
+        listItemEventBeforeClass="soleup-agenda-default-marker"
+        listDayHeaderClass="soleup-agenda-heading"
+        slotHeaderClass="soleup-grid-hour"
+        dayHeaderClass="soleup-grid-heading"
         eventContent={(info) => {
           const data = info.event.extendedProps.data as Data | undefined;
           // A selection's placeholder, or something dragged in from
@@ -222,6 +227,8 @@ export function Calendar<Data>({
         allDayText="All day"
         slotEventOverlap={false}
         nowIndicator
+        nowIndicatorLineClass="calendar-now-line"
+        nowIndicatorDotClass="calendar-now-dot"
         // FullCalendar hides a time grid's heading content from assistive
         // tech (the cell has its own label) unless it is a nav link, so a
         // day link must be FullCalendar's, not a link of ours inside it.

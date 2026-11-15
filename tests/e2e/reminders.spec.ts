@@ -157,16 +157,20 @@ test("new events remind 10 minutes before; a series' reminder applies to every e
   await expect(reminder).toHaveValue("10");
   await expect(reminder).toHaveAccessibleDescription(EARLY_HINT);
   // All-day events never remind, so the field goes away.
-  await create.getByLabel("All day").check();
+  const allDay = create.getByRole("switch", { name: "All day" });
+  await allDay.click();
+  await expect(allDay).toBeChecked();
   await expect(reminderField(create)).toHaveCount(0);
-  await create.getByLabel("All day").uncheck();
+  await allDay.click();
+  await expect(allDay).not.toBeChecked();
   await expect(reminder).toHaveValue("10");
 
   const tomorrow = tokyoInMinutes(24 * 60).date;
   await create.getByLabel("Title").fill("Standup");
   await create.getByLabel("Start date").fill(tomorrow);
   await create.getByLabel("Start time").fill("09:00");
-  await create.getByLabel("Repeat", { exact: true }).selectOption("weekly");
+  await create.getByRole("button", { name: "Repeat", exact: true }).click();
+  await create.getByLabel("Frequency").selectOption("weekly");
   await expect(reminder).toHaveAccessibleDescription(
     `Applies to every event in the series. ${EARLY_HINT}`,
   );

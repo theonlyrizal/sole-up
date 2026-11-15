@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useSyncExternalStore } from "react";
 
+import { AreaChip, type CalendarAreaColors } from "@/components/data/area-chip";
 import { useRefreshOnNewDay } from "@/components/tasks/use-refresh-on-new-day";
 import { cx, focusRing } from "@/components/ui/cx";
 import { LoadingState } from "@/components/ui/skeleton";
@@ -27,19 +28,34 @@ import {
 } from "@/lib/area-timeline";
 import { blockStatusLabel } from "@/lib/block-form";
 import { gridDayShortLabel, isGridKey } from "@/lib/calendar-views";
-import { formatTimeOfDay, type LocalDate } from "@/lib/dates";
+import {
+  addDays,
+  formatTimeOfDay,
+  type LocalDate,
+  type WeekStart,
+} from "@/lib/dates";
 import type { ScheduleEntry } from "@/lib/schedule";
 
-import { areaItemBoxClass } from "./area-columns-view";
+import type { BlockableTask } from "./block-form";
+import { CalendarActions } from "./calendar-actions";
+import {
+  areaItemStyle,
+  BlockStatusIcon,
+  useNowOffset,
+} from "./calendar-presentation";
 import type { EventFormContext } from "./event-dialog";
 import { ItemDialog, useItemDialog } from "./item-dialog";
-import { MoveNav, pillClass, ViewNav } from "./view-nav";
+import { ConnectedButtonGroup } from "@/components/ui/button-group";
+import { CalendarHeader } from "./view-nav";
 
 type AreaTimelineViewProps = EventFormContext & {
   /** The range's events and time blocks (`listSchedule`). */
   entries: ScheduleEntry[];
   /** The user's life areas, in their order (archived ones included). */
   areas: ColumnArea[];
+  areaColors: CalendarAreaColors;
+  tasks: BlockableTask[];
+  weekStart: WeekStart;
   range: TimelineRange;
   today: LocalDate;
   /** When the user's tomorrow begins (ISO instant). */
@@ -78,6 +94,9 @@ const noSubscription = () => () => {};
 export function AreaTimelineView({
   entries,
   areas,
+  areaColors,
+  tasks,
+  weekStart,
   range,
   today,
   nextDayStartsAt,
@@ -96,6 +115,7 @@ export function AreaTimelineView({
   const ticks = timelineTicks(range, timeZone);
   const trackWidth = `${timelineLengthHours(range, timeZone) * TIMELINE_SCALE[range.span].hourRem}rem`;
   const rangeLabel = timelineRangeLabel(range, locale);
+  const nowOffset = useNowOffset(range.start, range.end, timeZone);
   const hasActiveArea = areas.some((area) => area.status === "active");
 
   // Arrow keys move between items: left and right along a row, up and down
@@ -123,59 +143,53 @@ export function AreaTimelineView({
 
   return (
     <div className="flex flex-col gap-6">
-      <ViewNav
+      <CalendarHeader
         current="timeline"
         date={range.date}
         today={today}
+        locale={locale}
+        weekStart={weekStart}
+        dateLabel={rangeLabel}
+        start={range.start}
+        end={range.span === "week" ? addDays(range.end, -1) : undefined}
+        dateHref={(date) => timelineHref(range.span, date, today)}
         timelineSpan={range.span}
-      />
-      <div className="flex flex-wrap gap-x-4 gap-y-2">
-        <nav aria-label="Timeline span">
-          <ul className="flex flex-wrap gap-1">
-            {TIMELINE_SPANS.map((span) => (
-              <li key={span}>
-                <Link
-                  href={timelineHref(span, range.date, today)}
-                  aria-current={span === range.span ? "page" : undefined}
-                  className={pillClass(span === range.span)}
-                >
-                  {TIMELINE_SPAN_LABELS[span]}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <MoveNav
-          unit={range.span}
-          previousHref={timelineHref(
+        move={{
+          previousLabel: `Previous ${range.span}`,
+          nextLabel: `Next ${range.span}`,
+          previousHref: timelineHref(
             range.span,
             shiftTimelineDate(range, -1),
             today,
-          )}
-          todayHref={timelineHref(range.span, today, today)}
-          nextHref={timelineHref(
+          ),
+          todayHref: timelineHref(range.span, today, today),
+          nextHref: timelineHref(
             range.span,
             shiftTimelineDate(range, 1),
             today,
-          )}
-          atToday={range.date === today}
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <p className="text-muted">
-          <span className="sr-only">Showing </span>
-          {rangeLabel}
-        </p>
-        <p className="text-sm text-muted">
-          {entries.length === 0
-            ? `Nothing this ${range.span}. Events and time blocks show here, each in its life area's row.`
-            : "Tab or the arrow keys move between items; Enter opens one."}
-        </p>
-        <p className="text-sm text-muted">
-          {
-            "An event sits in its own life area, and a time block in its task's goal's area."
-          }
-        </p>
+          ),
+          atToday: range.date === today,
+        }}
+        actions={<CalendarActions context={context} tasks={tasks} />}
+        rangeControl={
+          <ConnectedButtonGroup
+            label="Timeline span"
+            compactLabels
+            value={range.span}
+            items={TIMELINE_SPANS.map((span) => ({
+              value: span,
+              label: TIMELINE_SPAN_LABELS[span],
+              href: timelineHref(span, range.date, today),
+            }))}
+          />
+        }
+      />
+      <div className="empty:hidden">
+        {entries.length === 0 && (
+          <p className="text-body-medium text-on-surface-variant">
+            Nothing this {range.span}. Events and time blocks show here by area.
+          </p>
+        )}
         {!hasActiveArea && (
           <p className="text-sm text-muted">
             You have no active life areas yet, so everything is under No area.{" "}
@@ -197,7 +211,7 @@ export function AreaTimelineView({
           tabIndex={0}
           onKeyDown={moveFocus}
           className={cx(
-            "overflow-x-auto rounded-md border border-border bg-surface",
+            "overflow-x-auto overscroll-x-contain rounded-xl border border-outline-variant bg-resting-surface",
             HEADING_SCROLL_PADDING,
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
           )}
@@ -215,6 +229,8 @@ export function AreaTimelineView({
               <Row
                 key={row.key}
                 row={row}
+                color={areaColors[row.areaId ?? ""] ?? "gray"}
+                nowOffset={nowOffset}
                 // Zero-padded, so the keys sort in row order.
                 position={String(index).padStart(3, "0")}
                 ticks={ticks}
@@ -255,11 +271,11 @@ function TimeAxis({
   return (
     <div
       aria-hidden="true"
-      className="flex border-b border-border text-xs text-muted"
+      className="flex border-b border-outline-variant text-label-small text-on-surface-variant tabular-nums"
     >
       <div
         className={cx(
-          "sticky left-0 z-10 shrink-0 border-r border-border bg-surface",
+          "sticky left-0 z-10 shrink-0 border-r border-outline-variant bg-resting-surface",
           HEADING_WIDTH,
         )}
       />
@@ -290,6 +306,8 @@ function TimeAxis({
 /** One area's row: its heading (kept in view) and its items along the axis. */
 function Row({
   row,
+  color,
+  nowOffset,
   position,
   ticks,
   range,
@@ -298,6 +316,8 @@ function Row({
   onOpen,
 }: {
   row: TimelineRow;
+  color: NonNullable<CalendarAreaColors[string]>;
+  nowOffset: number | null;
   position: string;
   ticks: TimelineTick[];
   range: TimelineRange;
@@ -312,19 +332,16 @@ function Row({
       aria-labelledby={headingId}
       data-row={position}
       data-area-id={row.areaId ?? ""}
-      className="flex border-b border-border last:border-b-0"
+      className="flex border-b border-outline-variant last:border-b-0"
     >
       <h2
         id={headingId}
         className={cx(
-          "sticky left-0 z-10 shrink-0 border-r border-border bg-surface px-2 py-2 text-sm font-semibold break-words",
+          "sticky left-0 z-10 shrink-0 border-r border-outline-variant bg-resting-surface px-2 py-2 text-sm font-semibold break-words",
           HEADING_WIDTH,
         )}
       >
-        {row.name}
-        {row.archived && (
-          <span className="font-normal text-muted"> (archived area)</span>
-        )}
+        <AreaChip name={row.name} color={color} archived={row.archived} />
       </h2>
       <div
         data-track=""
@@ -339,12 +356,19 @@ function Row({
             key={tick.at.toISOString()}
             aria-hidden="true"
             className={cx(
-              "absolute inset-y-0 border-l border-border",
+              "absolute inset-y-0 border-l border-outline-variant",
               tick.label === null && "border-dashed",
             )}
             style={{ left: `${tick.offset * 100}%` }}
           />
         ))}
+        {nowOffset !== null && (
+          <div
+            aria-hidden="true"
+            className="calendar-now-line-vertical absolute inset-y-0 z-[1]"
+            style={{ left: `${nowOffset * 100}%` }}
+          />
+        )}
         {row.items.length > 0 && (
           <ul>
             {row.items.map((placed) => (
@@ -352,6 +376,7 @@ function Row({
                 key={placed.entry.id}
                 placed={placed}
                 area={row.name}
+                color={color}
                 range={range}
                 context={context}
                 onOpen={onOpen}
@@ -368,12 +393,14 @@ function Row({
 function TimelineItem({
   placed: { entry, offset, length, lane },
   area,
+  color,
   range,
   context,
   onOpen,
 }: {
   placed: SpanPlacement;
   area: string;
+  color: NonNullable<CalendarAreaColors[string]>;
   range: TimelineRange;
   context: EventFormContext;
   onOpen: (entry: ScheduleEntry, opener: HTMLElement) => void;
@@ -393,10 +420,8 @@ function TimelineItem({
     >
       <div
         data-kind={entry.kind}
-        className={cx(
-          "flex h-full min-w-0 flex-col justify-center overflow-hidden rounded-sm px-1 text-xs leading-tight",
-          areaItemBoxClass(entry),
-        )}
+        className="calendar-area-item relative flex h-full min-w-0 flex-col justify-center overflow-hidden rounded-sm px-1 text-label-small leading-tight"
+        style={areaItemStyle(color)}
       >
         <button
           type="button"
@@ -407,11 +432,14 @@ function TimelineItem({
           title={entry.title}
           onClick={(click) => onOpen(entry, click.currentTarget)}
           className={cx(
-            "min-h-6 w-full cursor-pointer truncate rounded-sm text-left font-medium",
-            "hover:underline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-current",
+            "stretched-link flex min-h-6 w-full cursor-pointer items-center gap-0.5 rounded-sm text-left text-label-large leading-tight",
+            "hover:underline",
           )}
         >
-          {entry.title}
+          {entry.kind === "block" && (
+            <BlockStatusIcon status={entry.block.status} />
+          )}
+          <span className="truncate">{entry.title}</span>
         </button>
         {range.span === "day" && <span className="truncate">{time}</span>}
         <span id={descriptionId} className="sr-only">

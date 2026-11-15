@@ -223,6 +223,10 @@
   border-radius: var(--connected-corner);
 }
 
+.connected-item.connected-compact {
+  padding-inline: 0.625rem;
+}
+
 .connected-item.action-xs {
   --connected-corner: var(--radius-xs);
 }
@@ -597,6 +601,15 @@ textarea.field-control {
   border-color: var(--md-primary);
   background: var(--md-primary);
   color: var(--md-on-primary);
+}
+
+.selection-control input:not(:checked) + .radio-mark .native-radio-indicator {
+  visibility: hidden;
+}
+
+.selection-control input:checked + .radio-mark {
+  color: var(--md-primary);
+  border-color: var(--md-primary);
 }
 
 .selection-control:disabled :is(.check-mark, .radio-mark, .switch-track) {

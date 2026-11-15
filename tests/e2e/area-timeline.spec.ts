@@ -84,7 +84,7 @@ async function addEvent(
   }).toPass();
   await dialog.getByLabel("Title").fill(title);
   if (start === undefined) {
-    await dialog.getByLabel("All day").check();
+    await dialog.getByRole("switch", { name: "All day" }).click();
     await dialog.getByLabel("Start date").fill(date);
     await dialog.getByLabel("End date").fill(date);
   } else {

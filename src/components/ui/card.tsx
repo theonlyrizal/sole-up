@@ -18,7 +18,7 @@ export function Card({
   className,
   children,
 }: {
-  as?: "section" | "article" | "div";
+  as?: "section" | "article" | "aside" | "div";
   variant?: keyof typeof variants;
   padding?: "m" | "l";
   headingId?: string;

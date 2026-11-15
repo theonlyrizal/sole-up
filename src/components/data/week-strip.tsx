@@ -48,7 +48,11 @@ export function WeekStrip({
               <Link
                 ref={day.date === activeDate ? active : undefined}
                 href={day.href}
-                aria-label={day.fullLabel}
+                aria-label={
+                  day.date === selected && !current
+                    ? `${day.fullLabel}, selected`
+                    : day.fullLabel
+                }
                 aria-current={current ? "date" : undefined}
                 onFocus={(event) => {
                   if (strip.current)
