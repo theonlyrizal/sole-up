@@ -14,13 +14,15 @@ export function AreaChip({
   archived,
 }: {
   name: string;
-  color: LifeAreaColor;
+  color: LifeAreaColor | null;
   archived?: boolean;
 }) {
-  const palette = {
-    backgroundColor: `var(--area-${color}-container)`,
-    color: `var(--area-${color}-on)`,
-  };
+  const palette = color
+    ? {
+        backgroundColor: `var(--area-${color}-container)`,
+        color: `var(--area-${color}-on)`,
+      }
+    : undefined;
 
   return (
     <span className="inline-flex max-w-full">

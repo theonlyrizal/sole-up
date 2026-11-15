@@ -127,6 +127,7 @@ export function SurfaceExamples({
         <ListItem
           headline="Read the brief"
           href={`#${theme}-page-frame`}
+          wrapActions
           leading={
             <Checkbox
               shape="round"

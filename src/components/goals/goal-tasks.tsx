@@ -2,7 +2,15 @@
 
 import { useId, useRef, useState, useTransition } from "react";
 
-import { PlanTaskList, taskDetails } from "@/components/tasks/plan-task-list";
+import {
+  PlanTaskList,
+  TaskListRow,
+  TaskListScope,
+  taskDetails,
+} from "@/components/tasks/plan-task-list";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ListGroup } from "@/components/ui/list";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { FormField } from "@/components/ui/form-field";
@@ -29,7 +37,7 @@ type GoalTasksProps = {
   goalId: string;
   milestones: Milestone[];
   tasks: PlanTaskItem[];
-  nextAction: PlanTaskItem | null;
+  addTaskId: string;
   parentOptions: TaskParentOption[];
   locale: string;
   timeZone: string;
@@ -44,7 +52,7 @@ export function GoalTasks({
   goalId,
   milestones,
   tasks,
-  nextAction,
+  addTaskId,
   parentOptions,
   locale,
   timeZone,
@@ -55,7 +63,6 @@ export function GoalTasks({
     ? tasks
     : tasks.filter((task) => task.status === "open");
   const { direct, byMilestone } = groupGoalTasks(shown, timeZone);
-  const hasOpenTasks = tasks.some((task) => task.status === "open");
 
   // Open milestones always get a group to add to; others only with tasks.
   const milestoneGroups = milestones.filter(
@@ -63,27 +70,22 @@ export function GoalTasks({
       milestone.status === "open" ||
       tasks.some((task) => task.milestoneId === milestone.id),
   );
-  const listProps = { parentOptions, locale, timeZone, showGoal: false };
+  const listProps = {
+    parentOptions,
+    locale,
+    timeZone,
+    showGoal: false,
+    wrapActions: true,
+  };
 
   return (
     <div className="flex flex-col gap-6">
-      <NextAction
-        task={nextAction}
-        hasOpenTasks={hasOpenTasks}
-        locale={locale}
-        timeZone={timeZone}
-      />
-
       {closedCount > 0 && (
-        <label className="flex items-center gap-2 self-start text-sm">
-          <input
-            type="checkbox"
-            checked={showClosed}
-            onChange={(event) => setShowClosed(event.target.checked)}
-            className="size-4 accent-accent"
-          />
-          Show completed and cancelled ({closedCount})
-        </label>
+        <Checkbox
+          label={`Show completed and cancelled (${closedCount})`}
+          checked={showClosed}
+          onCheckedChange={(checked) => setShowClosed(checked === true)}
+        />
       )}
 
       <TaskGroup title="Directly under this goal">
@@ -98,6 +100,7 @@ export function GoalTasks({
         )}
         <AddTaskForm
           parent={{ goalId }}
+          id={addTaskId}
           label="New task"
           placeholder="e.g. Book a first lesson"
         />
@@ -134,43 +137,72 @@ export function GoalTasks({
   );
 }
 
-function NextAction({
+export function GoalNextAction({
   task,
   hasOpenTasks,
+  parentOptions,
   locale,
   timeZone,
-}: {
+  addTaskId,
+}: Pick<
+  GoalTasksProps,
+  "parentOptions" | "locale" | "timeZone" | "addTaskId"
+> & {
   task: PlanTaskItem | null;
   hasOpenTasks: boolean;
-  locale: string;
-  timeZone: string;
 }) {
+  const nextActionFallback = useId();
   return (
-    <section
-      aria-label="Next action"
-      className="flex flex-col gap-1 rounded-lg border border-border p-3"
+    <Card
+      headingId="goal-next-action"
+      className="grid min-w-0 gap-2 expanded:col-span-8"
     >
-      <h3 className="text-sm text-muted">Next action</h3>
-      {task ? (
-        <>
-          <p className="font-medium break-words">{task.title}</p>
-          <p className="text-sm text-muted">
-            {[
-              task.milestone && `Under ${task.milestone.title}`,
-              ...taskDetails(task, locale, timeZone),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </>
-      ) : (
-        <p className="text-sm">
-          {hasOpenTasks
-            ? "None yet. Plan one of the tasks below, or give it a due date, and it shows here."
-            : "None yet. Add a task for the next step you could take."}
-        </p>
-      )}
-    </section>
+      <h2 id="goal-next-action" className="text-title-medium">
+        Next action
+      </h2>
+      <TaskListScope
+        parentOptions={parentOptions}
+        locale={locale}
+        timeZone={timeZone}
+        fallbackId={nextActionFallback}
+      >
+        {task ? (
+          <ListGroup label="Next task">
+            <TaskListRow
+              task={task}
+              showGoal={false}
+              wrapActions
+              details={
+                <>
+                  {task.milestone && <span>Under {task.milestone.title}</span>}
+                  {taskDetails(task, locale, timeZone).map((detail) => (
+                    <span key={detail}>{detail}</span>
+                  ))}
+                </>
+              }
+            />
+          </ListGroup>
+        ) : (
+          <div className="grid gap-2">
+            <p className="text-body-medium text-on-surface-variant">
+              No next action yet.{" "}
+              {hasOpenTasks
+                ? "Plan one of the tasks below, or give it a due date, and it shows here."
+                : "Add a task for the next step you could take."}
+            </p>
+            <Button
+              id={nextActionFallback}
+              variant="tonal"
+              size="xs"
+              className="justify-self-start"
+              onClick={() => document.getElementById(addTaskId)?.focus()}
+            >
+              Add a task
+            </Button>
+          </div>
+        )}
+      </TaskListScope>
+    </Card>
   );
 }
 
@@ -243,18 +275,20 @@ function AddMilestoneTask({ milestone }: { milestone: Milestone }) {
  */
 function AddTaskForm({
   parent,
+  id,
   label,
   placeholder,
   autoFocus,
   onCancel,
 }: {
   parent: { goalId: string } | { milestoneId: string };
+  id?: string;
   label: string;
   placeholder?: string;
   autoFocus?: boolean;
   onCancel?: () => void;
 }) {
-  const id = useId();
+  const fallbackId = useId();
   const [title, setTitle] = useState("");
   const [error, setError] = useState<ActionError | null>(null);
   const [adding, startAdding] = useTransition();
@@ -287,10 +321,10 @@ function AddTaskForm({
       aria-label={label}
       className="flex flex-col gap-2"
     >
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-32 flex-1">
           <FormField
-            id={`${id}-title`}
+            id={id ?? fallbackId}
             label={label}
             errors={fieldErrors.title}
           >
@@ -308,7 +342,7 @@ function AddTaskForm({
             )}
           </FormField>
         </div>
-        <Button type="submit" disabled={adding}>
+        <Button type="submit" disabled={adding} aria-busy={adding || undefined}>
           {adding ? "Adding…" : "Add"}
         </Button>
         {onCancel && (

@@ -1,8 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  chooseGoalMenuItem,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
-const PROGRESS = /^\d+ of \d+ milestones?$/;
+const PROGRESS = /^\d+ of \d+ milestones? completed$/;
+const progress = (page: Page) =>
+  page.getByRole("region", { name: "Progress", exact: true });
 
 function milestoneSection(page: Page) {
   return page.getByRole("region", { name: "Milestones" });
@@ -10,7 +16,7 @@ function milestoneSection(page: Page) {
 
 /** Milestone titles in list order. */
 function milestoneTitles(page: Page) {
-  return milestoneSection(page).locator("ol > li label span");
+  return milestoneSection(page).locator("[data-milestone-title]");
 }
 
 async function addMilestone(page: Page, title: string) {
@@ -47,21 +53,31 @@ test("a goal with no milestones shows no progress, and the list adds and reorder
   await expect(
     milestoneSection(page).getByText("No milestones yet."),
   ).toBeVisible();
-  await expect(milestoneSection(page).getByText(PROGRESS)).toHaveCount(0);
-  await expect(milestoneSection(page).getByText("%")).toHaveCount(0);
+  await expect(progress(page).getByRole("img", { name: PROGRESS })).toHaveCount(
+    0,
+  );
+  await expect(progress(page).getByText("%")).toHaveCount(0);
 
   await addMilestone(page, "Draft the case studies");
   await addMilestone(page, "Record the demo");
   await addMilestone(page, "Write the about page");
 
-  // The definition is visible next to the progress.
+  // The info button opens the unchanged definition.
+  const info = progress(page).getByRole("button", {
+    name: "How milestone progress is counted",
+  });
+  await info.press("Enter");
   await expect(
-    milestoneSection(page).getByText("0 of 3 milestones"),
+    progress(page).getByRole("img", { name: "0 of 3 milestones completed" }),
   ).toBeVisible();
   await expect(
-    milestoneSection(page).getByText(/Dropped milestones don't count/),
+    page
+      .getByRole("dialog", { name: "Milestone progress definition" })
+      .getByText(/Dropped milestones don't count/),
   ).toBeVisible();
   await expectNoSeriousViolations(page);
+  await page.keyboard.press("Escape");
+  await expect(info).toBeFocused();
 
   // Reorder from the keyboard: focus the button, press Enter. Focus stays on
   // the pressed button, and the order survives a reload.
@@ -97,13 +113,11 @@ test("a goal with no milestones shows no progress, and the list adds and reorder
     .getByRole("checkbox", { name: "Draft the case studies" })
     .click();
   await expect(
-    milestoneSection(page).getByText("1 of 3 milestones"),
+    progress(page).getByRole("img", { name: "1 of 3 milestones completed" }),
   ).toBeVisible();
-  await milestoneSection(page)
-    .getByRole("button", { name: "Drop Write the about page" })
-    .click();
+  await chooseGoalMenuItem(page, "Drop", "Actions for Write the about page");
   await expect(
-    milestoneSection(page).getByText("1 of 2 milestones"),
+    progress(page).getByRole("img", { name: "1 of 2 milestones completed" }),
   ).toBeVisible();
   await expect(
     milestoneSection(page).getByText("Dropped", { exact: true }),
@@ -114,26 +128,24 @@ test("a goal with no milestones shows no progress, and the list adds and reorder
     .getByRole("checkbox", { name: "Record the demo" })
     .click();
   await expect(
-    milestoneSection(page).getByText("2 of 2 milestones"),
+    progress(page).getByRole("img", { name: "2 of 2 milestones completed" }),
   ).toBeVisible();
   await expect(
     page.getByText("Every milestone is done. Mark the goal complete?"),
   ).toBeVisible();
 
   // Dropping everything leaves nothing to count, so no progress shows.
-  await milestoneSection(page)
-    .getByRole("button", { name: "Drop Record the demo" })
-    .click();
-  await milestoneSection(page)
-    .getByRole("button", { name: "Drop Draft the case studies" })
-    .click();
-  await expect(milestoneSection(page).getByText(PROGRESS)).toHaveCount(0);
+  await chooseGoalMenuItem(page, "Drop", "Actions for Record the demo");
+  await chooseGoalMenuItem(page, "Drop", "Actions for Draft the case studies");
+  await expect(progress(page).getByRole("img", { name: PROGRESS })).toHaveCount(
+    0,
+  );
   await expect(
     page.getByText("Every milestone is done. Mark the goal complete?"),
   ).toHaveCount(0);
 
   // The goals list shows the same count for a goal that has one.
-  await page.getByRole("button", { name: "Restore Record the demo" }).click();
+  await chooseGoalMenuItem(page, "Restore", "Actions for Record the demo");
   await page.getByRole("link", { name: "← Goals" }).click();
   // Next keeps the detail page mounted but hidden after navigating, with
   // its own "0 of 1 milestone", so look inside the list's group only.

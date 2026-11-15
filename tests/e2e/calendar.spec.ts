@@ -1,6 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  addLifeArea,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 // The event dialog (chunk 4.4): default length, the repeat builder with its
 // field errors, all-day events with an inclusive end, goal → life area, the
@@ -205,8 +209,7 @@ test("all-day with an inclusive end, goal → area, and another time zone", asyn
   // A goal in a life area.
   await page.goto("/goals/areas");
   await page.getByRole("button", { name: "No thanks" }).click();
-  await page.getByLabel("New area").fill("Health");
-  await page.getByLabel("New area").press("Enter");
+  await addLifeArea(page, "Health");
   await expect(
     page.getByRole("region", { name: "Active" }).getByText("Health", {
       exact: true,

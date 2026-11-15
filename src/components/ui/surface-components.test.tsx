@@ -31,6 +31,21 @@ describe("segmented lists", () => {
     expect(html).not.toContain("first:rounded-t-lg");
     expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*>Read<\/a>/);
   });
+
+  it("keeps the row link and trailing button independent when actions wrap", () => {
+    const html = render(
+      <ListItem
+        headline="Plan"
+        href="/plan"
+        trailing={<button type="button">Move</button>}
+        wrapActions
+      />,
+    );
+    expect(html).toContain("flex-wrap");
+    expect(html).toMatch(
+      /href="\/plan">Plan<\/a>.*<button type="button">Move<\/button>/,
+    );
+  });
 });
 
 describe("feedback states", () => {

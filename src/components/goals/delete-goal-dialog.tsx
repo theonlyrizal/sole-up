@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toast";
 import {
@@ -19,8 +18,9 @@ type DeleteGoalDialogProps = {
   taskCounts: GoalTaskCounts;
   /** Notes linked to the goal, archived too: the delete only unlinks them. */
   noteLinkCount: number;
-  /** Accessible name for the trigger, when the page lists several goals. */
-  triggerLabel?: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus: (event: Event) => void;
   /** Runs after the goal is gone: refresh the list or leave its page. */
   onDeleted: () => void;
 };
@@ -34,16 +34,16 @@ export function DeleteGoalDialog({
   milestoneCount,
   taskCounts,
   noteLinkCount,
-  triggerLabel,
+  open,
+  onOpenChange,
+  onCloseAutoFocus,
   onDeleted,
 }: DeleteGoalDialogProps) {
   return (
     <ConfirmDialog
-      trigger={
-        <Button variant="danger" size="sm" aria-label={triggerLabel}>
-          Delete
-        </Button>
-      }
+      open={open}
+      onOpenChange={onOpenChange}
+      onCloseAutoFocus={onCloseAutoFocus}
       title={`Delete “${goal.title}”?`}
       description={
         <>

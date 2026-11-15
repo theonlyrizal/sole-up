@@ -1,7 +1,11 @@
 import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, type Locator, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  addLifeArea,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 // The By area view (chunk 4.10): one day with a column per active life
 // area plus "No area", events in their area's column, overlapping items
@@ -33,15 +37,12 @@ async function addAreas(page: Page, names: string[]) {
   ).toBeVisible();
   await page.getByRole("button", { name: "No thanks" }).click();
   await expect(page.getByText("No life areas yet")).toBeVisible();
-  const newArea = page.getByLabel("New area");
   const active = page
     .getByRole("region", { name: "Active" })
     .getByRole("listitem")
-    .locator("span.font-medium");
+    .locator("span.text-title-medium");
   for (const [index, name] of names.entries()) {
-    await expect(newArea).toBeEnabled();
-    await newArea.fill(name);
-    await newArea.press("Enter");
+    await addLifeArea(page, name);
     await expect(active).toHaveText(names.slice(0, index + 1));
   }
 }

@@ -88,7 +88,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-5 | Plan: Today, task row, timeline, Today habits | done | chunk/ui-5-today | 2026-11-13 | Today contracts, confirmed feedback and finish-line checks verified |
 | UI-6 | Plan: All tasks, Upcoming, Inbox, task dialog, Quick Add | done | chunk/ui-6-plan-task-lists | 2026-11-13 | URL contracts, task actions, both theme and size pairs, and finish-line checks verified |
 | UI-7 | Calendar and event/block dialogs | done | chunk/ui-7-calendar | 2026-11-15 | All five views, keyboard date navigation, theme and size pairs, and finish-line checks verified |
-| UI-8 | Goals, goal detail, life areas, archived goals | todo | | | |
+| UI-8 | Goals, goal detail, life areas, archived goals | done | chunk/ui-8-goals-life-areas | 2026-11-15 | Goal journeys, confirmed milestone feedback and all finish-line checks verified |
 | UI-9 | Track, habit form, archived habits | todo | | | Needs sign-off 5-B |
 | UI-10 | Weekly review, history, detail | todo | | | Uses 5-A |
 | UI-11 | Notes, editor, search (and tags if 8.5 shipped) | todo | | | |
@@ -584,5 +584,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Axe, grid keys, native scope selection, focus return, local date overflow and enlarged text passed in Chromium. |
 | Restraint | 2 | Empty time stays quiet and confirmed event feedback uses the existing snackbar. |
 | Variety | 1 | Agenda, time grids and area layouts answer different scheduling questions within the shared toolbar. |
+
+**Total — 15/16.**
+
+### UI-8 · Goals and life areas (2026-11-15)
+
+- **Branch / PR** — `chunk/ui-8-goals-life-areas` · [UI-8 pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-8-goals-life-areas). UI-7 [#99](https://github.com/theonlyrizal/sole-up/pull/99) merged before implementation.
+- **Routes and components** — `/goals` uses URL-backed status counts, area headings, stretched goal card links and compact milestone arcs. Goal detail keeps Why and Next action together, with progress, details and notes in the sticky supporting pane at expanded widths. Milestones use list rows with keyboard reorder and History uses a disclosure. The area manager uses a tonal starter offer, colour swatches and a responsive form. Archived goals show counts and keep Restore beside the Delete menu.
+- **Data paths and contracts** — The four server pages use `getGoalsView`, `getGoalDetail`, `getLifeAreasView` and `getArchivedGoals` with the existing goal, milestone, area, task and note actions. Active retains its default URL, the other statuses use `?status=`, and the back links, note links and goal not-found keep their existing destinations. The browser exercised status changes, reorder, the offer to complete a goal, contextual task creation, note links, archive and restore, and the milestone, task and kept-note counts in delete confirmations.
+- **Decisions** — D-07 supplies the same goal shape from its ID and the saved area colour when present. ADR 0010 supplies the milestone numerator and denominator. Completion and reopening fade the changed mark for 240 ms through the existing effects token. Countable-set changes recompose the arc directly from the saved result. The goal card uses a 72 px mini arc, and an empty count has an add action on detail. The detail overflow stays with the identity at both sizes. The area manager uses the fields returned by its existing query.
+- **Checks run** — `pnpm verify` passed with 1,241 unit and 831 integration tests. The isolated rerun used the standard timeouts after a concurrent run hit reminder-suite timeouts. The existing unused-variable lint warning in habit validation remains. `pnpm build` passed on Next.js 16.4.3. The production-backed `pnpm test:e2e` run passed 183 tests. `pnpm test:visual` passed all 30 cases.
+- **Screenshots** — 52 Playwright PNGs under `test-results/visual/ui-8/`, with `-390-light`, `-390-dark`, `-1280-light` and `-1280-dark` sets. See `goals-390-light.png`, `goal-detail-1280-dark.png`, `goal-detail-zoom-390-dark.png`, `life-areas-390-dark.png`, `life-areas-starter-1280-light.png`, `area-form-390-light.png`, `archived-goals-1280-dark.png` and `archived-goal-delete-390-dark.png`.
+- **Accessibility** — Chromium axe found zero serious or critical violations on the four populated routes and the area edit form in both themes at 390 × 844 and 1280 × 800. Browser checks exercised keyboard reorder, radio selection, menu and popover dismissal, and focus recovery when the last next action leaves. The four routes fit at 320, 375, 390, 414, 768, 840 and 1280 px and at 200% text in both capture sizes. The enlarged detail captures show the task controls wrapping to give the title room.
+- **Feedback evidence** — A held milestone request kept the original checkbox and 1 of 3 label visible and exposed the busy state. A real validation rejection kept the saved count and focus. Retry advanced to 2 of 3. Reopening returned to 1 of 3. Chromium recorded one segment animation per confirmed change with motion enabled and zero while pending, on failure, on reload or with reduced motion. The `milestone-pending-*`, `milestone-error-*` and `milestone-retry-saved-*` captures show the held request, rejection and successful retry.
+- **Unverified** — Physical touch devices, manual screen-reader playback and engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | Goal name, area and personal reason lead detail, with the actionable task next. The overview gives its status links and New goal distinct positions. |
+| Character | 2 | Goal shapes and area accents recur across the cards, header and archive rows. Cream and dark opaque surfaces frame the same layouts. |
+| Color | 2 | Forest marks progress, Kiwi marks selection and Restore, and the Why card uses the feature role with its paired text. Swatch radios expose their colour names and a checked state. |
+| Response | 2 | Chromium exercised a held request, real validation failure, retry and reopening. The next-action card retains keyboard focus when its last task completes. |
+| Truthfulness | 2 | Progress and archive counts derive from the saved records. Zero countable milestones has an explicit empty state, and completing all milestones only offers goal completion. |
+| Accessibility | 2 | Both themes and sizes pass axe. Keyboard, 200% text reflow and reduced motion were exercised in Chromium. |
+| Restraint | 2 | The overview uses a small arc and caption. Detail settles after one changed segment, and the initial count is drawn at its saved value. |
+| Variety | 1 | Goal cards, the two-pane detail and the archive rows give each route a different layout using the same typography and surfaces. |
 
 **Total — 15/16.**

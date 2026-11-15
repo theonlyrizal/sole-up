@@ -2,11 +2,12 @@
 
 import { useId, useState, useTransition } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/icons/icon";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { FormError } from "@/components/ui/form-error";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { RadioGroup, RadioSwatch } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import {
@@ -24,174 +25,148 @@ import {
 
 import { colorLabel } from "./life-area-colors";
 
-/** Inline form that adds an area by name. */
-export function CreateLifeAreaForm() {
+const NO_COLOR = "none";
+
+export function LifeAreaForm({
+  area,
+  open,
+  onOpenChange,
+  onCloseAutoFocus,
+  trigger,
+}: {
+  area?: LifeArea;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
+  trigger?: React.ReactElement;
+}) {
   const id = useId();
-  const [name, setName] = useState("");
   const [error, setError] = useState<ActionError | null>(null);
+  const [transportError, setTransportError] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  function changeOpen(next: boolean) {
+    if (pending) return;
+    setError(null);
+    setTransportError(false);
+    onOpenChange(next);
+  }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
+    const data = new FormData(event.currentTarget);
+    const color = data.get("color") as LifeAreaColor | typeof NO_COLOR | null;
+    const fields = {
+      name: String(data.get("name") ?? ""),
+      description: String(data.get("description") ?? ""),
+      color: color === NO_COLOR ? null : color,
+    };
     startTransition(async () => {
-      const result = await createLifeArea({ name });
-      if (result.ok) {
-        setName("");
-        setError(null);
-        toast({ title: "Area added", variant: "success" });
-      } else {
-        setError(result.error);
+      setError(null);
+      setTransportError(false);
+      try {
+        const result = area
+          ? await updateLifeArea({ id: area.id, ...fields })
+          : await createLifeArea(fields);
+        if (result.ok) {
+          toast({
+            title: area ? "Area saved" : "Area added",
+            variant: "success",
+          });
+          onOpenChange(false);
+        } else {
+          setError(result.error);
+        }
+      } catch {
+        setTransportError(true);
       }
     });
   }
 
   const fieldErrors = error?.code === "VALIDATION" ? error.fieldErrors : {};
+  const colorErrorId = fieldErrors.color?.length
+    ? `${id}-color-error`
+    : undefined;
   return (
-    <form
-      onSubmit={submit}
-      noValidate
-      aria-label="New life area"
-      className="flex flex-col gap-2"
+    <FormDialog
+      title={area ? "Edit life area" : "New life area"}
+      open={open}
+      onOpenChange={changeOpen}
+      onCloseAutoFocus={onCloseAutoFocus}
+      trigger={trigger}
+      formId={id}
+      pending={pending}
+      submitLabel={area ? "Save" : "Add area"}
     >
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <FormField
-            id={`${id}-name`}
-            label="New area"
-            errors={fieldErrors.name}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                name="name"
-                value={name}
-                maxLength={LIFE_AREA_NAME_MAX}
-                autoComplete="off"
-                placeholder="e.g. Health"
-                onChange={(event) => setName(event.target.value)}
-              />
-            )}
-          </FormField>
-        </div>
-        <Button type="submit" disabled={pending}>
-          {pending ? "Adding…" : "Add"}
-        </Button>
-      </div>
-      <FormError error={error} />
-    </form>
-  );
-}
-
-type EditProps = {
-  area: LifeArea;
-  onDone: () => void;
-  /** Extra controls in the footer, such as Delete. */
-  children?: React.ReactNode;
-};
-
-/** Inline editor for one area. Escape cancels. */
-export function EditLifeAreaForm({ area, onDone, children }: EditProps) {
-  const id = useId();
-  const [name, setName] = useState(area.name);
-  const [description, setDescription] = useState(area.description ?? "");
-  const [color, setColor] = useState<LifeAreaColor | "">(area.color ?? "");
-  const [error, setError] = useState<ActionError | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    startTransition(async () => {
-      const result = await updateLifeArea({
-        id: area.id,
-        name,
-        description,
-        color: color || null,
-      });
-      if (result.ok) {
-        toast({ title: "Area saved", variant: "success" });
-        onDone();
-      } else {
-        setError(result.error);
-      }
-    });
-  }
-
-  const fieldErrors = error?.code === "VALIDATION" ? error.fieldErrors : {};
-  return (
-    <form
-      onSubmit={submit}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !pending) onDone();
-      }}
-      noValidate
-      aria-label={`Edit ${area.name}`}
-      className="flex flex-col gap-4"
-    >
-      <FormField id={`${id}-name`} label="Name" errors={fieldErrors.name}>
-        {(control) => (
-          <Input
-            {...control}
-            name="name"
-            value={name}
-            maxLength={LIFE_AREA_NAME_MAX}
-            autoComplete="off"
-            autoFocus
-            onChange={(event) => setName(event.target.value)}
-          />
-        )}
-      </FormField>
-      <FormField
-        id={`${id}-description`}
-        label="Description"
-        hint="Optional. What this area covers for you."
-        errors={fieldErrors.description}
-      >
-        {(control) => (
-          <Textarea
-            {...control}
-            name="description"
-            rows={2}
-            value={description}
-            maxLength={LIFE_AREA_DESCRIPTION_MAX}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        )}
-      </FormField>
-      <FormField id={`${id}-color`} label="Color" errors={fieldErrors.color}>
-        {(control) => (
-          <Select
-            {...control}
+      <form id={id} onSubmit={submit} noValidate className="grid gap-4">
+        <FormField id={`${id}-name`} label="Name" errors={fieldErrors.name}>
+          {(control) => (
+            <Input
+              {...control}
+              name="name"
+              defaultValue={area?.name}
+              maxLength={LIFE_AREA_NAME_MAX}
+              autoComplete="off"
+              autoFocus
+              placeholder="e.g. Health"
+            />
+          )}
+        </FormField>
+        <div className="grid gap-1">
+          <p className="text-label-large">Colour</p>
+          <RadioGroup
+            label="Colour"
             name="color"
-            value={color}
-            onChange={(event) =>
-              setColor(event.target.value as LifeAreaColor | "")
-            }
+            defaultValue={area?.color ?? NO_COLOR}
+            className="flex-row flex-wrap gap-1"
+            aria-describedby={colorErrorId}
+            aria-invalid={colorErrorId ? true : undefined}
           >
-            <option value="">None</option>
             {LIFE_AREA_COLORS.map((value) => (
-              <option key={value} value={value}>
-                {colorLabel(value)}
-              </option>
+              <RadioSwatch
+                key={value}
+                value={value}
+                label={colorLabel(value)}
+                style={{
+                  backgroundColor: `var(--area-${value}-container)`,
+                  color: `var(--area-${value}-on)`,
+                }}
+              />
             ))}
-          </Select>
-        )}
-      </FormField>
-      <FormError error={error} />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={pending}
-          onClick={onDone}
+            <RadioSwatch value={NO_COLOR} label="No colour">
+              <Icon name="block" size={20} />
+            </RadioSwatch>
+          </RadioGroup>
+          {colorErrorId && (
+            <p id={colorErrorId} className="text-body-small text-error">
+              {fieldErrors.color?.join(" ")}
+            </p>
+          )}
+        </div>
+        <FormField
+          id={`${id}-description`}
+          label="Description"
+          hint="Optional. What this area covers for you."
+          errors={fieldErrors.description}
         >
-          Cancel
-        </Button>
-        <span className="flex-1" />
-        {children}
-      </div>
-    </form>
+          {(control) => (
+            <Textarea
+              {...control}
+              name="description"
+              rows={2}
+              defaultValue={area?.description ?? ""}
+              maxLength={LIFE_AREA_DESCRIPTION_MAX}
+            />
+          )}
+        </FormField>
+        <FormError error={error} />
+        {transportError && (
+          <p role="alert" className="text-body-medium text-error">
+            Couldn&apos;t save the area. Try again.
+          </p>
+        )}
+      </form>
+    </FormDialog>
   );
 }

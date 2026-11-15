@@ -12,14 +12,15 @@ export const metadata: Metadata = { title: "Goals · SoleUp" };
 
 export default function GoalsPage({ searchParams }: PageProps<"/goals">) {
   return (
-    <PageFrame
-      title="Goals"
-      description={"What you're working toward, grouped by area of your life."}
+    <Suspense
+      fallback={
+        <PageFrame title="Goals">
+          <LoadingState label="Loading goals" />
+        </PageFrame>
+      }
     >
-      <Suspense fallback={<LoadingState label="Loading goals" />}>
-        <Goals searchParams={searchParams} />
-      </Suspense>
-    </PageFrame>
+      <Goals searchParams={searchParams} />
+    </Suspense>
   );
 }
 

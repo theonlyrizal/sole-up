@@ -1,6 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  chooseGoalMenuItem,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 // Linking notes to goals and tasks (chunk 8.3): from goal detail, the task
 // dialog and the note editor; "New note" linked on its first save; goal
@@ -143,7 +147,7 @@ test("a note linked from a goal and a task shows on both, unlinks, and outlives 
   await page.keyboard.press("Escape");
 
   // The goal's delete confirmation says the note is kept; it is.
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await chooseGoalMenuItem(page, "Delete…", "Actions for Learn the cello");
   const confirm = page.getByRole("alertdialog", {
     name: "Delete “Learn the cello”?",
   });
@@ -168,7 +172,7 @@ test("the editor links goals and tasks of any status from its picker", async ({
 }) => {
   await signInAndConfirm(page);
   await createGoalAndOpen(page, "Run a marathon");
-  await page.getByRole("button", { name: "Pause" }).click();
+  await chooseGoalMenuItem(page, "Pause", "Actions for Run a marathon");
   await expect(
     page.getByRole("definition").getByText("Paused", { exact: true }),
   ).toBeVisible();

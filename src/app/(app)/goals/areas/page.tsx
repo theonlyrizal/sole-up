@@ -11,18 +11,19 @@ export const metadata: Metadata = { title: "Life areas · SoleUp" };
 
 export default function LifeAreasPage() {
   return (
-    <PageFrame
-      title="Life areas"
-      width="detail"
-      back={{ href: "/goals", label: "Goals" }}
-      description={
-        "The broad parts of your life, like Health or Career. Order them however you like."
+    <Suspense
+      fallback={
+        <PageFrame
+          title="Life areas"
+          width="detail"
+          back={{ href: "/goals", label: "Goals" }}
+        >
+          <LoadingState label="Loading life areas" />
+        </PageFrame>
       }
     >
-      <Suspense fallback={<LoadingState label="Loading life areas" />}>
-        <LifeAreas />
-      </Suspense>
-    </PageFrame>
+      <LifeAreas />
+    </Suspense>
   );
 }
 

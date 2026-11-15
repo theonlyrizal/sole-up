@@ -31,6 +31,7 @@ export function ListItem({
   selected,
   className,
   wrapSupporting,
+  wrapActions,
   lines = supporting ? 2 : 1,
 }: {
   leading?: ReactNode;
@@ -45,6 +46,7 @@ export function ListItem({
   selected?: boolean;
   className?: string;
   wrapSupporting?: boolean;
+  wrapActions?: boolean;
   lines?: 1 | 2 | 3;
 }) {
   return (
@@ -56,11 +58,12 @@ export function ListItem({
           : "rounded-xs bg-resting-surface text-on-resting-surface first:rounded-t-lg last:rounded-b-lg",
         lines === 1 ? "min-h-14" : lines === 2 ? "min-h-18" : "min-h-22",
         Boolean(href || onClick) && "list-interactive state-layer",
+        wrapActions && "flex-wrap gap-y-0",
         className,
       )}
     >
       {leading && <div className="relative z-10 shrink-0">{leading}</div>}
-      <div className="min-w-0 flex-1">
+      <div className={cx("min-w-0 flex-1", wrapActions && "basis-24")}>
         <div className={selected ? "text-title-medium" : "text-body-large"}>
           {href ? (
             <Link
@@ -106,7 +109,16 @@ export function ListItem({
           {meta}
         </div>
       )}
-      {trailing && <div className="relative z-10 shrink-0">{trailing}</div>}
+      {trailing && (
+        <div
+          className={cx(
+            "relative z-10 shrink-0",
+            wrapActions && "ms-auto max-w-full",
+          )}
+        >
+          {trailing}
+        </div>
+      )}
     </li>
   );
 }

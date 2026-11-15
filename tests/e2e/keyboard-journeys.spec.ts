@@ -94,11 +94,18 @@ test("keyboard journey A turns an ambition into a plan", async ({ page }) => {
   const task = "Plan a running route";
 
   await activate(page, navLink(page, "Goals"));
-  await activate(page, page.getByRole("link", { name: "Life areas" }));
+  await activate(page, page.getByRole("button", { name: "Goals options" }));
+  await expect(
+    page.getByRole("menuitem", { name: "Life areas" }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
   await activate(page, page.getByRole("button", { name: "No thanks" }));
+  await activate(page, page.getByRole("button", { name: "New area" }));
   await typeInto(
     page,
-    page.getByRole("textbox", { name: "New area" }),
+    page
+      .getByRole("dialog", { name: "New life area" })
+      .getByRole("textbox", { name: "Name" }),
     "Health",
   );
   await page.keyboard.press("Enter");
@@ -114,7 +121,7 @@ test("keyboard journey A turns an ambition into a plan", async ({ page }) => {
       .getByRole("link", { name: goal }),
   );
   await expect(
-    page.getByRole("region", { name: "Why it matters" }),
+    page.getByRole("region", { name: "Why this matters" }),
   ).toContainText(reason);
 
   await typeInto(

@@ -3,28 +3,28 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { ColorSwatch } from "@/components/life-areas/life-area-colors";
+import { AreaChip } from "@/components/data/area-chip";
 import { Button, buttonClass } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListGroup, ListItem } from "@/components/ui/list";
+import { ShapeAvatar } from "@/components/ui/shape-avatar";
 import { toast } from "@/components/ui/toast";
 import { changeGoalStatus } from "@/server/modules/goals/actions";
 import type { ArchivedGoalItem } from "@/server/modules/goals/queries";
 
-import { DeleteGoalDialog } from "./delete-goal-dialog";
+import { GoalActions } from "./goal-actions";
 
-/** Archived goals, each with Restore (to Active, ADR 0010) and Delete. */
 export function ArchivedGoalsView({ goals }: { goals: ArchivedGoalItem[] }) {
   const router = useRouter();
-
   if (goals.length === 0) {
     return (
       <EmptyState
+        art={{ icon: "archive" }}
         title="Nothing archived"
         description="Goals you archive are kept here, out of the way, until you restore or delete them."
         action={
-          <Link href="/goals" className={buttonClass({ variant: "secondary" })}>
+          <Link href="/goals" className={buttonClass({ variant: "tonal" })}>
             Back to goals
           </Link>
         }
@@ -33,49 +33,74 @@ export function ArchivedGoalsView({ goals }: { goals: ArchivedGoalItem[] }) {
   }
 
   return (
-    <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
-      {goals.map((goal) => (
-        <li key={goal.id} className="flex flex-col gap-3 p-4">
-          <ArchivedGoalSummary goal={goal} />
-          <div className="flex flex-wrap items-center gap-1">
-            <RestoreGoalDialog goal={goal} />
-            <DeleteGoalDialog
-              goal={goal}
-              milestoneCount={goal.milestoneCount}
-              taskCounts={goal.taskCounts}
-              noteLinkCount={goal.noteLinkCount}
-              triggerLabel={`Delete: ${goal.title}`}
-              onDeleted={() => router.refresh()}
-            />
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function ArchivedGoalSummary({ goal }: { goal: ArchivedGoalItem }) {
-  const details = [
-    goal.completedAtLabel && `Completed on ${goal.completedAtLabel}`,
-    `Archived on ${goal.archivedAtLabel}`,
-  ].filter(Boolean);
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <h2 className="font-medium break-words">
-        <Link
-          href={`/goals/${goal.id}`}
-          className={cx("rounded-sm hover:underline", focusRing)}
-        >
-          {goal.title}
-        </Link>
-      </h2>
-      <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
-        {goal.area && <ColorSwatch color={goal.area.color} />}
-        {goal.area?.name ?? "No area"}
-        <span aria-hidden="true">·</span>
-        {details.join(" · ")}
-      </p>
-    </div>
+    <ListGroup label="Archived goals">
+      {goals.map((goal) => {
+        const tasks =
+          goal.taskCounts.toInbox +
+          goal.taskCounts.planned +
+          goal.taskCounts.closed;
+        const counts = [
+          `${goal.milestoneCount} ${goal.milestoneCount === 1 ? "milestone" : "milestones"}`,
+          `${tasks} ${tasks === 1 ? "task" : "tasks"}`,
+          `${goal.noteLinkCount} ${goal.noteLinkCount === 1 ? "linked note" : "linked notes"}`,
+        ];
+        return (
+          <ListItem
+            key={goal.id}
+            className="max-medium:gap-x-2 max-medium:py-2"
+            wrapActions
+            lines={3}
+            leading={
+              <ShapeAvatar
+                id={goal.id}
+                entityType="goal"
+                label={goal.title}
+                area={goal.area?.color}
+                size={40}
+              />
+            }
+            headline={<h2 className="text-title-medium">{goal.title}</h2>}
+            href={`/goals/${goal.id}`}
+            supporting={
+              <div className="grid gap-1">
+                {goal.area && (
+                  <AreaChip
+                    name={goal.area.name}
+                    color={goal.area.color}
+                    archived={goal.area.status === "archived"}
+                  />
+                )}
+                <span>
+                  {[
+                    goal.completedAtLabel &&
+                      `Completed on ${goal.completedAtLabel}`,
+                    `Archived on ${goal.archivedAtLabel}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+                <span className="text-body-small">{counts.join(" · ")}</span>
+              </div>
+            }
+            wrapSupporting
+            trailing={
+              <div className="flex flex-wrap items-center justify-end">
+                <RestoreGoalDialog goal={goal} />
+                <GoalActions
+                  goal={goal}
+                  deletion={{
+                    milestoneCount: goal.milestoneCount,
+                    taskCounts: goal.taskCounts,
+                    noteLinkCount: goal.noteLinkCount,
+                    onDeleted: () => router.refresh(),
+                  }}
+                />
+              </div>
+            }
+          />
+        );
+      })}
+    </ListGroup>
   );
 }
 
@@ -83,11 +108,7 @@ function RestoreGoalDialog({ goal }: { goal: ArchivedGoalItem }) {
   return (
     <ConfirmDialog
       trigger={
-        <Button
-          variant="secondary"
-          size="sm"
-          aria-label={`Restore: ${goal.title}`}
-        >
+        <Button variant="tonal" size="xs" aria-label={`Restore: ${goal.title}`}>
           Restore
         </Button>
       }

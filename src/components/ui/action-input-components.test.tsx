@@ -10,7 +10,7 @@ import { FormField } from "./form-field";
 import { IconButton, IconLink } from "./icon-button";
 import { Input } from "./input";
 import { NumberStepper } from "./number-stepper";
-import { RadioGroup, RadioRow } from "./radio-group";
+import { RadioGroup, RadioRow, RadioSwatch } from "./radio-group";
 import { Select } from "./select";
 import { ShapeAvatar } from "./shape-avatar";
 import { Switch, SwitchRow } from "./switch";
@@ -23,6 +23,21 @@ const links = [
   { value: "month", label: "Four weeks", href: "/track?range=4w" },
 ];
 const choices = links.map(({ label, value }) => ({ label, value }));
+
+it("renders named swatches with checked radio semantics", () => {
+  const html = render(
+    <RadioGroup label="Colour" defaultValue="teal">
+      <RadioSwatch label="Teal" value="teal" />
+      <RadioSwatch label="No colour" value="none" />
+    </RadioGroup>,
+  );
+  expect(html).toMatch(
+    /role="radio"[^>]*aria-checked="true"[^>]*aria-label="Teal"/,
+  );
+  expect(html).toMatch(
+    /role="radio"[^>]*aria-checked="false"[^>]*aria-label="No colour"/,
+  );
+});
 
 describe("Button", () => {
   it.each([

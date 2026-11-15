@@ -3,7 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { galleryBaseURL } from "../../playwright.config";
 import {
+  chooseGoalMenuItem,
   expectNoSeriousViolations,
+  holdMilestoneSave,
   openQuickAdd,
   signInAndConfirm,
 } from "./helpers";
@@ -30,6 +32,125 @@ const sizes = [
   { width: 1280, height: 800 },
 ] as const;
 const themes = ["light", "dark"] as const;
+
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-8 goals ${viewport.width} ${theme}`, async ({ page }) => {
+      test.setTimeout(150_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      const { goalId } = await seedVisualData(page, { goalsUI: true });
+      const detailPath = `/goals/${goalId}`;
+      const capture = (state: string, fullPage = true) =>
+        page.screenshot({
+          path: `test-results/visual/ui-8/${state}-${viewport.width}-${theme}.png`,
+          fullPage,
+          animations: "disabled",
+          caret: "initial",
+        });
+      for (const [name, path, heading] of [
+        ["goals", "/goals", "Goals"],
+        ["goal-detail", detailPath, GOAL_TITLE],
+        ["life-areas", "/goals/areas", "Life areas"],
+        ["archived-goals", "/goals/archived", "Archived goals"],
+      ] as const) {
+        await openPage(page, path);
+        await expect(
+          page.getByRole("heading", { level: 1, name: heading }),
+        ).toBeVisible();
+        await checkRenderedPage(page, theme);
+        await capture(name);
+        for (const width of [320, 375, 390, 414, 768, 840, 1280]) {
+          await page.setViewportSize({ width, height: viewport.height });
+          await checkRenderedPage(page, theme);
+        }
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        await checkRenderedPage(page, theme);
+        if (name === "goal-detail") await capture("goal-detail-zoom");
+        await page.evaluate(() => {
+          document.documentElement.style.removeProperty("font-size");
+        });
+      }
+
+      await chooseGoalMenuItem(
+        page,
+        "Delete…",
+        "Actions for Organize the winter walking group",
+      );
+      const warning = page.getByRole("alertdialog");
+      await expect(warning).toContainText("1 linked note");
+      await capture("archived-goal-delete", false);
+      await page.keyboard.press("Escape");
+      await expect(
+        page.getByRole("button", {
+          name: "Actions for Organize the winter walking group",
+        }),
+      ).toBeFocused();
+
+      await openPage(page, "/goals/areas");
+      await chooseGoalMenuItem(page, "Edit", "Actions for Health");
+      const form = page.getByRole("dialog", { name: "Edit life area" });
+      await expect(form.getByRole("radio", { name: "Teal" })).toBeChecked();
+      await capture("area-form", false);
+      await page.keyboard.press("Escape");
+
+      await openPage(page, detailPath);
+      const before = page.getByRole("img", {
+        name: "1 of 3 milestones completed",
+      });
+      const check = page.getByRole("checkbox", {
+        name: "Try the riverside path",
+      });
+      await expect(before).toBeVisible();
+      const hold = await holdMilestoneSave(page, detailPath);
+      await check.press("Space");
+      try {
+        await hold.requested;
+        await expect(check).toHaveAttribute("aria-busy", "true");
+        await expect(before).toBeVisible();
+        await capture("milestone-pending");
+      } finally {
+        hold.release();
+      }
+      await expect(
+        page.getByRole("region", { name: "Milestones" }).getByRole("alert"),
+      ).toBeVisible();
+      await capture("milestone-error");
+      await hold.stop();
+      await check.press("Space");
+      await expect(
+        page.getByRole("img", { name: "2 of 3 milestones completed" }),
+      ).toBeVisible();
+      await expect(check).toBeChecked();
+      await capture("milestone-retry-saved");
+
+      await openPage(page, "/goals?status=paused");
+      await expect(
+        page.getByRole("link", { name: "Make a small herb garden" }),
+      ).toBeVisible();
+      await capture("goals-paused");
+      await openPage(page, "/goals?status=dropped");
+      await expect(
+        page.getByRole("link", { name: "Back to Active" }),
+      ).toBeVisible();
+      await capture("goals-filter-empty");
+
+      await signInAndConfirm(page, "Rowan Reed");
+      await openPage(page, "/goals/areas");
+      await expect(
+        page.getByRole("heading", { name: "Start with some suggestions?" }),
+      ).toBeVisible();
+      await capture("life-areas-starter");
+    });
+  }
+}
 
 for (const viewport of sizes) {
   for (const theme of themes) {
