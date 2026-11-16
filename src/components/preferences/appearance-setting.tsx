@@ -3,11 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { ConnectedButtonGroup } from "@/components/ui/button-group";
 import { InlineBanner } from "@/components/ui/inline-banner";
-import {
-  readThemeChoice,
-  saveThemeChoice,
-  type ThemeChoice,
-} from "@/lib/theme";
+import { readThemeChoice, saveThemeChoice } from "@/lib/theme";
 
 const choices = [
   { value: "system", label: "System", icon: "contrast" },
@@ -15,18 +11,29 @@ const choices = [
   { value: "dark", label: "Dark", icon: "dark_mode" },
 ] as const;
 
-const subscribe = () => () => {};
-const serverChoice = () => "light" as const;
+function subscribe(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, {
+    attributeFilter: ["data-theme", "data-theme-system"],
+  });
+  return () => observer.disconnect();
+}
+
+function useThemeChoice() {
+  return useSyncExternalStore(subscribe, readThemeChoice, () => null);
+}
+
+export function AppearanceSummary() {
+  const choice = useThemeChoice();
+  return (
+    choices.find(({ value }) => value === choice)?.label ??
+    "Checking this device…"
+  );
+}
 
 export function AppearanceSetting() {
-  const applied = useSyncExternalStore(
-    subscribe,
-    readThemeChoice,
-    serverChoice,
-  );
-  const [choice, setChoice] = useState<ThemeChoice>();
+  const current = useThemeChoice();
   const [storageFailed, setStorageFailed] = useState(false);
-  const current = choice ?? applied;
 
   return (
     <div className="grid gap-4">
@@ -49,13 +56,12 @@ export function AppearanceSetting() {
         <ConnectedButtonGroup
           label="Color theme"
           items={choices}
-          value={current}
+          value={current ?? "light"}
           size="xs"
           onValueChange={(value) => {
             const next = choices.find((item) => item.value === value)?.value;
             if (!next) return;
             setStorageFailed(!saveThemeChoice(next));
-            setChoice(next);
           }}
         />
         {storageFailed ? (

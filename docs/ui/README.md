@@ -19,6 +19,8 @@ SoleUp's visual language combines a Cream canvas, Forest Green controls, and var
 
 Read EXPERIENCE_DESIGN alongside SCREENS and COMPONENTS for composition and feedback. DESIGN_SYSTEM owns colour values and role pairs. DESIGN_DECISIONS §2, the product spec, the ADRs and the data model govern product behaviour.
 
+[Account, Settings and public entry](SCREENS.md#111-account-settings-and-public-entry-ui-12a) defines the profile, preference search and session-aware landing action. [Review Insights](SCREENS.md#112-review-insights-navigation-and-presentation-ui-12b) defines how to find and use the existing insights. The [phase tracker](UI_IMPLEMENTATION_PLAN.md#4-ui-phase-tracker) records delivery status.
+
 ## The reference images
 
 1. **Habit dashboard collage.** Borrow the tall weekday capsules, square activity tiles, oversized count and rounded progress marks. Use them for Home's date navigation, habit previews and real weekly progress.

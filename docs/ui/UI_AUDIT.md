@@ -4,12 +4,14 @@
 **Scope:** Read-only inventory for the UI redesign. No application code or behavior was changed.  
 **Sources checked:** `PRODUCT_SPEC.md`, `DATA_MODEL.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `IMPLEMENTATION_PLAN.md` and its progress log, UI design decisions/system/plan, ADRs 0010–0016, App Router pages/layouts/boundaries, route components, relevant query/action modules, URL parsers, and existing Playwright/unit/integration coverage.
 
+**UI-12 follow-ups** — This inventory is the UI-0 baseline. The app now has `/review/insights` and `/review/insights/[insight]?start=…` from chunks 9.2–9.3. UI-12a gives `/account` the read-only profile and the existing account actions, adds local search and saved-value summaries to `/settings`, and resolves the public landing action from the current session. [Screen recipes](SCREENS.md#11-planned-follow-ups-after-ui-12).
+
 ## Inspection limits
 
 - Four current dark-mode screen captures are described in `DESIGN_DECISIONS.md` (Home, Track, Weekly review, Settings). Their image files were not present in the repository, and the supplied context did not expose their pixel dimensions or viewport metadata. Findings attributed to screenshots below are limited to the documented observations. Do not treat the missing dimensions as evidence of phone/tablet/desktop layout.
 - No live application session or user database was inspected. Data and empty/error states below are those implemented or asserted by code/tests, not observations of a particular account.
-- `docs/IMPLEMENTATION_PLAN.md` records work through chunk 8.4 (Search) as done as of this audit. Chunks 8.5, 9.1–9.3 and 10.1–10.7 remain todo. A route or control for those chunks is not assumed to exist.
-- The project has no `/insights`, export, privacy or account-deletion route today. Search exists at `/notes/search` (chunk 8.4). The phrase "Insights" in product/design documents describes planned work.
+- At the time of this audit, `docs/IMPLEMENTATION_PLAN.md` recorded work through chunk 8.4 (Search) as done and listed chunks 8.5, 9.1–9.3 and 10.1–10.7 as todo.
+- The baseline includes Search at `/notes/search` (chunk 8.4). The Insights, export, privacy and account-deletion surfaces shipped after the audit.
 
 ## Route inventory and audit
 

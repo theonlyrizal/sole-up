@@ -53,6 +53,7 @@ export function ListItem({
   wrapActions?: boolean;
   lines?: 1 | 2 | 3;
 }) {
+  const currentPage = current ?? (selected ? "page" : undefined);
   return (
     <li
       className={cx(
@@ -69,11 +70,19 @@ export function ListItem({
       {leading && <div className="relative z-10 shrink-0">{leading}</div>}
       <div className={cx("min-w-0 flex-1", wrapActions && "basis-24")}>
         <div className={selected ? "text-title-medium" : "text-body-large"}>
-          {href ? (
+          {href?.startsWith("#") ? (
+            <a
+              className="stretched-link"
+              href={href}
+              aria-current={currentPage}
+            >
+              {headline}
+            </a>
+          ) : href ? (
             <Link
               className="stretched-link"
               href={href}
-              aria-current={current ?? (selected ? "page" : undefined)}
+              aria-current={currentPage}
               onNavigate={onNavigate}
             >
               {headline}

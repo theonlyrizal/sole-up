@@ -7,7 +7,7 @@ import { Icon } from "@/components/icons/icon";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { ListGroup, ListItem } from "@/components/ui/list";
 import { ShapeAvatar } from "@/components/ui/shape-avatar";
-import { MORE_ITEMS, isNavItemActive } from "./nav-items";
+import { ACCOUNT_PATH, MORE_ITEMS, isNavItemActive } from "./nav-items";
 
 export type ShellAccount = { id: string; name: string };
 
@@ -66,7 +66,11 @@ export function MoreSheet({
         </ListGroup>
         <ListGroup label="Account">
           <ListItem
-            headline={account.name}
+            href={ACCOUNT_PATH}
+            headline="Account"
+            supporting={account.name}
+            selected={pathname === ACCOUNT_PATH}
+            onNavigate={() => setOpenAt(null)}
             leading={
               <ShapeAvatar
                 id={account.id}

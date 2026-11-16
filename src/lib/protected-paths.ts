@@ -12,6 +12,7 @@ export const APP_ROUTE_SEGMENTS = [
   "notes",
   "review",
   "settings",
+  "account",
 ] as const;
 
 export const SIGN_IN_PATH = "/sign-in";

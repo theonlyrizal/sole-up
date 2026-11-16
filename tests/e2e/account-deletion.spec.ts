@@ -66,6 +66,11 @@ test("suspends, restores, and closes an account while retaining its data", async
     expect(secondSession.ok()).toBe(true);
     await seedOwnedRows(db, userId);
     await seedOwnedRows(db, otherId);
+    await db.insert(schema.accounts).values({
+      userId: otherId,
+      accountId: otherId,
+      providerId: "google",
+    });
     const otherBefore = await referencingRows(db, otherId);
 
     let selectedIdentity = { id: otherId, email: otherEmail };
@@ -93,7 +98,12 @@ test("suspends, restores, and closes an account while retaining its data", async
       },
     );
 
-    await page.goto("/settings");
+    await page.goto("/account");
+    const profile = page.getByRole("region", { name: "Profile" });
+    await expect(profile).toContainText(email);
+    await expect(profile).toContainText("GitHub");
+    await expect(profile).not.toContainText(otherEmail);
+    await expect(profile).not.toContainText("Google");
     await page.getByRole("link", { name: "Delete account" }).click();
     const confirmation = page.getByRole("textbox", {
       name: "Type DELETE to confirm",
@@ -166,6 +176,12 @@ test("suspends, restores, and closes an account while retaining its data", async
     expectedPrompt = null;
     await signIn.click();
     const reactivate = page.getByRole("button", { name: "Reactivate account" });
+    await expect(reactivate).toBeVisible();
+    await page.goto("/");
+    await expect(
+      page.getByRole("link", { name: "Reactivate account" }),
+    ).toHaveAttribute("href", "/sign-in");
+    await page.getByRole("link", { name: "Reactivate account" }).click();
     await expect(reactivate).toBeVisible();
     expect((await page.request.get("/api/export")).status()).toBe(401);
     expect((await page.request.get("/api/auth/get-session")).status()).toBe(

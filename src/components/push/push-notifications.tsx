@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useContext, useEffect, useRef, useState, useTransition } from "react";
+import { NotificationSummaryUpdater } from "@/components/settings/notification-summary";
 import { Icon } from "@/components/icons/icon";
 
 import { Button } from "@/components/ui/button";
@@ -163,6 +164,10 @@ export function PushNotifications({
     browser.kind === "ready" && browser.endpointHash
       ? devices.find((device) => device.endpointHash === browser.endpointHash)
       : undefined;
+
+  const updateSummary = useContext(NotificationSummaryUpdater);
+  const summary = browserSummary(browser, Boolean(thisDevice));
+  useEffect(() => updateSummary(summary), [summary, updateSummary]);
 
   function turnOn() {
     setAction("on");
@@ -398,6 +403,20 @@ export function PushNotifications({
       />
     </div>
   );
+}
+
+function browserSummary(browser: BrowserState, on: boolean) {
+  switch (browser.kind) {
+    case "checking":
+      return "Checking this device…";
+    case "unsupported":
+      return browser.needsInstall ? "Install required" : "Browser unsupported";
+    case "broken":
+      return "Couldn't start";
+    case "ready":
+      if (browser.permission === "denied") return "Blocked by browser";
+      return on ? "On for this device" : "Off for this device";
+  }
 }
 
 function ThisDeviceStatus({

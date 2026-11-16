@@ -11,6 +11,40 @@ import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 const compact = { width: 390, height: 844 };
 const desktop = { width: 1280, height: 800 };
 
+test("Account is reachable from the expanded rail, collapsed rail, and More", async ({
+  page,
+}) => {
+  await page.setViewportSize(desktop);
+  await signInAndConfirm(page);
+  const account = page.getByRole("link", { name: "Account", exact: true });
+  await account.click();
+  await expect(heading(page, "Account")).toBeVisible();
+  await expect(account).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByText("No sign-in providers are linked."),
+  ).toBeVisible();
+  await page.goto("/home");
+  await page.getByRole("button", { name: "Collapse navigation rail" }).click();
+  await page
+    .getByRole("button", { name: "Account", exact: true })
+    .press("Enter");
+  await page.getByRole("menuitem", { name: "Open account" }).press("Enter");
+  await expect(page).toHaveURL(/\/account$/);
+  await page.setViewportSize(compact);
+  const sheet = await openMore(page);
+  const mobileAccount = sheet.getByRole("link", {
+    name: "Account",
+    exact: true,
+  });
+  await expect(mobileAccount).toHaveAttribute("aria-current", "page");
+  await page.keyboard.press("Escape");
+  await page.goto("/home");
+  await openMore(page);
+  await mobileAccount.click();
+  await expect(sheet).toBeHidden();
+  await expect(heading(page, "Account")).toBeVisible();
+});
+
 function mainNav(page: Page) {
   return page.getByRole("navigation", { name: "Main", exact: true });
 }
@@ -177,18 +211,22 @@ test.describe("compact shell", () => {
     const appBar = page.locator(".top-app-bar");
     await expect(appBar).toHaveAttribute("data-scrolled", "false");
     const lastLink = page.getByRole("link", {
-      name: "Delete account",
+      name: "Open account",
       exact: true,
     });
     await expect(lastLink).toBeVisible();
-    await page.evaluate(() =>
-      window.scrollTo(0, document.documentElement.scrollHeight),
-    );
+    // Device and install status can expand as the page hydrates. Measure
+    // clearance at the current page end after those changes settle.
+    await expect(async () => {
+      await page.evaluate(() =>
+        window.scrollTo(0, document.documentElement.scrollHeight),
+      );
+      const lastBox = (await lastLink.boundingBox())!;
+      expect(lastBox.y + lastBox.height).toBeLessThanOrEqual(
+        (await create.boundingBox())!.y,
+      );
+    }).toPass();
     await expect(appBar).toHaveAttribute("data-scrolled", "true");
-    const lastBox = (await lastLink.boundingBox())!;
-    expect(lastBox.y + lastBox.height).toBeLessThanOrEqual(
-      (await create.boundingBox())!.y,
-    );
     expect((await create.boundingBox())!.y + 56).toBeLessThan(
       (await nav.boundingBox())!.y,
     );

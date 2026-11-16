@@ -88,6 +88,34 @@ test("settings round-trip: time zone, locale and week start", async ({
   await expect(page.getByText(/This device is set to/)).toHaveCount(0);
 });
 
+test("Settings search jumps by keyboard and keeps unsaved changes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInAndConfirm(page);
+  await page.goto("/settings");
+  const index = page.getByRole("navigation", { name: "On this page" });
+  const language = page.getByLabel("Language and region");
+  const search = page.getByRole("searchbox", { name: "Search settings" });
+  await search.fill("dark mode");
+  await expect(index.getByRole("link")).toHaveCount(1);
+  await language.selectOption("de-DE");
+  await expect(language).toHaveValue("de-DE");
+  await index.getByRole("link", { name: "Appearance" }).press("Enter");
+  await expect(page).toHaveURL(/#appearance$/);
+  await expect(page.locator("#appearance")).toBeFocused();
+  await expect(language).toHaveValue("de-DE");
+  await search.fill("qwerty");
+  await expect(index.getByRole("status")).toHaveText(
+    "No matching settings. Try a different search.",
+  );
+  await search.press("Escape");
+  await expect(index.getByRole("link")).toHaveCount(6);
+  await expect(language).toHaveValue("de-DE");
+  await page.getByRole("link", { name: "Open account" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+});
+
 test("Appearance applies immediately, persists per device, and returns control to the system", async ({
   page,
 }) => {
@@ -105,6 +133,11 @@ test("Appearance applies immediately, persists per device, and returns control t
   await dark.press("Space");
   await expect(root).toHaveAttribute("data-theme", "dark");
   await expect(dark).toBeChecked();
+  await expect(
+    page
+      .getByRole("navigation", { name: "On this page" })
+      .getByText("Dark", { exact: true }),
+  ).toBeVisible();
 
   await page.reload();
   await expect(root).toHaveAttribute("data-theme", "dark");
