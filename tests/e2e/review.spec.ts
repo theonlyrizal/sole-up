@@ -296,6 +296,19 @@ test("step links save the draft and focus the destination heading", async ({
   await expect(page).toHaveURL(/\/home$/);
   await page.goto("/review?step=reflect");
   await expect(wins).toHaveValue("Walked the short route with a friend.");
+
+  await wins.press("End");
+  await wins.pressSequentially(" Saved before opening Insights.");
+  const draft =
+    "Walked the short route with a friend. Saved before opening Insights.";
+  await expect(wins).toHaveValue(draft);
+  await page
+    .getByRole("navigation", { name: "Review pages" })
+    .getByRole("link", { name: "Insights" })
+    .press("Enter");
+  await expect(page).toHaveURL(/\/review\/insights$/);
+  await page.goto("/review?step=reflect");
+  await expect(wins).toHaveValue(draft);
 });
 
 test("Finish shows the sheet once after success and Escape closes it", async ({

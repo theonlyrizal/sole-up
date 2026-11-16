@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { ReviewHistoryList } from "@/components/reviews/review-history";
+import { ReviewNavigation } from "@/components/reviews/review-navigation";
 import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { requireUser } from "@/server/auth/session";
@@ -13,7 +14,7 @@ export default function ReviewHistoryPage() {
   return (
     <PageFrame
       title="Past reviews"
-      back={{ href: "/review", label: "Weekly review" }}
+      subnav={<ReviewNavigation current="history" />}
       description={
         "A review can be changed during its week and the week after. Then it's kept as you wrote it."
       }

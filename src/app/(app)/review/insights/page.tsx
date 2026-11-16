@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { InsightsView } from "@/components/reviews/insights-view";
+import { ReviewNavigation } from "@/components/reviews/review-navigation";
 import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { insightPeriod } from "@/lib/insights";
@@ -23,7 +24,7 @@ export default function InsightsPage() {
   return (
     <PageFrame
       title="Insights"
-      back={{ href: "/review", label: "Weekly review" }}
+      subnav={<ReviewNavigation current="insights" />}
       description={
         "See how your plans, goals and habits have gone, and what you have coming up next week."
       }

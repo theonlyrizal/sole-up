@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { InlineBanner } from "@/components/ui/inline-banner";
 import { toast } from "@/components/ui/toast";
 import type { LocalDate } from "@/lib/dates";
 import type { InsightKey } from "@/lib/insights";
@@ -27,11 +28,15 @@ export function DismissInsightButton({
   function dismiss() {
     setError(null);
     startTransition(async () => {
-      const result = await dismissInsight({ key: insightKey, start });
-      if (result.ok) {
-        toast({ title: "Insight dismissed", variant: "success" });
-      } else {
-        setError(result.error.message);
+      try {
+        const result = await dismissInsight({ key: insightKey, start });
+        if (result.ok) {
+          toast({ title: "Insight dismissed", variant: "success" });
+        } else {
+          setError(result.error.message);
+        }
+      } catch {
+        setError("The insight couldn't be dismissed. Try again.");
       }
     });
   }
@@ -40,18 +45,18 @@ export function DismissInsightButton({
     <>
       <Button
         type="button"
-        variant="secondary"
-        size="sm"
-        disabled={pending}
+        variant="text"
+        size="xs"
+        pending={pending}
         onClick={dismiss}
         aria-label={`${label}: ${title}`}
       >
         {pending ? "Dismissing…" : label}
       </Button>
       {error && (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
+        <div className="w-full">
+          <InlineBanner tone="error">{error}</InlineBanner>
+        </div>
       )}
     </>
   );

@@ -1,11 +1,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { MetricInfo } from "@/components/data/metric-info";
 import {
   metricAsOfLabel,
   metricRangeLabel,
 } from "@/components/home/metric-range";
+import { buttonClass } from "@/components/ui/button";
+import { Card, CardHeader } from "@/components/ui/card";
 import { cx, focusRing } from "@/components/ui/cx";
+import { EmptyState } from "@/components/ui/empty-state";
 import { formatLocalDate, type LocalDate, type WeekStart } from "@/lib/dates";
 import {
   formatDateSpan,
@@ -44,7 +48,10 @@ type InsightsViewProps = InsightContext & {
   workload: Metric<NextWeekWorkload>;
 };
 
-const linkStyle = cx("rounded-sm underline underline-offset-2", focusRing);
+const recordLink = cx(
+  "inline-flex min-h-12 self-start items-center rounded-sm text-title-small text-primary underline underline-offset-4 wrap-anywhere",
+  focusRing,
+);
 
 export function InsightsView({
   planned,
@@ -68,7 +75,10 @@ export function InsightsView({
   return (
     <>
       {dismissed.size === INSIGHT_KEYS.length ? (
-        <p>All insights are dismissed for their current periods.</p>
+        <EmptyState
+          title="All insights are dismissed"
+          description="New insights appear when their reporting periods change."
+        />
       ) : (
         <ul aria-label="Insights" className="flex flex-col gap-4">
           <Insight
@@ -82,7 +92,7 @@ export function InsightsView({
             }}
             {...context}
           >
-            <p className="text-lg font-semibold">
+            <p className="text-headline-small wrap-anywhere">
               {planned.value.planned > 0
                 ? `${number.format(planned.value.completed)} of ${number.format(planned.value.planned)} planned tasks completed`
                 : "No tasks were planned for that week."}
@@ -96,19 +106,13 @@ export function InsightsView({
             action={{ href: "/goals", label: "Review your active goals" }}
             {...context}
           >
-            <ul className="divide-y divide-border">
+            <ul className="divide-y divide-outline-variant">
               {inactiveFirst.map((goal) => (
                 <li key={goal.id} className="flex flex-col gap-1 py-2">
-                  <Link
-                    href={`/goals/${goal.id}`}
-                    className={cx(
-                      "self-start font-medium wrap-anywhere",
-                      linkStyle,
-                    )}
-                  >
+                  <Link href={`/goals/${goal.id}`} className={recordLink}>
                     {goal.title}
                   </Link>
-                  <p className="text-sm text-muted">
+                  <p className="text-body-medium text-on-surface-variant">
                     {goal.daysInactive === 0
                       ? "Last action today"
                       : `${number.format(goal.daysInactive)} ${goal.daysInactive === 1 ? "day" : "days"} since the last action`}
@@ -139,7 +143,7 @@ export function InsightsView({
                 </WeekRow>
               ))}
             </WeekTable>
-            <p className="text-sm text-muted">
+            <p className="text-body-medium text-on-surface-variant">
               These counts use recorded history for tasks that still exist.
             </p>
           </Insight>
@@ -154,7 +158,7 @@ export function InsightsView({
             }}
             {...context}
           >
-            <p className="text-sm text-muted">
+            <p className="text-body-medium text-on-surface-variant">
               Skips are left out of the expected count. Quantity habits can earn
               partial credit.
             </p>
@@ -163,10 +167,7 @@ export function InsightsView({
                 <li key={habit.id} className="flex flex-col gap-1">
                   <Link
                     href={`${trackHref("12w")}#${trackHabitAnchor(habit.id)}`}
-                    className={cx(
-                      "self-start font-medium wrap-anywhere",
-                      linkStyle,
-                    )}
+                    className={recordLink}
                   >
                     {habit.title}
                   </Link>
@@ -199,7 +200,7 @@ export function InsightsView({
             }}
             {...context}
           >
-            <p className="text-lg font-semibold">
+            <p className="text-headline-small wrap-anywhere">
               {estimatedTasks > 0
                 ? `${number.format(estimatedMinutes)} estimated minutes`
                 : "No estimates yet"}
@@ -211,7 +212,14 @@ export function InsightsView({
           </Insight>
         </ul>
       )}
-      <p className="text-sm text-muted">
+      {dismissed.size > 0 && dismissed.size < INSIGHT_KEYS.length && (
+        <p className="text-body-medium text-on-surface-variant">
+          {dismissed.size === 1
+            ? "One insight is dismissed for its current reporting period."
+            : `${number.format(dismissed.size)} insights are dismissed for their current reporting periods.`}
+        </p>
+      )}
+      <p className="text-body-medium text-on-surface-variant">
         Calculated{" "}
         <time dateTime={planned.range.asOf.toISOString()}>
           {formatLocalDate(today, locale)} at{" "}
@@ -244,32 +252,49 @@ function Insight({
 }) {
   if (dismissed.has(insightKey)) return null;
   const { start } = insightPeriod(insightKey, today, weekStart);
+  const headingId = `insight-${insightKey}`;
+  const range = metricRangeLabel(metric.range, today, locale);
 
   return (
-    <li className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-surface p-4 sm:p-5">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <p className="text-sm text-muted">
-          {metricRangeLabel(metric.range, today, locale)}
-        </p>
-      </div>
-      <div className="flex flex-col gap-2">
-        {metric.hasData ? children : <p>{empty}</p>}
-      </div>
-      <p className="text-sm text-pretty text-muted">{metric.definition}</p>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link
-          href={action.href}
-          className={cx("text-sm font-medium", linkStyle)}
-        >
-          {action.label}
-        </Link>
-        <DismissInsightButton
-          insightKey={insightKey}
-          start={start}
+    <li className="min-w-0">
+      <Card as="article" headingId={headingId} className="grid gap-3">
+        <CardHeader
           title={title}
+          id={headingId}
+          supporting={
+            <p className="text-body-medium text-on-surface-variant">{range}</p>
+          }
+          actions={
+            <MetricInfo
+              title={title}
+              definition={metric.definition}
+              range={range}
+              asOf={metric.range.asOf.toISOString()}
+              asOfLabel={metricAsOfLabel(metric.range, locale)}
+            />
+          }
         />
-      </div>
+        <div className="flex min-w-0 flex-col gap-2">
+          {metric.hasData ? (
+            children
+          ) : (
+            <p className="text-body-large text-on-surface-variant">{empty}</p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-start justify-between gap-2 border-t border-outline-variant pt-2">
+          <Link
+            href={action.href}
+            className={buttonClass({ variant: "tonal", size: "xs" })}
+          >
+            {action.label}
+          </Link>
+          <DismissInsightButton
+            insightKey={insightKey}
+            start={start}
+            title={title}
+          />
+        </div>
+      </Card>
     </li>
   );
 }
@@ -282,8 +307,8 @@ function WeekTable({
   children: ReactNode;
 }) {
   return (
-    <table className="w-full text-sm">
-      <thead className="border-b border-border text-muted">
+    <table className="w-full table-fixed text-body-medium wrap-anywhere">
+      <thead className="border-b border-outline-variant text-on-surface-variant">
         <tr>
           <th scope="col" className="py-2 pe-3 text-start font-medium">
             Week
@@ -293,7 +318,7 @@ function WeekTable({
           </th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-border">{children}</tbody>
+      <tbody className="divide-y divide-outline-variant">{children}</tbody>
     </table>
   );
 }

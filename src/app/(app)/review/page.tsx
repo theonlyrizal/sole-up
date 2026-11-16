@@ -10,8 +10,7 @@ import { ReviewFlow } from "@/components/reviews/review-flow";
 import { PageFrame } from "@/components/shell/page-frame";
 import { ReviewHeader } from "@/components/reviews/review-header";
 import { StartReview } from "@/components/reviews/start-review";
-import { ReviewMenu } from "@/components/reviews/review-menu";
-import { TopAppBar } from "@/components/shell/top-app-bar";
+import { ReviewNavigation } from "@/components/reviews/review-navigation";
 import { LoadingState } from "@/components/ui/skeleton";
 import { addDays, formatLocalDate } from "@/lib/dates";
 import { formatDateSpan } from "@/lib/habits/track-range";
@@ -38,11 +37,7 @@ export default function ReviewPage({ searchParams }: PageProps<"/review">) {
     <PageFrame
       title="Weekly review"
       hideCreate
-      mobileHeader={
-        <TopAppBar title="Weekly review" actions={<ReviewMenu />} />
-      }
-      compactActions={false}
-      actions={<ReviewMenu />}
+      subnav={<ReviewNavigation current="weekly" />}
     >
       <Suspense fallback={<LoadingState label="Loading your review" />}>
         <Review searchParams={searchParams} />
