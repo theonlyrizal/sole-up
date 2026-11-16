@@ -28,6 +28,7 @@ import {
   noteGoals,
   noteTags,
   notes,
+  pushSubscriptions,
   tags,
   tasks,
   timeBlocks,
@@ -93,6 +94,28 @@ export async function createUnscheduledHabit(
       await pool.end();
     }
   };
+}
+
+/** Fixture for the device list. No browser is subscribed to this test endpoint. */
+export async function seedVisualDevice(userId: string) {
+  const pool = new Pool({
+    connectionString: assertTestDatabaseUrl(testDatabaseUrl),
+  });
+  try {
+    await drizzle({ client: pool, casing: "snake_case" })
+      .insert(pushSubscriptions)
+      .values({
+        userId,
+        endpoint: `https://push.example.test/${randomUUID()}`,
+        p256dh: "A".repeat(87),
+        auth: "A".repeat(22),
+        userAgentLabel: "Chrome on Android",
+        lastSuccessAt: new Date(Date.now() - 60 * 60 * 1000),
+        failedCount: 2,
+      });
+  } finally {
+    await pool.end();
+  }
 }
 
 /** Give a fresh test account a populated UI without relying on clicks to seed it. */

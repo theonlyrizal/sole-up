@@ -1,12 +1,9 @@
-import { LoadingState } from "@/components/ui/skeleton";
+import { LoadingIndicator } from "@/components/ui/loading-indicator";
 
 export default function RootLoading() {
   return (
-    <main
-      id="main"
-      className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10"
-    >
-      <LoadingState />
+    <main id="main" className="grid flex-1 place-items-center p-6">
+      <LoadingIndicator label="Loading SoleUp" size={48} />
     </main>
   );
 }

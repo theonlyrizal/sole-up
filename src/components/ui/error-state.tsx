@@ -32,12 +32,12 @@ export function ErrorState({
         action={
           <>
             {onRetry && (
-              <Button variant="tonal" onClick={onRetry} pending={retrying}>
+              <Button variant="filled" onClick={onRetry} pending={retrying}>
                 {retrying ? "Trying again…" : "Try again"}
               </Button>
             )}
             <Link href="/home" className={buttonClass({ variant: "text" })}>
-              Go home
+              Go to Home
             </Link>
           </>
         }

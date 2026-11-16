@@ -3,8 +3,9 @@
 import { useId, useState, useSyncExternalStore, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
 import { FormField } from "@/components/ui/form-field";
+import { InlineBanner } from "@/components/ui/inline-banner";
+import { SaveStatus } from "@/components/ui/save-status";
 import { Select } from "@/components/ui/select";
 import type { WeekStart } from "@/lib/dates";
 import {
@@ -13,7 +14,7 @@ import {
   localeLabel,
   matchTimeZoneOption,
 } from "@/lib/preferences";
-import type { ActionError } from "@/lib/result";
+import { internalError, type ActionError } from "@/lib/result";
 import { savePreferences } from "@/server/modules/preferences/actions";
 
 type Preferences = {
@@ -96,16 +97,21 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     startTransition(async () => {
       setError(null);
       setSaved(false);
-      const result = await savePreferences({ timezone, locale, weekStart });
-      if (result.ok) {
-        setChosenZone(result.data.timezone);
-        setChosenLocale(result.data.locale);
-        setSaved(true);
-      } else {
-        setError(result.error);
+      try {
+        const result = await savePreferences({ timezone, locale, weekStart });
+        if (result.ok) {
+          setChosenZone(result.data.timezone);
+          setChosenLocale(result.data.locale);
+          setSaved(true);
+        } else {
+          setError(result.error);
+        }
+      } catch {
+        setError(internalError());
       }
     });
   }
@@ -121,7 +127,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
         hint={
           mode === "confirm"
             ? "Suggested from this device. SoleUp uses it to decide what “today” is."
-            : "SoleUp uses it to decide what “today” is. Changing it doesn't move dates you've already set."
+            : "SoleUp uses it to decide what “today” is. Type the start of a time zone name to find it. Changing it doesn't move dates you've already set."
         }
         errors={fieldErrors.timezone}
       >
@@ -129,6 +135,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
           <Select
             {...control}
             name="timezone"
+            disabled={pending}
             value={timezone}
             required
             onChange={(event) => {
@@ -147,22 +154,20 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
       </FormField>
 
       {showDeviceHint && (
-        <p className="-mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
-          This device is set to {zoneLabel(deviceZone)}.
-          <button
-            type="button"
+        <div className="-mt-3 flex flex-wrap items-center gap-x-2 text-body-medium text-on-surface-variant">
+          <p>This device is set to {zoneLabel(deviceZone)}.</p>
+          <Button
+            variant="text"
+            size="xs"
+            disabled={pending}
             onClick={() => {
               setChosenZone(deviceZone);
               edited();
             }}
-            className={cx(
-              "rounded-sm underline underline-offset-2 hover:text-fg",
-              focusRing,
-            )}
           >
             Use it
-          </button>
-        </p>
+          </Button>
+        </div>
       )}
 
       <FormField
@@ -175,6 +180,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
           <Select
             {...control}
             name="locale"
+            disabled={pending}
             value={locale}
             onChange={(event) => {
               setChosenLocale(event.target.value);
@@ -199,6 +205,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
           <Select
             {...control}
             name="weekStart"
+            disabled={pending}
             value={weekStart}
             onChange={(event) => {
               setWeekStart(Number(event.target.value) as WeekStart);
@@ -214,21 +221,29 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
         )}
       </FormField>
 
+      {error && error.code !== "VALIDATION" && (
+        <InlineBanner tone="error">{error.message}</InlineBanner>
+      )}
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={pending || timezone === ""}>
+        <Button
+          type="submit"
+          aria-busy={pending || undefined}
+          disabled={pending || timezone === ""}
+        >
           {pending
             ? "Saving…"
             : mode === "confirm"
               ? "Confirm and continue"
               : "Save"}
         </Button>
-        <p role="status" className="text-sm text-success">
-          {saved && mode === "settings" ? "Saved." : null}
-        </p>
+        {mode === "settings" && (
+          <SaveStatus
+            phase={
+              pending ? "saving" : error ? "error" : saved ? "saved" : "idle"
+            }
+          />
+        )}
       </div>
-      <p role="alert" className="min-h-5 text-sm text-danger">
-        {error && error.code !== "VALIDATION" ? error.message : null}
-      </p>
     </form>
   );
 }

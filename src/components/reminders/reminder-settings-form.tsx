@@ -3,9 +3,12 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { PickerField } from "@/components/calendar/picker-field";
-import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
+import Link from "next/link";
+import { Button, buttonClass } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
+import { InlineBanner } from "@/components/ui/inline-banner";
+import { SaveStatus } from "@/components/ui/save-status";
+import { SwitchRow } from "@/components/ui/switch";
 import { Select } from "@/components/ui/select";
 import type { WeekStart } from "@/lib/dates";
 import { WEEK_DAYS } from "@/lib/preferences";
@@ -15,7 +18,7 @@ import {
   SUGGESTED_QUIET_HOURS,
 } from "@/lib/quiet-hours";
 import { NUDGE_TIME_PATTERN } from "@/lib/reminders";
-import type { ActionError } from "@/lib/result";
+import { DEFAULT_ERROR_MESSAGES, type ActionError } from "@/lib/result";
 import { saveReminderSettings } from "@/server/modules/preferences/actions";
 import type { ReminderSettings } from "@/server/modules/preferences/service";
 
@@ -49,6 +52,7 @@ export function ReminderSettingsForm({
   const [quietHours, setQuietHours] = useState<QuietHours>(
     initial.quietHours ?? SUGGESTED_QUIET_HOURS,
   );
+  const [nudgeOn, setNudgeOn] = useState(initial.dailyNudgeTime !== null);
   const [nudge, setNudge] = useState(initial.dailyNudgeTime ?? "");
   const [reviewDay, setReviewDay] = useState<WeekStart | null>(
     initial.weeklyReview?.day ?? null,
@@ -63,11 +67,11 @@ export function ReminderSettingsForm({
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (attempt === 0) return;
+    if (attempt === 0 || pending) return;
     formRef.current
       ?.querySelector<HTMLElement>('[aria-invalid="true"]')
       ?.focus();
-  }, [attempt]);
+  }, [attempt, pending]);
 
   function edited() {
     setSaved(false);
@@ -76,24 +80,63 @@ export function ReminderSettingsForm({
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    startTransition(async () => {
-      setError(null);
-      setSaved(false);
-      const result = await saveReminderSettings({
-        remindersEnabled: enabled,
-        remindersPrivate: isPrivate,
-        quietHours: quiet,
-        quietHoursStart: quietHours.start,
-        quietHoursEnd: quietHours.end,
-        dailyNudgeTime: nudge,
-        weeklyReviewDay: reviewDay,
-        weeklyReviewTime: reviewTime,
+    if (pending) return;
+    if (enabled && nudgeOn && nudge === "") {
+      setError({
+        code: "VALIDATION",
+        message: DEFAULT_ERROR_MESSAGES.VALIDATION,
+        fieldErrors: {
+          dailyNudgeTime: ["Enter a time for the daily planning nudge."],
+        },
+        formErrors: [],
       });
-      if (result.ok) {
-        setSaved(true);
-      } else {
-        setError(result.error);
-        setAttempt((count) => count + 1);
+      setAttempt((count) => count + 1);
+      return;
+    }
+    startTransition(async () => {
+      edited();
+      // Disabling delivery keeps the saved options available for re-enabling.
+      const savedQuiet = initial.quietHours ?? SUGGESTED_QUIET_HOURS;
+      try {
+        const result = await saveReminderSettings({
+          remindersEnabled: enabled,
+          remindersPrivate: enabled ? isPrivate : initial.remindersPrivate,
+          quietHours: enabled ? quiet : initial.quietHours !== null,
+          quietHoursStart: enabled ? quietHours.start : savedQuiet.start,
+          quietHoursEnd: enabled ? quietHours.end : savedQuiet.end,
+          dailyNudgeTime: enabled
+            ? nudgeOn
+              ? nudge
+              : ""
+            : (initial.dailyNudgeTime ?? ""),
+          weeklyReviewDay: enabled
+            ? reviewDay
+            : (initial.weeklyReview?.day ?? null),
+          weeklyReviewTime: enabled
+            ? reviewTime
+            : (initial.weeklyReview?.time ?? ""),
+        });
+        if (result.ok) {
+          if (!enabled) {
+            const settings = result.data;
+            setIsPrivate(settings.remindersPrivate);
+            setQuiet(settings.quietHours !== null);
+            setQuietHours(settings.quietHours ?? SUGGESTED_QUIET_HOURS);
+            setNudgeOn(settings.dailyNudgeTime !== null);
+            setNudge(settings.dailyNudgeTime ?? "");
+            setReviewDay(settings.weeklyReview?.day ?? null);
+            setReviewTime(settings.weeklyReview?.time ?? "");
+          }
+          setSaved(true);
+        } else {
+          setError(result.error);
+          setAttempt((count) => count + 1);
+        }
+      } catch {
+        setError({
+          code: "INTERNAL",
+          message: DEFAULT_ERROR_MESSAGES.INTERNAL,
+        });
       }
     });
   }
@@ -105,7 +148,7 @@ export function ReminderSettingsForm({
     quietHours.start !== quietHours.end &&
     NUDGE_TIME_PATTERN.test(quietHours.end) &&
     isInQuietHours(time, quietHours);
-  const nudgeInQuietHours = inQuietHours(nudge);
+  const nudgeInQuietHours = nudgeOn && inQuietHours(nudge);
   const reviewInQuietHours = reviewDay !== null && inQuietHours(reviewTime);
 
   return (
@@ -117,229 +160,214 @@ export function ReminderSettingsForm({
       className="flex flex-col gap-5"
     >
       {enabled && sweepsStopped && (
-        <p className="rounded-md border border-border bg-surface p-3 text-sm">
+        <InlineBanner tone="warning" title="Reminder delivery paused">
           {sweepsStopped.lastSweep
             ? `Reminders were last checked ${sweepsStopped.lastSweep}, over an hour ago. The regular check that sends them seems to have stopped, so reminders won't arrive until it runs again.`
             : "Reminders haven't been checked yet. The regular check that sends them isn't running, so reminders won't arrive until it does."}
-        </p>
+        </InlineBanner>
       )}
       {!hasDevice && (
-        <p className="rounded-md border border-border bg-surface p-3 text-sm">
+        <InlineBanner
+          tone="info"
+          title="No notification devices"
+          action={
+            <Link
+              href="#notifications"
+              className={buttonClass({ variant: "text", size: "xs" })}
+            >
+              Notifications
+            </Link>
+          }
+        >
           No device is set up for notifications yet, so reminders can&apos;t
-          reach you. Turn them on under Notifications below.
-        </p>
+          reach you.
+        </InlineBanner>
       )}
 
-      <Checkbox
+      <SwitchRow
         id={`${ids}-enabled`}
-        label="Send reminders"
-        hint={
+        name="remindersEnabled"
+        label="Reminders"
+        description={
           enabled
-            ? "Task deadlines, events, the daily nudge and the weekly review, as you set them."
+            ? "Send reminders to your devices."
             : "Off: nothing is sent, and reminders that come due are skipped, not saved for later."
         }
         checked={enabled}
-        errors={fieldErrors.remindersEnabled}
-        onChange={(checked) => {
+        disabled={pending}
+        onCheckedChange={(checked) => {
           setEnabled(checked);
           edited();
         }}
       />
 
-      <Checkbox
-        id={`${ids}-private`}
-        label="Private mode"
-        hint="Notifications say “You have a reminder” and the time, never the title."
-        checked={isPrivate}
-        errors={fieldErrors.remindersPrivate}
-        onChange={(checked) => {
-          setIsPrivate(checked);
-          edited();
-        }}
-      />
-
-      <div className="flex flex-col gap-3">
-        <Checkbox
-          id={`${ids}-quiet`}
-          label="Quiet hours"
-          hint="Reminders due in quiet hours wait until they end, together in one notification, unless they've passed by then."
-          checked={quiet}
-          errors={fieldErrors.quietHours}
-          onChange={(checked) => {
-            setQuiet(checked);
+      <fieldset
+        disabled={!enabled || pending}
+        className="grid min-w-0 gap-4 rounded-xl bg-surface-container-low p-3 disabled:bg-surface-container"
+      >
+        <legend className="sr-only">Reminder options</legend>
+        <SwitchRow
+          id={`${ids}-private`}
+          name="remindersPrivate"
+          label="Private notifications"
+          description="Notifications say “You have a reminder” and the time, never the title."
+          checked={isPrivate}
+          disabled={!enabled || pending}
+          onCheckedChange={(checked) => {
+            setIsPrivate(checked);
             edited();
           }}
         />
-        {quiet && (
-          <div className="grid gap-4 pl-6 sm:grid-cols-2">
-            <PickerField
-              id={`${ids}-quiet-start`}
-              label="From"
-              type="time"
-              value={quietHours.start}
-              name="quietHoursStart"
-              errors={fieldErrors.quietHoursStart}
-              onChange={(start) => {
-                setQuietHours((hours) => ({ ...hours, start }));
-                edited();
-              }}
-            />
-            <PickerField
-              id={`${ids}-quiet-end`}
-              label="Until"
-              type="time"
-              value={quietHours.end}
-              name="quietHoursEnd"
-              errors={fieldErrors.quietHoursEnd}
-              onChange={(end) => {
-                setQuietHours((hours) => ({ ...hours, end }));
-                edited();
-              }}
-            />
-          </div>
-        )}
-      </div>
 
-      <div className="flex flex-col gap-1.5">
-        <PickerField
-          id={`${ids}-nudge`}
-          label="Daily planning nudge"
-          type="time"
-          value={nudge}
-          name="dailyNudgeTime"
-          hint="“Time to plan your day”, at this time each day. Leave it empty to turn it off."
-          errors={fieldErrors.dailyNudgeTime}
-          clearable
-          onChange={(time) => {
-            setNudge(time);
-            edited();
-          }}
-        />
-        {nudge !== "" && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="self-start"
-            onClick={() => {
-              setNudge("");
-              edited();
-            }}
-          >
-            Turn off the nudge
-          </Button>
-        )}
-        {nudgeInQuietHours && (
-          <p className="text-sm font-medium">
-            This time is inside your quiet hours, so the nudge will wait until
-            they end at {quietHours.end}.
-          </p>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <FormField
-          id={`${ids}-review-day`}
-          label="Weekly review reminder"
-          hint="“Time for your weekly review”, once a week on this day, opening your review. It comes even when that week’s review is finished."
-          errors={fieldErrors.weeklyReviewDay}
-        >
-          {(control) => (
-            <Select
-              {...control}
-              name="weeklyReviewDay"
-              value={reviewDay ?? ""}
-              onChange={(event) => {
-                const { value } = event.target;
-                setReviewDay(
-                  value === "" ? null : (Number(value) as WeekStart),
-                );
-                edited();
-              }}
-            >
-              <option value="">Off</option>
-              {WEEK_DAYS.map((day, index) => (
-                <option key={day} value={index}>
-                  {day}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-        {reviewDay !== null && (
-          <PickerField
-            id={`${ids}-review-time`}
-            label="Weekly review time"
-            type="time"
-            value={reviewTime}
-            name="weeklyReviewTime"
-            errors={fieldErrors.weeklyReviewTime}
-            onChange={(time) => {
-              setReviewTime(time);
+        <div className="grid gap-3 border-t border-outline-variant pt-4">
+          <SwitchRow
+            id={`${ids}-nudge-on`}
+            label="Daily planning nudge"
+            description="“Time to plan your day”, at this time each day."
+            checked={nudgeOn}
+            disabled={!enabled || pending}
+            onCheckedChange={(checked) => {
+              setNudgeOn(checked);
               edited();
             }}
           />
-        )}
-        {reviewInQuietHours && (
-          <p className="text-sm font-medium">
-            This time is inside your quiet hours, so the weekly review reminder
-            will wait until they end at {quietHours.end}.
-          </p>
-        )}
-      </div>
+          <PickerField
+            id={`${ids}-nudge`}
+            label="Daily planning nudge time"
+            type="time"
+            value={nudgeOn ? nudge : ""}
+            name="dailyNudgeTime"
+            errors={fieldErrors.dailyNudgeTime}
+            disabled={!enabled || !nudgeOn || pending}
+            onChange={(time) => {
+              setNudge(time);
+              edited();
+            }}
+          />
+          {enabled && nudgeInQuietHours && (
+            <p className="text-body-medium text-on-surface-variant">
+              This time is inside your quiet hours, so the nudge will wait until
+              they end at {quietHours.end}.
+            </p>
+          )}
+        </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save reminders"}
-        </Button>
-        <p role="status" className="text-sm text-success">
-          {saved ? "Saved." : null}
-        </p>
-      </div>
-      <p role="alert" className="min-h-5 text-sm text-danger">
-        {error && error.code !== "VALIDATION" ? error.message : null}
-      </p>
-    </form>
-  );
-}
+        <div className="grid gap-3 border-t border-outline-variant pt-4">
+          <FormField
+            id={`${ids}-review-day`}
+            label="Weekly review reminder"
+            hint="“Time for your weekly review”, once a week on this day, opening your review. It comes even when that week’s review is finished."
+            errors={fieldErrors.weeklyReviewDay}
+          >
+            {(control) => (
+              <Select
+                {...control}
+                name="weeklyReviewDay"
+                disabled={!enabled || pending}
+                value={reviewDay ?? ""}
+                onChange={(event) => {
+                  const { value } = event.target;
+                  setReviewDay(
+                    value === "" ? null : (Number(value) as WeekStart),
+                  );
+                  edited();
+                }}
+              >
+                <option value="">Off</option>
+                {WEEK_DAYS.map((day, index) => (
+                  <option key={day} value={index}>
+                    {day}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+          {reviewDay !== null && (
+            <PickerField
+              id={`${ids}-review-time`}
+              label="Weekly review time"
+              type="time"
+              value={reviewTime}
+              name="weeklyReviewTime"
+              disabled={!enabled || pending}
+              errors={fieldErrors.weeklyReviewTime}
+              onChange={(time) => {
+                setReviewTime(time);
+                edited();
+              }}
+            />
+          )}
+          {enabled && reviewInQuietHours && (
+            <p className="text-sm font-medium">
+              This time is inside your quiet hours, so the weekly review
+              reminder will wait until they end at {quietHours.end}.
+            </p>
+          )}
+        </div>
 
-function Checkbox({
-  id,
-  label,
-  hint,
-  checked,
-  errors,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  hint: string;
-  checked: boolean;
-  errors?: string[];
-  onChange: (checked: boolean) => void;
-}) {
-  const errorId = errors?.length ? `${id}-error` : undefined;
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="flex items-start gap-2">
-        <input
-          id={id}
-          type="checkbox"
-          checked={checked}
-          aria-describedby={[`${id}-hint`, errorId].filter(Boolean).join(" ")}
-          aria-invalid={errorId ? true : undefined}
-          onChange={(event) => onChange(event.target.checked)}
-          className={cx("mt-1 size-4 shrink-0 accent-accent", focusRing)}
-        />
-        <span className="font-medium">{label}</span>
-      </label>
-      <p id={`${id}-hint`} className="pl-6 text-sm text-muted">
-        {hint}
-      </p>
-      {errorId && (
-        <p id={errorId} className="pl-6 text-sm text-danger">
-          {errors!.join(" ")}
-        </p>
+        <div className="grid gap-3 border-t border-outline-variant pt-4">
+          <SwitchRow
+            id={`${ids}-quiet`}
+            name="quietHours"
+            label="Quiet hours"
+            description="Reminders due in quiet hours wait until they end, together in one notification, unless they've passed by then."
+            checked={quiet}
+            disabled={!enabled || pending}
+            onCheckedChange={(checked) => {
+              setQuiet(checked);
+              edited();
+            }}
+          />
+          {quiet && (
+            <div className="grid min-w-0 gap-4 medium:grid-cols-2">
+              <PickerField
+                id={`${ids}-quiet-start`}
+                label="From"
+                type="time"
+                value={quietHours.start}
+                name="quietHoursStart"
+                disabled={!enabled || pending}
+                errors={fieldErrors.quietHoursStart}
+                onChange={(start) => {
+                  setQuietHours((hours) => ({ ...hours, start }));
+                  edited();
+                }}
+              />
+              <PickerField
+                id={`${ids}-quiet-end`}
+                label="Until"
+                type="time"
+                value={quietHours.end}
+                name="quietHoursEnd"
+                disabled={!enabled || pending}
+                errors={fieldErrors.quietHoursEnd}
+                onChange={(end) => {
+                  setQuietHours((hours) => ({ ...hours, end }));
+                  edited();
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </fieldset>
+
+      {error && error.code !== "VALIDATION" && (
+        <InlineBanner tone="error">{error.message}</InlineBanner>
       )}
-    </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="submit"
+          disabled={pending}
+          aria-busy={pending || undefined}
+        >
+          {pending ? "Saving…" : "Save"}
+        </Button>
+        <SaveStatus
+          phase={
+            pending ? "saving" : error ? "error" : saved ? "saved" : "idle"
+          }
+        />
+      </div>
+    </form>
   );
 }

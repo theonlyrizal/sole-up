@@ -12,7 +12,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] {
+  :root[data-theme-system] {
     color-scheme: dark;
     --md-card-shadow: none;
   }

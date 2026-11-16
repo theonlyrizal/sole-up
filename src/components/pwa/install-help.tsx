@@ -1,7 +1,10 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
+import { Chip } from "@/components/ui/chip";
+import { Disclosure } from "@/components/ui/disclosure";
+import { InlineBanner } from "@/components/ui/inline-banner";
 import { installPlatform, type InstallPlatform } from "@/lib/install-platform";
 
 const STANDALONE_QUERY = "(display-mode: standalone)";
@@ -44,7 +47,7 @@ type Steps = {
 const STEPS: Steps[] = [
   {
     platform: "ios",
-    title: "iPhone and iPad",
+    title: "iPhone & iPad",
     body: (
       <>
         <ol className="list-decimal space-y-1 pl-5">
@@ -108,49 +111,56 @@ export function InstallHelp() {
   const platform = usePlatform();
   const installed = useInstalled();
 
+  const [expanded, setExpanded] = useState<
+    Partial<Record<InstallPlatform, boolean>>
+  >({});
+
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-muted">
-        Installing puts SoleUp on your home screen or dock and opens it in its
-        own window. It updates itself, like the website.
-      </p>
-      <div aria-live="polite">
-        {installed ? (
-          <p className="rounded-md border border-border bg-surface-muted px-3 py-2">
-            You&apos;re using the installed app on this device.
-          </p>
-        ) : (
-          platform === "ios" && (
-            <p className="rounded-md border border-border bg-surface-muted px-3 py-2">
-              On this device, notifications only work after you add SoleUp to
-              your Home Screen.
-            </p>
-          )
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {installed && (
+          <Chip
+            type="status"
+            tone="success"
+            icon="check_circle"
+            label="Installed"
+          />
         )}
+        <p className="text-body-medium text-on-surface-variant">
+          {installed
+            ? "You're using the installed app on this device."
+            : "Installing puts SoleUp on your home screen or dock and opens it in its own window."}
+        </p>
       </div>
-      {STEPS.map((steps) => (
-        <section
-          key={steps.platform}
-          aria-labelledby={`install-${steps.platform}`}
-          className="flex flex-col gap-2"
-        >
-          <h3
-            id={`install-${steps.platform}`}
-            className="flex items-baseline gap-2 font-medium"
-          >
-            {steps.title}
-            {platform === steps.platform && (
-              <>
-                {" "}
-                <span className="text-sm font-normal text-muted">
-                  (this device)
-                </span>
-              </>
-            )}
-          </h3>
-          <div className="flex flex-col gap-2 text-sm">{steps.body}</div>
-        </section>
-      ))}
+      {!installed && platform === "ios" && (
+        <InlineBanner tone="info">
+          On this device, notifications only work after you add SoleUp to your
+          Home Screen.
+        </InlineBanner>
+      )}
+      <div className="grid gap-1">
+        {STEPS.map((steps) => {
+          const current = platform === steps.platform;
+          return (
+            <Disclosure
+              key={steps.platform}
+              title={current ? `${steps.title} (this device)` : steps.title}
+              className="rounded-lg bg-surface-container-low"
+              open={expanded[steps.platform] ?? current}
+              onOpenChange={(open) =>
+                setExpanded((previous) => ({
+                  ...previous,
+                  [steps.platform]: open,
+                }))
+              }
+            >
+              <div className="grid gap-2 px-4 pt-1 pb-4 text-body-medium text-on-surface-variant">
+                {steps.body}
+              </div>
+            </Disclosure>
+          );
+        })}
+      </div>
     </div>
   );
 }

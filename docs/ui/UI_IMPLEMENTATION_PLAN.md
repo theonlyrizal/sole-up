@@ -64,7 +64,7 @@ First paint shows true values without progress reveals or count-ups. Home gets o
   - `THEME_STORAGE_KEY = "soleup.theme"`;
   - `type ThemeChoice = "system" | "light" | "dark"`;
   - `resolveTheme(choice, prefersDark)`;
-  - `themeInitScript()`, a string for an inline `<script>` that reads `localStorage` inside `try/catch`, sets `data-theme` for explicit `light`, `dark` or `system` choices. The default is light. A media query applies the OS preference to `system`.
+  - `themeInitScript()`, a string for an inline `<script>` that reads `localStorage` inside `try/catch`, sets `data-theme` for explicit `light` and `dark` choices. System clears `data-theme` and sets `data-theme-system`, which follows the OS through a media query. Light is the default.
 
   `layout.tsx` renders it in `<head>` with `<html suppressHydrationWarning>`. Unit-test `resolveTheme` and that the script string has no template injection. The Settings toggle (UI-12) writes the key and sets `dataset.theme` straight away.
 - **Breakpoints in JS.** `src/lib/breakpoints.ts` exports `BREAKPOINTS = { medium: 600, expanded: 840, large: 1200, xlarge: 1600 }` and `mediaQuery(name)`. CSS `@theme` uses the same numbers. A unit test reads `globals.css` and checks they match.
@@ -92,7 +92,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-9 | Track, habit form, archived habits | done | chunk/ui-9-track-habits | 2026-11-16 | 5-B approved. Three ranges, confirmed feedback, keyboard targets and finish-line checks verified |
 | UI-10 | Weekly review, history, detail | done | chunk/ui-10-weekly-review | 2026-11-16 | Save, period lock and one-time Finish verified. Full E2E passed on Ubuntu |
 | UI-11 | Notes, editor, search (and tags if 8.5 shipped) | in progress | chunk/ui-11-notes-search | | |
-| UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | todo | | | Needs sign-off 5-D |
+| UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | done | chunk/ui-12-settings-public | 2026-11-16 | 5-D approved. Settings, public states and finish-line checks verified |
 | UI-13 | Consistency, cleanup, token lint, accessibility sweep, docs | todo | | | |
 
 ## 5. Visual capture harness (built in UI-1, extended by each phase)
@@ -684,5 +684,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Keyboard formatting, focus return, viewport docking, reflow, enlarged text, reduced motion and the axe matrix were exercised in Chromium. |
 | Restraint | 2 | Autosave feedback stays in the header and settles on Saved. The error and conflict stay with the draft, with no success toast or halo from autosave. |
 | Variety | 1 | Writing, collection browsing and grouped search have distinct compositions within the Notes routes. |
+
+**Total — 15/16.**
+
+### UI-12 · Settings, appearance and public entry (2026-11-16)
+
+- **Branch / PR** — `chunk/ui-12-settings-public` · [UI-12 pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-12-settings-public). UI-11 [#104](https://github.com/theonlyrizal/sole-up/pull/104) had merged with both checks green.
+- **Routes and components** — `/settings` puts the section index beside the cards at medium widths and keeps it sticky at large widths. The compact header stays opaque over deep-linked sections. Time and region and Reminders have separate saves. Appearance previews the applied theme. Notifications groups this-device actions and saved subscriptions, and Install the app opens this platform’s steps. Account shows the name and Sign out. Export, Delete account and Privacy retain their shipped actions. The landing has one Sign in action and the sign-in card shows configured providers and mapped errors. Existing error boundaries share the retry state. Not-found screens keep context and back destinations, and the root loading fallback is a centered indicator.
+- **Data paths and contracts** — Settings still reads `getUserPreferences`, `getReminderSettings`, `listPushDevices`, `sweepHealth` and the configured VAPID public key. Writes still use the preference, reminder and push actions. Turning reminders off preserves saved dependent choices. The sign-in provider selection, `?error=` mapping, closures and reactivation use the existing auth paths. The six Settings anchors stay on `/settings`, and record not-found links retain their original destinations.
+- **Decisions** — The user approved 5-D, recorded in PRODUCT_SPEC §7 and DESIGN_DECISIONS. Light is the default. System clears the explicit attribute and follows OS changes. The setting writes to `localStorage["soleup.theme"]` and takes effect on selection. Settings surfaces and their foregrounds switch together to keep contrast during the change. The installed Next.js version provides `retry()` for refetching a failed segment, which SCREENS §10 now reflects. Provider marks use the published assets. [Google Identity branding](https://developers.google.com/identity/branding-guidelines) · [GitHub Brand Toolkit](https://brand.github.com/foundations/logo).
+- **Checks run** — `pnpm verify` passed with 1,258 unit and 831 integration tests and one existing habit validation lint warning. `pnpm build` passed on Next.js 16.4.3. The pinned Linux `pnpm test:e2e --workers 2 --timeout 90000` run passed all 208 tests on the first attempt, with 46 visual-only skips. `pnpm test:visual --workers 2 --timeout 90000` passed all 46 cases against the production build.
+- **Screenshots** — 80 Chromium PNGs in `test-results/visual/ui-12/` at 390 × 844 and 1280 × 800 in light and dark. Start with `landing-1280-light.png`, `sign-in-error-390-dark.png`, `sign-in-no-provider-390-light.png`, `settings-first-screen-1280-light.png`, `appearance-selected-390-dark.png`, `notifications-device-390-light.png`, `notifications-remove-1280-dark.png` and `error-390-dark.png`. The no-provider captures use a separate local production server started with both OAuth providers disabled.
+- **Interaction evidence** — The preference captures hold the real Save request, abort it, show the retained German locale draft with Not saved, and show Saved after a successful retry. They run with reduced motion. The browser verified that only the submitted Settings form persists, and reminder validation focuses its time field after the save settles. Space selects Dark and updates the document immediately, reload retains it, and System follows an emulated OS change. The device test checks Cancel focus, Escape, trigger focus return, confirmed removal and focus recovery after the row leaves. The install tests exercise desktop and iPhone disclosure defaults and the standalone chip.
+- **Accessibility** — Chromium axe found zero serious or critical violations on the landing, sign-in, mapped sign-in error, no-provider sign-in, Settings, root and goal not-found, forced render error and device confirmation at both capture sizes and themes. The route matrix checks reflow from 320 to 1280 px and at 200% text size. The compact direct-link capture exercises the section landing position and opaque header.
+- **Unverified** — Live OAuth, physical-device install and push delivery, manual screen readers, and browser engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | Sign in leads the landing. Section headings, the active index and local Save buttons show what each Settings action affects. |
+| Character | 2 | Cream and opaque cards carry the shared typography. The landing’s three shapes recur as a single composition in both themes. |
+| Color | 2 | Forest leads primary actions, Kiwi marks selection, and error and warning roles are distinct in the rendered states. |
+| Response | 2 | The captures show the held save, persistent failure with the draft retained, and confirmed retry. The browser also exercises disabled options, validation focus and confirmed removal. |
+| Truthfulness | 2 | The device states come from browser permissions and saved subscription data. The feature lines describe shipped flows, and the theme preview follows the applied choice. |
+| Accessibility | 2 | The Chromium matrix exercises axe, keyboard selection and dismissal, narrow widths, enlarged text and reduced motion. |
+| Restraint | 2 | The landing keeps a single sign-in action. Saves use local status and the theme preview updates in place. |
+| Variety | 1 | Settings groups, the split landing, the sign-in card and recovery states use distinct compositions within this phase. |
 
 **Total — 15/16.**

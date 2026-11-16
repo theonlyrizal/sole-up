@@ -576,7 +576,7 @@ Large /notes/<id> (list–detail, D-33)
   - An opaque `Card` (max 400 px) on the canvas contains the wordmark, "Sign in to SoleUp" (`headline-small`), one-line reassurance, and **outlined `m` buttons** with the provider name ("Continue with Google" / "Continue with GitHub"). Use the brand marks as inline SVG: each provider's trademark guidelines allow their logo on sign-in buttons. Keep the existing provider logic.
   - The mapped `?error=` message as an `InlineBanner error`.
   - "No provider is configured" as an `InlineBanner info`.
-- **Error boundaries** (`src/app/error.tsx` and every route `error.tsx`): the new `ErrorState` with the fixed copy, `ErrorReference` (digest), [Try again] (filled, `reset()`), [Go to Home] (text).
+- **Error boundaries** (`src/app/error.tsx` and every route `error.tsx`): the new `ErrorState` with the fixed copy, `ErrorReference` (digest), [Try again] (filled, uses Next.js `retry()` to refetch the failed segment), [Go to Home] (text).
 - **Not found** (root and the in-shell `not-found.tsx` for goals, notes and reviews): the arch shape art with a `search_off`-style icon (use `search` if absent), "We couldn't find that" plus the context line ("This goal may have been deleted."), and [Back to Goals].
 - **Loading** (`src/app/loading.tsx`, route fallbacks): a centred `LoadingIndicator` 48 px for the root; page skeletons per route elsewhere.
 - **Test-only routes** (`/test-errors/*`): they get the restyled error UI automatically. No other change.

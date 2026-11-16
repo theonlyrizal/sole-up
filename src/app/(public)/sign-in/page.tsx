@@ -5,7 +5,10 @@ import { Suspense } from "react";
 
 import { SignInButtons } from "@/components/auth/sign-in-buttons";
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { InlineBanner } from "@/components/ui/inline-banner";
+import { LoadingState } from "@/components/ui/skeleton";
 import { ACCOUNT_RECOVERY_DAYS } from "@/lib/account-deletion";
 import { formatInstant } from "@/lib/dates";
 import { signInErrorMessage } from "@/lib/sign-in-errors";
@@ -18,24 +21,37 @@ export const metadata: Metadata = { title: "Sign in · SoleUp" };
 
 export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
   return (
-    <main className="header-wash mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-16">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Sign in to SoleUp
-        </h1>
-        <p className="text-sm text-muted">
-          Use your Google or GitHub account. SoleUp never sees your password.
-        </p>
-      </div>
-      <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
-        <SignInOptions searchParams={searchParams} />
-      </Suspense>
-      <Link
-        href="/privacy"
-        className="text-sm text-accent underline underline-offset-4"
-      >
-        Privacy notes
-      </Link>
+    <main
+      id="main"
+      className="header-wash grid w-full flex-1 place-items-center px-4 py-10"
+    >
+      <Card as="div" padding="l" className="grid w-full max-w-100 gap-5">
+        <div className="grid gap-2">
+          <Link
+            href="/"
+            className="rond-title-large-emphasized justify-self-start text-title-large-emphasized text-primary"
+          >
+            SoleUp
+          </Link>
+          <h1 className="text-headline-small">Sign in to SoleUp</h1>
+          <p className="text-body-medium text-on-surface-variant">
+            SoleUp never sees your password.
+          </p>
+        </div>
+        <Suspense fallback={<LoadingState label="Loading sign-in options" />}>
+          <SignInOptions searchParams={searchParams} />
+        </Suspense>
+        <Link
+          href="/privacy"
+          className={buttonClass({
+            variant: "text",
+            size: "xs",
+            className: "justify-self-start",
+          })}
+        >
+          Privacy notes
+        </Link>
+      </Card>
     </main>
   );
 }
@@ -52,10 +68,10 @@ async function SignInOptions({
         aria-labelledby="reactivate-heading"
         className="flex flex-col gap-3"
       >
-        <h2 id="reactivate-heading" className="text-lg font-semibold">
+        <h2 id="reactivate-heading" className="text-title-large">
           Reactivate your account
         </h2>
-        <p className="text-sm text-muted">
+        <p className="text-body-medium text-on-surface-variant">
           You can restore access until{" "}
           <time dateTime={recoverUntil.toISOString()}>
             {formatInstant(recoverUntil, "en-US", "UTC")} UTC
@@ -87,26 +103,19 @@ async function SignInOptions({
   return (
     <div className="flex flex-col gap-4">
       {closure === "scheduled" && (
-        <p role="status" className="text-sm text-muted">
+        <p role="status" className="text-body-medium text-on-surface-variant">
           Your account is scheduled to close. Sign in within{" "}
           {ACCOUNT_RECOVERY_DAYS} days to reactivate it.
         </p>
       )}
-      {errorMessage && (
-        <p
-          role="alert"
-          className="rounded-md border border-danger px-4 py-3 text-sm text-danger"
-        >
-          {errorMessage}
-        </p>
-      )}
+      {errorMessage && <InlineBanner tone="error">{errorMessage}</InlineBanner>}
       {providers.length > 0 ? (
         <SignInButtons providers={providers} />
       ) : (
-        <p className="rounded-md border border-border bg-surface p-4 text-sm text-muted">
-          Sign-in isn&apos;t available yet: no sign-in provider is configured.
-          See README &gt; Authentication.
-        </p>
+        <InlineBanner tone="info" title="No sign-in provider is configured">
+          Sign-in is currently unavailable. See the Authentication section of
+          the README for setup.
+        </InlineBanner>
       )}
     </div>
   );

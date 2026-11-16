@@ -13,8 +13,10 @@ export function TopAppBar({
   back,
   actions,
   greeting,
+  opaque = false,
 }: {
   title: string;
+  opaque?: boolean;
   back?: PageBackLink;
   actions?: ReactNode;
   greeting?: { avatar: ReactNode; date: string };
@@ -31,7 +33,8 @@ export function TopAppBar({
       <header
         className={cx(
           "top-app-bar sticky top-0 z-20 medium:hidden",
-          scrolled && "bg-surface-container",
+          opaque && "[--duration-default-effects:0ms]",
+          scrolled ? "bg-surface-container" : opaque && "bg-canvas",
         )}
         data-scrolled={scrolled}
       >

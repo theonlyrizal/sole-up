@@ -42,6 +42,11 @@ test("a rendering error shows the error page with a reference", async ({
     page.getByRole("heading", { level: 1, name: "Something went wrong" }),
   ).toBeVisible();
   await expect(main).toContainText(/Reference: \S+/);
+  await expect(main.getByRole("link", { name: "Go to Home" })).toHaveAttribute(
+    "href",
+    "/home",
+  );
+  await expect(main.getByRole("button", { name: "Try again" })).toBeEnabled();
   await expect(main).not.toContainText("private note");
   await expectNoSeriousViolations(page);
 });

@@ -41,12 +41,19 @@ test.describe("install help in Settings", () => {
     await signInAndConfirm(page);
     await page.goto("/settings");
     const install = page.getByRole("region", { name: "Install the app" });
-    await expect(install.getByRole("heading", { level: 3 })).toHaveText([
-      "iPhone and iPad",
-      "Android",
-      "Computer (this device)",
-    ]);
-    await expect(install).toContainText("Add to Home Screen");
+    const ios = install.getByRole("button", { name: "iPhone & iPad" });
+    await expect(ios).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      install.getByRole("button", { name: "Android" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      install.getByRole("button", { name: "Computer (this device)" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    await ios.press("Enter");
+    await expect(ios).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      install.getByText("Add to Home Screen", { exact: true }),
+    ).toBeVisible();
     // Desktop Chrome: no iOS note, not installed.
     await expect(install).not.toContainText("only work after you add");
     await expect(install).not.toContainText("installed app on this device");
@@ -63,8 +70,8 @@ test.describe("install help in Settings", () => {
       await page.goto("/settings");
       const install = page.getByRole("region", { name: "Install the app" });
       await expect(
-        install.getByRole("heading", { name: "iPhone and iPad (this device)" }),
-      ).toBeVisible();
+        install.getByRole("button", { name: "iPhone & iPad (this device)" }),
+      ).toHaveAttribute("aria-expanded", "true");
       await expect(install).toContainText(
         "On this device, notifications only work after you add SoleUp to your Home Screen.",
       );
@@ -81,6 +88,9 @@ test.describe("install help in Settings", () => {
       await expect(install).toContainText(
         "You're using the installed app on this device.",
       );
+      await expect(
+        install.getByText("Installed", { exact: true }),
+      ).toBeVisible();
       await expect(install).not.toContainText("only work after you add");
     });
   });

@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { signInAndConfirm } from "./helpers";
+
 /** Settings' "Time and region" section (Reminders has its own Save). */
 const timeAndRegion = (page: Page) =>
   page.getByRole("region", { name: "Time and region" });
@@ -65,7 +67,7 @@ test("settings round-trip: time zone, locale and week start", async ({
   await page.getByLabel("Language and region").selectOption("de-DE");
   await page.getByLabel("Week starts on").selectOption({ label: "Sunday" });
   await timeAndRegion(page).getByRole("button", { name: "Save" }).click();
-  await expect(timeAndRegion(page).getByRole("status")).toHaveText("Saved.");
+  await expect(timeAndRegion(page).getByRole("status")).toHaveText("Saved");
 
   // A device zone different from the saved one is pointed out, not applied.
   await expect(
@@ -80,8 +82,79 @@ test("settings round-trip: time zone, locale and week start", async ({
   await page.getByRole("button", { name: "Use it" }).click();
   await expect(page.getByLabel("Time zone")).toHaveValue("Asia/Tokyo");
   await timeAndRegion(page).getByRole("button", { name: "Save" }).click();
-  await expect(timeAndRegion(page).getByRole("status")).toHaveText("Saved.");
+  await expect(timeAndRegion(page).getByRole("status")).toHaveText("Saved");
   await page.reload();
   await expect(page.getByLabel("Time zone")).toHaveValue("Asia/Tokyo");
   await expect(page.getByText(/This device is set to/)).toHaveCount(0);
+});
+
+test("Appearance applies immediately, persists per device, and returns control to the system", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await signInAndConfirm(page);
+  await page.goto("/settings#appearance");
+
+  const group = page.getByRole("radiogroup", { name: "Color theme" });
+  const root = page.locator("html");
+  const dark = group.getByRole("radio", { name: "Dark" });
+  const light = group.getByRole("radio", { name: "Light" });
+  const system = group.getByRole("radio", { name: "System" });
+
+  await expect(light).toBeChecked();
+  await dark.press("Space");
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(dark).toBeChecked();
+
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(dark).toBeChecked();
+
+  await system.press("Space");
+  await expect(root).not.toHaveAttribute("data-theme");
+  await expect(system).toBeChecked();
+  await expect(root).toHaveCSS("color-scheme", "light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(root).toHaveCSS("color-scheme", "dark");
+
+  await page.reload();
+  await expect(root).not.toHaveAttribute("data-theme");
+  await expect(system).toBeChecked();
+  await expect(root).toHaveCSS("color-scheme", "dark");
+
+  await light.click();
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await expect(root).toHaveCSS("color-scheme", "light");
+});
+
+test("time and region and reminders save independently", async ({ page }) => {
+  await signInAndConfirm(page);
+  await page.goto("/settings");
+  const region = timeAndRegion(page);
+  const reminders = page.getByRole("form", { name: "Reminder settings" });
+  const privacy = reminders.getByRole("switch", {
+    name: "Private notifications",
+  });
+  const locale = region.getByLabel("Language and region");
+
+  await privacy.click();
+  await expect(privacy).toBeChecked();
+  await locale.selectOption("de-DE");
+  await region.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(region.getByRole("status")).toHaveText("Saved");
+  await expect(privacy).toBeChecked();
+  await page.reload();
+  await expect(locale).toHaveValue("de-DE");
+  await expect(privacy).not.toBeChecked();
+
+  await privacy.click();
+  await expect(privacy).toBeChecked();
+  await locale.selectOption("en-GB");
+  await expect(locale).toHaveValue("en-GB");
+  await reminders.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(reminders.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(locale).toHaveValue("en-GB");
+  await page.reload();
+  await expect(locale).toHaveValue("de-DE");
+  await expect(privacy).toBeChecked();
 });
