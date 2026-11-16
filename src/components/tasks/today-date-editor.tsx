@@ -2,9 +2,8 @@
 
 import { useId, useState, useTransition } from "react";
 
+import { PickerField } from "@/components/calendar/picker-field";
 import { Button } from "@/components/ui/button";
-import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { formatLocalDate, localDateTimeOf } from "@/lib/dates";
 import { planTask, rescheduleTaskDue } from "@/server/modules/tasks/actions";
@@ -90,7 +89,12 @@ export function TodayDateEditor({
       noValidate
       aria-label={`${label}: ${task.title}`}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !pending) {
+        if (
+          event.key === "Escape" &&
+          !pending &&
+          !event.defaultPrevented &&
+          event.currentTarget.contains(event.target as Node)
+        ) {
           event.preventDefault();
           onDone();
         }
@@ -102,36 +106,26 @@ export function TodayDateEditor({
           : "flex flex-wrap items-end gap-2 rounded-md border border-border bg-surface-muted p-3"
       }
     >
-      <FormField
+      <PickerField
         id={`${id}-date`}
         label={label}
+        type="date"
+        value={date}
+        name="date"
         hint={
           timedDue && kind === "due"
             ? `Keeps the time, ${timedDue.time} (${zone}).`
             : undefined
         }
         errors={error && !inSheet ? [error] : undefined}
-      >
-        {(control) => (
-          <Input
-            {...control}
-            type="date"
-            name="date"
-            aria-invalid={error ? true : undefined}
-            aria-describedby={
-              inSheet && error
-                ? [control["aria-describedby"], `${id}-error`]
-                    .filter(Boolean)
-                    .join(" ")
-                : control["aria-describedby"]
-            }
-            className="py-1.5 text-sm"
-            value={date}
-            autoFocus
-            onChange={(event) => setDate(event.target.value)}
-          />
-        )}
-      </FormField>
+        aria-invalid={error ? true : undefined}
+        aria-describedby={inSheet && error ? `${id}-error` : undefined}
+        className="py-1.5 text-sm"
+        locale={locale}
+        timeZone={kind === "due" ? zone : timeZone}
+        autoFocus
+        onChange={setDate}
+      />
       {inSheet && error && (
         <p
           id={`${id}-error`}

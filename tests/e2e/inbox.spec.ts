@@ -84,8 +84,8 @@ test("quick add from any page can file a task under a goal with a plan", async (
   const parent = dialog.getByLabel("Goal or milestone");
   await expect(parent).toBeEnabled();
   await parent.selectOption({ label: "Run a 10k" });
-  await dialog.getByLabel("Plan for").fill("2026-11-02");
-  await dialog.getByLabel("Due").fill("2026-11-05");
+  await dialog.getByLabel("Plan for", { exact: true }).fill("2026-11-02");
+  await dialog.getByLabel("Due", { exact: true }).fill("2026-11-05");
   await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("Task added", { exact: true })).toBeVisible();

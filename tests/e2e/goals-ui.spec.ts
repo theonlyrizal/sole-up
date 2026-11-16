@@ -5,8 +5,47 @@ import {
   chooseGoalMenuItem,
   expectNoSeriousViolations,
   holdMilestoneSave,
+  signInAndConfirm,
 } from "./helpers";
 import { GOAL_TITLE, seedVisualData } from "./visual-data";
+
+test("inactive end tabs keep the same inner corner as the middle tabs", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await signInAndConfirm(page);
+  await page.goto("/goals?status=completed");
+  const statuses = page.getByRole("navigation", {
+    name: "Filter goals by status",
+  });
+  await expect(
+    statuses.getByRole("link", { name: /^Completed/ }),
+  ).toHaveAttribute("aria-current", "page");
+  const corners = await statuses.getByRole("link").evaluateAll((items) =>
+    items.map((item) => {
+      const style = getComputedStyle(item, "::after");
+      return {
+        height: Number.parseFloat(style.height),
+        left: Number.parseFloat(style.borderTopLeftRadius),
+        right: Number.parseFloat(style.borderTopRightRadius),
+      };
+    }),
+  );
+  const [first, middle, selected, last] = corners;
+  expect(middle!.left).toBeGreaterThan(0);
+  expect(selected!.left).toBe(selected!.height / 2);
+  expect(selected!.right).toBe(selected!.height / 2);
+  expect(first).toEqual({
+    height: first!.height,
+    left: first!.height / 2,
+    right: middle!.right,
+  });
+  expect(last).toEqual({
+    height: last!.height,
+    left: middle!.left,
+    right: last!.height / 2,
+  });
+});
 
 for (const viewport of [
   { width: 390, height: 844 },

@@ -1,7 +1,6 @@
-import { Icon } from "@/components/icons/icon";
 import { fieldClass } from "./field-styles";
 
-/** Native so platform pickers, form semantics and long lists work as usual. */
+/** A native form control with a styled picker where the browser supports it. */
 export function Select({
   className,
   ...props
@@ -12,7 +11,7 @@ export function Select({
   return (
     <span className="native-select">
       <select className={fieldClass(className)} {...props} />
-      <Icon name="expand_more" size={20} className="native-select-icon" />
+      <span aria-hidden="true" className="native-select-icon" />
     </span>
   );
 }

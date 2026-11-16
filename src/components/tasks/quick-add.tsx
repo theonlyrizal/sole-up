@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
+import { PickerField } from "@/components/calendar/picker-field";
 import { useMediaQuery } from "@/components/hooks/use-media-query";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
@@ -253,32 +254,26 @@ function QuickAddForm({
           )}
         </FormField>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
+          <PickerField
             id={`${id}-planned`}
             label="Plan for"
+            type="date"
+            value={plannedDate}
+            name="plannedDate"
             errors={fieldErrors.plannedDate}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
-                name="plannedDate"
-                value={plannedDate}
-                onChange={(event) => setPlannedDate(event.target.value)}
-              />
-            )}
-          </FormField>
-          <FormField id={`${id}-due`} label="Due" errors={fieldErrors.dueDate}>
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
-                name="dueDate"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-              />
-            )}
-          </FormField>
+            clearable
+            onChange={setPlannedDate}
+          />
+          <PickerField
+            id={`${id}-due`}
+            label="Due"
+            type="date"
+            value={dueDate}
+            name="dueDate"
+            errors={fieldErrors.dueDate}
+            clearable
+            onChange={setDueDate}
+          />
         </div>
       </div>
 

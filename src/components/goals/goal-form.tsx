@@ -2,6 +2,7 @@
 
 import { useId, useState, useTransition } from "react";
 
+import { PickerField } from "@/components/calendar/picker-field";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { FormError } from "@/components/ui/form-error";
 import { FormField } from "@/components/ui/form-field";
@@ -219,37 +220,27 @@ export function GoalFormDialog(props: GoalFormDialogProps) {
               </Select>
             )}
           </FormField>
-          <FormField
+          <PickerField
             id={`${id}-start`}
             label="Start date"
+            type="date"
+            value={startDate}
+            name="startDate"
             errors={fieldErrors.startDate}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
-                name="startDate"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-              />
-            )}
-          </FormField>
-          <FormField
+            clearable
+            onChange={setStartDate}
+          />
+          <PickerField
             id={`${id}-target`}
             label="Target date"
+            type="date"
+            value={targetDate}
+            name="targetDate"
             errors={fieldErrors.targetDate}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
-                name="targetDate"
-                value={targetDate}
-                min={startDate || undefined}
-                onChange={(event) => setTargetDate(event.target.value)}
-              />
-            )}
-          </FormField>
+            min={startDate || undefined}
+            clearable
+            onChange={setTargetDate}
+          />
         </div>
         <FormField
           id={`${id}-description`}

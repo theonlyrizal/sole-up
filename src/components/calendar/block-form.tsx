@@ -32,6 +32,7 @@ import {
 import { createTimeBlock } from "@/server/modules/time-blocks/actions";
 
 import { RepeatBuilder } from "./repeat-builder";
+import { PickerField } from "./picker-field";
 import { type ScopeOption, ScopeChooser } from "./scope-chooser";
 
 /** A task a block can be made for: what the forms and the panel read. */
@@ -113,45 +114,31 @@ export function BlockTimesFields({
       <div className="calendar-time-fields">
         <fieldset className="calendar-time-group">
           <legend>Start</legend>
-          <FormField
+          <PickerField
             id={`${id}-date`}
             label="Date"
+            name="startDate"
+            type="date"
+            value={values.startDate}
+            locale={locale}
             errors={fieldErrors.startDate}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
-                name="startDate"
-                value={values.startDate}
-                onChange={(change) =>
-                  onChange((current) =>
-                    withBlockStartDate(current, change.target.value),
-                  )
-                }
-              />
-            )}
-          </FormField>
-          <FormField
+            timeZone={values.tz}
+            onChange={(startDate) =>
+              onChange((current) => withBlockStartDate(current, startDate))
+            }
+          />
+          <PickerField
             id={`${id}-start`}
             label="Start time"
+            name="startTime"
+            type="time"
+            value={values.startTime}
+            locale={locale}
             errors={fieldErrors.startTime}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                type="time"
-                name="startTime"
-                value={values.startTime}
-                onChange={(change) =>
-                  onChange((current) => ({
-                    ...current,
-                    startTime: change.target.value,
-                  }))
-                }
-              />
-            )}
-          </FormField>
+            onChange={(startTime) =>
+              onChange((current) => ({ ...current, startTime }))
+            }
+          />
         </fieldset>
         <fieldset className="calendar-time-group">
           <legend>End</legend>
@@ -205,6 +192,7 @@ export function BlockTimesFields({
         }}
         startDate={values.startDate}
         locale={locale}
+        timeZone={values.tz}
         errors={repeatErrors}
         ruleErrors={fieldErrors.rrule}
       />

@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { PickerPreferencesProvider } from "@/components/calendar/picker-preferences";
 import { PreferencesForm } from "@/components/preferences/preferences-form";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageContainer } from "@/components/shell/page-container";
@@ -89,8 +90,16 @@ async function SignedInShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AppShell account={{ id: user.id, name: user.name }}>
-      <ShellMain>{children}</ShellMain>
-    </AppShell>
+    <PickerPreferencesProvider
+      value={{
+        locale: preferences.locale,
+        timeZone: preferences.timezone,
+        weekStart: preferences.weekStart,
+      }}
+    >
+      <AppShell account={{ id: user.id, name: user.name }}>
+        <ShellMain>{children}</ShellMain>
+      </AppShell>
+    </PickerPreferencesProvider>
   );
 }

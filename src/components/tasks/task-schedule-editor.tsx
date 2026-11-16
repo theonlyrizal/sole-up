@@ -2,11 +2,11 @@
 
 import { useId, useRef, useState, useTransition } from "react";
 
+import { PickerField } from "@/components/calendar/picker-field";
 import { Button } from "@/components/ui/button";
 import { ResponsiveSheet } from "@/components/ui/bottom-sheet";
 import { FormError } from "@/components/ui/form-error";
 import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { localDateTimeOf } from "@/lib/dates";
 import type { ActionError } from "@/lib/result";
@@ -134,7 +134,12 @@ function ScheduleForm({
       noValidate
       aria-label={`Dates and goal for ${task.title}`}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !pending) {
+        if (
+          event.key === "Escape" &&
+          !pending &&
+          !event.defaultPrevented &&
+          event.currentTarget.contains(event.target as Node)
+        ) {
           event.preventDefault();
           onDone();
         }
@@ -142,59 +147,46 @@ function ScheduleForm({
       className="grid min-w-0 gap-3"
     >
       <div className="grid min-w-0 gap-3 sm:grid-cols-3">
-        <FormField
+        <PickerField
           id={`${id}-planned`}
           label="Plan for"
+          type="date"
+          value={plannedDate}
+          name="plannedDate"
           errors={fieldErrors.plannedDate}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              name="plannedDate"
-              className="py-1.5 text-sm"
-              value={plannedDate}
-              autoFocus
-              onChange={(event) => setPlannedDate(event.target.value)}
-            />
-          )}
-        </FormField>
-        <FormField
+          timeZone={timeZone}
+          className="py-1.5 text-sm"
+          autoFocus
+          clearable
+          onChange={setPlannedDate}
+        />
+        <PickerField
           id={`${id}-due`}
           label="Due date"
+          type="date"
+          value={dueDate}
+          name="dueDate"
           errors={fieldErrors.dueDate}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              name="dueDate"
-              className="py-1.5 text-sm"
-              value={dueDate}
-              onChange={(event) => setDueDate(event.target.value)}
-            />
-          )}
-        </FormField>
-        <FormField
+          timeZone={zone}
+          className="py-1.5 text-sm"
+          clearable
+          onChange={setDueDate}
+        />
+        <PickerField
           id={`${id}-due-time`}
           label="Due time"
+          type="time"
+          value={dueTime}
+          name="dueTime"
           hint={`Optional. In ${zone}.`}
           errors={[
             ...(fieldErrors.dueTime ?? []),
             ...(fieldErrors.dueTz ?? []),
           ]}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="time"
-              name="dueTime"
-              className="py-1.5 text-sm"
-              value={dueTime}
-              onChange={(event) => setDueTime(event.target.value)}
-            />
-          )}
-        </FormField>
+          className="py-1.5 text-sm"
+          clearable
+          onChange={setDueTime}
+        />
       </div>
       <FormField
         id={`${id}-parent`}

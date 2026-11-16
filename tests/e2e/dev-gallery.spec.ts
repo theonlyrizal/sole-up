@@ -146,6 +146,47 @@ test("Tab reaches every gallery tab stop and arrows reach the other group contro
   }
 });
 
+test("connected buttons keep their painted inner corners when an edge is inactive", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto(`${galleryBaseURL}/dev/ui`);
+  const column = page.getByRole("region", { name: "Light", exact: true });
+  const links = column.getByRole("navigation", {
+    name: "Light gallery sections",
+  });
+  const range = column.getByRole("radiogroup", { name: "Light range" });
+  const week = range.getByRole("radio", { name: "Week", exact: true });
+  const fourWeeks = range.getByRole("radio", { name: "Four weeks" });
+  const year = range.getByRole("radio", { name: "Year", exact: true });
+  const paintedCorners = (item: Element) => {
+    const layer = getComputedStyle(item, "::after");
+    return [
+      layer.height,
+      layer.borderTopLeftRadius,
+      layer.borderTopRightRadius,
+    ];
+  };
+
+  await expect
+    .poll(() =>
+      links.getByRole("link", { name: "Fields" }).evaluate(paintedCorners),
+    )
+    .toEqual(["32px", "4px", "16px"]);
+  await expect
+    .poll(() => week.evaluate(paintedCorners))
+    .toEqual(["40px", "20px", "20px"]);
+  await fourWeeks.click();
+  await expect(fourWeeks).toBeChecked();
+  await expect
+    .poll(() => week.evaluate(paintedCorners))
+    .toEqual(["40px", "20px", "8px"]);
+  await expect(year).toBeDisabled();
+  await expect
+    .poll(() => year.evaluate(paintedCorners))
+    .toEqual(["40px", "8px", "20px"]);
+});
+
 test("FAB uses Enter, arrows and Escape, returns focus and links mark the current page", async ({
   page,
 }) => {

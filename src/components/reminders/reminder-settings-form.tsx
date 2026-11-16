@@ -2,10 +2,10 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
+import { PickerField } from "@/components/calendar/picker-field";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
 import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { WeekStart } from "@/lib/dates";
 import { WEEK_DAYS } from "@/lib/preferences";
@@ -172,81 +172,62 @@ export function ReminderSettingsForm({
         />
         {quiet && (
           <div className="grid gap-4 pl-6 sm:grid-cols-2">
-            <FormField
+            <PickerField
               id={`${ids}-quiet-start`}
               label="From"
+              type="time"
+              value={quietHours.start}
+              name="quietHoursStart"
               errors={fieldErrors.quietHoursStart}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  type="time"
-                  name="quietHoursStart"
-                  value={quietHours.start}
-                  onChange={(event) => {
-                    setQuietHours({ ...quietHours, start: event.target.value });
-                    edited();
-                  }}
-                />
-              )}
-            </FormField>
-            <FormField
+              onChange={(start) => {
+                setQuietHours((hours) => ({ ...hours, start }));
+                edited();
+              }}
+            />
+            <PickerField
               id={`${ids}-quiet-end`}
               label="Until"
+              type="time"
+              value={quietHours.end}
+              name="quietHoursEnd"
               errors={fieldErrors.quietHoursEnd}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  type="time"
-                  name="quietHoursEnd"
-                  value={quietHours.end}
-                  onChange={(event) => {
-                    setQuietHours({ ...quietHours, end: event.target.value });
-                    edited();
-                  }}
-                />
-              )}
-            </FormField>
+              onChange={(end) => {
+                setQuietHours((hours) => ({ ...hours, end }));
+                edited();
+              }}
+            />
           </div>
         )}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <FormField
+        <PickerField
           id={`${ids}-nudge`}
           label="Daily planning nudge"
+          type="time"
+          value={nudge}
+          name="dailyNudgeTime"
           hint="“Time to plan your day”, at this time each day. Leave it empty to turn it off."
           errors={fieldErrors.dailyNudgeTime}
-        >
-          {(control) => (
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                {...control}
-                type="time"
-                name="dailyNudgeTime"
-                value={nudge}
-                className="w-auto"
-                onChange={(event) => {
-                  setNudge(event.target.value);
-                  edited();
-                }}
-              />
-              {nudge !== "" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setNudge("");
-                    edited();
-                  }}
-                >
-                  Turn off the nudge
-                </Button>
-              )}
-            </div>
-          )}
-        </FormField>
+          clearable
+          onChange={(time) => {
+            setNudge(time);
+            edited();
+          }}
+        />
+        {nudge !== "" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="self-start"
+            onClick={() => {
+              setNudge("");
+              edited();
+            }}
+          >
+            Turn off the nudge
+          </Button>
+        )}
         {nudgeInQuietHours && (
           <p className="text-sm font-medium">
             This time is inside your quiet hours, so the nudge will wait until
@@ -285,25 +266,18 @@ export function ReminderSettingsForm({
           )}
         </FormField>
         {reviewDay !== null && (
-          <FormField
+          <PickerField
             id={`${ids}-review-time`}
             label="Weekly review time"
+            type="time"
+            value={reviewTime}
+            name="weeklyReviewTime"
             errors={fieldErrors.weeklyReviewTime}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                type="time"
-                name="weeklyReviewTime"
-                value={reviewTime}
-                className="w-auto"
-                onChange={(event) => {
-                  setReviewTime(event.target.value);
-                  edited();
-                }}
-              />
-            )}
-          </FormField>
+            onChange={(time) => {
+              setReviewTime(time);
+              edited();
+            }}
+          />
         )}
         {reviewInQuietHours && (
           <p className="text-sm font-medium">

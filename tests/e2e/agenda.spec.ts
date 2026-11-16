@@ -61,7 +61,7 @@ async function addTask(page: Page, title: string, plannedDate?: string) {
   await dialog.getByLabel("Task title").fill(title);
   if (plannedDate) {
     await dialog.getByRole("button", { name: "More options" }).click();
-    await dialog.getByLabel("Plan for").fill(plannedDate);
+    await dialog.getByLabel("Plan for", { exact: true }).fill(plannedDate);
   }
   await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);
