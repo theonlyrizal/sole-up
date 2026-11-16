@@ -36,6 +36,7 @@ const signedInPages = [
   ["/review/insights", "Insights"],
   ["/review/insights/missing", "We couldn't find that"],
   ["/settings", "Settings"],
+  ["/account", "Account"],
   ["/settings/delete-account", "Delete account"],
 ] as const;
 
@@ -94,7 +95,7 @@ test("axe scans the hovered primary and danger buttons", async ({ page }) => {
       await expectNoSeriousViolations(page);
       await page.keyboard.press("Escape");
 
-      await page.goto("/settings");
+      await page.goto("/account");
       await scanHovered(
         page,
         page.getByRole("link", { name: "Delete account", exact: true }),

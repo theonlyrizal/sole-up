@@ -167,6 +167,11 @@ Settings → Appearance applies System, Light, or Dark immediately and saves the
 
 On phones the bar shows Home, Plan, Goals, Track and More. More holds Notes, Review, Search and Settings.
 
+- **Settings and Account:** Appearance, Reminders, Notifications, Time and region, and install help are grouped and searchable in `/settings`. The account shortcut opens `/account` for your name, email, linked sign-in providers, personal-data export, privacy notes, sign-out and account deletion. Profile details are read-only.
+- **Public landing:** The primary action opens Home for an active session, sign-in for a visitor, or the existing reactivation flow for a recoverable account.
+
+The [next Review follow-up](ui/SCREENS.md#112-review-insights-navigation-and-presentation-ui-12b) makes the existing Insights page easier to find from Review.
+
 ## 8. Dashboard questions
 
 The Home screen should help answer:

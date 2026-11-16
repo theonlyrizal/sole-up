@@ -19,7 +19,7 @@ const privateFields: Record<string, string[]> = {
   push_subscriptions: ["endpoint", "p256dh", "auth"],
 };
 
-test("Settings downloads every owned table with only the signed-in user's rows", async ({
+test("Account downloads every owned table with only the signed-in user's rows", async ({
   page,
   request,
 }) => {
@@ -42,7 +42,7 @@ test("Settings downloads every owned table with only the signed-in user's rows",
     await seedOwnedRows(db, userId);
     await seedOwnedRows(db, otherId);
 
-    await page.goto("/settings");
+    await page.goto("/account");
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("link", { name: "Download export" }).click();
     const download = await downloadPromise;

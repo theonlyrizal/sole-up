@@ -114,7 +114,7 @@ test("turning reminders off in Settings stops their delivery", async ({
   // Settings: with no device, a note says reminders can't arrive.
   const form = await openSettings(page);
   await expect(
-    form.getByText(/No device is set up for notifications yet/),
+    page.getByText(/No device is set up for notifications yet/),
   ).toBeVisible();
   const enabled = form.getByRole("switch", { name: "Reminders", exact: true });
   await expect(enabled).toBeChecked();

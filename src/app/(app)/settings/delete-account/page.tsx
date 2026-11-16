@@ -33,7 +33,7 @@ export default function DeleteAccountPage({
     <PageFrame
       title="Delete account"
       width="reading"
-      back={{ href: "/settings", label: "Settings" }}
+      back={{ href: "/account", label: "Account" }}
     >
       <p className="text-muted-fg text-sm">
         This suspends your account, signs you out on every device, and pauses
@@ -45,13 +45,13 @@ export default function DeleteAccountPage({
         <DeleteAccountStep searchParams={searchParams} />
       </Suspense>
       <Link
-        href="/settings"
+        href="/account"
         className={buttonClass({
           variant: "secondary",
           className: "self-start",
         })}
       >
-        Back to Settings
+        Back to Account
       </Link>
     </PageFrame>
   );

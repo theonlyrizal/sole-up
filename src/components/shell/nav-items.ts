@@ -13,6 +13,7 @@ export type NavItem = (typeof NAV_ITEMS)[number];
 const [home, goals, plan, track, notes, review, settings] = NAV_ITEMS;
 
 export const SEARCH_PATH = "/notes/search";
+export const ACCOUNT_PATH = "/account";
 export const BAR_ITEMS = [home, plan, goals, track] as const;
 export const MORE_ITEMS = [
   { ...notes, tint: "violet" },
@@ -48,5 +49,8 @@ export function isNavItemActive(pathname: string, href: string): boolean {
 }
 
 export function isMoreActive(pathname: string): boolean {
-  return MORE_ITEMS.some((item) => isNavItemActive(pathname, item.href));
+  return (
+    pathname === ACCOUNT_PATH ||
+    MORE_ITEMS.some((item) => isNavItemActive(pathname, item.href))
+  );
 }

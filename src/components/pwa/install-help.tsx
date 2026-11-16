@@ -44,6 +44,12 @@ type Steps = {
   body: React.ReactNode;
 };
 
+export function InstallSummary() {
+  const installed = useInstalled();
+  if (installed === null) return "Checking this device…";
+  return installed ? "Installed app" : "Using the browser";
+}
+
 const STEPS: Steps[] = [
   {
     platform: "ios",

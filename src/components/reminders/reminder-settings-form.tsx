@@ -3,8 +3,7 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { PickerField } from "@/components/calendar/picker-field";
-import Link from "next/link";
-import { Button, buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { InlineBanner } from "@/components/ui/inline-banner";
 import { SaveStatus } from "@/components/ui/save-status";
@@ -24,13 +23,6 @@ import type { ReminderSettings } from "@/server/modules/preferences/service";
 
 type Props = {
   initial: ReminderSettings;
-  /** False when no device is subscribed: nothing could be delivered. */
-  hasDevice: boolean;
-  /**
-   * Set when no reminder sweep has run for an hour (5.7): when the last
-   * one ran, formatted, or null when none has yet.
-   */
-  sweepsStopped: { lastSweep: string | null } | null;
 };
 
 /**
@@ -39,11 +31,7 @@ type Props = {
  * daily planning nudge (off until a time is chosen) and the weekly review
  * reminder (chunk 7.5, ADR 0015: off until a day is chosen). Saved together.
  */
-export function ReminderSettingsForm({
-  initial,
-  hasDevice,
-  sweepsStopped,
-}: Props) {
+export function ReminderSettingsForm({ initial }: Props) {
   const ids = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const [enabled, setEnabled] = useState(initial.remindersEnabled);
@@ -159,31 +147,6 @@ export function ReminderSettingsForm({
       aria-label="Reminder settings"
       className="flex flex-col gap-5"
     >
-      {enabled && sweepsStopped && (
-        <InlineBanner tone="warning" title="Reminder delivery paused">
-          {sweepsStopped.lastSweep
-            ? `Reminders were last checked ${sweepsStopped.lastSweep}, over an hour ago. The regular check that sends them seems to have stopped, so reminders won't arrive until it runs again.`
-            : "Reminders haven't been checked yet. The regular check that sends them isn't running, so reminders won't arrive until it does."}
-        </InlineBanner>
-      )}
-      {!hasDevice && (
-        <InlineBanner
-          tone="info"
-          title="No notification devices"
-          action={
-            <Link
-              href="#notifications"
-              className={buttonClass({ variant: "text", size: "xs" })}
-            >
-              Notifications
-            </Link>
-          }
-        >
-          No device is set up for notifications yet, so reminders can&apos;t
-          reach you.
-        </InlineBanner>
-      )}
-
       <SwitchRow
         id={`${ids}-enabled`}
         name="remindersEnabled"

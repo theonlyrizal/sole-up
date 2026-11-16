@@ -313,6 +313,22 @@ Subagent rule: Do all coding and testing in this main thread. If you must use a 
 Finish line: Stop immediately once SCREENS §9–§10 hold, pnpm verify, pnpm build, pnpm test:e2e and pnpm test:visual pass, and the protocol close-out is complete.
 ```
 
+### UI-12a: Account, Settings and public entry
+```text
+Follow the shared preamble. Read UI plan phase UI-12a, SCREENS §11.1, and the linked UXcel lesson. Build /account first, then Settings findability and the session-aware landing CTA. Keep the existing data-rights and recovery URLs. Exercise signed-out and signed-in access, the shell entry points, independent saves, Settings search, and the landing CTA at first paint. Include the experience rubric, axe results and visual and interaction evidence in the handoff.
+
+Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
+Finish line: Stop once UI-12a's acceptance checks and the protocol close-out are complete.
+```
+
+### UI-12b: Review Insights navigation and presentation
+```text
+Follow the shared preamble. Read UI plan phase UI-12b and SCREENS §11.2. Make the existing Insights overview easy to reach from Review and check that it and the task correction pages are readable on compact screens. Preserve the review draft guard, metric evidence, reporting windows, dismissal and correction links. Include the experience rubric, axe results and visual and interaction evidence in the handoff.
+
+Subagent rule: Do all coding and testing in this main thread. If you must use a subagent to search files, force its model to haiku and never spawn parallel coding subagents.
+Finish line: Stop once UI-12b's acceptance checks and the protocol close-out are complete.
+```
+
 ### UI-13: Consistency, cleanup and accessibility sweep
 ```text
 Experience requirements (revision 4): read docs/ui/EXPERIENCE_DESIGN.md and DESIGN_SYSTEM §§1 and 13. Run the EXPERIENCE_DESIGN §7 rubric across all routes and states. Check stable identity, focal color allocation, feedback repetition, failures, small chart layouts and reduced motion. Require at least 13/16 with full truthfulness/accessibility and no zero; document screenshots and remaining issues. Include the experience rubric and real visual/interaction evidence in your handoff. Keep backend and URL contracts.

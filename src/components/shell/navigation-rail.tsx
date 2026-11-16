@@ -2,17 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { useMediaQuery } from "@/components/hooks/use-media-query";
 import { ShellSearch } from "@/components/search/shell-search";
 import { cx, focusRing } from "@/components/ui/cx";
 import { IconButton, IconLink } from "@/components/ui/icon-button";
-import { Menu, MenuContent, MenuTrigger } from "@/components/ui/menu";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { ShapeAvatar } from "@/components/ui/shape-avatar";
 import { CreateMenu, type OpenQuickAdd } from "./create-menu";
 import type { ShellAccount } from "./more-sheet";
 import {
+  ACCOUNT_PATH,
   BAR_ITEMS,
   NAV_ITEMS,
   NAV_SUB_ITEMS,
@@ -57,6 +58,7 @@ export function NavigationRail({
   const collapsed = useSyncExternalStore(subscribe, isCollapsed, () => false);
   const expanded = useMediaQuery("large") !== false && !collapsed;
   const pathname = usePathname();
+  const accountLink = useRef<HTMLAnchorElement>(null);
   const avatar = (
     <ShapeAvatar
       id={account.id}
@@ -127,10 +129,22 @@ export function NavigationRail({
         </nav>
         <div className="rail-expanded">
           <div className="flex flex-wrap items-center gap-x-2 rounded-lg bg-surface-container px-3 py-1">
-            {avatar}
-            <span className="min-w-0 flex-1 truncate text-label-large">
-              {account.name}
-            </span>
+            <Link
+              href={ACCOUNT_PATH}
+              aria-label="Account"
+              aria-current={pathname === ACCOUNT_PATH ? "page" : undefined}
+              className={cx(
+                "state-layer flex min-h-12 min-w-0 flex-1 items-center gap-2 rounded-full pe-2",
+                pathname === ACCOUNT_PATH &&
+                  "bg-secondary-container text-on-secondary-container",
+                focusRing,
+              )}
+            >
+              {avatar}
+              <span className="min-w-0 truncate text-label-large">
+                {account.name}
+              </span>
+            </Link>
             <SignOutButton variant="icon" />
           </div>
         </div>
@@ -152,8 +166,17 @@ export function NavigationRail({
               <p className="px-3 py-2 text-label-large wrap-anywhere">
                 {account.name}
               </p>
+              <MenuItem
+                aria-current={pathname === ACCOUNT_PATH ? "page" : undefined}
+                onSelect={() => accountLink.current?.click()}
+              >
+                Open account
+              </MenuItem>
               <SignOutButton variant="menu" />
             </MenuContent>
+            <Link href={ACCOUNT_PATH} ref={accountLink} hidden>
+              Open account
+            </Link>
           </Menu>
         </div>
       </div>

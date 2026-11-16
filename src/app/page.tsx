@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { Icon, type IconName } from "@/components/icons/icon";
 import { buttonClass } from "@/components/ui/button";
 import { SHAPES } from "@/components/ui/shapes";
+import { getSignedInAccount } from "@/server/auth/session";
 
 const features = [
   {
@@ -41,9 +43,17 @@ export default function HomePage() {
             <h1 className="rond-display-small expanded:rond-display-large max-w-full text-display-small text-balance wrap-anywhere expanded:text-display-large">
               Decide what matters. Plan what&apos;s realistic. See how it went.
             </h1>
-            <Link href="/sign-in" className={buttonClass({ size: "m" })}>
-              Sign in
-            </Link>
+            <div className="min-h-14">
+              <Suspense
+                fallback={
+                  <span className="sr-only" role="status">
+                    Checking sign-in…
+                  </span>
+                }
+              >
+                <LandingAction />
+              </Suspense>
+            </div>
           </div>
           <svg
             aria-hidden="true"
@@ -104,5 +114,24 @@ export default function HomePage() {
         </Link>
       </footer>
     </div>
+  );
+}
+
+async function LandingAction() {
+  const account = await getSignedInAccount();
+  const active = account?.status === "active";
+  const label = active
+    ? "Go to Home"
+    : account?.status === "recoverable"
+      ? "Reactivate account"
+      : "Sign in";
+
+  return (
+    <Link
+      href={active ? "/home" : "/sign-in"}
+      className={buttonClass({ size: "m" })}
+    >
+      {label}
+    </Link>
   );
 }

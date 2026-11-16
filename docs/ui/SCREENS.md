@@ -540,25 +540,23 @@ Large /notes/<id> (list–detail, D-33)
 
 **Data:** unchanged: `getUserPreferences`, `getReminderSettings`, `listPushDevices`, `sweepHealth`, `env.VAPID_PUBLIC_KEY`.
 
-**Structure.** M3 settings pattern: on compact, a **settings list** whose rows open sub-sections; on medium and wider, sections side by side.
-- Compact `/settings` renders **every section on one page** as titled groups. **No new routes**: the page keeps its single-route contract and anchor ids, and an in-page index (`ListGroup` of links to `#time-region`, `#appearance`, `#reminders`, `#notifications`, `#install`) sits at the top.
-- Large: a two-column layout. A sticky index on the left (3 columns) highlights the section in view (an `IntersectionObserver`). The sections are on the right (7 columns, `width="reading"`).
+**Structure.** Compact `/settings` renders all groups on one page, with a searchable jump list and current values above them. Delivery alerts precede the index and link to the affected section. Medium and larger widths place the index next to the groups. At large widths the index sticks and marks the section in view. See [§11.1](#111-account-settings-and-public-entry-ui-12a) for the Account route and anchor details.
 
 **Sections** (in order):
-1. **Time and region** (`PreferencesForm mode="settings"`): Time zone (native select with search hint), Locale, Week starts on. Its own [Save] (filled) at the bottom of the card, with save feedback inline (a `SaveStatus`-style row) and field errors as now.
-2. **Appearance** (new, D-08 / 5-D): a `ConnectedButtonGroup` toggle of System (`contrast` icon), Light (`light_mode`), Dark (`dark_mode`). It applies instantly with no save button and writes `localStorage["soleup.theme"]`. Supporting text: "Saved on this device." The rail collapse preference isn't shown (it's remembered automatically).
-3. **Reminders** (`ReminderSettingsForm`): the master `SwitchRow` "Reminders" ("Send reminders to your devices"), then the dependent controls (dimmed and `disabled` while off, as now):
+1. **Appearance** (D-08 / 5-D) uses a `ConnectedButtonGroup` with System (`contrast` icon), Light (`light_mode`) and Dark (`dark_mode`). It applies instantly and writes `localStorage["soleup.theme"]`. The preview follows the applied choice, and the supporting text says "Saved on this device."
+2. **Reminders** (`ReminderSettingsForm`): the master `SwitchRow` "Reminders" ("Send reminders to your devices"), then the dependent controls (dimmed and `disabled` while off, as now):
    - `SwitchRow` "Private notifications" with the existing explanation;
    - "Daily planning nudge" (`SwitchRow` plus a time field);
    - "Weekly review reminder" (weekday select plus time);
    - "Quiet hours" (`SwitchRow` plus start and end times, and the existing warning).
-   - The no-device note and the sweep-stopped warning are `InlineBanner`s at the top of the card.
+   - The no-device note and the sweep-stopped warning are `InlineBanner`s at the top of Settings.
    - One [Save].
-4. **Notifications** (`PushNotifications`):
+3. **Notifications** (`PushNotifications`):
    - **This device:** the status line and [Turn on notifications on this device] (filled) or [Send a test notification] (tonal).
    - **Devices:** a `ListGroup` of devices. Each row has a `devices` icon, the label, "Added …", "Last delivered …", and a failure count chip, with ⋮ → Remove… (`ConfirmDialog`).
+4. **Time and region** (`PreferencesForm mode="settings"`) has Time zone, Language and region, and Week starts on. The card has its own filled Save button, inline status and field errors.
 5. **Install the app** (`InstallHelp`): three `Disclosure`s (iPhone & iPad, Android, Computer), with this device's one opened by default and an "Installed" `success` chip when running standalone.
-6. **Account** (UI-12 shows only what exists): the name and Sign out (tonal). The phase 10 sections (Export, Delete account, Privacy) are added by those chunks into this layout with these patterns: **Export** is a card with a filled button; **Delete account** is a separate card with an `error`-outlined border, `danger` button and typed confirmation per its own spec.
+6. **Account** keeps the `#account` shortcut and opens the separate profile and data page.
 
 **Must survive:** every field name and action, `preferences.spec.ts`, `reminders.spec.ts`, `push-devices.spec.ts`, `pwa.spec.ts`, the per-section loading states (skeleton cards), and truthful status text.
 
@@ -569,7 +567,7 @@ Large /notes/<id> (list–detail, D-33)
 - **Landing `/`:**
   - Cream canvas with a shallow header wash. Centred on compact, split on expanded.
   - The headline is "Decide what matters. Plan what's realistic. See how it went." in `display-small`/`display-large` with ROND 100 (product promise copy from PRODUCT_SPEC §1).
-  - One [Sign in] filled `m` button.
+  - One filled `m` action based on the session. Active accounts see Go to Home, recoverable accounts see Reactivate account, and other visitors see Sign in.
   - A decorative composition of 3 identity shapes (cookie-9 `primary-container`, clover-4 `secondary-container`, soft-burst `tertiary-container`) floating behind, `aria-hidden`, static under reduced motion.
   - Three short feature lines with icons: Goals → Today, Habits counted kindly, Weekly review. No screenshots or invented numbers. A footer with the "Your data stays yours" privacy line.
 - **Sign in `/sign-in`:**
@@ -580,3 +578,23 @@ Large /notes/<id> (list–detail, D-33)
 - **Not found** (root and the in-shell `not-found.tsx` for goals, notes and reviews): the arch shape art with a `search_off`-style icon (use `search` if absent), "We couldn't find that" plus the context line ("This goal may have been deleted."), and [Back to Goals].
 - **Loading** (`src/app/loading.tsx`, route fallbacks): a centred `LoadingIndicator` 48 px for the root; page skeletons per route elsewhere.
 - **Test-only routes** (`/test-errors/*`): they get the restyled error UI automatically. No other change.
+
+## 11. Planned follow-ups after UI-12
+
+### 11.1 Account, Settings and public entry (UI-12a)
+
+**Account `/account`.** Start with a signed-in, read-only profile. Show the existing account name and email together with the shared identity avatar. List linked sign-in providers by their display names when they exist. Get the account identity from `requireUser()` and read provider IDs only for that user's linked accounts. Keep OAuth tokens and provider account IDs on the server. Display a clear empty state if there are no linked providers. Add `account` to the protected route segments.
+
+Open Account from the profile row in More, the profile area in both rail layouts, and the Account link in Settings. Keep Settings directly reachable wherever it is today. Place Download export and Privacy notes after the profile, then Sign out near the end and Delete account in a visually distinct final section. Reuse `/api/export`, `/privacy`, and `/settings/delete-account`, including the existing verification, typed confirmation and recovery flow. Profile editing, provider linking and password management are outside this phase.
+
+**Settings `/settings`.** Give app and device preferences their own space. Start with Appearance, then Reminders and Notifications next to each other, then Time and region and Install the app. This order is a starting hypothesis about which controls people are likely to revisit. Keep the Account shortcut at `#account`. On compact widths use a jump list with short current-value summaries. On larger widths keep the index beside the groups and sticky at the existing large breakpoint. Keep `#appearance`, `#reminders`, `#notifications`, `#time-region` and `#install` directly linkable.
+
+Put a labelled Search settings field above the index. Search setting names and a small set of aliases such as “dark mode”, “alerts” and “language”. Results jump to the relevant group or field, and clearing the search restores the index. Keep forms mounted so search and section jumps preserve unsaved edits. Reflect saved settings and actual browser permission in the summaries. Keep plain-language consequences next to their controls, and surface actionable delivery problems near the top with a link to the relevant group. A status that has yet to load keeps its loading treatment. Preserve independent saves, local theme application, install help and confirmed device removal. [UXcel settings best practices](https://uxcel.com/lessons/settings-best-practices-572).
+
+**Landing `/`.** Keep one primary action. A valid active session sees **Go to Home**, linking to `/home`. A recoverable account session sees **Reactivate account**, linking to the existing recovery flow at `/sign-in`. Other visitors see **Sign in**, also linking to `/sign-in`. Resolve the account status per request with `getSignedInAccount()`. Reserve the action's space during loading to prevent a premature prompt. Keep the welcome content public and keep profile details on `/account`.
+
+### 11.2 Review Insights navigation and presentation (UI-12b)
+
+`/review/insights` and `/review/insights/[insight]?start=…` already ship. Insights is reachable through Review options and the expanded Review rail. Give Weekly review, Past reviews and Insights a visible local navigation row across Review on compact and expanded screens. Keep Insights selected on its correction pages and preserve the review draft guard when a user follows one of these links.
+
+Use the existing five insights, user-local reporting windows and record links. Give each card a readable figure, its range, access to its definition and as-of time, and a direct way to open the contributing records. Keep the four-week comparisons readable at compact widths and at larger text sizes. Show missing data, a measured zero, and a dismissed period with distinct text. Reuse the existing correction and period-specific dismissal paths, including the `start` parameter and invalid-link handling.

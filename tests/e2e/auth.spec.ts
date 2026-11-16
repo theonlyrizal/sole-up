@@ -39,6 +39,44 @@ test("an OAuth error is shown as a readable message", async ({ page }) => {
   );
 });
 
+test("the landing action follows the current session without a premature sign-in link", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("link", { name: "Sign in", exact: true }),
+  ).toHaveAttribute("href", "/sign-in");
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await signInAsNewUser(page, "Landing Test");
+  await page.addInitScript(() => {
+    const observer = new MutationObserver(() => {
+      if (document.querySelector("main a[href='/sign-in']")) {
+        document.documentElement.dataset.prematureSignIn = "true";
+      }
+    });
+    observer.observe(document, { childList: true, subtree: true });
+  });
+  await page.goto("/");
+  const action = page.getByRole("link", { name: "Go to Home" });
+  await expect(action).toHaveAttribute("href", "/home");
+  await expect(page.locator("html")).not.toHaveAttribute(
+    "data-premature-sign-in",
+  );
+  await action.click();
+  await expect(page).toHaveURL(/\/home$/);
+
+  const cookie = (await page.context().cookies()).find(({ name }) =>
+    name.endsWith(".session_token"),
+  )!;
+  await page.context().addCookies([{ ...cookie, value: "stale" }]);
+  await page.goto("/");
+  await expect(
+    page.getByRole("link", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Go to Home" })).toHaveCount(0);
+});
+
 test("sign in through the shortcut, then sign out", async ({ page }) => {
   const email = await signInAsNewUser(page, "Ada Lovelace");
 

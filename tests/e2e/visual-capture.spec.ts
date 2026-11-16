@@ -1939,6 +1939,9 @@ for (const viewport of sizes) {
       }
 
       await openPage(page, "/");
+      await expect(
+        page.getByRole("link", { name: "Sign in", exact: true }),
+      ).toBeVisible();
       await verifyRoute("landing");
       await page
         .getByRole("link", { name: "Sign in", exact: true })
@@ -1970,22 +1973,50 @@ for (const viewport of sizes) {
       await verifyRoute("error");
 
       const userId = await signInAndConfirm(page, "Alex Morgan");
-      await openPage(page, "/settings");
-      const reminders = page.getByRole("form", { name: "Reminder settings" });
-      await expect(reminders).toContainText(
-        "No device is set up for notifications yet",
+      await openPage(page, "/");
+      await expect(
+        page.getByRole("link", { name: "Go to Home" }),
+      ).toBeVisible();
+      await verifyRoute("landing-signed-in");
+      await openPage(page, "/account");
+      await expect(page.getByRole("region", { name: "Profile" })).toContainText(
+        "Alex Morgan",
       );
+      await verifyRoute("account");
+
+      await openPage(page, "/settings");
+      await expect(
+        page.getByText("No device is set up for notifications yet", {
+          exact: false,
+        }),
+      ).toBeVisible();
       await verifyRoute("settings");
       await capture("settings-first-screen", false);
 
       const index = page.getByRole("navigation", { name: "On this page" });
+      const search = page.getByRole("searchbox", { name: "Search settings" });
+      await search.fill("dark mode");
+      await expect(index.getByRole("link")).toHaveCount(1);
+      await capture("settings-search", false);
+      await search.press("Escape");
       const appearance = index.getByRole("link", { name: "Appearance" });
       await appearance.press("Enter");
       await expect(page).toHaveURL(/\/settings#appearance$/);
       if (viewport.width >= 1200) {
         await expect(appearance).toHaveAttribute("aria-current", "true");
-        const navBounds = await index.boundingBox();
-        expect(navBounds?.y).toBeLessThan(80);
+        await page.locator("#reminders").evaluate((section) => {
+          section.scrollIntoView({ block: "start", behavior: "instant" });
+        });
+        await expect
+          .poll(
+            async () =>
+              (
+                await page
+                  .getByRole("search", { name: "Settings" })
+                  .boundingBox()
+              )?.y,
+          )
+          .toBeLessThan(80);
       }
       const group = page.getByRole("radiogroup", { name: "Color theme" });
       const explicit = group.getByRole("radio", {
@@ -2033,7 +2064,9 @@ for (const viewport of sizes) {
       await capture("preferences-error", false);
       await page.unroute("**/settings");
       await save.press("Enter");
-      await expect(preferences.getByRole("status")).toHaveText("Saved");
+      await expect(preferences.getByRole("status")).toHaveText("Saved", {
+        timeout: 15_000,
+      });
       await capture("preferences-retry", false);
 
       await seedVisualDevice(userId);

@@ -77,6 +77,8 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
   const [error, setError] = useState<ActionError | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
+  // Keep native inputs from accepting edits before their handlers hydrate.
+  const editingDisabled = device === null || pending;
 
   const timezone = chosenZone ?? initial.timezone ?? deviceZone ?? "";
   const locale =
@@ -135,7 +137,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
           <Select
             {...control}
             name="timezone"
-            disabled={pending}
+            disabled={editingDisabled}
             value={timezone}
             required
             onChange={(event) => {
@@ -159,7 +161,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
           <Button
             variant="text"
             size="xs"
-            disabled={pending}
+            disabled={editingDisabled}
             onClick={() => {
               setChosenZone(deviceZone);
               edited();
@@ -180,7 +182,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
           <Select
             {...control}
             name="locale"
-            disabled={pending}
+            disabled={editingDisabled}
             value={locale}
             onChange={(event) => {
               setChosenLocale(event.target.value);
@@ -205,7 +207,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
           <Select
             {...control}
             name="weekStart"
-            disabled={pending}
+            disabled={editingDisabled}
             value={weekStart}
             onChange={(event) => {
               setWeekStart(Number(event.target.value) as WeekStart);
@@ -228,7 +230,7 @@ export function PreferencesForm({ initial, timeZones, locales, mode }: Props) {
         <Button
           type="submit"
           aria-busy={pending || undefined}
-          disabled={pending || timezone === ""}
+          disabled={editingDisabled || timezone === ""}
         >
           {pending
             ? "Saving…"

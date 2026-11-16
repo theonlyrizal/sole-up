@@ -93,6 +93,8 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-10 | Weekly review, history, detail | done | chunk/ui-10-weekly-review | 2026-11-16 | Save, period lock and one-time Finish verified. Full E2E passed on Ubuntu |
 | UI-11 | Notes, editor, search (and tags if 8.5 shipped) | in progress | chunk/ui-11-notes-search | | |
 | UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | done | chunk/ui-12-settings-public | 2026-11-16 | 5-D approved. Settings, public states and finish-line checks verified |
+| UI-12a | Account page, Settings findability, and signed-in landing action | done | `chunk/ui-12a-account-settings` | 2026-11-17 | Validated account scoping, Settings search and the session-aware landing |
+| UI-12b | Review Insights navigation and presentation | todo | | | After UI-12a. Reuses the shipped Insights routes and data |
 | UI-13 | Consistency, cleanup, token lint, accessibility sweep, docs | todo | | | |
 
 ## 5. Visual capture harness (built in UI-1, extended by each phase)
@@ -329,6 +331,26 @@ Each phase lists **Read**, **Build**, **Tests**, **Done when** and **Out of scop
 **Tests:** update the specs; add an E2E test that choosing Dark sets `data-theme="dark"` immediately and after a reload, and System removes it; each Settings section saves independently (the existing assertions); axe on the landing page, sign-in, settings, not-found and error pages in both themes and sizes.
 
 **Done when:** SCREENS §9–10 hold and the finish-line commands pass.
+
+### UI-12a: Account, Settings and public entry
+
+**Read** [SCREENS §11.1](SCREENS.md#111-account-settings-and-public-entry-ui-12a), [UXcel's settings lesson](https://uxcel.com/lessons/settings-best-practices-572), and the current Settings, shell profile controls, authentication and account-deletion code. Use UI-12's captures as the starting point.
+
+**Build in this order**
+
+1. Add and protect `/account` with the existing profile data and links to account actions. Make it reachable from the shell profile controls and Settings before moving any controls off Settings.
+2. Group device and app preferences around the decisions people make. Add local settings search, short summaries, and prominent actionable alerts. Preserve section links, unsaved edits and independent saves. Use the existing UI-12 preference and device components.
+3. Resolve the landing CTA from the request's authenticated account status. Keep the existing Home, Sign in and recovery destinations.
+
+**Acceptance** — Test access and user scoping for `/account`, the profile entry in both rail layouts and More, existing export and verified deletion, Settings anchor and search keyboard behavior, independent saves, and current browser permission messages. Test the landing action for signed-out, active, recoverable and stale sessions, including first paint for an active session. Run the finish-line commands, axe and visual captures for the changed pages in both themes at 390 × 844 and 1280 × 800.
+
+### UI-12b: Review Insights navigation and presentation
+
+**Read** [SCREENS §11.2](SCREENS.md#112-review-insights-navigation-and-presentation-ui-12b), product chunks 9.2–9.3, the two Insights pages, `InsightsView`, the review draft guard, and `insights.spec.ts`.
+
+**Build** — Give Review a visible local navigation row. Check the existing Insights overview and record correction pages for small-screen readability and use shared components where a fix is needed. Preserve the review save-before-navigation path and the metric definitions, dates, actions and URL contracts.
+
+**Acceptance** — Reach Insights from Review without opening an overflow menu. Check pending review drafts, current-page state, all five insights, missing data and genuine zero, dismissal and correction, and invalid links. Add axe and visual captures for the overview and correction screens in both themes and sizes. Run the finish-line commands.
 
 ### UI-13: Consistency, cleanup and accessibility sweep
 **Read:** everything in `docs/ui/`, then the captures from every phase.
@@ -709,5 +731,28 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | The Chromium matrix exercises axe, keyboard selection and dismissal, narrow widths, enlarged text and reduced motion. |
 | Restraint | 2 | The landing keeps a single sign-in action. Saves use local status and the theme preview updates in place. |
 | Variety | 1 | Settings groups, the split landing, the sign-in card and recovery states use distinct compositions within this phase. |
+
+**Total — 15/16.**
+
+### UI-12a · Account, Settings and public entry (2026-11-17)
+
+- **Branch / PR** — `chunk/ui-12a-account-settings` · [UI-12a pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-12a-account-settings). Predecessor [#105](https://github.com/theonlyrizal/sole-up/pull/105) merged with both required checks green.
+- **Routes** — The read-only profile, linked provider names, export, privacy, sign-out and verified deletion are reachable from `/account`. The Account link is available in both rail layouts, More and Settings. Settings leads with Appearance, keeps related delivery controls adjacent, and puts time/region and installation after them. Search filters the jump list, and both preference forms keep their own Save. The public landing resolves its one CTA from session status.
+- **Data and decisions** — Account requires an active session and reads only the current user's linked provider IDs. The landing uses the existing active, recoverable and signed-out account states. Settings uses the existing preference, push and sweep reads and actions. Time and region's controls wait for their handlers to hydrate. Native fragment links preserve drafts while focusing the destination, and the six anchors still resolve on Settings. Export still uses `/api/export` and verified account deletion still uses `/settings/delete-account`. Its back action points to Account. Updated PRODUCT_SPEC §7 and SCREENS §§9–11. [Settings reference](https://uxcel.com/lessons/settings-best-practices-572).
+- **Checks run** — `pnpm verify` passed with 1,258 unit and 831 integration tests. `pnpm build` passed. Linux production `pnpm test:visual` passed all 46 cases. The full Linux production `pnpm test:e2e` run passed 211 cases and found a shell geometry assertion that measured before streamed content settled. The test now measures at the current page end and passed on the production rerun, alongside the new shell account test. A separate production run of account isolation, export and recovery passed.
+- **Screenshots** — The Chromium matrix captures Settings, search, Account and both landing states in light and dark at 390 × 844 and 1280 × 800. See `test-results/visual/ui-12/` for `settings-first-screen-1280-light.png`, `settings-search-390-dark.png`, `account-390-dark.png` and `landing-signed-in-1280-light.png`. The screenshots use test accounts.
+- **Interaction evidence** — Keyboard search for “dark mode” keeps a changed locale in the form and focuses Appearance. Escape clears the filter. The desktop index stays alongside the groups while scrolling. The reduced-motion capture holds and rejects the real preference request and shows the retained draft, failure and confirmed retry. Theme selection, independent preference saves, device removal, account-data scoping and existing account recovery have browser coverage. A browser observer checks that an active session never sees a Sign in link on the landing.
+- **Unverified** — Live OAuth, physical-device installation and push delivery, manual screen readers, and browser engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | Settings starts with actionable delivery notices and a searchable index. The Account page orders identity, data, session and deletion. The landing has one action. |
+| Character | 2 | The opaque surfaces, existing theme preview and shared profile avatar connect the pages to the app. |
+| Color | 2 | The paired colors distinguish the current section, warnings and destructive actions in both themes. |
+| Response | 2 | The browser observed pending, failure with a retained draft, retry and confirmed save. The theme preview and summary update when a choice takes effect. |
+| Truthfulness | 2 | The profile and provider labels are scoped to the active account. Summaries read saved settings or actual browser state. Recovery and stale sessions use their corresponding actions. |
+| Accessibility | 2 | Keyboard navigation, focus, enlarged text, width reflow, reduced motion and the axe matrix were exercised in Chromium. |
+| Restraint | 2 | Search keeps settings in place. Feedback stays with its form and the landing reserves space for its single action. |
+| Variety | 1 | A compact jump list, a profile with grouped actions, and a split public page serve distinct tasks. |
 
 **Total — 15/16.**

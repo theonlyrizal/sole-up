@@ -1,25 +1,36 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
+import { cache, Suspense, type ReactNode } from "react";
 
-import { SignOutButton } from "@/components/auth/sign-out-button";
-import { AppearanceSetting } from "@/components/preferences/appearance-setting";
+import {
+  AppearanceSetting,
+  AppearanceSummary,
+} from "@/components/preferences/appearance-setting";
+import { PreferencesForm } from "@/components/preferences/preferences-form";
+import { PushNotifications } from "@/components/push/push-notifications";
+import { InstallHelp, InstallSummary } from "@/components/pwa/install-help";
+import { ReminderSettingsForm } from "@/components/reminders/reminder-settings-form";
+import {
+  NotificationSummary,
+  NotificationSummaryProvider,
+} from "@/components/settings/notification-summary";
 import {
   SettingsIndex,
   type SettingsIndexItem,
 } from "@/components/settings/settings-index";
-import { PreferencesForm } from "@/components/preferences/preferences-form";
-import { PushNotifications } from "@/components/push/push-notifications";
-import { ReminderSettingsForm } from "@/components/reminders/reminder-settings-form";
-import { InstallHelp } from "@/components/pwa/install-help";
-import { buttonClass } from "@/components/ui/button";
+import { ACCOUNT_PATH } from "@/components/shell/nav-items";
 import { PageFrame } from "@/components/shell/page-frame";
 import { TopAppBar } from "@/components/shell/top-app-bar";
+import { buttonClass } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { InlineBanner } from "@/components/ui/inline-banner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DELETE_ACCOUNT_PATH } from "@/lib/account-deletion";
 import { formatInstant } from "@/lib/dates";
-import { localeOptions, supportedTimeZones } from "@/lib/preferences";
+import {
+  localeLabel,
+  localeOptions,
+  supportedTimeZones,
+} from "@/lib/preferences";
 import { requireUser } from "@/server/auth/session";
 import { env } from "@/server/env";
 import {
@@ -32,13 +43,55 @@ import { sweepHealth } from "@/server/modules/reminders/sweep-status";
 export const metadata: Metadata = { title: "Settings · SoleUp" };
 
 const sections = [
-  { id: "time-region", title: "Time and region", icon: "language" },
-  { id: "appearance", title: "Appearance", icon: "contrast" },
-  { id: "reminders", title: "Reminders", icon: "schedule" },
-  { id: "notifications", title: "Notifications", icon: "notifications" },
-  { id: "install", title: "Install the app", icon: "install_mobile" },
-  { id: "account", title: "Account", icon: "person" },
+  {
+    id: "appearance",
+    title: "Appearance",
+    icon: "contrast",
+    keywords: "theme color dark mode light system",
+  },
+  {
+    id: "reminders",
+    title: "Reminders",
+    icon: "schedule",
+    keywords: "quiet hours sounds daily planning nudge weekly review private",
+  },
+  {
+    id: "notifications",
+    title: "Notifications",
+    icon: "notifications",
+    keywords: "alerts push browser permission devices",
+  },
+  {
+    id: "time-region",
+    title: "Time and region",
+    icon: "language",
+    keywords: "time zone timezone locale language calendar week start",
+  },
+  {
+    id: "install",
+    title: "Install the app",
+    icon: "install_mobile",
+    keywords: "home screen shortcut dock android iphone pwa",
+  },
+  {
+    id: "account",
+    title: "Account",
+    icon: "person",
+    keywords:
+      "profile email export download data privacy delete sign out providers",
+  },
 ] as const satisfies readonly SettingsIndexItem[];
+
+const [appearance, reminders, notifications, timeRegion, install, account] =
+  sections;
+const getUser = cache(requireUser);
+const readPreferences = cache(async () =>
+  getUserPreferences((await getUser()).id),
+);
+const readReminders = cache(async () =>
+  getReminderSettings((await getUser()).id),
+);
+const readDevices = cache(async () => listPushDevices((await getUser()).id));
 
 export default function SettingsPage() {
   return (
@@ -46,87 +99,79 @@ export default function SettingsPage() {
       title="Settings"
       mobileHeader={<TopAppBar title="Settings" opaque />}
     >
-      {/* Theme changes apply the foreground and surface colors together. */}
-      <div className="grid min-w-0 gap-6 [--duration-default-effects:0ms] medium:grid-cols-10 medium:items-start medium:max-large:gap-4">
-        <div className="medium:col-span-3 large:sticky large:top-8">
-          <SettingsIndex items={sections} />
-        </div>
-        <div className="grid w-full max-w-180 min-w-0 gap-4 medium:col-span-7">
-          <SettingsSection item={sections[0]}>
-            <Suspense
-              fallback={<SectionSkeleton label="Loading time and region" />}
-            >
-              <Preferences />
-            </Suspense>
-          </SettingsSection>
-          <SettingsSection item={sections[1]}>
-            <AppearanceSetting />
-          </SettingsSection>
-          <SettingsSection item={sections[2]}>
-            <Suspense
-              fallback={<SectionSkeleton label="Loading reminder settings" />}
-            >
-              <Reminders />
-            </Suspense>
-          </SettingsSection>
-          <SettingsSection item={sections[3]}>
-            <Suspense fallback={<SectionSkeleton label="Loading devices" />}>
-              <Notifications />
-            </Suspense>
-          </SettingsSection>
-          <SettingsSection item={sections[4]}>
-            <InstallHelp />
-          </SettingsSection>
-          <SettingsSection item={sections[5]}>
-            <Suspense fallback={<SectionSkeleton label="Loading account" />}>
-              <Account />
-            </Suspense>
-          </SettingsSection>
-          <Card headingId="export-heading" className="grid gap-3">
-            <CardHeader title="Export" id="export-heading" />
-            <p className="text-body-medium text-on-surface-variant">
-              Download your SoleUp data as a JSON file, including a Markdown
-              copy of each note. The file contains personal data, so store it
-              somewhere private.
-            </p>
-            <a
-              href="/api/export"
-              className={buttonClass({ className: "justify-self-start" })}
-            >
-              Download export
-            </a>
-          </Card>
-          <Card
-            headingId="delete-heading"
-            className="grid gap-3 border border-error"
-          >
-            <CardHeader title="Delete account" id="delete-heading" />
-            <p className="text-body-medium text-on-surface-variant">
-              Close your account with a 30-day reactivation period.
-            </p>
-            <Link
-              href={DELETE_ACCOUNT_PATH}
-              className={buttonClass({
-                variant: "danger",
-                className: "justify-self-start",
-              })}
-            >
-              Delete account
-            </Link>
-          </Card>
-          <Card headingId="privacy-heading" className="grid gap-3">
-            <CardHeader title="Privacy" id="privacy-heading" />
-            <Link
-              href="/privacy"
-              className={buttonClass({
-                variant: "text",
-                className: "justify-self-start",
-              })}
-            >
-              Privacy notes
-            </Link>
-          </Card>
-        </div>
+      <div className="grid min-w-0 gap-4 [--duration-default-effects:0ms]">
+        <Suspense>
+          <DeliveryAlerts />
+        </Suspense>
+        <NotificationSummaryProvider>
+          <div className="grid min-w-0 gap-6 medium:grid-cols-10 medium:items-start medium:max-large:gap-4">
+            <div className="medium:col-span-3 large:sticky large:top-4 large:max-h-[calc(100dvh-2rem)] large:overflow-y-auto large:p-1">
+              <SettingsIndex
+                items={sections}
+                summaries={{
+                  appearance: <AppearanceSummary />,
+                  reminders: (
+                    <Suspense fallback="Loading…">
+                      <RemindersSummary />
+                    </Suspense>
+                  ),
+                  notifications: <NotificationSummary />,
+                  "time-region": (
+                    <Suspense fallback="Loading…">
+                      <TimeSummary />
+                    </Suspense>
+                  ),
+                  install: <InstallSummary />,
+                  account: "Profile and data",
+                }}
+              />
+            </div>
+            <div className="grid w-full max-w-180 min-w-0 gap-4 medium:col-span-7">
+              <SettingsSection item={appearance}>
+                <AppearanceSetting />
+              </SettingsSection>
+              <SettingsSection item={reminders}>
+                <Suspense
+                  fallback={
+                    <SectionSkeleton label="Loading reminder settings" />
+                  }
+                >
+                  <Reminders />
+                </Suspense>
+              </SettingsSection>
+              <SettingsSection item={notifications}>
+                <Suspense
+                  fallback={<SectionSkeleton label="Loading devices" />}
+                >
+                  <Notifications />
+                </Suspense>
+              </SettingsSection>
+              <SettingsSection item={timeRegion}>
+                <Suspense
+                  fallback={<SectionSkeleton label="Loading time and region" />}
+                >
+                  <Preferences />
+                </Suspense>
+              </SettingsSection>
+              <SettingsSection item={install}>
+                <InstallHelp />
+              </SettingsSection>
+              <SettingsSection item={account}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-body-medium text-on-surface-variant">
+                    Profile, sign-in and your data.
+                  </p>
+                  <Link
+                    href={ACCOUNT_PATH}
+                    className={buttonClass({ variant: "secondary" })}
+                  >
+                    Open account
+                  </Link>
+                </div>
+              </SettingsSection>
+            </div>
+          </div>
+        </NotificationSummaryProvider>
       </div>
     </PageFrame>
   );
@@ -137,11 +182,17 @@ function SettingsSection({
   children,
 }: {
   item: SettingsIndexItem;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const headingId = `${item.id}-heading`;
   return (
-    <div id={item.id} tabIndex={-1} className="scroll-mt-4 rounded-2xl">
+    <div
+      id={item.id}
+      tabIndex={-1}
+      role="group"
+      aria-labelledby={headingId}
+      className="scroll-mt-4 rounded-2xl"
+    >
       <Card headingId={headingId} className="grid gap-5">
         <CardHeader
           title={item.title}
@@ -165,19 +216,80 @@ function SectionSkeleton({ label }: { label: string }) {
   );
 }
 
-async function Account() {
-  const user = await requireUser();
+async function TimeSummary() {
+  const { timezone, locale } = await readPreferences();
+  return [timezone?.replaceAll("_", " "), localeLabel(locale)]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+async function RemindersSummary() {
+  const { remindersEnabled } = await readReminders();
+  return remindersEnabled ? "On" : "Off";
+}
+
+async function DeliveryAlerts() {
+  const [settings, devices] = await Promise.all([
+    readReminders(),
+    readDevices(),
+  ]);
+  const sweeps = settings.remindersEnabled ? await sweepHealth() : null;
+  const stopped = sweeps?.overdue;
+  if (!stopped && devices.length > 0) return null;
+  const lastSweepAt = sweeps?.lastSweepAt;
+  const lastSweep =
+    stopped && lastSweepAt
+      ? await readPreferences().then(({ locale, timezone }) =>
+          formatInstant(lastSweepAt, locale, timezone ?? "UTC"),
+        )
+      : null;
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="min-w-0 text-body-large wrap-anywhere">{user.name}</p>
-      <SignOutButton buttonTone="tonal" />
+    <div className="grid gap-2">
+      {stopped && (
+        <InlineBanner
+          tone="warning"
+          title="Reminder delivery paused"
+          action={
+            <a
+              href="#reminders"
+              className={buttonClass({
+                variant: "text",
+                size: "xs",
+                className: "text-on-alert-container",
+              })}
+            >
+              Review reminders
+            </a>
+          }
+        >
+          {lastSweep
+            ? `Reminders were last checked ${lastSweep}, over an hour ago. Delivery will resume when the regular check runs again.`
+            : "Reminders haven't been checked yet. Delivery will start when the regular check runs."}
+        </InlineBanner>
+      )}
+      {devices.length === 0 && (
+        <InlineBanner
+          title="No notification devices"
+          action={
+            <a
+              href="#notifications"
+              className={buttonClass({ variant: "text", size: "xs" })}
+            >
+              Set up notifications
+            </a>
+          }
+        >
+          No device is set up for notifications yet, so reminders can&apos;t
+          reach you.
+        </InlineBanner>
+      )}
     </div>
   );
 }
 
 async function Preferences() {
-  const user = await requireUser();
-  const preferences = await getUserPreferences(user.id);
+  const preferences = await readPreferences();
   return (
     <PreferencesForm
       mode="settings"
@@ -189,41 +301,15 @@ async function Preferences() {
 }
 
 async function Reminders() {
-  const user = await requireUser();
-  const [settings, devices, preferences, sweeps] = await Promise.all([
-    getReminderSettings(user.id),
-    listPushDevices(user.id),
-    getUserPreferences(user.id),
-    sweepHealth(),
-  ]);
-  // Formatted here, so server and browser can't disagree while hydrating.
-  const sweepsStopped = sweeps.overdue
-    ? {
-        lastSweep:
-          sweeps.lastSweepAt &&
-          formatInstant(
-            sweeps.lastSweepAt,
-            preferences.locale,
-            preferences.timezone ?? "UTC",
-          ),
-      }
-    : null;
-  return (
-    <ReminderSettingsForm
-      initial={settings}
-      hasDevice={devices.length > 0}
-      sweepsStopped={sweepsStopped}
-    />
-  );
+  return <ReminderSettingsForm initial={await readReminders()} />;
 }
 
 async function Notifications() {
-  const user = await requireUser();
   const [preferences, devices] = await Promise.all([
-    getUserPreferences(user.id),
-    listPushDevices(user.id),
+    readPreferences(),
+    readDevices(),
   ]);
-  // Formatted here, so server and browser can't disagree while hydrating.
+  // Format here so hydration uses the same text as the server.
   const format = (instant: Date) =>
     formatInstant(instant, preferences.locale, preferences.timezone ?? "UTC");
   return (
