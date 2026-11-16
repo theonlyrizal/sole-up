@@ -11,6 +11,7 @@ import {
   ReviewHeader,
   reviewWeekLabel,
 } from "@/components/reviews/review-header";
+import { ReviewNavigation } from "@/components/reviews/review-navigation";
 import { buttonClass } from "@/components/ui/button";
 import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
@@ -32,6 +33,7 @@ export default function ReviewViewPage({
       title="Weekly review"
       width="detail"
       back={{ href: "/review/history", label: "Past reviews" }}
+      subnav={<ReviewNavigation current="history" />}
     >
       <Suspense fallback={<LoadingState label="Loading your review" />}>
         <ReviewView params={params} />

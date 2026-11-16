@@ -1,10 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { Pool } from "pg";
-
-import { testDatabaseUrl } from "../../playwright.config";
-import { addDays, startOfWeek, todayFor } from "../../src/lib/dates";
-import { assertTestDatabaseUrl } from "../integration/helpers/database";
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import { seedInsightEvidence } from "./insight-evidence";
 
 test.use({ timezoneId: "UTC", viewport: { width: 375, height: 812 } });
 
@@ -12,6 +8,7 @@ test("Review Insights shows evidence and links to the relevant work", async ({
   page,
 }) => {
   test.slow();
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const userId = await signInAndConfirm(page);
   await page
     .getByRole("navigation", { name: "Main" })
@@ -21,8 +18,11 @@ test("Review Insights shows evidence and links to the relevant work", async ({
     .getByRole("dialog", { name: "More", exact: true })
     .getByRole("link", { name: "Review", exact: true })
     .click();
-  await page.getByRole("button", { name: "Review options" }).click();
-  await page.getByRole("menuitem", { name: "Insights" }).click();
+  const navigation = page.getByRole("navigation", { name: "Review pages" });
+  await expect(
+    navigation.getByRole("link", { name: "Weekly review" }),
+  ).toHaveAttribute("aria-current", "page");
+  await navigation.getByRole("link", { name: "Insights" }).press("Enter");
   await expect(page).toHaveURL(/\/review\/insights$/);
   await expect(
     page.getByRole("heading", { name: "Insights", exact: true }),
@@ -46,9 +46,24 @@ test("Review Insights shows evidence and links to the relevant work", async ({
   await expect(
     insights.getByText("0 of 1 planned tasks completed"),
   ).toBeVisible();
+  const definition = insights.getByRole("button", {
+    name: "How this is counted: Goal inactivity",
+  });
+  const definitionSheet = page.getByRole("dialog", {
+    name: "How this is counted",
+  });
+  await expect(async () => {
+    if (!(await definitionSheet.isVisible())) await definition.press("Enter");
+    await expect(definitionSheet).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
   await expect(
-    insights.getByText(/Local calendar days since each active goal/),
+    definitionSheet.getByText(/Local calendar days since each active goal/),
   ).toBeVisible();
+  await expect(
+    definitionSheet.getByText("As of", { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(definition).toBeFocused();
   await expect(
     insights.getByRole("link", { name: "Read more fiction" }),
   ).toHaveAttribute("href", /\/goals\//);
@@ -78,6 +93,9 @@ test("Review Insights shows evidence and links to the relevant work", async ({
     "Review tasks counted as overdue",
   ]) {
     await insights.getByRole("link", { name: link }).click();
+    await expect(
+      navigation.getByRole("link", { name: "Insights" }),
+    ).toHaveAttribute("aria-current", "page");
     const tasks = page.getByRole("list", { name: "Tasks", exact: true });
     await expect(tasks.getByRole("listitem")).toHaveCount(1);
     await expect(
@@ -103,68 +121,75 @@ test("Review Insights shows evidence and links to the relevant work", async ({
   await page.getByRole("link", { name: "← Insights" }).click();
   await expect(insights.getByText("60 estimated minutes")).toBeVisible();
 
-  await insights
-    .getByRole("button", {
-      name: "Dismiss for this period: Next-week workload",
-    })
-    .click();
+  const dismiss = insights.getByRole("button", {
+    name: "Dismiss for this period: Next-week workload",
+  });
+  const requested = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const insightsPath = "**/review/insights";
+  await page.route(insightsPath, async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    requested.resolve();
+    await release.promise;
+    return route.abort("failed");
+  });
+  await dismiss.press("Enter");
+  try {
+    await requested.promise;
+    await expect(dismiss).toBeDisabled();
+    await expect(dismiss).toContainText("Dismissing…");
+    await expect(insights.getByText("60 estimated minutes")).toBeVisible();
+    await page.screenshot({
+      path: test.info().outputPath("dismiss-pending.png"),
+      animations: "disabled",
+    });
+  } finally {
+    release.resolve();
+  }
+  const error = insights.getByRole("alert");
+  await expect(error).toHaveText(
+    "The insight couldn't be dismissed. Try again.",
+  );
+  await error.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: test.info().outputPath("dismiss-error.png"),
+    animations: "disabled",
+  });
+  await page.unroute(insightsPath);
+  await dismiss.press("Enter");
   await expect(
     insights.getByRole("heading", { name: "Next-week workload" }),
   ).toHaveCount(0);
+  const dismissed = page.getByText(
+    "One insight is dismissed for its current reporting period.",
+  );
+  await dismissed.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: test.info().outputPath("dismiss-confirmed.png"),
+    animations: "disabled",
+  });
   await page.reload();
   await expect(insights.getByRole("heading", { level: 2 })).toHaveCount(4);
+  await expect(dismissed).toBeVisible();
   await expect(
     insights.getByRole("heading", { name: "Next-week workload" }),
   ).toHaveCount(0);
 });
 
-async function seedInsightEvidence(userId: string) {
-  const week = startOfWeek(todayFor("UTC"), 1);
-  const lastWeek = addDays(week, -7);
-  const nextWeek = addDays(week, 7);
-  const pool = new Pool({
-    connectionString: assertTestDatabaseUrl(testDatabaseUrl),
-  });
-  try {
-    await pool.query(
-      `insert into goals (user_id, title, created_at)
-       values ($1, 'Read more fiction', $2)`,
-      [userId, `${lastWeek}T12:00:00Z`],
-    );
-    await pool.query(
-      `with planned as (
-         insert into tasks (user_id, title, created_at, planned_date, due_date)
-         values ($1, 'Return a book', $2, null, $3::date) returning id
-       )
-       insert into audit_events (user_id, entity_id, entity_type, event_type, changes)
-       select $1, id, 'task', 'task.created', jsonb_build_object(
-         'plannedDate', jsonb_build_object('from', null, 'to', $3::date)
-       ) from planned`,
-      [userId, `${lastWeek}T12:00:00Z`, lastWeek],
-    );
-    await pool.query(
-      `insert into tasks (user_id, title, planned_date, estimated_minutes)
-       values ($1, 'Pick up a book', $2, 45), ($1, 'Find a bookmark', $2, null)`,
-      [userId, nextWeek],
-    );
-    const {
-      rows: [habit],
-    } = await pool.query<{ id: string }>(
-      `insert into habits (user_id, title, measure, start_date)
-       values ($1, 'Read a chapter', 'check', $2) returning id`,
-      [userId, lastWeek],
-    );
-    await pool.query(
-      `insert into habit_schedules (user_id, habit_id, effective_from, cadence_type, cadence_config)
-       values ($1, $2, $3, 'daily', '{}')`,
-      [userId, habit.id, lastWeek],
-    );
-    await pool.query(
-      `insert into habit_logs (user_id, habit_id, local_date, status)
-       values ($1, $2, $3, 'completed'), ($1, $2, $4, 'skipped')`,
-      [userId, habit.id, lastWeek, addDays(lastWeek, 1)],
-    );
-  } finally {
-    await pool.end();
+test("invalid insight keys and reporting dates keep a way back to Insights", async ({
+  page,
+}) => {
+  await signInAndConfirm(page);
+  for (const path of [
+    "/review/insights/missing?start=2026-01-01",
+    "/review/insights/next_week_workload?start=bad",
+  ]) {
+    await page.goto(path);
+    await expect(
+      page.getByRole("heading", { name: "We couldn't find that" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Back to Insights" }),
+    ).toHaveAttribute("href", "/review/insights");
   }
-}
+});

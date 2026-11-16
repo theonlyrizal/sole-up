@@ -11,6 +11,7 @@ import {
   openQuickAdd,
   signInAndConfirm,
 } from "./helpers";
+import { seedInsightEvidence } from "./insight-evidence";
 import {
   CALENDAR_BLOCK_TITLE,
   CALENDAR_SERIES_TITLE,
@@ -35,6 +36,111 @@ const sizes = [
   { width: 1280, height: 800 },
 ] as const;
 const themes = ["light", "dark"] as const;
+
+test.describe("Review Insights evidence", () => {
+  test.use({ timezoneId: "UTC" });
+
+  for (const viewport of sizes) {
+    for (const theme of themes) {
+      test(`@visual UI-12b Review Insights ${viewport.width} ${theme}`, async ({
+        page,
+      }) => {
+        test.setTimeout(150_000);
+        await page.setViewportSize(viewport);
+        await page.emulateMedia({
+          colorScheme: theme,
+          reducedMotion: "reduce",
+        });
+        await page.addInitScript(
+          (key) => localStorage.setItem(key, "system"),
+          THEME_STORAGE_KEY,
+        );
+        const userId = await signInAndConfirm(page, "Alex Morgan");
+        const capture = (name: string, fullPage = true) =>
+          page.screenshot({
+            path: `test-results/visual/ui-12b/${name}-${viewport.width}-${theme}.png`,
+            fullPage,
+            animations: "disabled",
+          });
+
+        await openPage(page, "/review");
+        const navigation = page.getByRole("navigation", {
+          name: "Review pages",
+        });
+        const insights = navigation.getByRole("link", { name: "Insights" });
+        await expect(insights).toBeInViewport();
+        await expect(
+          page.getByRole("heading", {
+            level: 2,
+            name: "Look back",
+            exact: true,
+          }),
+        ).toBeVisible();
+        await capture("review-navigation", false);
+        await insights.press("Enter");
+        await expect(page.getByText("No task history yet.")).toBeVisible();
+        await expectNoSeriousViolations(page);
+        await capture("insights-empty");
+
+        await seedInsightEvidence(userId);
+        await openPage(page, "/review/insights");
+        await expect(
+          page.getByText("0 of 1 planned tasks completed"),
+        ).toBeVisible();
+        await expectNoSeriousViolations(page);
+        await capture("insights");
+
+        for (const width of [320, 375, 390, 414, 768, 1280]) {
+          await page.setViewportSize({ width, height: viewport.height });
+          await checkRenderedPage(page, theme);
+        }
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        await checkRenderedPage(page, theme);
+        await capture("insights-zoom");
+        await page.evaluate(() =>
+          document.documentElement.style.removeProperty("font-size"),
+        );
+
+        const definition = page.getByRole("button", {
+          name: "How this is counted: Planned versus completed",
+        });
+        const sheet = page.getByRole("dialog", { name: "How this is counted" });
+        await expect(async () => {
+          if (!(await sheet.isVisible())) await definition.press("Enter");
+          await expect(sheet).toBeVisible({ timeout: 1_000 });
+        }).toPass({ timeout: 15_000 });
+        await expect(sheet.getByText("As of", { exact: true })).toBeVisible();
+        await expectNoSeriousViolations(page);
+        await capture("insight-definition", false);
+        await page.keyboard.press("Escape");
+        await expect(definition).toBeFocused();
+
+        await page
+          .getByRole("link", { name: "Review tasks in next week’s workload" })
+          .press("Enter");
+        await expect(insights).toHaveAttribute("aria-current", "page");
+        await expect(
+          page
+            .getByRole("list", { name: "Tasks", exact: true })
+            .getByRole("listitem"),
+        ).toHaveCount(2);
+        await expectNoSeriousViolations(page);
+        await checkRenderedPage(page, theme);
+        await capture("insight-tasks");
+
+        await openPage(page, "/review/insights/missing?start=2026-01-01");
+        await expect(
+          page.getByRole("link", { name: "Back to Insights" }),
+        ).toBeVisible();
+        await expectNoSeriousViolations(page);
+        await capture("insight-not-found");
+      });
+    }
+  }
+});
 
 for (const viewport of sizes) {
   for (const theme of themes) {

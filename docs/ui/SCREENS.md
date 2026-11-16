@@ -447,7 +447,8 @@ On compact, compute fit from the available card content width after gutters and 
 
 ```
 Compact
-│ Review                      ⋮   │ ⋮ = Past reviews
+│ Weekly review                   │
+│ Weekly review  Past reviews  Insights │ shared Review navigation (UI-12b)
 │ ▢ hero                          │ ReviewHeader
 │ │ Week of Oct 26 – Nov 1        │ title-large
 │ │ Open until Sun 8 Nov · Not finished │ status chip
@@ -595,6 +596,6 @@ Put a labelled Search settings field above the index. Search setting names and a
 
 ### 11.2 Review Insights navigation and presentation (UI-12b)
 
-`/review/insights` and `/review/insights/[insight]?start=…` already ship. Insights is reachable through Review options and the expanded Review rail. Give Weekly review, Past reviews and Insights a visible local navigation row across Review on compact and expanded screens. Keep Insights selected on its correction pages and preserve the review draft guard when a user follows one of these links.
+`/review/insights` and `/review/insights/[insight]?start=…` use the existing insight data and correction routes from chunks 9.2–9.3. Weekly review, Past reviews and Insights appear in the same local navigation row on compact and expanded screens. Insights stays selected on its correction pages and the review draft guard runs when someone follows one of the links.
 
-Use the existing five insights, user-local reporting windows and record links. Give each card a readable figure, its range, access to its definition and as-of time, and a direct way to open the contributing records. Keep the four-week comparisons readable at compact widths and at larger text sizes. Show missing data, a measured zero, and a dismissed period with distinct text. Reuse the existing correction and period-specific dismissal paths, including the `start` parameter and invalid-link handling.
+Use the five insights, user-local reporting windows and existing record links. Each card gives the range and the evidence, with the definition and as-of time under “How this is counted.” Four-week comparisons use tables that wrap dates and values on compact screens and at larger text sizes. Missing data, a measured zero and dismissals have distinct text. The correction links use the `start` parameter, and an unavailable insight keeps a link back to Insights.

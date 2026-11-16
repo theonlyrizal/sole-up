@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { ReviewNavigation } from "@/components/reviews/review-navigation";
 import { PageContainer } from "@/components/shell/page-container";
 import { PageFrame } from "@/components/shell/page-frame";
 import { PlanTaskList } from "@/components/tasks/plan-task-list";
@@ -82,6 +83,7 @@ async function InsightTasks({ params, searchParams }: InsightTaskPageProps) {
       title={title}
       width="detail"
       back={{ href: "/review/insights", label: "Insights" }}
+      subnav={<ReviewNavigation current="insights" />}
       description={description}
       eyebrow={formatDateSpan(
         { from: period.start, to: addDays(period.end, -1) },

@@ -4,7 +4,7 @@
 **Scope:** Read-only inventory for the UI redesign. No application code or behavior was changed.  
 **Sources checked:** `PRODUCT_SPEC.md`, `DATA_MODEL.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `IMPLEMENTATION_PLAN.md` and its progress log, UI design decisions/system/plan, ADRs 0010–0016, App Router pages/layouts/boundaries, route components, relevant query/action modules, URL parsers, and existing Playwright/unit/integration coverage.
 
-**UI-12 follow-ups** — This inventory is the UI-0 baseline. The app now has `/review/insights` and `/review/insights/[insight]?start=…` from chunks 9.2–9.3. UI-12a gives `/account` the read-only profile and the existing account actions, adds local search and saved-value summaries to `/settings`, and resolves the public landing action from the current session. [Screen recipes](SCREENS.md#11-planned-follow-ups-after-ui-12).
+**UI-12 follow-ups** — This inventory is the UI-0 baseline. UI-12a gives `/account` the read-only profile and existing account actions, adds local search and saved-value summaries to `/settings`, and resolves the public landing action from the current session. UI-12b adds a shared Review navigation row and updates the presentation of `/review/insights` and `/review/insights/[insight]?start=…` from chunks 9.2–9.3. [Screen recipes](SCREENS.md#11-planned-follow-ups-after-ui-12).
 
 ## Inspection limits
 

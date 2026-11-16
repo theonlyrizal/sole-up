@@ -47,8 +47,10 @@ async function expectStep(page: Page, label: string) {
 
 /** Through the review page's link, once a review exists. */
 async function openHistory(page: Page) {
-  await page.getByRole("button", { name: "Review options" }).click();
-  await page.getByRole("menuitem", { name: "Past reviews" }).click();
+  await page
+    .getByRole("navigation", { name: "Review pages" })
+    .getByRole("link", { name: "Past reviews" })
+    .click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Past reviews" }),
   ).toBeVisible();

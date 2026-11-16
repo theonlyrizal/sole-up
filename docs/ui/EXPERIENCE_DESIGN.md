@@ -189,6 +189,8 @@ If trying the design with users, ask them to find the next commitment, log/corre
 | UI-10 | Warm saved finish; strict explicit-success trigger |
 | UI-11 | Quiet writing and save status, readable search matches |
 | UI-12 | Theme previews, meaningful selected states and coherent public entry |
+| UI-12a | Searchable Settings, saved-value summaries, account actions and session-aware public entry |
+| UI-12b | Visible Review navigation, readable reporting evidence and confirmed dismissal |
 | UI-13 | Rubric and cross-route identity, timing, accessibility and state review |
 
 Agents implement the part their phase owns. Where the backend cannot support a requested figure or action, retain the honest existing behavior and document a separate proposal. Never invent a denominator, a completion event, or a visit history to fill a visual.

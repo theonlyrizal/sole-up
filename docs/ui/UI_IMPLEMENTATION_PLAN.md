@@ -94,7 +94,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-11 | Notes, editor, search (and tags if 8.5 shipped) | in progress | chunk/ui-11-notes-search | | |
 | UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | done | chunk/ui-12-settings-public | 2026-11-16 | 5-D approved. Settings, public states and finish-line checks verified |
 | UI-12a | Account page, Settings findability, and signed-in landing action | done | `chunk/ui-12a-account-settings` | 2026-11-17 | Validated account scoping, Settings search and the session-aware landing |
-| UI-12b | Review Insights navigation and presentation | todo | | | After UI-12a. Reuses the shipped Insights routes and data |
+| UI-12b | Review Insights navigation and presentation | done | `chunk/ui-12b-review-insights` | 2026-11-17 | Verified visible navigation, draft saving, correction and dismissal |
 | UI-13 | Consistency, cleanup, token lint, accessibility sweep, docs | todo | | | |
 
 ## 5. Visual capture harness (built in UI-1, extended by each phase)
@@ -736,7 +736,7 @@ Append one note per phase, newest last. Template:
 
 ### UI-12a · Account, Settings and public entry (2026-11-17)
 
-- **Branch / PR** — `chunk/ui-12a-account-settings` · [UI-12a pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-12a-account-settings). Predecessor [#105](https://github.com/theonlyrizal/sole-up/pull/105) merged with both required checks green.
+- **Branch / PR** — `chunk/ui-12a-account-settings` · [#106](https://github.com/theonlyrizal/sole-up/pull/106) merged with both required checks green. Predecessor [#105](https://github.com/theonlyrizal/sole-up/pull/105) had also merged.
 - **Routes** — The read-only profile, linked provider names, export, privacy, sign-out and verified deletion are reachable from `/account`. The Account link is available in both rail layouts, More and Settings. Settings leads with Appearance, keeps related delivery controls adjacent, and puts time/region and installation after them. Search filters the jump list, and both preference forms keep their own Save. The public landing resolves its one CTA from session status.
 - **Data and decisions** — Account requires an active session and reads only the current user's linked provider IDs. The landing uses the existing active, recoverable and signed-out account states. Settings uses the existing preference, push and sweep reads and actions. Time and region's controls wait for their handlers to hydrate. Native fragment links preserve drafts while focusing the destination, and the six anchors still resolve on Settings. Export still uses `/api/export` and verified account deletion still uses `/settings/delete-account`. Its back action points to Account. Updated PRODUCT_SPEC §7 and SCREENS §§9–11. [Settings reference](https://uxcel.com/lessons/settings-best-practices-572).
 - **Checks run** — `pnpm verify` passed with 1,258 unit and 831 integration tests. `pnpm build` passed. Linux production `pnpm test:visual` passed all 46 cases. The full Linux production `pnpm test:e2e` run passed 211 cases and found a shell geometry assertion that measured before streamed content settled. The test now measures at the current page end and passed on the production rerun, alongside the new shell account test. A separate production run of account isolation, export and recovery passed.
@@ -754,5 +754,28 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Keyboard navigation, focus, enlarged text, width reflow, reduced motion and the axe matrix were exercised in Chromium. |
 | Restraint | 2 | Search keeps settings in place. Feedback stays with its form and the landing reserves space for its single action. |
 | Variety | 1 | A compact jump list, a profile with grouped actions, and a split public page serve distinct tasks. |
+
+**Total — 15/16.**
+
+### UI-12b · Review Insights navigation and presentation (2026-11-17)
+
+- **Branch / PR** — `chunk/ui-12b-review-insights` · [UI-12b pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-12b-review-insights). Predecessor [#106](https://github.com/theonlyrizal/sole-up/pull/106) merged after both required checks passed.
+- **Routes and decisions** — Weekly review, Past reviews and Insights share a visible navigation row across list, detail and unavailable-record screens. Insights stays selected on the task correction pages. The row uses real links, so the existing draft guard saves before navigating. Cards use shared surfaces and “How this is counted” for the definition, range and as-of time. Narrow four-week tables wrap within their cards.
+- **Data paths and contracts** — The five measures, local reporting periods, existing correction links and period-specific dismissal use the shipped data. A measured zero has its own figure, missing data has explanatory text, and dismissed periods retain a summary after reload. Task correction still uses `/review/insights/[insight]?start=…`. An invalid date or insight key reaches the existing not-found path with a back link. Updated PRODUCT_SPEC §7 and SCREENS §11.2.
+- **Checks run** — `pnpm verify` passed with 1,258 unit and 831 integration tests. `pnpm build` passed. The combined Linux production E2E run passed 213 cases, including two cases that passed on retry in the gallery and iPhone install checks. The final Linux production `pnpm test:visual` run passed all 50 cases. The Review captures wait on the shared step heading.
+- **Screenshots** — See `test-results/visual/ui-12b/` for `review-navigation-390-light.png`, `insights-390-light.png`, `insights-zoom-390-dark.png`, `insight-definition-1280-light.png`, and `insight-tasks-1280-dark.png`. The overview, definition, correction, and unavailable states pass Chromium axe at both sizes and themes. The interaction spec writes `dismiss-pending.png`, `dismiss-error.png`, and `dismiss-confirmed.png` to the Playwright test output.
+- **Interaction evidence** — Keyboard activation opens Insights from a review, and returning to Reflect shows the persisted draft. The definition sheet restores focus when dismissed. A task estimate edit changes the workload from 45 to 60 minutes. With reduced motion enabled, the browser held a real dismissal request, saw the busy button and retained evidence, aborted the request, saw the inline error, and confirmed dismissal after retry and reload.
+- **Unverified** — Manual screen readers and browser engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | The shared row makes Insights visible from Review. Each card puts its range and evidence before the contributing records and dismissal action. |
+| Character | 2 | Shared opaque cards, typography and plain-language review prompts fit the existing Review flow. |
+| Color | 2 | Selected destinations, correction actions and errors use distinct paired roles in both themes. |
+| Response | 2 | The held request, retained record and failure, retry and confirmed dismissal are visible in the browser. |
+| Truthfulness | 2 | Tests distinguish zero, missing data and dismissed periods, and observe the workload figure change after a real task edit. |
+| Accessibility | 2 | Keyboard navigation, focus return, reflow, enlarged text, reduced motion and the axe matrix were exercised in Chromium. |
+| Restraint | 2 | Definitions are available on demand and figures render from their actual values. |
+| Variety | 1 | The evidence cards, comparison tables and record correction list have distinct structures. |
 
 **Total — 15/16.**
