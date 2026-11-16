@@ -170,6 +170,7 @@ export function ResponsiveSheet({
   description,
   children,
   onCloseAutoFocus,
+  fitKeyboard,
   ...root
 }: SheetProps & { anchor?: ReactElement }) {
   const medium = useMediaQuery("medium");
@@ -180,6 +181,7 @@ export function ResponsiveSheet({
         title={title}
         description={description}
         trigger={trigger ?? anchor}
+        fitKeyboard={fitKeyboard}
         onCloseAutoFocus={onCloseAutoFocus}
       >
         {children}
@@ -214,6 +216,7 @@ export function ResponsiveSheet({
     <Dialog {...root}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
+        fitKeyboard={fitKeyboard}
         title={title}
         description={description}
         onCloseAutoFocus={onCloseAutoFocus}

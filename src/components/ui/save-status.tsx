@@ -6,7 +6,7 @@ export function SaveStatus({
   phase,
   onRetry,
 }: {
-  phase: "saving" | "saved" | "error";
+  phase: "idle" | "saving" | "saved" | "error";
   onRetry?: () => void;
 }) {
   return (
@@ -15,7 +15,11 @@ export function SaveStatus({
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        className="inline-flex min-h-8 items-center gap-2 rounded-full bg-surface-container px-3 py-1 text-label-medium text-on-surface"
+        className={
+          phase === "idle"
+            ? "sr-only"
+            : "inline-flex min-h-8 items-center gap-2 rounded-full bg-surface-container px-3 py-1 text-label-medium text-on-surface"
+        }
       >
         {phase === "saving" && (
           <>

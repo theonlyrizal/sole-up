@@ -60,6 +60,12 @@ describe("segmented lists", () => {
 });
 
 describe("feedback states", () => {
+  it("holds an empty polite live region before the first save", () => {
+    const html = render(<SaveStatus phase="idle" />);
+    expect(html).toMatch(/<span[^>]*role="status"[^>]*><\/span>/);
+    expect(html).not.toContain("Retry");
+  });
+
   it("keeps compact empty-state art decorative and uses the requested heading level", () => {
     const html = render(
       <EmptyState

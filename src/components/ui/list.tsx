@@ -30,6 +30,7 @@ export function ListItem({
   onNavigate,
   current,
   onClick,
+  popup,
   selected,
   className,
   wrapSupporting,
@@ -45,6 +46,7 @@ export function ListItem({
   onNavigate?: React.ComponentProps<typeof Link>["onNavigate"];
   current?: "page" | "true";
   onClick?: MouseEventHandler<HTMLButtonElement>;
+  popup?: React.AriaAttributes["aria-haspopup"];
   selected?: boolean;
   className?: string;
   wrapSupporting?: boolean;
@@ -81,6 +83,7 @@ export function ListItem({
               type="button"
               className="stretched-link cursor-pointer text-start"
               onClick={onClick}
+              aria-haspopup={popup}
               aria-pressed={selected}
             >
               {headline}

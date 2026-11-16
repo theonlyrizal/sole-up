@@ -1,10 +1,17 @@
 "use client";
 
 import { useEditorState, type Editor } from "@tiptap/react";
-import { useId, useState } from "react";
+import {
+  useId,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 
 import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
+import { useKeyboardOpen } from "@/components/hooks/use-keyboard-open";
+import type { IconName } from "@/components/icons/icon";
+import { IconButton } from "@/components/ui/icon-button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -20,9 +27,7 @@ import {
 
 type ToolbarItem = {
   label: string;
-  /** What the button shows; the label is what it's called. */
-  glyph: string;
-  glyphClass?: string;
+  icon: IconName;
   shortcut: string;
   isActive: (editor: Editor) => boolean;
   run: (editor: Editor) => void;
@@ -30,7 +35,7 @@ type ToolbarItem = {
 
 const heading = (level: NoteHeadingLevel): ToolbarItem => ({
   label: `Heading ${level}`,
-  glyph: `H${level}`,
+  icon: `format_h${level}`,
   shortcut: `Control+Alt+${level}`,
   isActive: (editor) => editor.isActive("heading", { level }),
   run: (editor) => editor.chain().focus().toggleHeading({ level }).run(),
@@ -39,32 +44,28 @@ const heading = (level: NoteHeadingLevel): ToolbarItem => ({
 const MARK_ITEMS: ToolbarItem[] = [
   {
     label: "Bold",
-    glyph: "B",
-    glyphClass: "font-bold",
+    icon: "format_bold",
     shortcut: "Control+B",
     isActive: (editor) => editor.isActive("bold"),
     run: (editor) => editor.chain().focus().toggleBold().run(),
   },
   {
     label: "Italic",
-    glyph: "I",
-    glyphClass: "font-serif italic",
+    icon: "format_italic",
     shortcut: "Control+I",
     isActive: (editor) => editor.isActive("italic"),
     run: (editor) => editor.chain().focus().toggleItalic().run(),
   },
   {
     label: "Strikethrough",
-    glyph: "S",
-    glyphClass: "line-through",
+    icon: "format_strikethrough",
     shortcut: "Control+Shift+S",
     isActive: (editor) => editor.isActive("strike"),
     run: (editor) => editor.chain().focus().toggleStrike().run(),
   },
   {
     label: "Code",
-    glyph: "</>",
-    glyphClass: "font-mono text-xs",
+    icon: "code",
     shortcut: "Control+E",
     isActive: (editor) => editor.isActive("code"),
     run: (editor) => editor.chain().focus().toggleCode().run(),
@@ -77,28 +78,28 @@ const BLOCK_ITEMS: ToolbarItem[] = [
   heading(3),
   {
     label: "Bulleted list",
-    glyph: "•",
+    icon: "format_list_bulleted",
     shortcut: "Control+Shift+8",
     isActive: (editor) => editor.isActive("bulletList"),
     run: (editor) => editor.chain().focus().toggleBulletList().run(),
   },
   {
     label: "Numbered list",
-    glyph: "1.",
+    icon: "format_list_numbered",
     shortcut: "Control+Shift+7",
     isActive: (editor) => editor.isActive("orderedList"),
     run: (editor) => editor.chain().focus().toggleOrderedList().run(),
   },
   {
     label: "Quote",
-    glyph: "“",
+    icon: "format_quote",
     shortcut: "Control+Shift+B",
     isActive: (editor) => editor.isActive("blockquote"),
     run: (editor) => editor.chain().focus().toggleBlockquote().run(),
   },
   {
     label: "Code block",
-    glyph: "{ }",
+    icon: "data_object",
     shortcut: "Control+Alt+C",
     isActive: (editor) => editor.isActive("codeBlock"),
     run: (editor) => editor.chain().focus().toggleCodeBlock().run(),
@@ -113,14 +114,32 @@ const ALL_ITEMS = [...MARK_ITEMS, ...BLOCK_ITEMS];
  */
 const keepEditorFocus = (event: React.MouseEvent) => event.preventDefault();
 
-const buttonClass = (active: boolean) =>
-  cx(
-    "min-w-9 rounded-md px-2 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60",
-    focusRing,
-    active
-      ? "bg-surface-muted text-fg ring-1 ring-border"
-      : "text-muted hover:bg-surface-muted hover:text-fg",
-  );
+function subscribeToViewport(update: () => void) {
+  const viewport = window.visualViewport;
+  viewport?.addEventListener("resize", update);
+  viewport?.addEventListener("scroll", update);
+  window.addEventListener("resize", update);
+  return () => {
+    viewport?.removeEventListener("resize", update);
+    viewport?.removeEventListener("scroll", update);
+    window.removeEventListener("resize", update);
+  };
+}
+
+function keyboardInset() {
+  const viewport = window.visualViewport;
+  return viewport && viewport.scale === 1
+    ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+    : 0;
+}
+
+const noKeyboardInset = () => 0;
+const divider = (
+  <span
+    aria-hidden="true"
+    className="mx-1 h-5 w-px shrink-0 bg-outline-variant"
+  />
+);
 
 /** `linkOpen` is the editor's, since Mod-K in the body opens it too. */
 export function NoteToolbar({
@@ -132,6 +151,12 @@ export function NoteToolbar({
   linkOpen: boolean;
   setLinkOpen: (open: boolean) => void;
 }) {
+  const keyboardOpen = useKeyboardOpen();
+  const bottom = useSyncExternalStore(
+    subscribeToViewport,
+    keyboardInset,
+    noKeyboardInset,
+  );
   const active = useEditorState({
     editor,
     selector: ({ editor: current }) =>
@@ -139,64 +164,94 @@ export function NoteToolbar({
         ? {
             items: ALL_ITEMS.map((item) => item.isActive(current)),
             link: current.isActive("link"),
+            undo: current.can().undo(),
+            redo: current.can().redo(),
           }
         : null,
   });
 
   const renderItem = (item: ToolbarItem, index: number) => (
-    <button
+    <IconButton
       key={item.label}
-      type="button"
-      aria-label={item.label}
+      icon={item.icon}
+      label={item.label}
+      size={40}
+      tooltip={false}
+      variant={active?.items[index] ? "tonal" : "standard"}
       aria-pressed={active?.items[index] ?? false}
       aria-keyshortcuts={item.shortcut}
       title={`${item.label} (${item.shortcut.replace("Control", "Ctrl")})`}
       disabled={!editor}
       onMouseDown={keepEditorFocus}
       onClick={() => editor && item.run(editor)}
-      className={buttonClass(active?.items[index] ?? false)}
-    >
-      <span aria-hidden="true" className={item.glyphClass}>
-        {item.glyph}
-      </span>
-    </button>
+    />
   );
 
   return (
-    <div
-      role="group"
-      aria-label="Formatting"
-      className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-surface p-1"
-    >
-      {MARK_ITEMS.map((item, index) => renderItem(item, index))}
-      <button
-        type="button"
-        aria-label="Link"
-        aria-pressed={active?.link ?? false}
-        aria-keyshortcuts="Control+K"
-        title="Link (Ctrl+K)"
-        disabled={!editor}
-        onMouseDown={keepEditorFocus}
-        onClick={() => setLinkOpen(true)}
-        className={buttonClass(active?.link ?? false)}
+    <>
+      <div
+        className="note-toolbar"
+        data-docked={keyboardOpen || undefined}
+        style={{ "--note-keyboard-bottom": `${bottom}px` } as CSSProperties}
       >
-        <span aria-hidden="true">Link</span>
-      </button>
-      <span aria-hidden="true" className="mx-1 h-6 w-px bg-border" />
-      {BLOCK_ITEMS.map((item, index) =>
-        renderItem(item, MARK_ITEMS.length + index),
-      )}
-      <button
-        type="button"
-        aria-label="Divider"
-        title="Divider"
-        disabled={!editor}
-        onMouseDown={keepEditorFocus}
-        onClick={() => editor?.chain().focus().setHorizontalRule().run()}
-        className={buttonClass(false)}
-      >
-        <span aria-hidden="true">―</span>
-      </button>
+        <div
+          role="group"
+          aria-label="Formatting"
+          className="flex w-fit max-w-full items-center overflow-x-auto overscroll-x-contain rounded-full bg-surface-container p-1 shadow-2"
+        >
+          {MARK_ITEMS.map((item, index) => renderItem(item, index))}
+          <IconButton
+            icon="link"
+            label="Link"
+            size={40}
+            tooltip={false}
+            variant={active?.link ? "tonal" : "standard"}
+            aria-pressed={active?.link ?? false}
+            aria-keyshortcuts="Control+K"
+            title="Link (Ctrl+K)"
+            disabled={!editor}
+            onMouseDown={keepEditorFocus}
+            onClick={() => setLinkOpen(true)}
+          />
+          {divider}
+          {BLOCK_ITEMS.map((item, index) =>
+            renderItem(item, MARK_ITEMS.length + index),
+          )}
+          <IconButton
+            icon="horizontal_rule"
+            label="Divider"
+            size={40}
+            tooltip={false}
+            title="Divider"
+            disabled={!editor}
+            onMouseDown={keepEditorFocus}
+            onClick={() => editor?.chain().focus().setHorizontalRule().run()}
+          />
+          {divider}
+          <IconButton
+            icon="undo"
+            label="Undo"
+            size={40}
+            tooltip={false}
+            title="Undo (Ctrl+Z)"
+            aria-keyshortcuts="Control+Z"
+            disabled={!active?.undo}
+            onMouseDown={keepEditorFocus}
+            onClick={() => editor?.chain().focus().undo().run()}
+          />
+          <IconButton
+            icon="redo"
+            label="Redo"
+            size={40}
+            tooltip={false}
+            title="Redo (Ctrl+Shift+Z)"
+            aria-keyshortcuts="Control+Shift+Z"
+            disabled={!active?.redo}
+            onMouseDown={keepEditorFocus}
+            onClick={() => editor?.chain().focus().redo().run()}
+          />
+        </div>
+      </div>
       {editor && (
         <LinkDialog
           editor={editor}
@@ -204,7 +259,7 @@ export function NoteToolbar({
           onOpenChange={setLinkOpen}
         />
       )}
-    </div>
+    </>
   );
 }
 

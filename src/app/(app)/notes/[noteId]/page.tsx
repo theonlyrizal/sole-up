@@ -5,7 +5,8 @@ import { z } from "zod";
 
 import { ArchivedNote } from "@/components/notes/archived-note";
 import { NoteEditor } from "@/components/notes/note-editor";
-import { PageFrame } from "@/components/shell/page-frame";
+import { NoteHeader } from "@/components/notes/note-header";
+import { PageContainer } from "@/components/shell/page-container";
 import { LoadingState } from "@/components/ui/skeleton";
 import { requireUser } from "@/server/auth/session";
 import { getNote } from "@/server/modules/notes/queries";
@@ -17,15 +18,16 @@ export const metadata: Metadata = { title: "Note · SoleUp" };
 
 export default function NotePage({ params }: PageProps<"/notes/[noteId]">) {
   return (
-    <PageFrame
-      title="Note"
-      width="reading"
-      back={{ href: "/notes", label: "Notes" }}
+    <Suspense
+      fallback={
+        <PageContainer width="reading">
+          <NoteHeader />
+          <LoadingState label="Loading your note" />
+        </PageContainer>
+      }
     >
-      <Suspense fallback={<LoadingState label="Loading your note" />}>
-        <NoteView params={params} />
-      </Suspense>
-    </PageFrame>
+      <NoteView params={params} />
+    </Suspense>
   );
 }
 
@@ -47,16 +49,14 @@ async function NoteView({
     return <ArchivedNote note={{ ...note, tags }} />;
   }
   return (
-    <div className="contents" data-hide-create>
-      <NoteEditor
-        key={note.id}
-        note={{
-          id: note.id,
-          title: note.title,
-          body: note.body,
-          updatedAt: note.updatedAt,
-        }}
-      />
-    </div>
+    <NoteEditor
+      key={note.id}
+      note={{
+        id: note.id,
+        title: note.title,
+        body: note.body,
+        updatedAt: note.updatedAt,
+      }}
+    />
   );
 }

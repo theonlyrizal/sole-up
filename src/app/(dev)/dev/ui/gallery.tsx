@@ -13,6 +13,7 @@ import { Fab, FabMenu } from "@/components/ui/fab";
 import { FormField } from "@/components/ui/form-field";
 import { IconButton, IconLink } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
+import { SearchBar } from "@/components/ui/search-bar";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { RadioGroup, RadioRow, RadioSwatch } from "@/components/ui/radio-group";
 import { Select } from "@/components/ui/select";
@@ -146,6 +147,7 @@ function ThemeColumn({
   const [range, setRange] = useState("week");
   const [filter, setFilter] = useState(false);
   const [chip, setChip] = useState(true);
+  const [search, setSearch] = useState("Weekend walk");
   const [star, setStar] = useState(false);
   const [lastAction, setLastAction] = useState("");
   const anchor = `#${theme}-fields`;
@@ -368,6 +370,8 @@ function ThemeColumn({
             <Chip
               type="input"
               label="Reading and research"
+              detail={<Chip type="status" label="Goal · Active" />}
+              removeLabel="Unlink reading and research"
               onRemove={() => setChip(false)}
             />
           ) : (
@@ -375,6 +379,7 @@ function ThemeColumn({
               Restore reading and research
             </Button>
           )}
+          <Chip type="input" label="Will link to: Weekend walk" icon="link" />
           <StatusChip status="active" />
           <StatusChip status="paused" />
           <Chip type="status" label="Saved" tone="success" icon="check" />
@@ -388,6 +393,15 @@ function ThemeColumn({
           <Chip type="metric" label="planned" count={4} />
           <Chip type="metric" label="due" count={0} />
         </div>
+      </Example>
+      <Example title="SearchBar">
+        <SearchBar
+          aria-label="Search example"
+          autoComplete="off"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          onClear={() => setSearch("")}
+        />
       </Example>
       <Example title="Checkbox">
         <Checkbox label="Show tasks without a date" />

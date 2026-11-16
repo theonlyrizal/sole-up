@@ -14,7 +14,13 @@ type ChipAction =
 type ChipKind =
   | { type: "assist" }
   | { type: "filter"; selected: boolean }
-  | { type: "input"; onRemove: () => void }
+  | {
+      type: "input";
+      onRemove?: () => void;
+      removeLabel?: string;
+      removeDisabled?: boolean;
+      detail?: React.ReactNode;
+    }
   | {
       type: "status";
       tone?:
@@ -68,6 +74,7 @@ export function Chip(props: ChipProps) {
       <span className="min-w-0 wrap-anywhere">
         {metric ? `${props.count} ${label}` : label}
       </span>
+      {type === "input" && props.detail}
     </>
   );
   const classes = cx(
@@ -80,7 +87,7 @@ export function Chip(props: ChipProps) {
     type === "filter" && "chip-filter",
     selected && "action-tonal",
     metric && props.count > 0 && "chip-metric",
-    type !== "input" &&
+    (type !== "input" || !props.onRemove) &&
       !status &&
       !selected &&
       !(metric && props.count > 0) &&
@@ -120,16 +127,16 @@ export function Chip(props: ChipProps) {
     </span>
   );
 
-  if (type !== "input") return chip;
+  if (type !== "input" || !props.onRemove) return chip;
   return (
     <span className="input-chip relative isolate inline-flex max-w-full min-w-0 items-center rounded-sm">
       {chip}
       <IconButton
-        label={`Remove ${label}`}
+        label={props.removeLabel ?? `Remove ${label}`}
         icon="close"
         size={40}
         tooltip={false}
-        disabled={disabled}
+        disabled={props.removeDisabled ?? disabled}
         onClick={props.onRemove}
       />
     </span>

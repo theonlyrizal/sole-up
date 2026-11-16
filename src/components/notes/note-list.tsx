@@ -1,8 +1,9 @@
 import Link from "next/link";
 
+import { Icon } from "@/components/icons/icon";
 import { buttonClass } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListGroup, ListItem } from "@/components/ui/list";
 import type { NoteListItem } from "@/server/modules/notes/queries";
 
 import { TagChips } from "./tag-chips";
@@ -12,21 +13,16 @@ export function noteTitle(title: string | null): string {
   return title ?? "Untitled";
 }
 
-/**
- * The user's notes (chunk 8.2): title (or "Untitled"), the first line of
- * the body, its tags (chunk 8.5; each opens the list filtered by it) and
- * the date. Active notes show when they were updated, archived ones when
- * they were archived.
- */
 export function NoteList({
   notes,
   archived = false,
   filtered = false,
+  selectedId,
 }: {
   notes: NoteListItem[];
   archived?: boolean;
-  /** The list is filtered by a tag (chunk 8.5). */
   filtered?: boolean;
+  selectedId?: string;
 }) {
   if (notes.length === 0) {
     if (filtered) {
@@ -35,10 +31,7 @@ export function NoteList({
           title="No notes with this tag"
           description="None of your notes has this tag. Archived notes aren't listed here."
           action={
-            <Link
-              href="/notes"
-              className={buttonClass({ variant: "secondary" })}
-            >
+            <Link href="/notes" className={buttonClass({ variant: "tonal" })}>
               Show all notes
             </Link>
           }
@@ -50,7 +43,7 @@ export function NoteList({
         title="Nothing archived"
         description="Notes you archive are kept here, read-only, until you restore or delete them."
         action={
-          <Link href="/notes" className={buttonClass({ variant: "secondary" })}>
+          <Link href="/notes" className={buttonClass({ variant: "tonal" })}>
             Back to notes
           </Link>
         }
@@ -69,35 +62,46 @@ export function NoteList({
   }
 
   return (
-    <ul
-      aria-label={archived ? "Archived notes" : "Notes"}
-      className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface"
-    >
-      {notes.map((note) => (
-        <li key={note.id} className="flex min-w-0 flex-col gap-1 p-4">
-          <h2 className="font-medium break-words">
-            <Link
-              href={`/notes/${note.id}`}
-              className={cx(
-                "rounded-sm hover:underline",
-                focusRing,
-                note.title === null && "text-muted italic",
-              )}
-            >
-              {noteTitle(note.title)}
-            </Link>
-          </h2>
-          {note.preview && (
-            <p className="truncate text-sm text-fg">{note.preview}</p>
-          )}
-          <TagChips tags={note.tags} label="Tags" linked={!archived} />
-          <p className="text-sm text-muted">
-            {archived && note.archivedLabel
-              ? `Archived on ${note.archivedLabel}`
-              : `Updated ${note.updatedLabel}`}
-          </p>
-        </li>
-      ))}
-    </ul>
+    <ListGroup label={archived ? "Archived notes" : "Notes"}>
+      {notes.map((note) => {
+        const selected = selectedId === note.id;
+        return (
+          <ListItem
+            key={note.id}
+            selected={selected || undefined}
+            href={`/notes/${note.id}`}
+            className={selected ? "rounded-lg" : undefined}
+            leading={
+              <span className="grid size-10 place-items-center rounded-md bg-reflection-surface text-on-reflection-surface">
+                <Icon name={selected ? "check" : "sticky_note_2"} size={20} />
+              </span>
+            }
+            headline={
+              <h2
+                className={
+                  note.title === null
+                    ? "text-on-surface-variant italic"
+                    : undefined
+                }
+              >
+                {noteTitle(note.title)}
+              </h2>
+            }
+            supporting={
+              <>
+                {note.preview && <p className="line-clamp-2">{note.preview}</p>}
+                <p className="mt-1 text-label-medium">
+                  {archived && note.archivedLabel
+                    ? `Archived on ${note.archivedLabel}`
+                    : `Updated ${note.updatedLabel}`}
+                </p>
+                <TagChips tags={note.tags} label="Tags" linked={!archived} />
+              </>
+            }
+            wrapSupporting
+          />
+        );
+      })}
+    </ListGroup>
   );
 }

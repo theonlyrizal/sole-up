@@ -63,6 +63,7 @@ const allowlist = [
   "format_italic",
   "format_strikethrough",
   "code",
+  "data_object",
   "format_quote",
   "format_list_bulleted",
   "format_list_numbered",

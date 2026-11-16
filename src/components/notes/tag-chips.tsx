@@ -1,15 +1,7 @@
-import Link from "next/link";
-
-import { cx, focusRing } from "@/components/ui/cx";
+import { Chip } from "@/components/ui/chip";
 import type { TagSummary } from "@/lib/notes/tags";
 
-export const tagChipClass =
-  "inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-xs break-all";
-
-/**
- * A note's tags as chips (chunk 8.5). With `linked`, each chip opens the
- * Notes list filtered by that tag (`?tag=<id>`, never the name).
- */
+/** Read-only tag names, optionally linked to the active Notes filter. */
 export function TagChips({
   tags,
   label,
@@ -21,18 +13,20 @@ export function TagChips({
 }) {
   if (tags.length === 0) return null;
   return (
-    <ul aria-label={label} className="flex flex-wrap gap-1.5">
+    <ul
+      aria-label={label}
+      className="relative z-10 mt-1 flex w-fit max-w-full flex-wrap gap-1"
+    >
       {tags.map((tag) => (
         <li key={tag.id} className="max-w-full">
           {linked ? (
-            <Link
+            <Chip
+              type="assist"
+              label={tag.name}
               href={`/notes?tag=${tag.id}`}
-              className={cx(tagChipClass, "hover:underline", focusRing)}
-            >
-              {tag.name}
-            </Link>
+            />
           ) : (
-            <span className={tagChipClass}>{tag.name}</span>
+            <Chip type="status" label={tag.name} />
           )}
         </li>
       ))}

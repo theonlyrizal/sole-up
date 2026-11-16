@@ -5,7 +5,7 @@ import { NoteList } from "@/components/notes/note-list";
 import { PageFrame } from "@/components/shell/page-frame";
 import { LoadingState } from "@/components/ui/skeleton";
 import { requireUser } from "@/server/auth/session";
-import { listNotes } from "@/server/modules/notes/queries";
+import { listNotesForRequest } from "../notes-data";
 
 export const metadata: Metadata = { title: "Archived notes · SoleUp" };
 
@@ -27,7 +27,5 @@ export default function ArchivedNotesPage() {
 
 async function ArchivedNotes() {
   const user = await requireUser();
-  return (
-    <NoteList notes={await listNotes(user.id, { archived: true })} archived />
-  );
+  return <NoteList notes={await listNotesForRequest(user.id, true)} archived />;
 }

@@ -91,7 +91,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-8 | Goals, goal detail, life areas, archived goals | done | chunk/ui-8-goals-life-areas | 2026-11-15 | Goal journeys, confirmed milestone feedback and all finish-line checks verified |
 | UI-9 | Track, habit form, archived habits | done | chunk/ui-9-track-habits | 2026-11-16 | 5-B approved. Three ranges, confirmed feedback, keyboard targets and finish-line checks verified |
 | UI-10 | Weekly review, history, detail | done | chunk/ui-10-weekly-review | 2026-11-16 | Save, period lock and one-time Finish verified. Full E2E passed on Ubuntu |
-| UI-11 | Notes, editor, search (and tags if 8.5 shipped) | todo | | | |
+| UI-11 | Notes, editor, search (and tags if 8.5 shipped) | in progress | chunk/ui-11-notes-search | | |
 | UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | todo | | | Needs sign-off 5-D |
 | UI-13 | Consistency, cleanup, token lint, accessibility sweep, docs | todo | | | |
 
@@ -659,5 +659,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Both size and theme pairs pass axe. Keyboard navigation, reflow, enlarged text and reduced motion were exercised. |
 | Restraint | 2 | The sheet opens after confirmed Finish and leaves a finished review when dismissed. Reload and subsequent correction stay quiet. |
 | Variety | 1 | Metrics, writing cards, adjustment rows and the confirmation have distinct layouts within the review sequence. |
+
+**Total — 15/16.**
+
+### UI-11 · Notes and search (2026-11-16)
+
+- **Branch / PR** — `chunk/ui-11-notes-search` · [#104](https://github.com/theonlyrizal/sole-up/pull/104). UI-10 [#103](https://github.com/theonlyrizal/sole-up/pull/103) and Tags chunk 8.5 [#75](https://github.com/theonlyrizal/sole-up/pull/75) had merged before implementation.
+- **Routes and components** — The Notes index, new note and active detail share a 360 px list pane at 1200 px and wider. ListGroup shows the title, up to two preview lines, the date and tags. The editor uses a borderless title, a sticky scrollable formatting toolbar, SaveStatus, and overflow actions. Linked to uses input chips with separate unlink controls and a ResponsiveSheet picker. Tags sit in the same section and the index uses filter chips. The archive list and read-only note use the existing restore and confirmed delete actions. Search has a focused SearchBar, clear control, and counted Notes, Goals and Tasks groups.
+- **Data paths and contracts** — The layout and index share the active `listNotes` read through React `cache()`. The archived read supplies the real archive count and list. The existing note, tag, link and search queries and actions supply all content and writes. The `?tag=`, `?goal=` and `?task=` routes retain their validation and fallbacks. A first non-empty save still replaces the URL in place. The idle delay, blur and exit flushes, leave prompt, Retry, TipTap allowlist, React-only renderer and 50-link cap retain their behavior. Search terms stay in memory and in the existing POST body. The browser journey checks request and navigation URLs.
+- **Decisions and deviations** — D-33 keeps the pane mounted while the selected note changes. The note dates sit under previews to give titles room in the 360 px pane. Confirmed saves update the pane with the saved snapshot, and confirmed tag edits update its filter chips and row tags. The violet note glyph identifies the record type. The selected row adds a check, a tonal surface and `aria-current="page"`. Search and archived views use the full content width.
+- **Checks run** — FINAL_CHECKS_PENDING
+- **Screenshots** — 62 Playwright PNGs in `test-results/visual/ui-11/`. Start with `notes-390-light.png`, `editor-1280-dark.png`, `new-390-dark.png`, `archived-note-390-dark.png` and `search-results-1280-dark.png`. The `saving-*`, `save-error-*`, `retry-saved-*` and `conflict-*` files show the browser exercise in both themes and sizes. The `keyboard-dock-390-*` files show the simulated compact viewport.
+- **Interaction evidence** — Chromium held an actual autosave POST with Saving visible, aborted it to simulate lost connectivity, and showed persistent Not saved with the draft retained. Retry saved the draft and updated the selected desktop row. The save produced zero success toasts and halos under reduced motion. A second tab kept its conflicting title and body on screen. Loading the saved version restored the server text and allowed editing again. The desktop journey checks that the same 360 px pane stays mounted while opening two notes and marks a newly saved note on its first URL change.
+- **Accessibility** — Chromium axe reported zero serious or critical violations for the captured Notes routes, search results, link picker, save error and conflict at 390 × 844 and 1280 × 800 in both themes. The browser checked reflow at 320, 375, 390, 414, 768 and 1280 px, and at 200% text at both capture widths. Tab reached the available formatting controls, Space toggled a heading and changed `aria-pressed`, Escape returned focus from the picker, and unlink returned focus to Link. In the simulated 480 px visual viewport panned down 32 px, the toolbar ended at 504 px, 8 px above the visible bottom.
+- **Unverified** — Physical soft keyboards, manual screen-reader playback and engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | The selected row locates the open note, and the editor puts the title and body before links and tags. Search starts at its focused field and groups the hits under named counts. |
+| Character | 2 | Cream and dark canvases frame opaque writing and row surfaces. The small violet note glyph identifies the same record type throughout the list. |
+| Color | 2 | The selected row, persistent status, warnings and Sunshine marks each have distinct roles. Both theme and size pairs pass the rendered axe checks. |
+| Response | 2 | A held save, loss of connectivity, retained draft, explicit Retry and two-tab conflict were exercised in the browser. |
+| Truthfulness | 2 | Dates, tags, archive counts, target status and search counts come from the existing data. Save status follows the write result, and the first-save link preview describes a pending relationship. |
+| Accessibility | 2 | Keyboard formatting, focus return, viewport docking, reflow, enlarged text, reduced motion and the axe matrix were exercised in Chromium. |
+| Restraint | 2 | Autosave feedback stays in the header and settles on Saved. The error and conflict stay with the draft, with no success toast or halo from autosave. |
+| Variety | 1 | Writing, collection browsing and grouped search have distinct compositions within the Notes routes. |
 
 **Total — 15/16.**

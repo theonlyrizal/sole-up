@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  chooseNoteMenuItem,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 // Notes (chunk 8.2): the list, the TipTap editor limited to the 8.1
 // allowlist, autosave with its indicator and conflict prompt, the
@@ -190,6 +194,7 @@ test("a draft is not lost when leaving right after typing", async ({
   await list.getByRole("link", { name: "Untitled" }).click();
   await expect(noteBody(page)).toContainText("A thought worth keeping");
   await noteTitle(page).fill("Kept");
+  await page.setViewportSize({ width: 900, height: 800 });
   await page.getByRole("link", { name: "← Notes" }).click();
   await expect(page).toHaveURL(/\/notes$/);
   await expect(list.getByRole("link", { name: "Kept" })).toBeVisible();
@@ -250,7 +255,7 @@ test("script never executes: pasted markup is stripped and stored markup renders
   await expect(noteBody(page).locator("img, script")).toHaveCount(0);
 
   // So does the read-only view.
-  await page.getByRole("button", { name: "Archive" }).click();
+  await chooseNoteMenuItem(page, "Archive");
   await expect(page).toHaveURL(/\/notes$/);
   await page.goto("/notes/archived");
   await page.getByRole("link", { name: "Untrusted" }).click();
@@ -300,9 +305,7 @@ test("a save from a stale tab is a conflict that keeps the text and offers the s
   await expect(noteBody(other)).toContainText("Written in the second tab.");
   await expectNoSeriousViolations(other);
 
-  await conflict
-    .getByRole("button", { name: "Load the saved version" })
-    .click();
+  await other.getByRole("button", { name: "Load the saved version" }).click();
   const confirm = other.getByRole("alertdialog", {
     name: "Load the saved version?",
   });
@@ -372,13 +375,13 @@ test("a note is archived read-only, restored, and deleted after confirming", asy
   await signInAndConfirm(page);
   await createNote(page, "Old plans", "Plans from last year.");
 
-  await page.getByRole("button", { name: "Archive" }).click();
+  await chooseNoteMenuItem(page, "Archive");
   await expect(page).toHaveURL(/\/notes$/);
   await expect(
     page.getByRole("heading", { level: 2, name: "No notes yet" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "Archived notes" }).click();
+  await page.getByRole("link", { name: /^Archived \(/ }).click();
   const archived = page.getByRole("list", { name: "Archived notes" });
   await expect(archived.getByText(/^Archived on /)).toBeVisible();
   await expectNoSeriousViolations(page);
@@ -386,7 +389,7 @@ test("a note is archived read-only, restored, and deleted after confirming", asy
 
   // Read-only: no editor, the stored text shown.
   await expect(
-    page.getByText(/^Archived on .*Restore it to change it\.$/),
+    page.getByText(/^Archived on .*Restore it to edit\.$/),
   ).toBeVisible();
   await expect(noteBody(page)).toHaveCount(0);
   await expect(page.getByRole("article", { name: "Note" })).toHaveText(
@@ -399,7 +402,7 @@ test("a note is archived read-only, restored, and deleted after confirming", asy
   await expect(noteTitle(page)).toHaveValue("Old plans");
 
   // Deleting asks first; Cancel keeps the note.
-  await page.getByRole("button", { name: "Delete note" }).click();
+  await chooseNoteMenuItem(page, "Delete…");
   const confirm = page.getByRole("alertdialog", { name: "Delete this note?" });
   await expect(confirm).toContainText("It can't be undone.");
   await expectNoSeriousViolations(page);
@@ -407,7 +410,7 @@ test("a note is archived read-only, restored, and deleted after confirming", asy
   await expect(confirm).toHaveCount(0);
   await expect(noteBody(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete note" }).click();
+  await chooseNoteMenuItem(page, "Delete…");
   await confirm.getByRole("button", { name: "Delete note" }).click();
   await expect(page).toHaveURL(/\/notes$/);
   await expect(
@@ -420,6 +423,7 @@ test("a note is archived read-only, restored, and deleted after confirming", asy
 });
 
 test("the editor works with the keyboard alone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await signInAndConfirm(page);
   await page.goto("/notes/new");
   await expect(noteBody(page)).toBeVisible();
@@ -428,8 +432,11 @@ test("the editor works with the keyboard alone", async ({ page }) => {
   await page.keyboard.type("Keyboard note");
   // From the title, Tab reaches each toolbar button, then the body.
   const toolbar = page.getByRole("group", { name: "Formatting" });
-  const buttons = await toolbar.getByRole("button").all();
+  await expect(toolbar.getByRole("button")).toHaveCount(15);
+  const buttons = await toolbar.getByRole("button", { disabled: false }).all();
   expect(buttons.length).toBe(13);
+  const bold = toolbar.getByRole("button", { name: "Bold" });
+  await expect(bold).toHaveAttribute("aria-pressed", "false");
   for (const button of buttons) {
     await page.keyboard.press("Tab");
     await expect(button).toBeFocused();
@@ -461,10 +468,9 @@ test("the editor works with the keyboard alone", async ({ page }) => {
     noteBody(page).locator('a[href="mailto:me@example.com"]'),
   ).toBeVisible();
 
-  // Back from the body to Heading 1 (past Divider, Code block, Quote,
-  // the two lists and Headings 3 and 2); Space applies it.
+  // Back through the enabled controls from the body to Heading 1.
   await page.keyboard.press("Enter");
-  for (let step = 0; step < 8; step += 1) {
+  for (let step = 0; step < 9; step += 1) {
     await page.keyboard.press("Shift+Tab");
   }
   const heading1 = toolbar.getByRole("button", { name: "Heading 1" });
@@ -486,4 +492,58 @@ test("unknown and malformed note IDs are not found", async ({ page }) => {
       page.getByRole("heading", { level: 1, name: "Note not found" }),
     ).toBeVisible();
   }
+});
+
+test("at 1280 px opening notes keeps the list pane and marks the current note", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signInAndConfirm(page);
+  await createNote(page, "First note", "A line in the first note");
+  await createNote(page, "Second note", "A line in the second note");
+  await page.goto("/notes");
+
+  const pane = page.getByRole("complementary", { name: "Notes list" });
+  await expect(pane).toBeVisible();
+  expect((await pane.boundingBox())?.width).toBe(360);
+  const listBefore = await pane.elementHandle();
+  const first = pane.getByRole("link", { name: "First note" });
+  const second = pane.getByRole("link", { name: "Second note" });
+  await first.click();
+  await expect(noteTitle(page)).toHaveValue("First note");
+  await expect(first).toHaveAttribute("aria-current", "page");
+  await expect(second).not.toHaveAttribute("aria-current", "page");
+  expect(await listBefore?.evaluate((element) => element.isConnected)).toBe(
+    true,
+  );
+  await second.click();
+  await expect(noteTitle(page)).toHaveValue("Second note");
+  await expect(second).toHaveAttribute("aria-current", "page");
+  await expect(first).not.toHaveAttribute("aria-current", "page");
+  expect((await pane.boundingBox())?.width).toBe(360);
+  expect(await listBefore?.evaluate((element) => element.isConnected)).toBe(
+    true,
+  );
+
+  await pane.getByRole("link", { name: "New note" }).click();
+  await expect(page).toHaveURL(/\/notes\/new$/);
+  await expect(noteTitle(page)).toBeEmpty();
+  await noteTitle(page).fill("Created in the pane");
+  await noteBody(page).click();
+  await expectSaved(page);
+  await expect(
+    pane.getByRole("link", { name: "Created in the pane" }),
+  ).toHaveAttribute("aria-current", "page");
+  const tagInput = page.getByRole("combobox", { name: "Add a tag" });
+  await tagInput.fill("From this editor");
+  await tagInput.press("Enter");
+  await expect(
+    pane
+      .getByRole("navigation", { name: "Filter notes by tag" })
+      .getByRole("link", { name: "From this editor" }),
+  ).toBeVisible();
+  await expectSaved(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(pane).toBeHidden();
+  await expect(noteTitle(page)).toHaveValue("Created in the pane");
 });
