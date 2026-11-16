@@ -21,10 +21,8 @@ test("Review Insights shows evidence and links to the relevant work", async ({
     .getByRole("dialog", { name: "More", exact: true })
     .getByRole("link", { name: "Review", exact: true })
     .click();
-  await page
-    .getByRole("navigation", { name: "Review pages" })
-    .getByRole("link", { name: "Insights" })
-    .click();
+  await page.getByRole("button", { name: "Review options" }).click();
+  await page.getByRole("menuitem", { name: "Insights" }).click();
   await expect(page).toHaveURL(/\/review\/insights$/);
   await expect(
     page.getByRole("heading", { name: "Insights", exact: true }),

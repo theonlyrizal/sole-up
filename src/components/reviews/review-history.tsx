@@ -1,16 +1,14 @@
 import Link from "next/link";
 
+import { Icon } from "@/components/icons/icon";
 import { buttonClass } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
+import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListGroup, ListItem } from "@/components/ui/list";
 import { addDays, formatLocalDate, localDateOf } from "@/lib/dates";
 import type { ReviewHistory } from "@/server/modules/weekly-reviews/queries";
 
-import { reviewWeekLabel } from "./review-header";
-
-// Past reviews (chunk 7.4), newest first. Each names its week, whether it
-// was finished, and until when it can change or when it closed. Weeks
-// without a review aren't listed or counted (ADR 0015).
+import { reviewWeekLabel, reviewWeekName } from "./review-header";
 
 export function ReviewHistoryList({ history }: { history: ReviewHistory }) {
   const { reviews, locale, timeZone } = history;
@@ -18,12 +16,9 @@ export function ReviewHistoryList({ history }: { history: ReviewHistory }) {
     return (
       <EmptyState
         title="No reviews yet"
-        description="Reviews you start are kept here, newest first."
+        description="Reviews you start show here."
         action={
-          <Link
-            href="/review"
-            className={buttonClass({ variant: "secondary" })}
-          >
+          <Link href="/review" className={buttonClass({ variant: "tonal" })}>
             Review a week
           </Link>
         }
@@ -32,17 +27,9 @@ export function ReviewHistoryList({ history }: { history: ReviewHistory }) {
   }
 
   return (
-    <ul
-      aria-label="Past reviews"
-      className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface"
-    >
+    <ListGroup label="Past reviews">
       {reviews.map((review) => {
-        const name =
-          review.periodStart === history.thisWeek
-            ? "This week: "
-            : review.periodStart === history.lastWeek
-              ? "Last week: "
-              : "";
+        const name = reviewWeekName(history, review.periodStart);
         const status = review.completedAt
           ? `Finished on ${formatLocalDate(localDateOf(review.completedAt, timeZone), locale)}`
           : "Not finished";
@@ -50,22 +37,25 @@ export function ReviewHistoryList({ history }: { history: ReviewHistory }) {
           ? `Open until ${formatLocalDate(addDays(review.closesOn, -1), locale)}`
           : `Closed on ${formatLocalDate(review.closesOn, locale)}`;
         return (
-          <li key={review.id} className="flex flex-col gap-1 p-4">
-            <h2 className="font-medium">
-              <Link
-                href={`/review/history/${review.id}`}
-                className={cx("rounded-sm hover:underline", focusRing)}
-              >
-                {name}
-                {reviewWeekLabel(review.periodStart, review.periodEnd, locale)}
-              </Link>
-            </h2>
-            <p className="text-sm text-muted">
-              {status} · {editable}
-            </p>
-          </li>
+          <ListItem
+            key={review.id}
+            href={`/review/history/${review.id}`}
+            headline={`${name ? `${name}: ` : ""}${reviewWeekLabel(review.periodStart, review.periodEnd, locale)}`}
+            supporting={
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1">
+                <Chip
+                  type="status"
+                  label={status}
+                  icon={review.completedAt ? "check" : undefined}
+                />
+                <span>{editable}</span>
+              </div>
+            }
+            wrapSupporting
+            trailing={<Icon name="chevron_right" size={20} />}
+          />
         );
       })}
-    </ul>
+    </ListGroup>
   );
 }

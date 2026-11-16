@@ -25,6 +25,17 @@ describe("segmented lists", () => {
     expect(html.match(/<li /g)).toHaveLength(3);
   });
 
+  it("keeps ordered groups as native ordered lists", () => {
+    const html = render(
+      <ListGroup as="ol" label="Upcoming priorities">
+        <ListItem headline="Read" />
+        <ListItem headline="Write" />
+      </ListGroup>,
+    );
+    expect(html).toMatch(/<ol aria-label="Upcoming priorities"[^>]*>.*<\/ol>/);
+    expect(html.match(/<li /g)).toHaveLength(2);
+  });
+
   it("uses full corners and a current link for the selected row", () => {
     const html = render(<ListItem headline="Read" href="/notes" selected />);
     expect(html).toContain("rounded-full");

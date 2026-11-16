@@ -3,35 +3,32 @@
 import Link from "next/link";
 import { useId, useRef, useState, useTransition } from "react";
 
+import { StatusChip } from "@/components/data/status-chip";
 import { TodayDateEditor } from "@/components/tasks/today-date-editor";
+import { ResponsiveSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cx, focusRing } from "@/components/ui/cx";
 import { FormField } from "@/components/ui/form-field";
+import { InlineBanner } from "@/components/ui/inline-banner";
+import { ListGroup, ListItem } from "@/components/ui/list";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { formatInstant, formatLocalDate, type LocalDate } from "@/lib/dates";
-import { goalStatusActions, type GoalStatusAction } from "@/lib/goals";
-import type { ActionResult } from "@/lib/result";
+import { goalStatusActions } from "@/lib/goals";
 import { changeGoalStatus } from "@/server/modules/goals/actions";
 import { changeTaskStatus, planTask } from "@/server/modules/tasks/actions";
-import type { PlanTaskItem } from "@/server/modules/tasks/queries";
 import type {
   AdjustGoal,
   AdjustStep,
   StalledTask,
 } from "@/server/modules/weekly-reviews/queries";
 
-// Adjust (chunk 7.3): small changes through the existing goal and task
-// actions, each saved at once like anywhere else in the app. Nothing here is
-// part of the review's own record (ADR 0015).
+type Context = { locale: string; timeZone: string };
 
-type Context = { today: LocalDate; locale: string; timeZone: string };
-
-/**
- * Next week's dates and its days' names, worked out on the server: Node and
- * the browser can word a date range differently, which would not hydrate.
- */
-export type NextWeekLabels = {
+// Date labels are formatted on the server so Node and the browser agree.
+type NextWeekLabels = {
   week: string;
   days: { value: LocalDate; label: string }[];
 };
@@ -41,152 +38,131 @@ export function AdjustStepView({
   labels,
   ...context
 }: Context & { data: AdjustStep; labels: NextWeekLabels }) {
+  const goalsId = useId();
+  const stalledId = useId();
   return (
-    <div className="flex flex-col gap-8">
-      <p className="text-muted">
-        Make any changes the week suggests. Each one is saved straight away, and
-        you can skip this step.
+    <div className="grid min-w-0 gap-6">
+      <p className="text-body-medium text-on-surface-variant">
+        Changes here save as you make them.
       </p>
-      <GoalsSection goals={data.goals} />
-      <StalledSection stalled={data.stalled} {...context} />
-      <NextWeekSection data={data} labels={labels} {...context} />
+      <section aria-labelledby={goalsId} className="grid gap-2">
+        <h3
+          className={cx("w-fit rounded-xs text-title-large", focusRing)}
+          id={goalsId}
+          tabIndex={-1}
+        >
+          Goals
+        </h3>
+        {data.goals.length ? (
+          <ListGroup label="Active and paused goals">
+            {data.goals.map((goal) => (
+              <GoalRow key={goal.id} goal={goal} headingId={goalsId} />
+            ))}
+          </ListGroup>
+        ) : (
+          <Empty>No active or paused goals.</Empty>
+        )}
+      </section>
+      <section aria-labelledby={stalledId} className="grid gap-2">
+        <h3
+          className={cx("w-fit rounded-xs text-title-large", focusRing)}
+          id={stalledId}
+          tabIndex={-1}
+        >
+          Stalled tasks
+        </h3>
+        {data.stalled.length ? (
+          <ListGroup label="Stalled tasks">
+            {data.stalled.map((item) => (
+              <StalledRow
+                key={item.task.id}
+                item={item}
+                headingId={stalledId}
+                {...context}
+              />
+            ))}
+          </ListGroup>
+        ) : (
+          <Empty>Nothing has stalled.</Empty>
+        )}
+      </section>
+      <NextWeekSection data={data} labels={labels} locale={context.locale} />
     </div>
   );
 }
 
-function AdjustSection({
-  title,
-  hint,
-  children,
-}: {
-  title: string;
-  hint: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const headingId = useId();
-  return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h3 id={headingId} className="text-lg font-semibold">
-          {title}
-        </h3>
-        <p className="text-sm text-muted">{hint}</p>
-      </div>
-      {children}
-    </section>
-  );
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="text-body-medium text-on-surface-variant">{children}</p>;
 }
 
-const listClass =
-  "flex flex-col divide-y divide-border rounded-lg border border-border bg-surface";
+const goalConsequences = {
+  paused:
+    "This moves the goal to Paused. You can resume it from Goals whenever you're ready.",
+  active: "This moves the goal back to Active.",
+  dropped: "This moves the goal to Dropped. You can reopen it from Goals.",
+} as const;
 
-/** Runs one action and toasts its message, or shows its error. */
-function useRowAction() {
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  function run<T>(action: () => Promise<ActionResult<T>>, done: string) {
-    startTransition(async () => {
-      setError(null);
-      const result = await action();
-      if (result.ok) toast({ title: done, variant: "success" });
-      else setError(result.error.message);
-    });
-  }
-  return { error, pending, run };
-}
-
-/** The status changes the review offers: pause, resume and drop. */
-const REVIEW_GOAL_TARGETS = new Set(["paused", "active", "dropped"]);
-
-function GoalsSection({ goals }: { goals: AdjustGoal[] }) {
+function GoalRow({ goal, headingId }: { goal: AdjustGoal; headingId: string }) {
   return (
-    <AdjustSection
-      title="Goals"
-      hint="Pause a goal you can't give time to right now, or drop one that no longer fits. Either can be picked up again later."
-    >
-      {goals.length === 0 ? (
-        <p className="text-sm text-muted">No active or paused goals.</p>
-      ) : (
-        <ul aria-label="Active and paused goals" className={listClass}>
-          {goals.map((goal) => (
-            <GoalRow key={goal.id} goal={goal} />
-          ))}
-        </ul>
-      )}
-    </AdjustSection>
-  );
-}
-
-function GoalRow({ goal }: { goal: AdjustGoal }) {
-  const { error, pending, run } = useRowAction();
-  const actions = goalStatusActions(goal.status).filter((action) =>
-    REVIEW_GOAL_TARGETS.has(action.to),
-  );
-  const change = (action: GoalStatusAction) =>
-    run(
-      () => changeGoalStatus({ id: goal.id, status: action.to }),
-      action.done,
-    );
-  return (
-    <li className="flex flex-col gap-2 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Link
-            href={`/goals/${goal.id}`}
-            className={cx(
-              "min-w-0 rounded-sm font-medium break-words hover:underline",
-              focusRing,
-            )}
-          >
-            {goal.title}
-          </Link>
-          {goal.status === "paused" && (
-            <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs text-muted">
-              Paused
-            </span>
+    <ListItem
+      headline={
+        <Link
+          href={`/goals/${goal.id}`}
+          className={cx(
+            "inline-flex min-h-12 items-center rounded-xs hover:underline",
+            focusRing,
           )}
+        >
+          {goal.title}
+        </Link>
+      }
+      supporting={goal.status === "paused" && <StatusChip status="paused" />}
+      wrapActions
+      wrapSupporting
+      trailing={
+        <div className="flex flex-wrap justify-end gap-1">
+          {goalStatusActions(goal.status).map((action) => {
+            if (
+              action.to !== "paused" &&
+              action.to !== "active" &&
+              action.to !== "dropped"
+            )
+              return null;
+            return (
+              <ConfirmDialog
+                key={action.to === "dropped" ? "drop" : "pause-resume"}
+                trigger={
+                  <Button
+                    variant="tonal"
+                    size="xs"
+                    aria-label={`${action.label}: ${goal.title}`}
+                  >
+                    {action.label}
+                  </Button>
+                }
+                title={`${action.label} ${goal.title}?`}
+                description={goalConsequences[action.to]}
+                destructive={action.to === "dropped"}
+                icon={action.to === "dropped" ? "block" : undefined}
+                confirmLabel={action.label}
+                onConfirm={async () => {
+                  const result = await changeGoalStatus({
+                    id: goal.id,
+                    status: action.to,
+                  });
+                  if (result.ok) {
+                    toast({ title: action.done, variant: "success" });
+                    if (action.to === "dropped")
+                      document.getElementById(headingId)?.focus();
+                  }
+                  return result;
+                }}
+              />
+            );
+          })}
         </div>
-        <div className="flex flex-wrap gap-1">
-          {actions.map((action) => (
-            <Button
-              key={action.to}
-              variant="secondary"
-              size="sm"
-              disabled={pending}
-              aria-label={`${action.label}: ${goal.title}`}
-              onClick={() => change(action)}
-            >
-              {action.label}
-            </Button>
-          ))}
-        </div>
-      </div>
-      <p role="alert" className="text-sm text-danger empty:hidden">
-        {error}
-      </p>
-    </li>
-  );
-}
-
-function StalledSection({
-  stalled,
-  ...context
-}: Context & { stalled: StalledTask[] }) {
-  return (
-    <AdjustSection
-      title="Stalled tasks"
-      hint="Open tasks whose deadline has passed, or that were planned for an earlier day. Give one a new date, or cancel it if it no longer matters."
-    >
-      {stalled.length === 0 ? (
-        <p className="text-sm text-muted">Nothing has stalled.</p>
-      ) : (
-        <ul aria-label="Stalled tasks" className={listClass}>
-          {stalled.map((item) => (
-            <StalledRow key={item.task.id} item={item} {...context} />
-          ))}
-        </ul>
-      )}
-    </AdjustSection>
+      }
+    />
   );
 }
 
@@ -194,69 +170,92 @@ function StalledRow({
   item: { task, passed },
   locale,
   timeZone,
-}: Context & { item: StalledTask }) {
-  const { error, pending, run } = useRowAction();
+  headingId,
+}: Context & { item: StalledTask; headingId: string }) {
   const [editing, setEditing] = useState(false);
-  const rescheduleButton = useRef<HTMLButtonElement>(null);
+  const reschedule = useRef<HTMLButtonElement>(null);
+  const isDeadline = passed === "deadline";
+  const details = isDeadline
+    ? `Was due ${task.dueAt ? formatInstant(task.dueAt, locale, timeZone) : formatLocalDate(task.dueDate!, locale)}`
+    : `Planned for ${formatLocalDate(task.plannedDate!, locale)}`;
 
-  function closeEditor() {
-    setEditing(false);
-    requestAnimationFrame(() => rescheduleButton.current?.focus());
+  function restoreFocus(event: Event) {
+    event.preventDefault();
+    (reschedule.current ?? document.getElementById(headingId))?.focus();
   }
 
-  const details =
-    passed === "deadline"
-      ? `Was due ${task.dueAt ? formatInstant(task.dueAt, locale, timeZone) : formatLocalDate(task.dueDate!, locale)}`
-      : `Planned for ${formatLocalDate(task.plannedDate!, locale)}`;
-
   return (
-    <li className="flex flex-col gap-2 p-3">
-      <div className="flex flex-col gap-1">
-        <span className="font-medium break-words">{task.title}</span>
-        <p className="text-sm text-muted">
-          {[task.goal?.title, details].filter(Boolean).join(" · ")}
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-1">
-        <Button
-          ref={rescheduleButton}
-          variant="secondary"
-          size="sm"
-          disabled={pending}
-          aria-expanded={editing}
-          aria-label={`Reschedule: ${task.title}`}
-          onClick={() => (editing ? closeEditor() : setEditing(true))}
-        >
-          Reschedule
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={pending}
-          aria-label={`Cancel task: ${task.title}`}
-          onClick={() =>
-            run(
-              () => changeTaskStatus({ id: task.id, status: "cancelled" }),
-              "Task cancelled. You can reopen it from Plan.",
-            )
-          }
-        >
-          Cancel task
-        </Button>
-      </div>
-      <p role="alert" className="text-sm text-danger empty:hidden">
-        {error}
-      </p>
-      {editing && (
-        <TodayDateEditor
-          task={task}
-          kind={passed === "deadline" ? "due" : "plan"}
-          locale={locale}
-          timeZone={timeZone}
-          onDone={closeEditor}
-        />
-      )}
-    </li>
+    <ListItem
+      headline={task.title}
+      supporting={[task.goal?.title, details].filter(Boolean).join(" · ")}
+      wrapActions
+      wrapSupporting
+      trailing={
+        <div className="flex flex-wrap justify-end gap-1">
+          <ResponsiveSheet
+            open={editing}
+            onOpenChange={setEditing}
+            onCloseAutoFocus={restoreFocus}
+            fitKeyboard
+            title={`Reschedule ${task.title}`}
+            description={
+              isDeadline
+                ? "This changes the task’s deadline."
+                : "This moves the task to the new day in Plan."
+            }
+            trigger={
+              <Button
+                ref={reschedule}
+                variant="tonal"
+                size="xs"
+                aria-label={`Reschedule: ${task.title}`}
+              >
+                Reschedule
+              </Button>
+            }
+          >
+            <TodayDateEditor
+              task={task}
+              kind={isDeadline ? "due" : "plan"}
+              locale={locale}
+              timeZone={timeZone}
+              inSheet
+              onDone={() => setEditing(false)}
+            />
+          </ResponsiveSheet>
+          <ConfirmDialog
+            trigger={
+              <Button
+                variant="text"
+                size="xs"
+                aria-label={`Cancel task: ${task.title}`}
+              >
+                Cancel task
+              </Button>
+            }
+            title={`Cancel ${task.title}?`}
+            description="This moves the task out of your open lists. You can reopen it from Plan."
+            confirmLabel="Cancel task"
+            cancelLabel="Keep task"
+            icon="close"
+            onConfirm={async () => {
+              const result = await changeTaskStatus({
+                id: task.id,
+                status: "cancelled",
+              });
+              if (result.ok) {
+                toast({
+                  title: "Task cancelled. You can reopen it from Plan.",
+                  variant: "success",
+                });
+                document.getElementById(headingId)?.focus();
+              }
+              return result;
+            }}
+          />
+        </div>
+      }
+    />
   );
 }
 
@@ -264,7 +263,11 @@ function NextWeekSection({
   data: { plannedNextWeek, plannable },
   labels,
   locale,
-}: Context & { data: AdjustStep; labels: NextWeekLabels }) {
+}: {
+  data: AdjustStep;
+  labels: NextWeekLabels;
+  locale: string;
+}) {
   const id = useId();
   const [taskId, setTaskId] = useState("");
   const [day, setDay] = useState<LocalDate>(labels.days[0]?.value ?? "");
@@ -274,6 +277,7 @@ function NextWeekSection({
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     if (!taskId) {
       setErrors({ task: ["Choose a task."] });
       return;
@@ -281,103 +285,113 @@ function NextWeekSection({
     startTransition(async () => {
       setErrors({});
       setFormError(null);
-      const result = await planTask({ id: taskId, plannedDate: day });
-      if (result.ok) {
-        toast({
-          title: `Planned for ${formatLocalDate(day, locale, "full")}`,
-          variant: "success",
-        });
-        setTaskId("");
-      } else {
-        const fieldErrors =
-          result.error.code === "VALIDATION" ? result.error.fieldErrors : {};
-        setErrors({ day: fieldErrors.plannedDate });
-        setFormError(result.error.message);
+      try {
+        const result = await planTask({ id: taskId, plannedDate: day });
+        if (result.ok) {
+          toast({
+            title: `Planned for ${formatLocalDate(day, locale, "full")}`,
+            variant: "success",
+          });
+          setTaskId("");
+        } else {
+          const fieldErrors =
+            result.error.code === "VALIDATION" ? result.error.fieldErrors : {};
+          setErrors({ day: fieldErrors.plannedDate });
+          setFormError(result.error.message);
+        }
+      } catch {
+        setFormError("Couldn't plan the task. Try again.");
       }
     });
   }
 
   return (
-    <AdjustSection
-      title="Plan next week"
-      hint={`Put tasks on a day of the week after this one, ${labels.week}.`}
-    >
-      {plannable.length === 0 ? (
-        <p className="text-sm text-muted">No other open tasks to plan.</p>
-      ) : (
-        <form
-          onSubmit={submit}
-          noValidate
-          aria-label="Plan a task for next week"
-          className="flex flex-col gap-3 rounded-lg border border-border bg-surface-muted p-3 sm:flex-row sm:items-end"
-        >
-          <div className="min-w-0 flex-1">
-            <FormField id={`${id}-task`} label="Task" errors={errors.task}>
-              {(control) => (
-                <Select
-                  {...control}
-                  name="task"
-                  value={taskId}
-                  onChange={(event) => setTaskId(event.target.value)}
-                >
-                  <option value="">Choose a task</option>
-                  {plannable.map((task) => (
-                    <option key={task.id} value={task.id}>
-                      {task.goalTitle
-                        ? `${task.title} (${task.goalTitle})`
-                        : task.title}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </FormField>
-          </div>
-          <FormField id={`${id}-day`} label="Day" errors={errors.day}>
-            {(control) => (
-              <Select
-                {...control}
-                name="day"
-                value={day}
-                onChange={(event) => setDay(event.target.value)}
-              >
-                {labels.days.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
-          <Button type="submit" disabled={pending}>
-            {pending ? "Planning…" : "Plan"}
-          </Button>
-        </form>
-      )}
-      <p role="alert" className="text-sm text-danger empty:hidden">
-        {formError}
-      </p>
-      {plannedNextWeek.length === 0 ? (
-        <p className="text-sm text-muted">
-          Nothing is planned for that week yet.
+    <section aria-labelledby={`${id}-next-week`} className="grid gap-3">
+      <div>
+        <h3 id={`${id}-next-week`} className="text-title-large">
+          Plan next week
+        </h3>
+        <p className="text-body-medium text-on-surface-variant">
+          {labels.week}
         </p>
+      </div>
+      {plannable.length === 0 ? (
+        <Empty>No other open tasks to plan.</Empty>
       ) : (
-        <ul aria-label="Planned for next week" className={listClass}>
-          {plannedNextWeek.map((task) => (
-            <PlannedRow key={task.id} task={task} locale={locale} />
-          ))}
-        </ul>
+        <Card as="div">
+          <form
+            onSubmit={submit}
+            noValidate
+            aria-label="Plan a task for next week"
+            className="grid gap-3"
+          >
+            <div className="grid min-w-0 gap-3 large:grid-cols-2">
+              <FormField id={`${id}-task`} label="Task" errors={errors.task}>
+                {(control) => (
+                  <Select
+                    {...control}
+                    name="task"
+                    value={taskId}
+                    onChange={(event) => setTaskId(event.target.value)}
+                  >
+                    <option value="">Choose a task</option>
+                    {plannable.map((task) => (
+                      <option key={task.id} value={task.id}>
+                        {task.goalTitle
+                          ? `${task.title} (${task.goalTitle})`
+                          : task.title}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </FormField>
+              <FormField id={`${id}-day`} label="Day" errors={errors.day}>
+                {(control) => (
+                  <Select
+                    {...control}
+                    name="day"
+                    value={day}
+                    onChange={(event) => setDay(event.target.value)}
+                  >
+                    {labels.days.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </FormField>
+            </div>
+            <p className="text-body-small text-on-surface-variant">
+              The task will move to the chosen day in Plan.
+            </p>
+            {formError && <InlineBanner tone="error">{formError}</InlineBanner>}
+            <Button
+              type="submit"
+              variant="tonal"
+              size="xs"
+              className="justify-self-start"
+              pending={pending}
+            >
+              Plan
+            </Button>
+          </form>
+        </Card>
       )}
-    </AdjustSection>
-  );
-}
-
-function PlannedRow({ task, locale }: { task: PlanTaskItem; locale: string }) {
-  return (
-    <li className="flex flex-wrap items-baseline justify-between gap-2 p-3">
-      <span className="min-w-0 font-medium break-words">{task.title}</span>
-      <span className="text-sm text-muted">
-        {formatLocalDate(task.plannedDate!, locale, "full")}
-      </span>
-    </li>
+      {plannedNextWeek.length === 0 ? (
+        <Empty>Nothing is planned for that week yet.</Empty>
+      ) : (
+        <ListGroup label="Planned for next week">
+          {plannedNextWeek.map((task) => (
+            <ListItem
+              key={task.id}
+              headline={task.title}
+              supporting={formatLocalDate(task.plannedDate!, locale, "full")}
+              wrapSupporting
+            />
+          ))}
+        </ListGroup>
+      )}
+    </section>
   );
 }

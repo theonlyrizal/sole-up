@@ -317,6 +317,12 @@ test("keyboard journey D reflects, adjusts and finishes the weekly review", asyn
     page.getByRole("heading", { name: "Adjust", exact: true }),
   ).toBeFocused();
   await activate(page, page.getByRole("button", { name: `Pause: ${goal}` }));
+  const pause = page.getByRole("alertdialog", { name: `Pause ${goal}?` });
+  await expect(pause.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await activate(
+    page,
+    pause.getByRole("button", { name: "Pause", exact: true }),
+  );
   await expect(
     page.getByRole("button", { name: `Resume: ${goal}` }),
   ).toBeVisible();
@@ -328,17 +334,22 @@ test("keyboard journey D reflects, adjusts and finishes the weekly review", asyn
   await expect(
     page.getByRole("heading", { name: "Choose priorities", exact: true }),
   ).toBeFocused();
-  const form = page.getByRole("form", { name: "Add a priority" });
-  await chooseNextOption(
-    page,
-    form.getByLabel("Goal or task"),
-    `${goal} (paused)`,
-  );
-  await activate(page, form.getByRole("button", { name: "Add", exact: true }));
+  const picker = page.getByRole("region", { name: "Add a priority" });
+  await typeInto(page, picker.getByRole("searchbox"), "short story");
+  await expect(
+    picker.getByRole("listitem").filter({ hasText: goal }),
+  ).toContainText("Paused");
+  await activate(page, picker.getByRole("button", { name: `Add ${goal}` }));
   await expect(
     page.getByRole("list", { name: "Priorities for next week" }),
   ).toContainText(goal);
   await activate(page, page.getByRole("button", { name: "Finish review" }));
+  const finish = page.getByRole("dialog", { name: "Your review is saved" });
+  await activate(
+    page,
+    finish.getByRole("button", { name: "Done", exact: true }),
+  );
+  await expect(finish).toHaveCount(0);
   await expect(
     page.getByRole("region", { name: "Reviewed week" }),
   ).toContainText("Finished on");

@@ -1,3 +1,5 @@
+import { reviewHref } from "../../src/lib/review-flow";
+import { REVIEW_TEXT_MAX } from "../../src/lib/weekly-reviews";
 import { THEME_STORAGE_KEY } from "../../src/lib/theme";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -1517,6 +1519,163 @@ for (const viewport of sizes) {
       ).toBeVisible();
       await checkRenderedPage(page, theme);
       await capture("track-archived");
+    });
+  }
+}
+
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-10 review ${viewport.width} ${theme}`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+
+      const { lastWeek, reviewId, pastReviewId } = await seedVisualData(page, {
+        goalsUI: true,
+        plan: true,
+        reviewUI: true,
+      });
+      const capture = (state: string, fullPage = true) =>
+        page.screenshot({
+          path: `test-results/visual/ui-10/${state}-${viewport.width}-${theme}.png`,
+          fullPage,
+          animations: "disabled",
+          caret: "initial",
+        });
+
+      for (const [state, path, heading] of [
+        ["look-back", reviewHref(lastWeek), "Look back"],
+        ["reflect", reviewHref(lastWeek, "reflect"), "Reflect"],
+        ["adjust", reviewHref(lastWeek, "adjust"), "Adjust"],
+        ["priorities", reviewHref(lastWeek, "priorities"), "Choose priorities"],
+        ["history", "/review/history", "Past reviews"],
+        ["detail-open", `/review/history/${reviewId}`, "Reflect"],
+        ["detail-closed", `/review/history/${pastReviewId}`, "Reflect"],
+      ] as const) {
+        await openPage(page, path);
+        await expect(
+          page.getByRole("heading", { name: heading, exact: true }),
+        ).toBeVisible();
+        await checkRenderedPage(page, theme);
+        await capture(state);
+        if (state === "look-back")
+          await capture("look-back-first-screen", false);
+        for (const width of [320, 375, 390, 414, 768, 840, 1280]) {
+          await page.setViewportSize({ width, height: viewport.height });
+          await checkRenderedPage(page, theme);
+        }
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        await checkRenderedPage(page, theme);
+        if (state === "priorities") await capture("priorities-zoom");
+        await page.evaluate(() =>
+          document.documentElement.style.removeProperty("font-size"),
+        );
+      }
+
+      await openPage(page, reviewHref(lastWeek));
+      const info = page.getByRole("button", {
+        name: "How this is counted: Tasks completed",
+      });
+      const definition = page.getByRole("dialog", {
+        name: "How this is counted",
+      });
+      await expect(async () => {
+        if (!(await definition.isVisible())) await info.press("Enter");
+        await expect(definition).toBeVisible({ timeout: 500 });
+      }).toPass({ timeout: 10_000 });
+      await expect(definition).toContainText("As of");
+      await capture("metric-definition", false);
+      await page.keyboard.press("Escape");
+      await expect(info).toBeFocused();
+
+      // Hold a real Reflect write under reduced motion and make the server reject
+      // its modified content. Retry submits the unchanged browser draft.
+      await page.getByRole("button", { name: "Next: Reflect" }).click();
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Reflect", exact: true }),
+      ).toBeVisible();
+      const winsText = "Took the riverside route before the rain.";
+      const wins = page.getByLabel("Wins", { exact: true });
+      const next = page.getByRole("button", { name: "Next: Adjust" });
+      await expect(async () => {
+        await wins.fill(winsText);
+        await expect(wins).toHaveValue(winsText, { timeout: 500 });
+      }).toPass({ timeout: 10_000 });
+      const requested = Promise.withResolvers<void>();
+      const held = Promise.withResolvers<void>();
+      const reviewRoute = (url: URL) => url.pathname === "/review";
+      await page.route(reviewRoute, async (route) => {
+        const request = route.request();
+        if (request.method() !== "POST" || !request.headers()["next-action"]) {
+          await route.continue();
+          return;
+        }
+        requested.resolve();
+        await held.promise;
+        const body = request.postData()!;
+        const invalid = body.replace(winsText, "x".repeat(REVIEW_TEXT_MAX + 1));
+        expect(invalid).not.toBe(body);
+        await route.continue({ postData: invalid });
+      });
+      await next.click();
+      try {
+        await requested.promise;
+        await expect(
+          page.getByRole("status").getByText("Saving…"),
+        ).toBeVisible();
+        await expect(next).toBeDisabled();
+        await capture("reflect-pending");
+      } finally {
+        held.resolve();
+      }
+      await expect(
+        page.getByRole("status").getByText("Not saved"),
+      ).toBeVisible();
+      await expect(wins).toHaveValue(winsText);
+      await capture("reflect-error");
+      await page.unroute(reviewRoute);
+      await page
+        .getByRole("button", { name: "Retry", exact: true })
+        .press("Enter");
+      await expect(
+        page.getByRole("status").getByText("Saved", { exact: true }),
+      ).toBeVisible();
+      await expect(wins).toHaveValue(winsText);
+      await capture("reflect-retry-saved");
+
+      await next.click();
+      await page
+        .getByRole("button", { name: "Next: Choose priorities" })
+        .click();
+      await page.getByRole("button", { name: "Finish review" }).click();
+      const saved = page.getByRole("dialog", { name: "Your review is saved" });
+      await expect(saved).toContainText("You can change it until");
+      await capture("finish", false);
+      await saved
+        .getByRole("button", { name: "Done", exact: true })
+        .press("Enter");
+      await expect(saved).toHaveCount(0);
+      const week = page.getByRole("region", { name: "Reviewed week" });
+      await expect(week).toContainText("Finished on");
+      await capture("finished-open");
+
+      await openPage(page, `/review/history/${pastReviewId}`);
+      const menu = page.getByRole("button", { name: "Review options" });
+      await menu.press("Enter");
+      await page.getByRole("menuitem", { name: "Delete…" }).press("Enter");
+      await expect(page.getByRole("alertdialog")).toBeVisible();
+      await capture("delete-confirmation", false);
+      await page.keyboard.press("Escape");
+      await expect(menu).toBeFocused();
     });
   }
 }

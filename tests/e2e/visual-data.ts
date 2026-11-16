@@ -15,6 +15,7 @@ import {
 } from "../../src/lib/dates";
 import { DEFAULT_WEEK_START } from "../../src/lib/preferences";
 import {
+  auditEvents,
   calendarEventExceptions,
   calendarEvents,
   goals,
@@ -29,6 +30,7 @@ import {
   tasks,
   timeBlocks,
   userPreferences,
+  weeklyReviewPriorities,
   weeklyReviews,
 } from "../../src/server/db/schema";
 import { assertTestDatabaseUrl } from "../integration/helpers/database";
@@ -101,6 +103,7 @@ export async function seedVisualData(
     calendar = false,
     goalsUI = false,
     track = false,
+    reviewUI = false,
   } = {},
 ) {
   const userId = await signInAndConfirm(page, "Alex Morgan");
@@ -118,9 +121,12 @@ export async function seedVisualData(
   const goalId = randomUUID();
   const archivedGoalId = randomUUID();
   const noteId = randomUUID();
+  const reviewId = randomUUID();
   const pastReviewId = randomUUID();
   const eventId = randomUUID();
   const plannedTaskId = randomUUID();
+  const stalledTaskId = randomUUID();
+  const completedTaskId = randomUUID();
   const dailyId = randomUUID();
   const weekdaysId = randomUUID();
   const flexibleId = randomUUID();
@@ -144,6 +150,7 @@ export async function seedVisualData(
           reason: "A little more time outside each week.",
           priority: "medium",
           ...(goalsUI && { startDate: today, targetDate: addDays(today, 45) }),
+          ...(reviewUI && { createdAt: new Date(`${lastWeek}T12:00:00Z`) }),
         });
         if (goalsUI) {
           await db.insert(lifeAreas).values([
@@ -250,9 +257,10 @@ export async function seedVisualData(
             dueDate: yesterday,
           },
           {
+            id: stalledTaskId,
             userId,
             title: "Move the spare seedlings to the porch",
-            plannedDate: yesterday,
+            plannedDate: reviewUI ? addDays(lastWeek, 2) : yesterday,
           },
           {
             userId,
@@ -260,6 +268,7 @@ export async function seedVisualData(
             dueDate: addDays(today, 4),
           },
           {
+            id: completedTaskId,
             userId,
             title: "Borrow a route map",
             plannedDate: lastWeek,
@@ -566,9 +575,15 @@ export async function seedVisualData(
         await db.insert(weeklyReviews).values([
           {
             userId,
+            id: reviewId,
             periodStart: lastWeek,
             periodEnd: thisWeek,
             wins: "Made time for the short loop.",
+            ...(reviewUI && {
+              blockers: "Two appointments shifted into the afternoon.",
+              lessons: "Keep the shorter route ready for busy days.",
+              prioritiesNote: "Pack the bag the night before.",
+            }),
           },
           {
             id: pastReviewId,
@@ -579,6 +594,34 @@ export async function seedVisualData(
             lessons: "Short walks fit between errands.",
           },
         ]);
+        if (reviewUI) {
+          const occurredAt = new Date(`${lastWeek}T15:00:00Z`);
+          await db.insert(auditEvents).values([
+            {
+              userId,
+              entityId: completedTaskId,
+              entityType: "task",
+              eventType: "task.planned",
+              occurredAt,
+              changes: { plannedDate: { from: null, to: lastWeek } },
+            },
+            {
+              userId,
+              entityId: stalledTaskId,
+              entityType: "task",
+              eventType: "task.planned",
+              occurredAt,
+              changes: {
+                plannedDate: { from: lastWeek, to: addDays(lastWeek, 2) },
+              },
+            },
+          ]);
+          await db.insert(weeklyReviewPriorities).values([
+            { userId, reviewId, goalId, sortOrder: 0 },
+            { userId, reviewId, taskId: plannedTaskId, sortOrder: 1 },
+            { userId, reviewId: pastReviewId, goalId, sortOrder: 0 },
+          ]);
+        }
       },
     );
   } finally {
@@ -593,6 +636,7 @@ export async function seedVisualData(
     lastWeek,
     goalId,
     noteId,
+    reviewId,
     pastReviewId,
     eventId,
   };

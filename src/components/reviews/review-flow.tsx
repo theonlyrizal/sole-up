@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -10,9 +12,11 @@ import {
   useTransition,
 } from "react";
 
+import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
-import { toast } from "@/components/ui/toast";
+import { InlineBanner } from "@/components/ui/inline-banner";
+import { SaveStatus } from "@/components/ui/save-status";
 import type { LocalDate } from "@/lib/dates";
 import {
   adjacentReviewStep,
@@ -23,122 +27,220 @@ import {
 } from "@/lib/review-flow";
 import { finishWeeklyReview } from "@/server/modules/weekly-reviews/actions";
 
-/**
- * Saves a step's unsaved changes. Resolves false when the save failed; the
- * step shows why, and the flow stays on it.
- */
+import { ReviewFinishSheet } from "./review-finish-sheet";
+
 type StepSave = () => Promise<boolean>;
+type StepDraft = { save: StepSave; dirty: boolean };
 
-const StepSaveContext = createContext<React.RefObject<StepSave | null> | null>(
-  null,
-);
+const StepSaveContext = createContext<{
+  register: (registration: StepDraft) => () => void;
+  retry: () => void;
+  pending: boolean;
+} | null>(null);
 
-/**
- * Registers how the current step saves. The flow calls it whenever the
- * user leaves the step (another step, Back, Next, Finish), so each step
- * saves as it is left and the review can be resumed (chunk 7.3).
- */
-export function useStepSave(save: StepSave) {
-  const ref = useContext(StepSaveContext);
-  useEffect(() => {
-    if (!ref) return;
-    ref.current = save;
-    return () => {
-      if (ref.current === save) ref.current = null;
-    };
-  });
+/** Register the current step's draft and how to save it before leaving. */
+export function useStepSave(save: StepSave, dirty: boolean) {
+  const context = useContext(StepSaveContext);
+  const register = context?.register;
+  useEffect(() => register?.({ save, dirty }), [register, save, dirty]);
+  return context;
 }
 
-type ReviewFlowProps = {
-  reviewId: string;
-  week: LocalDate;
-  step: ReviewStep;
-  finished: boolean;
-  children: React.ReactNode;
-};
-
-/**
- * The four steps of an open review: a list of the steps (each one a link),
- * the current step's content, and Back / Next, with "Finish review" on the
- * last. Nothing has to be filled in to move on or to finish.
- */
 export function ReviewFlow({
   reviewId,
   week,
   step,
   finished,
+  editableUntil,
   children,
-}: ReviewFlowProps) {
+}: {
+  reviewId: string;
+  week: LocalDate;
+  step: ReviewStep;
+  finished: boolean;
+  editableUntil: string;
+  children: React.ReactNode;
+}) {
   const router = useRouter();
-  const save = useRef<StepSave | null>(null);
+  const draft = useRef<StepDraft | null>(null);
+  const register = useCallback((registration: StepDraft) => {
+    draft.current = registration;
+    return () => {
+      if (draft.current === registration) draft.current = null;
+    };
+  }, []);
   const heading = useRef<HTMLHeadingElement>(null);
   const shownStep = useRef(step);
+  const running = useRef(false);
+  const actionButton = useRef<HTMLButtonElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [celebrating, setCelebrating] = useState(false);
+  const [justFinished, setJustFinished] = useState(false);
+  const [savedAgain, setSavedAgain] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  // After moving to another step, focus its heading, so keyboard and
-  // screen reader users start at the new step rather than the old button.
   useEffect(() => {
     if (shownStep.current === step) return;
     shownStep.current = step;
     heading.current?.focus();
   }, [step]);
 
-  const saveStep = async () => (save.current ? save.current() : true);
-
-  function goTo(target: ReviewStep) {
+  function saveThen(next?: () => void | Promise<void>) {
+    if (running.current || pending) return;
+    running.current = true;
     startTransition(async () => {
       setError(null);
-      if (!(await saveStep())) return;
-      router.push(reviewHref(week, target));
-    });
-  }
-
-  function finish() {
-    startTransition(async () => {
-      setError(null);
-      if (!(await saveStep())) return;
-      const result = await finishWeeklyReview({ id: reviewId });
-      if (result.ok) {
-        toast({
-          title: finished ? "Review saved" : "Review finished",
-          variant: "success",
-        });
-      } else {
-        setError(result.error.message);
+      setSavedAgain(false);
+      try {
+        if (draft.current && !(await draft.current.save())) {
+          heading.current?.focus();
+          return;
+        }
+        await next?.();
+      } catch {
+        setError("Changes couldn't be saved. Try again.");
+      } finally {
+        running.current = false;
       }
     });
   }
 
+  // The shell and review menus use links too. Save before following a
+  // same-tab app link, including links outside the review's component tree.
+  useEffect(() => {
+    function onLinkClick(event: MouseEvent) {
+      if (
+        (!draft.current?.dirty && !running.current && !pending) ||
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+
+      const anchor = (event.target as Element | null)?.closest?.("a[href]");
+      if (
+        !(anchor instanceof HTMLAnchorElement) ||
+        (anchor.target && anchor.target !== "_self") ||
+        anchor.hasAttribute("download") ||
+        anchor.getAttribute("aria-current") === "step"
+      )
+        return;
+
+      const url = new URL(anchor.href);
+      if (
+        url.origin !== location.origin ||
+        (url.pathname === location.pathname && url.search === location.search)
+      )
+        return;
+
+      event.preventDefault();
+      const sameWeek =
+        url.pathname === "/review" && url.searchParams.get("week") === week;
+      saveThen(() =>
+        router.push(url.pathname + url.search + url.hash, {
+          scroll: !sameWeek,
+        }),
+      );
+    }
+
+    document.addEventListener("click", onLinkClick, true);
+    return () => document.removeEventListener("click", onLinkClick, true);
+  });
+
   const index = REVIEW_STEPS.indexOf(step);
   const previous = adjacentReviewStep(step, -1);
   const next = adjacentReviewStep(step, 1);
+  const isFinished = finished || justFinished;
+
+  function goTo(target: ReviewStep) {
+    saveThen(() => router.push(reviewHref(week, target), { scroll: false }));
+  }
+
+  function finish() {
+    if (running.current || pending) return;
+    // A direct link can omit the week. Keep the displayed period selected
+    // when the action refreshes and the default changes after Finish.
+    if (new URLSearchParams(location.search).get("week") !== week) {
+      window.history.replaceState(null, "", reviewHref(week, step));
+    }
+    saveThen(async () => {
+      const result = await finishWeeklyReview({ id: reviewId });
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+      if (isFinished) {
+        setSavedAgain(true);
+        return;
+      }
+      setJustFinished(true);
+      setCelebrating(true);
+    });
+  }
 
   return (
-    <StepSaveContext value={save}>
-      <div className="flex flex-col gap-6" data-hide-create>
-        <nav aria-label="Review steps">
-          <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <StepSaveContext value={{ register, retry: () => saveThen(), pending }}>
+      <div className="grid min-w-0 gap-5 expanded:grid-cols-10 expanded:items-start expanded:gap-6">
+        <div className="grid gap-2 expanded:hidden">
+          <p className="text-label-large text-on-surface-variant">
+            Step {index + 1} of {REVIEW_STEPS.length} ·{" "}
+            {REVIEW_STEP_LABELS[step]}
+          </p>
+          <div aria-hidden="true" className="grid grid-cols-4 gap-1.5">
             {REVIEW_STEPS.map((item, itemIndex) => (
-              <li key={item} className="flex">
-                <a
+              <span
+                key={item}
+                className={cx(
+                  "h-2 rounded-full",
+                  itemIndex <= index ? "bg-primary" : "bg-progress-track",
+                )}
+              />
+            ))}
+          </div>
+        </div>
+        <nav
+          aria-label="Review steps"
+          className="hidden expanded:sticky expanded:top-4 expanded:col-span-3 expanded:block"
+        >
+          <ol className="grid gap-1">
+            {REVIEW_STEPS.map((item, itemIndex) => (
+              <li key={item}>
+                <Link
                   href={reviewHref(week, item)}
+                  prefetch={false}
+                  scroll={false}
                   aria-current={item === step ? "step" : undefined}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    if (item !== step && !pending) goTo(item);
+                  onNavigate={(event) => {
+                    if (item === step) event.preventDefault();
                   }}
                   className={cx(
-                    "flex flex-1 flex-col rounded-md border px-3 py-2 text-sm",
+                    "state-layer flex min-h-12 min-w-0 items-center gap-3 rounded-lg px-3 py-2 text-label-large wrap-anywhere",
                     focusRing,
                     item === step
-                      ? "border-fg bg-surface-muted font-semibold"
-                      : "border-border text-muted hover:bg-surface-muted hover:text-fg",
+                      ? "bg-primary-container text-on-primary-container"
+                      : "text-on-surface-variant",
                   )}
                 >
-                  <span className="text-xs">Step {itemIndex + 1}</span>
+                  <span
+                    aria-hidden="true"
+                    className={cx(
+                      "grid size-8 shrink-0 place-items-center rounded-full text-label-large tabular-nums",
+                      item === step
+                        ? "bg-primary text-on-primary"
+                        : "border border-outline",
+                    )}
+                  >
+                    {itemIndex < index ? (
+                      <Icon name="check" size={18} />
+                    ) : (
+                      itemIndex + 1
+                    )}
+                  </span>
                   {REVIEW_STEP_LABELS[item]}
-                </a>
+                </Link>
               </li>
             ))}
           </ol>
@@ -146,52 +248,60 @@ export function ReviewFlow({
 
         <section
           aria-labelledby="review-step-heading"
-          className="flex flex-col gap-4"
+          className="grid min-w-0 gap-4 expanded:col-span-7"
         >
-          <div className="flex flex-col gap-1">
-            <p className="text-sm text-muted">
-              Step {index + 1} of {REVIEW_STEPS.length}
-            </p>
-            <h2
-              id="review-step-heading"
-              ref={heading}
-              tabIndex={-1}
-              className={cx("rounded-sm text-xl font-semibold", focusRing)}
-            >
-              {REVIEW_STEP_LABELS[step]}
-            </h2>
-          </div>
-          {children}
-        </section>
-
-        <div className="flex flex-col gap-2 border-t border-border pt-4">
-          <p role="alert" className="text-sm text-danger empty:hidden">
-            {error}
-          </p>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {previous ? (
+          <h2
+            id="review-step-heading"
+            ref={heading}
+            tabIndex={-1}
+            className={cx("w-fit rounded-xs text-headline-small", focusRing)}
+          >
+            {REVIEW_STEP_LABELS[step]}
+          </h2>
+          <fieldset disabled={pending} className="min-w-0">
+            {children}
+          </fieldset>
+          <div className="sticky bottom-[var(--compact-bottom-clearance,0px)] z-10 -mx-4 grid gap-2 border-t border-outline-variant bg-canvas px-4 py-2 medium:mx-0 medium:px-0 expanded:static">
+            {error && <InlineBanner tone="error">{error}</InlineBanner>}
+            {savedAgain && <SaveStatus phase="saved" />}
+            <div className="flex flex-wrap justify-between gap-2">
+              {previous && (
+                <Button
+                  variant="tonal"
+                  disabled={pending}
+                  onClick={() => goTo(previous)}
+                >
+                  Back
+                </Button>
+              )}
               <Button
-                variant="secondary"
-                disabled={pending}
-                onClick={() => goTo(previous)}
+                ref={actionButton}
+                className="ms-auto"
+                pending={pending}
+                onClick={next ? () => goTo(next) : finish}
               >
-                Back
+                {next
+                  ? `Next: ${REVIEW_STEP_LABELS[next]}`
+                  : isFinished
+                    ? "Save review"
+                    : "Finish review"}
               </Button>
-            ) : (
-              <span />
-            )}
-            {next ? (
-              <Button disabled={pending} onClick={() => goTo(next)}>
-                Next: {REVIEW_STEP_LABELS[next]}
-              </Button>
-            ) : (
-              <Button disabled={pending} onClick={finish}>
-                {finished ? "Save review" : "Finish review"}
-              </Button>
-            )}
+            </div>
           </div>
-        </div>
+        </section>
       </div>
+      <ReviewFinishSheet
+        open={celebrating}
+        editableUntil={editableUntil}
+        onOpenChange={setCelebrating}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          (actionButton.current?.disabled
+            ? heading.current
+            : actionButton.current
+          )?.focus();
+        }}
+      />
     </StepSaveContext>
   );
 }

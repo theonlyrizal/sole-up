@@ -1,16 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { IconButton } from "@/components/ui/icon-button";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { toast } from "@/components/ui/toast";
 import { deleteWeeklyReview } from "@/server/modules/weekly-reviews/actions";
 
-/**
- * Confirms a review's hard delete (ADR 0015), open or closed, then goes
- * back to the list of past reviews. `weekLabel` is formatted on the server.
- */
 export function DeleteReviewDialog({
   reviewId,
   weekLabel,
@@ -19,24 +17,53 @@ export function DeleteReviewDialog({
   weekLabel: string;
 }) {
   const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
-    <ConfirmDialog
-      trigger={
-        <Button variant="danger" size="sm">
-          Delete review
-        </Button>
-      }
-      title={`Delete the review of ${weekLabel}?`}
-      description="This permanently deletes what you wrote and the priorities you chose. The goals and tasks themselves stay as they are. It can't be undone."
-      confirmLabel="Delete review"
-      onConfirm={async () => {
-        const result = await deleteWeeklyReview({ id: reviewId });
-        if (result.ok) {
-          toast({ title: "Review deleted", variant: "success" });
-          router.replace("/review/history");
-        }
-        return result;
-      }}
-    />
+    <>
+      <Menu modal={false}>
+        <MenuTrigger asChild>
+          <IconButton
+            ref={trigger}
+            icon="more_vert"
+            label="Review options"
+            tooltip={false}
+          />
+        </MenuTrigger>
+        <MenuContent
+          align="end"
+          onCloseAutoFocus={(event) => {
+            if (confirming) event.preventDefault();
+          }}
+        >
+          <MenuItem
+            icon="delete"
+            destructive
+            onSelect={() => setConfirming(true)}
+          >
+            Delete…
+          </MenuItem>
+        </MenuContent>
+      </Menu>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          trigger.current?.focus();
+        }}
+        title={`Delete the review of ${weekLabel}?`}
+        description="This permanently deletes what you wrote and the priorities you chose. The goals and tasks themselves stay as they are. It can't be undone."
+        confirmLabel="Delete review"
+        onConfirm={async () => {
+          const result = await deleteWeeklyReview({ id: reviewId });
+          if (result.ok) {
+            toast({ title: "Review deleted", variant: "success" });
+            router.replace("/review/history");
+          }
+          return result;
+        }}
+      />
+    </>
   );
 }
