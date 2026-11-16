@@ -264,9 +264,7 @@ test("keyboard journey C creates, logs, corrects and pauses a habit", async ({
   );
   await expect(page.getByText("Marked done", { exact: true })).toBeVisible();
   await activate(page, navLink(page, "Track"));
-  await expect(
-    page.getByText("Last 4 weeks: 1 of 1 day", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("1 of 1 day", { exact: true })).toBeVisible();
   const logged = page.getByRole("button", { name: /: Done$/ });
   await activate(page, logged);
   const logDialog = page.getByRole("dialog");
@@ -274,21 +272,27 @@ test("keyboard journey C creates, logs, corrects and pauses a habit", async ({
   await expect(done).toBeChecked();
   await tabTo(page, done);
   await page.keyboard.press("ArrowDown");
-  await expect(logDialog.getByRole("radio", { name: "Skipped" })).toBeChecked();
+  await expect(logDialog.getByRole("radio", { name: "Skip" })).toBeChecked();
   await activate(page, logDialog.getByRole("button", { name: "Save" }));
   await expect(logDialog).toBeHidden();
   await expect(page.getByRole("button", { name: /: Skipped$/ })).toBeFocused();
   await expect(
-    page.getByText("Last 4 weeks: Nothing expected in this range", {
+    page.getByText("Nothing expected in this range", {
       exact: true,
     }),
   ).toBeVisible();
 
-  await activate(page, page.getByRole("button", { name: `Pause: ${habit}` }));
+  await activate(
+    page,
+    page.getByRole("button", { name: `Actions for ${habit}` }),
+  );
+  await page
+    .getByRole("menuitem", { name: "Pause", exact: true })
+    .press("Enter");
   await expect(
     page
       .getByRole("region", { name: "Paused" })
-      .getByRole("button", { name: `Resume: ${habit}` }),
+      .getByRole("button", { name: "Resume", exact: true }),
   ).toBeVisible();
 });
 

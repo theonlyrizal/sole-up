@@ -13,9 +13,9 @@ export function MetricInfo({
   title: string;
   definition: string;
   range: string;
-  asOf: string;
-  asOfLabel: string;
-}) {
+} & (
+  { asOf: string; asOfLabel: string } | { asOf?: never; asOfLabel?: never }
+)) {
   return (
     <ResponsiveSheet
       title="How this is counted"
@@ -29,12 +29,14 @@ export function MetricInfo({
           <dt className="font-semibold">Range</dt>
           <dd>{range}</dd>
         </div>
-        <div className="flex flex-wrap gap-x-2">
-          <dt className="font-semibold">As of</dt>
-          <dd>
-            <time dateTime={asOf}>{asOfLabel}</time>
-          </dd>
-        </div>
+        {asOf && (
+          <div className="flex flex-wrap gap-x-2">
+            <dt className="font-semibold">As of</dt>
+            <dd>
+              <time dateTime={asOf}>{asOfLabel}</time>
+            </dd>
+          </div>
+        )}
       </dl>
     </ResponsiveSheet>
   );

@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  chooseGoalMenuItem,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 // Home's Habits card (chunk 6.6): each active habit with its own last-4-weeks
 // figure and this week's progress, from the 6.2 engine, linking to its row
@@ -127,7 +131,7 @@ test("Home lists each active habit's figure and links to it on Track", async ({
   // A paused habit leaves the card; with none active it says nothing yet.
   const paused = page.getByRole("region", { name: "Paused" });
   for (const title of ["Read", "Stretch"]) {
-    await page.getByRole("button", { name: `Pause: ${title}` }).click();
+    await chooseGoalMenuItem(page, "Pause", `Actions for ${title}`);
     await expect(
       paused.getByRole("heading", { name: title, exact: true }),
     ).toBeVisible();

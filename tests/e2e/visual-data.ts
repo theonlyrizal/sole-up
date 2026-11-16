@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { type Page } from "@playwright/test";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
@@ -18,6 +19,7 @@ import {
   calendarEvents,
   goals,
   habitLogs,
+  habitPauses,
   habits,
   habitSchedules,
   lifeAreas,
@@ -26,6 +28,7 @@ import {
   notes,
   tasks,
   timeBlocks,
+  userPreferences,
   weeklyReviews,
 } from "../../src/server/db/schema";
 import { assertTestDatabaseUrl } from "../integration/helpers/database";
@@ -97,6 +100,7 @@ export async function seedVisualData(
     plan = false,
     calendar = false,
     goalsUI = false,
+    track = false,
   } = {},
 ) {
   const userId = await signInAndConfirm(page, "Alex Morgan");
@@ -109,7 +113,7 @@ export async function seedVisualData(
   const tomorrow = addDays(today, 1);
   const thisWeek = startOfWeek(today, DEFAULT_WEEK_START);
   const lastWeek = addDays(thisWeek, -7);
-  const habitStart = addDays(today, -18);
+  const habitStart = addDays(today, track ? -65 : -18);
   const areaId = randomUUID();
   const goalId = randomUUID();
   const archivedGoalId = randomUUID();
@@ -469,6 +473,70 @@ export async function seedVisualData(
             status: "completed",
           },
         ]);
+        if (track) {
+          await db
+            .update(userPreferences)
+            .set({ weekStart: dayOfWeek(addDays(today, -4)) })
+            .where(eq(userPreferences.userId, userId));
+          const pausedId = randomUUID();
+          const archivedId = randomUUID();
+          await db.insert(habits).values([
+            {
+              id: pausedId,
+              userId,
+              title: "Evening reflection",
+              measure: "check",
+              startDate: habitStart,
+              status: "paused",
+            },
+            {
+              id: archivedId,
+              userId,
+              title: "Practice guitar",
+              measure: "check",
+              startDate: habitStart,
+              status: "archived",
+            },
+          ]);
+          await db.insert(habitSchedules).values(
+            [pausedId, archivedId].map((habitId) => ({
+              userId,
+              habitId,
+              cadenceType: "daily" as const,
+              cadenceConfig: {},
+              effectiveFrom: habitStart,
+            })),
+          );
+          await db.insert(habitPauses).values(
+            [pausedId, archivedId].map((habitId) => ({
+              userId,
+              habitId,
+              startDate: addDays(today, -6),
+            })),
+          );
+          await db.insert(habitLogs).values([
+            ...[-7, -13, -21, -28, -35, -53].map((offset) => ({
+              userId,
+              habitId: dailyId,
+              localDate: addDays(today, offset),
+              status:
+                offset === -21 ? ("skipped" as const) : ("completed" as const),
+            })),
+            {
+              userId,
+              habitId: weekdaysId,
+              localDate: addDays(today, -2),
+              status: "completed",
+              value: "18",
+            },
+            {
+              userId,
+              habitId: pausedId,
+              localDate: addDays(today, -7),
+              status: "completed",
+            },
+          ]);
+        }
         await db.insert(notes).values({
           id: noteId,
           userId,
