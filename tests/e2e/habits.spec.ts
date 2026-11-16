@@ -1,6 +1,13 @@
+import { THEME_STORAGE_KEY } from "../../src/lib/theme";
+import { seedVisualData, VISUAL_ZONE } from "./visual-data";
+
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  chooseGoalMenuItem,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 
 function habitItem(page: Page, title: string) {
   return page
@@ -37,7 +44,7 @@ test("create check and quantity habits, then edit the schedule from this week", 
   await dialog.getByLabel("Title").fill("Stretch");
   await dialog.getByRole("radio", { name: "On chosen days" }).check();
   for (const day of ["Monday", "Wednesday", "Friday"]) {
-    await dialog.getByRole("checkbox", { name: day }).check();
+    await dialog.getByRole("button", { name: day, exact: true }).click();
   }
   await expectNoSeriousViolations(page);
   await dialog.getByRole("button", { name: "Add habit" }).click();
@@ -46,7 +53,7 @@ test("create check and quantity habits, then edit the schedule from this week", 
 
   // A quantity habit: the errors name each missing field.
   dialog = await openNewHabit(page);
-  await dialog.getByRole("radio", { name: "An amount" }).check();
+  await dialog.getByRole("radio", { name: "Quantity" }).click();
   await dialog.getByRole("button", { name: "Add habit" }).click();
   await expect(dialog.getByLabel("Title")).toHaveAttribute(
     "aria-invalid",
@@ -57,20 +64,19 @@ test("create check and quantity habits, then edit the schedule from this week", 
     "aria-invalid",
     "true",
   );
-  await expect(dialog.getByLabel(/Target per day/)).toHaveAttribute(
-    "aria-invalid",
-    "true",
-  );
-  // The pointer still rests on Add habit, and the primary button's hover
-  // state is below 4.5:1 (a follow-up in the 6.3 handoff note).
+  await expect(
+    dialog.getByRole("textbox", { name: /^Target per day/ }),
+  ).toHaveAttribute("aria-invalid", "true");
   await page.mouse.move(0, 0);
   await expectNoSeriousViolations(page);
 
   await dialog.getByLabel("Title").fill("Drink water");
   await dialog.getByLabel("Unit").fill("glasses");
-  await dialog.getByLabel("Target per day (glasses)").fill("8");
+  await dialog
+    .getByLabel("Target per day (glasses)", { exact: true })
+    .fill("8");
   await dialog.getByRole("radio", { name: "A number of times a week" }).check();
-  await dialog.getByLabel("Times a week", { exact: true }).selectOption("3");
+  await dialog.getByLabel("Times a week", { exact: true }).fill("3");
   await dialog.getByRole("button", { name: "Add habit" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(habitItem(page, "Drink water")).toContainText(
@@ -79,30 +85,30 @@ test("create check and quantity habits, then edit the schedule from this week", 
 
   // Editing the schedule says it applies from this week. All seven days
   // becomes daily.
-  await page.getByRole("button", { name: "Edit: Stretch" }).click();
+  await chooseGoalMenuItem(page, "Edit", "Actions for Stretch");
   dialog = page.getByRole("dialog", { name: "Edit habit" });
   await expect(
     dialog.getByText(/apply from the start of this week/),
   ).toBeVisible();
   await expect(dialog.getByText("Measured as done or not.")).toBeVisible();
-  await expect(dialog.getByRole("radio", { name: "Done or not" })).toHaveCount(
-    0,
-  );
+  await expect(dialog.getByRole("radio", { name: "Check" })).toHaveCount(0);
   for (const day of ["Tuesday", "Thursday", "Saturday", "Sunday"]) {
-    await dialog.getByRole("checkbox", { name: day }).check();
+    await dialog.getByRole("button", { name: day, exact: true }).click();
   }
   await expect(dialog.getByText(/saved as a daily habit/)).toBeVisible();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(habitItem(page, "Stretch")).toContainText("Every day");
 
-  await page.getByRole("button", { name: "Edit: Drink water" }).click();
+  await chooseGoalMenuItem(page, "Edit", "Actions for Drink water");
   dialog = page.getByRole("dialog", { name: "Edit habit" });
   await expect(dialog.getByLabel("Unit")).toHaveCount(0);
   await expect(dialog.getByLabel("Times a week", { exact: true })).toHaveValue(
     "3",
   );
-  await dialog.getByLabel("Target per day (glasses)").fill("6.5");
+  await dialog
+    .getByLabel("Target per day (glasses)", { exact: true })
+    .fill("6.5");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(habitItem(page, "Drink water")).toContainText(
@@ -123,17 +129,17 @@ test("pause and resume, archive and restore, then a confirmed delete", async ({
   const active = page.getByRole("region", { name: "Active" });
   const paused = page.getByRole("region", { name: "Paused" });
 
-  await page.getByRole("button", { name: "Pause: Meditate" }).click();
+  await chooseGoalMenuItem(page, "Pause", "Actions for Meditate");
   await expect(paused.getByRole("heading", { name: "Meditate" })).toBeVisible();
   await expect(active).toHaveCount(0);
   await expectNoSeriousViolations(page);
 
-  await page.getByRole("button", { name: "Resume: Meditate" }).click();
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
   await expect(active.getByRole("heading", { name: "Meditate" })).toBeVisible();
   await expect(paused).toHaveCount(0);
 
   // Archive moves it out of Track; Restore asks, then makes it active.
-  await page.getByRole("button", { name: "Archive: Meditate" }).click();
+  await chooseGoalMenuItem(page, "Archive", "Actions for Meditate");
   await expect(
     page.getByRole("heading", { name: "No habits yet" }),
   ).toBeVisible();
@@ -156,7 +162,7 @@ test("pause and resume, archive and restore, then a confirmed delete", async ({
   await expect(active.getByRole("heading", { name: "Meditate" })).toBeVisible();
 
   // Delete names what goes with it, and Cancel keeps the habit.
-  await page.getByRole("button", { name: "Delete: Meditate" }).click();
+  await chooseGoalMenuItem(page, "Delete…", "Actions for Meditate");
   const confirm = page.getByRole("alertdialog", {
     name: "Delete “Meditate”?",
   });
@@ -167,7 +173,7 @@ test("pause and resume, archive and restore, then a confirmed delete", async ({
   await confirm.getByRole("button", { name: "Cancel" }).click();
   await expect(habitItem(page, "Meditate")).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete: Meditate" }).click();
+  await chooseGoalMenuItem(page, "Delete…", "Actions for Meditate");
   await confirm.getByRole("button", { name: "Delete habit" }).click();
   await expect(
     page.getByRole("heading", { name: "No habits yet" }),
@@ -190,9 +196,7 @@ test("a habit can be created with the keyboard alone", async ({ page }) => {
 
   // Tab to the measure, then to how often; arrows pick within each group.
   await page.keyboard.press("Tab");
-  await expect(
-    dialog.getByRole("radio", { name: "Done or not" }),
-  ).toBeFocused();
+  await expect(dialog.getByRole("radio", { name: "Check" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(dialog.getByRole("radio", { name: "Every day" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
@@ -200,14 +204,14 @@ test("a habit can be created with the keyboard alone", async ({ page }) => {
     dialog.getByRole("radio", { name: "On chosen days" }),
   ).toBeChecked();
   await page.keyboard.press("Tab");
-  const monday = dialog.getByRole("checkbox", { name: "Monday" });
+  const monday = dialog.getByRole("button", { name: "Monday", exact: true });
   await expect(monday).toBeFocused();
   const outline = await monday.evaluate(
     (element) => getComputedStyle(element).outlineStyle,
   );
   expect(outline).not.toBe("none");
   await page.keyboard.press("Space");
-  await expect(monday).toBeChecked();
+  await expect(monday).toHaveAttribute("aria-pressed", "true");
 
   // Enter in the title submits the form.
   await title.focus();
@@ -215,3 +219,78 @@ test("a habit can be created with the keyboard alone", async ({ page }) => {
   await expect(dialog).toHaveCount(0);
   await expect(habitItem(page, "Journal")).toContainText("Mon");
 });
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 1280, height: 800 },
+]) {
+  for (const theme of ["light", "dark"] as const) {
+    test.describe(`habit accessibility ${viewport.width} ${theme}`, () => {
+      test.use({
+        viewport,
+        colorScheme: theme,
+        timezoneId: VISUAL_ZONE,
+        reducedMotion: "reduce",
+      });
+      test("scans all layouts, the habit form, day sheet and archive", async ({
+        page,
+      }) => {
+        test.slow();
+        await page.addInitScript(
+          (key) => localStorage.setItem(key, "system"),
+          THEME_STORAGE_KEY,
+        );
+        await seedVisualData(page, { track: true });
+        for (const path of [
+          "/track?range=week",
+          "/track",
+          "/track?range=12w",
+        ]) {
+          await page.goto(path);
+          await expect(habitItem(page, "Morning stretch")).toBeVisible();
+          await expectNoSeriousViolations(page);
+        }
+        const form = await openNewHabit(page);
+        await form
+          .getByRole("radio", { name: "Quantity", exact: true })
+          .click();
+        await form
+          .getByRole("radio", { name: "On chosen days", exact: true })
+          .click();
+        await expectNoSeriousViolations(page);
+        await page.keyboard.press("Escape");
+        const quantity = habitItem(
+          page,
+          "Read a few pages before the afternoon commute",
+        );
+        await quantity
+          .getByRole("button", { name: /: 6 of 12 pages$/ })
+          .click();
+        await expect(page.getByRole("dialog")).toBeVisible();
+        await expectNoSeriousViolations(page);
+        await page.keyboard.press("Escape");
+        if (viewport.width === 390) {
+          const options = page.getByRole("button", { name: "Track options" });
+          await options.press("Enter");
+          await page.getByRole("menuitem", { name: "Legend" }).press("Enter");
+          await expect(
+            page.getByRole("button", { name: "Legend" }),
+          ).toBeFocused();
+          await expect(
+            page.getByRole("list", { name: "What the days show" }),
+          ).toBeVisible();
+          await options.press("Enter");
+          await page
+            .getByRole("menuitem", { name: "Archived (1)" })
+            .press("Enter");
+        } else {
+          await page.getByRole("link", { name: "Archived (1)" }).click();
+        }
+        await expect(page).toHaveURL(/\/track\/archived$/);
+        await expect(
+          page.getByRole("heading", { name: "Practice guitar" }),
+        ).toBeVisible();
+        await expectNoSeriousViolations(page);
+      });
+    });
+  }
+}

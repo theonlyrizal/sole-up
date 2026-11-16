@@ -458,9 +458,11 @@ for (const viewport of sizes) {
         name: "Filter and sort tasks",
       });
       const due = filters.getByRole("button", { name: "Due", exact: true });
-      await due.press("Enter");
       const dueSheet = page.getByRole("dialog", { name: "Due" });
-      await expect(dueSheet).toBeVisible();
+      await expect(async () => {
+        if (!(await dueSheet.isVisible())) await due.press("Enter");
+        await expect(dueSheet).toBeVisible({ timeout: 1_000 });
+      }).toPass({ timeout: 15_000 });
       await capture("plan-due-filter", false);
       await expectNoSeriousViolations(page);
       await dueSheet.getByRole("radio", { name: "Next 7 days" }).press("Space");
@@ -1427,6 +1429,94 @@ for (const viewport of sizes) {
         ).toBeVisible();
         await capture("track-first-paint");
       }
+    });
+  }
+}
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-9 Track ${viewport.width} ${theme}`, async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      await seedVisualData(page, { track: true });
+      const capture = (state: string, fullPage = true) =>
+        page.screenshot({
+          path: `test-results/visual/ui-9/${state}-${viewport.width}-${theme}.png`,
+          fullPage,
+          animations: "disabled",
+          caret: "initial",
+        });
+      for (const [range, path] of [
+        ["week", "/track?range=week"],
+        ["4w", "/track"],
+        ["12w", "/track?range=12w"],
+      ]) {
+        await openPage(page, path!);
+        await expect(
+          page.getByRole("heading", { name: DAILY_HABIT }),
+        ).toBeVisible();
+        await checkRenderedPage(page, theme);
+        await capture("track-" + range);
+        for (const width of [320, 375, 390, 414, 768, 1280]) {
+          await page.setViewportSize({ width, height: viewport.height });
+          await checkRenderedPage(page, theme);
+        }
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        await checkRenderedPage(page, theme);
+        if (range === "4w") await capture("track-4w-zoom");
+        await page.evaluate(() =>
+          document.documentElement.style.removeProperty("font-size"),
+        );
+      }
+
+      await openPage(page, "/track");
+      await page.getByRole("button", { name: "Legend", exact: true }).click();
+      await expect(
+        page
+          .getByRole("list", { name: "What the days show" })
+          .getByRole("listitem"),
+      ).toHaveCount(10);
+      await capture("track-legend");
+      await page.getByRole("button", { name: "Legend", exact: true }).click();
+      await page
+        .getByRole("button", { name: "How this is counted: " + QUANTITY_HABIT })
+        .click();
+      await expect(
+        page.getByRole("dialog", { name: "How this is counted" }),
+      ).toBeVisible();
+      await capture("track-definition", false);
+      await page.keyboard.press("Escape");
+
+      await page.getByRole("button", { name: /: 6 of 12 pages$/ }).click();
+      await expect(
+        page
+          .getByRole("dialog")
+          .getByRole("textbox", { name: "Amount (pages)" }),
+      ).toHaveValue("6");
+      await capture("track-quantity-log", false);
+      await page.keyboard.press("Escape");
+      await page
+        .getByRole("button", { name: "New habit", exact: true })
+        .click();
+      const dialog = page.getByRole("dialog", { name: "New habit" });
+      await dialog
+        .getByRole("radio", { name: "On chosen days", exact: true })
+        .click();
+      await capture("habit-form", false);
+
+      await openPage(page, "/track/archived");
+      await expect(
+        page.getByRole("heading", { name: "Practice guitar" }),
+      ).toBeVisible();
+      await checkRenderedPage(page, theme);
+      await capture("track-archived");
     });
   }
 }

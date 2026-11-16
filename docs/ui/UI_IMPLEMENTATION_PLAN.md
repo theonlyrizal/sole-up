@@ -89,7 +89,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-6 | Plan: All tasks, Upcoming, Inbox, task dialog, Quick Add | done | chunk/ui-6-plan-task-lists | 2026-11-13 | URL contracts, task actions, both theme and size pairs, and finish-line checks verified |
 | UI-7 | Calendar and event/block dialogs | done | chunk/ui-7-calendar | 2026-11-15 | All five views, keyboard date navigation, theme and size pairs, and finish-line checks verified |
 | UI-8 | Goals, goal detail, life areas, archived goals | done | chunk/ui-8-goals-life-areas | 2026-11-15 | Goal journeys, confirmed milestone feedback and all finish-line checks verified |
-| UI-9 | Track, habit form, archived habits | todo | | | Needs sign-off 5-B |
+| UI-9 | Track, habit form, archived habits | done | chunk/ui-9-track-habits | 2026-11-16 | 5-B approved. Three ranges, confirmed feedback, keyboard targets and finish-line checks verified |
 | UI-10 | Weekly review, history, detail | todo | | | Uses 5-A |
 | UI-11 | Notes, editor, search (and tags if 8.5 shipped) | todo | | | |
 | UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | todo | | | Needs sign-off 5-D |
@@ -609,5 +609,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Both themes and sizes pass axe. Keyboard, 200% text reflow and reduced motion were exercised in Chromium. |
 | Restraint | 2 | The overview uses a small arc and caption. Detail settles after one changed segment, and the initial count is drawn at its saved value. |
 | Variety | 1 | Goal cards, the two-pane detail and the archive rows give each route a different layout using the same typography and surfaces. |
+
+**Total — 15/16.**
+
+### UI-9 · Track and habits (2026-11-16)
+
+- **Branch / PR** — `chunk/ui-9-track-habits` · [UI-9 pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-9-track-habits). UI-8 [#100](https://github.com/theonlyrizal/sole-up/pull/100) merged before this phase.
+- **Routes and components** — `/track` renders the week pills, 4-week numbered grid and 12-week matrix, with one collapsible D-19 legend. Habit cards use stable identity avatars, visible figures, a definition control and overflow actions. The day log uses a responsive sheet. The habit form uses FormDialog with create-only measure selection, week-ordered day chips, and quantity and cadence steppers. `/track/archived` uses a ListGroup with Restore and confirmed Delete.
+- **Data paths and contracts** — `getTrackView`, `getArchivedHabits` and the existing habit actions supply the UI. `trackHref` keeps the default and explicit selections, and the history test exercises invalid-range fallback. Home’s hash lands with the card below the compact app bar. Each loggable target uses the query’s date and state labels. Non-loggable history remains static. Existing Undo, status messages and delete log counts are exercised.
+- **Decisions** — The user approved 5-B. PRODUCT_SPEC §8 now puts the definition behind “How this is counted” while the figure stays visible. Track shows the optimistic write as pending and keeps the figure and mark credit tied to the confirmed query result, including historical schedules. Week labels sit above rows when the card cannot fit them alongside seven 48 px targets.
+- **Checks run** — `pnpm verify` passed with 1,253 unit and 831 integration tests. `pnpm build` passed with Next.js 16.4.3. `pnpm test:e2e` completed with 192 first-attempt passes, two existing Calendar and push tests passing on retry, and 34 visual-only skips. `pnpm test:visual` passed all 34 cases against the production build. The compact Plan capture now waits for the Due filter to open when hydration delays the first keyboard press. A concurrent verification run timed out in the existing spring-forward reminder test. The serial run passed with standard timeouts. Lint reports one existing unused-variable warning in habit validation.
+- **Screenshots** — The week, 4w, 12w, archive, legend, definition, quantity sheet, habit form and 200% text captures are in `test-results/visual/ui-9/` at 390 × 844 and 1280 × 800 in both themes. Start with `track-week-390-light.png`, `track-4w-390-dark.png` and `track-12w-1280-dark.png`.
+- **Interaction evidence** — See `test-results/e2e-results/habit-logging-Track-waits--68a04-s-a-failed-amount-for-retry-chromium/` for the pending, error, confirmed retry, correction and reduced-motion PNGs. Chromium held the real request with the figure at 0 of 3 days and no halo. Server validation rejected the modified request and the sheet retained the typed 5.5 cups. Retry saved 5.5 of 8 cups, updated the figure to 0.6 of 3 days and showed one local halo. The identical save, correction to 2 cups, reduced-motion full target and reload produced zero halos. The history journey also covers Skip, Clear and Undo.
+- **Accessibility** — Axe reported zero serious or critical violations across the three ranges, habit form, day sheet and archive in both themes at both capture sizes. At 320 px, Chromium verified local chart scroll, non-overlapping 48 px targets, static non-loggable days, and keyboard logging with focus returning to its day in each layout. Width checks covered 320, 375, 390, 414, 768 and 1280 px. The capture sizes also passed 200% text reflow.
+- **Unverified** — Physical touch and soft-keyboard behavior, manual screen-reader playback, and browser engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | The range and dates frame the cards. The habit name, cadence and figure are visible before exploring the history. |
+| Character | 2 | Cream and dark opaque cards use the same stable habit avatars and three day shapes. |
+| Color | 2 | Forest marks confirmed credit, Kiwi marks selection or secondary actions, and the transient Sunshine halo is local to a confirmed day. Both themes passed axe. |
+| Response | 2 | A real delayed rejection, retained input, explicit retry and subsequent correction are distinguishable in Chromium. |
+| Truthfulness | 2 | The figure, state labels and capped marks come from the queries. Partial quantity stays partial, and pending never presents the draft as saved. |
+| Accessibility | 2 | Keyboard logging and focus return pass in each layout. Local scroll, static marks, reduced motion, 200% text and the theme and size axe matrix pass. |
+| Restraint | 2 | Feedback stays at the day and settles after confirmation. Reload, repeat and correction leave the chart quiet. |
+| Variety | 1 | Tall pills, numbered circles and compact squares give the time scales different shapes within the same card. |
 
 **Total — 15/16.**

@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toast";
 import type { HabitStatus } from "@/lib/habits/habit";
@@ -11,24 +10,23 @@ type DeleteHabitDialogProps = {
   habit: { id: string; title: string; status: HabitStatus };
   /** Every log of the habit, completed or skipped. */
   logCount: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus: (event: Event) => void;
 };
 
 /**
  * Confirms a habit's hard delete (ADR 0006) and names how many logs go
  * with it. Live habits are pointed at archiving, the reversible option.
  */
-export function DeleteHabitDialog({ habit, logCount }: DeleteHabitDialogProps) {
+export function DeleteHabitDialog({
+  habit,
+  logCount,
+  ...dialog
+}: DeleteHabitDialogProps) {
   return (
     <ConfirmDialog
-      trigger={
-        <Button
-          variant="danger"
-          size="sm"
-          aria-label={`Delete: ${habit.title}`}
-        >
-          Delete
-        </Button>
-      }
+      {...dialog}
       title={`Delete “${habit.title}”?`}
       description={
         <>

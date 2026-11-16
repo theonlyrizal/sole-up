@@ -59,10 +59,10 @@ async function createHabit(
   const dialog = page.getByRole("dialog", { name: "New habit" });
   await dialog.getByLabel("Title").fill(title);
   if (options.quantity) {
-    await dialog.getByRole("radio", { name: "An amount" }).check();
+    await dialog.getByRole("radio", { name: "Quantity" }).click();
     await dialog.getByLabel("Unit").fill(options.quantity.unit);
     await dialog
-      .getByLabel(`Target per day (${options.quantity.unit})`)
+      .getByLabel(`Target per day (${options.quantity.unit})`, { exact: true })
       .fill(options.quantity.target);
   }
   if (options.startDate) {
@@ -178,7 +178,7 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await createHabit(page, "Read", { startDate: tokyoDate(-7) });
 
   const read = habitItem(page, "Read");
-  await expect(read).toContainText("Last 4 weeks: 0 of 7 days");
+  await expect(read).toContainText("0 of 7 days");
   const missed = read.getByRole("button", { name: /: Missed$/ });
   await expect(missed).toHaveCount(7);
   await expectNoSeriousViolations(page);
@@ -191,7 +191,7 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await expectNoSeriousViolations(page);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(read).toContainText("Last 4 weeks: 1 of 7 days");
+  await expect(read).toContainText("1 of 7 days");
   const yesterday = read.getByRole("button", { name: /: Done$/ });
   await expect(yesterday).toHaveCount(1);
   await expect(yesterday).toBeFocused();
@@ -200,33 +200,33 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await yesterday.press("Enter");
   dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("radio", { name: "Done" })).toBeChecked();
-  await dialog.getByRole("radio", { name: "Skipped" }).check();
+  await dialog.getByRole("radio", { name: "Skip" }).check();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(read).toContainText("Last 4 weeks: 0 of 6 days · 1 skipped");
+  await expect(read).toContainText("0 of 6 days · 1 skipped");
   await expect(read.getByRole("button", { name: /: Skipped$/ })).toHaveCount(1);
 
   // Undo puts the correction back.
   await undoIn(page, "Day saved").click();
-  await expect(read).toContainText("Last 4 weeks: 1 of 7 days");
+  await expect(read).toContainText("1 of 7 days");
 
   // Escape closes the dialog without saving, and focus returns to the day.
   const day = read.getByRole("button", { name: /: Done$/ });
   await day.click();
   dialog = page.getByRole("dialog");
-  await dialog.getByRole("radio", { name: "No log" }).check();
+  await dialog.getByRole("radio", { name: "Clear" }).check();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(day).toBeFocused();
-  await expect(read).toContainText("Last 4 weeks: 1 of 7 days");
+  await expect(read).toContainText("1 of 7 days");
 
-  // "No log" removes it: the day is missed again.
+  // "Clear" removes it: the day is missed again.
   await day.click();
   dialog = page.getByRole("dialog");
-  await dialog.getByRole("radio", { name: "No log" }).check();
+  await dialog.getByRole("radio", { name: "Clear" }).check();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(read).toContainText("Last 4 weeks: 0 of 7 days");
+  await expect(read).toContainText("0 of 7 days");
   await expect(missed).toHaveCount(7);
 
   // Today, logged on Today, shows on the strip and counts from then on.
@@ -236,7 +236,7 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   // The row changes at once; the toast confirms the save.
   await expect(toastSaying(page, "Marked done")).toBeVisible();
   await page.goto("/track");
-  await expect(read).toContainText("Last 4 weeks: 1 of 8 days");
+  await expect(read).toContainText("1 of 8 days");
   await expect(read.getByRole("button", { name: /: Done$/ })).toHaveCount(1);
 });
 
@@ -331,4 +331,132 @@ test("Today distinguishes a pending amount, rollback, confirmed retry and correc
   await openToday(page);
   await expect(row).toContainText("8 of 8 glasses");
   expect(await activeHalos()).toBe(0);
+});
+test("Track waits for persistence and keeps a failed amount for retry", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await signInAndConfirm(page);
+  await createHabit(page, "Water", {
+    startDate: tokyoDate(-3),
+    quantity: { unit: "cups", target: "8" },
+  });
+  const cardId = await habitItem(page, "Water").getAttribute("id");
+  // The sheet aria-hides the surrounding Track content while it is open.
+  const card = page.locator("#" + cardId);
+  const missed = card.getByRole("button", { name: /: Missed$/ }).last();
+  const name = (await missed.getAttribute("aria-label"))!.replace(
+    /: Missed$/,
+    "",
+  );
+  const cell = card.getByRole("button", { name: new RegExp("^" + name + ":") });
+  const dialog = page.getByRole("dialog", { name });
+  const amount = dialog.getByRole("textbox", { name: "Amount (cups)" });
+  const halo = cell.locator(".confirmation-halo");
+  const countHalos = () => halo.evaluate((mark) => mark.getAnimations().length);
+  const capture = async (state: string) => {
+    const path = test.info().outputPath(state + ".png");
+    await page.screenshot({ path });
+    await test.info().attach(state, { path, contentType: "image/png" });
+  };
+
+  await page.evaluate(() => {
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (keyframes, options) {
+      const animation = animate.call(this, keyframes, options);
+      if (this.classList.contains("confirmation-halo")) {
+        animation.pause();
+        animation.currentTime = 35;
+      }
+      return animation;
+    };
+  });
+
+  const requestStarted = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const matches = (url: URL) =>
+    url.pathname === "/track" && !url.searchParams.has("range");
+  await page.route(matches, async (route) => {
+    const request = route.request();
+    if (request.method() !== "POST" || !request.headers()["next-action"])
+      return route.continue();
+    requestStarted.resolve();
+    await release.promise;
+    const [input] = request.postDataJSON() as [{ value: number }];
+    await route.continue({
+      postData: JSON.stringify([{ ...input, value: 5.555 }]),
+    });
+  });
+
+  await missed.click();
+  await dialog.getByRole("button", { name: "Full target (8 cups)" }).click();
+  await expect(amount).toHaveValue("8");
+  await amount.fill("5.5");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  try {
+    await requestStarted.promise;
+    await expect(dialog.getByRole("form")).toHaveAttribute("aria-busy", "true");
+    await expect(card.locator("button[aria-busy=true]")).toHaveAttribute(
+      "aria-label",
+      name + ": Missed",
+    );
+    await expect(card.getByText(/^0 of 3 days/)).toHaveCount(1);
+    expect(
+      await card
+        .locator(".confirmation-halo")
+        .evaluateAll((marks) =>
+          marks.some((mark) => mark.getAnimations().length),
+        ),
+    ).toBe(false);
+    await capture("track-pending");
+  } finally {
+    release.resolve();
+  }
+  await expect(dialog.getByRole("alert")).toBeVisible();
+  await expect(amount).toHaveValue("5.5");
+  await expect(card.getByText(/^0 of 3 days/)).toHaveCount(1);
+  await capture("track-error");
+  await page.unroute(matches);
+
+  await dialog.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(cell).toHaveAccessibleName(name + ": 5.5 of 8 cups");
+  await expect(card.getByText(/^0.6 of 3 days/)).toBeVisible();
+  await expect.poll(countHalos).toBe(1);
+  await expect(cell).toBeFocused();
+  await capture("track-confirmed-retry");
+
+  await cell.press("Enter");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(await countHalos()).toBe(0);
+
+  await cell.press("Enter");
+  await amount.fill("2");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(cell).toHaveAccessibleName(name + ": 2 of 8 cups");
+  expect(await countHalos()).toBe(0);
+  await capture("track-correction");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await cell.press("Enter");
+  await dialog.getByRole("radio", { name: "Clear" }).click();
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(cell).toHaveAccessibleName(name + ": Missed");
+  await cell.press("Enter");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(cell).toHaveAccessibleName(name + ": 8 of 8 cups");
+  const animations = await cell.evaluate((element) =>
+    element
+      .getAnimations({ subtree: true })
+      .map((animation) => animation.playState),
+  );
+  expect(animations).toEqual([]);
+  await capture("track-reduced-motion");
+  await page.reload();
+  await expect(cell).toHaveAccessibleName(name + ": 8 of 8 cups");
+  expect(await countHalos()).toBe(0);
 });

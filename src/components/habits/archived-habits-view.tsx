@@ -5,14 +5,14 @@ import Link from "next/link";
 import { Button, buttonClass } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListGroup, ListItem } from "@/components/ui/list";
+import { ShapeAvatar } from "@/components/ui/shape-avatar";
 import { toast } from "@/components/ui/toast";
 import { restoreHabit } from "@/server/modules/habits/actions";
 import type { ArchivedHabitItem } from "@/server/modules/habits/queries";
 
-import { DeleteHabitDialog } from "./delete-habit-dialog";
-import { HabitSummary } from "./track-view";
+import { HabitActions } from "./habit-actions";
 
-/** Archived habits, each with Restore (to active, ADR 0014) and Delete. */
 export function ArchivedHabitsView({
   habits,
 }: {
@@ -21,10 +21,11 @@ export function ArchivedHabitsView({
   if (habits.length === 0) {
     return (
       <EmptyState
+        art={{ icon: "archive" }}
         title="Nothing archived"
         description="Habits you archive are kept here, with their history, until you restore or delete them."
         action={
-          <Link href="/track" className={buttonClass({ variant: "secondary" })}>
+          <Link href="/track" className={buttonClass({ variant: "tonal" })}>
             Back to Track
           </Link>
         }
@@ -33,20 +34,31 @@ export function ArchivedHabitsView({
   }
 
   return (
-    <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
+    <ListGroup label="Archived habits">
       {habits.map((habit) => (
-        <li key={habit.id} className="flex flex-col gap-3 p-4">
-          <HabitSummary habit={habit} headingLevel={2} />
-          <p className="text-sm text-muted">
-            Archived on {habit.archivedAtLabel}
-          </p>
-          <div className="flex flex-wrap items-center gap-1">
-            <RestoreHabitDialog habit={habit} />
-            <DeleteHabitDialog habit={habit} logCount={habit.logCount} />
-          </div>
-        </li>
+        <ListItem
+          key={habit.id}
+          wrapActions
+          wrapSupporting
+          leading={
+            <ShapeAvatar
+              id={habit.id}
+              entityType="habit"
+              label={habit.title}
+              size={40}
+            />
+          }
+          headline={<h2 className="text-title-medium">{habit.title}</h2>}
+          supporting={`Archived on ${habit.archivedAtLabel}`}
+          trailing={
+            <div className="flex items-center">
+              <RestoreHabitDialog habit={habit} />
+              <HabitActions habit={habit} />
+            </div>
+          }
+        />
       ))}
-    </ul>
+    </ListGroup>
   );
 }
 
@@ -55,8 +67,8 @@ function RestoreHabitDialog({ habit }: { habit: ArchivedHabitItem }) {
     <ConfirmDialog
       trigger={
         <Button
-          variant="secondary"
-          size="sm"
+          variant="tonal"
+          size="xs"
           aria-label={`Restore: ${habit.title}`}
         >
           Restore
@@ -68,9 +80,8 @@ function RestoreHabitDialog({ habit }: { habit: ArchivedHabitItem }) {
       destructive={false}
       onConfirm={async () => {
         const result = await restoreHabit({ id: habit.id });
-        if (result.ok) {
+        if (result.ok)
           toast({ title: "Restored and active again.", variant: "success" });
-        }
         return result;
       }}
     />

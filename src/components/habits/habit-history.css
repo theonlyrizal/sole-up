@@ -1,0 +1,302 @@
+.habit-history {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.habit-history-scroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-color: var(--md-outline) var(--md-surface-container);
+}
+
+.habit-history-grid {
+  --day-target-min: 48px;
+  --week-label-width: 0px;
+  min-inline-size: calc(
+    7 * var(--day-target-min) + 8px + var(--week-label-width)
+  );
+  padding: 4px;
+}
+
+.habit-history:not([data-layout="week"]) .habit-history-grid {
+  max-inline-size: 34rem;
+}
+
+.habit-history-weekdays {
+  margin-inline-start: var(--week-label-width);
+}
+
+.habit-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.habit-history-row-label {
+  position: sticky;
+  inset-inline-start: 0;
+  justify-self: start;
+  padding-inline: 4px;
+  padding-block-start: 6px;
+}
+
+@container (min-width: 408px) {
+  .habit-history:not([data-layout="week"]) .habit-history-grid {
+    --week-label-width: 64px;
+  }
+
+  .habit-history:not([data-layout="week"]) .habit-history-row {
+    grid-template-columns: var(--week-label-width) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .habit-history-row-label {
+    padding-block-start: 0;
+  }
+}
+
+.habit-history-overflow {
+  display: none;
+  margin-block-start: 4px;
+}
+
+@container (width < 344px) {
+  .habit-history-overflow {
+    display: block;
+  }
+}
+
+.habit-day-target {
+  position: relative;
+  display: grid;
+  inline-size: 100%;
+  min-inline-size: 48px;
+  min-block-size: 48px;
+  place-items: center;
+  gap: 4px;
+  padding-block: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--md-on-surface);
+  scroll-margin-inline: 4px;
+}
+
+.habit-day-button {
+  cursor: pointer;
+}
+
+.habit-day-button:focus-visible {
+  outline: 3px solid var(--md-focus);
+  outline-offset: -3px;
+}
+
+.habit-day-button[aria-busy="true"] {
+  cursor: progress;
+}
+
+.habit-mark {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  inline-size: 44px;
+  block-size: 44px;
+  place-items: center;
+  border-radius: 100%;
+  color: var(--md-on-surface-variant);
+  font-size: var(--text-label-medium);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.habit-mark-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--md-primary);
+  clip-path: inset(calc((1 - var(--day-credit, 0)) * 100%) 0 0);
+  transition: clip-path var(--duration-expressive-default-spatial)
+    var(--ease-expressive-default-spatial);
+}
+
+.habit-day-button[data-pending-completion] .habit-mark {
+  background-color: var(--md-secondary-container);
+}
+
+.habit-mark-done {
+  color: var(--md-on-primary);
+}
+
+.habit-mark-partial,
+.habit-mark-unlogged {
+  background-color: var(--md-surface-container-high);
+}
+
+.habit-mark-extra {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.habit-mark-skipped {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--md-outline-variant) 0 2px,
+    transparent 2px 6px
+  );
+}
+
+.habit-mark-missed {
+  box-shadow: inset 0 0 0 1.5px var(--md-outline);
+}
+
+.habit-mark-future {
+  background: color-mix(in srgb, var(--md-surface-container) 60%, transparent);
+}
+
+.habit-mark-inactive {
+  outline: 2px dotted var(--md-outline-variant);
+  outline-offset: -2px;
+}
+
+.habit-day-target[aria-current="date"] .habit-mark,
+.habit-mark-today {
+  outline: 2px solid var(--md-primary);
+  outline-offset: -2px;
+}
+
+.habit-day-target[aria-current="date"] .habit-mark-done {
+  outline-color: var(--md-on-primary);
+  outline-offset: -4px;
+}
+
+.habit-day-target[aria-current="date"] .habit-date-number,
+.habit-day-target[aria-current="date"] .tabular-nums {
+  font-weight: 700;
+}
+
+.habit-date-number {
+  font-variant-numeric: tabular-nums;
+}
+
+.habit-mark-partial .habit-date-number,
+.habit-mark-skipped .habit-date-number {
+  padding: 2px;
+  border-radius: var(--radius-xs);
+  background: var(--md-resting-surface);
+  color: var(--md-on-resting-surface);
+}
+
+.habit-mark-glyph,
+.habit-day-feedback {
+  grid-area: 1 / 1;
+}
+
+.habit-date-number {
+  grid-area: 1 / 1;
+}
+
+.habit-mark-partial .habit-mark-glyph,
+.habit-mark-skipped .habit-mark-glyph {
+  border-radius: 100%;
+  background: var(--md-resting-surface);
+  color: var(--md-on-resting-surface);
+}
+
+[data-layout="calendar"] :is(.habit-mark-glyph, .habit-day-feedback) {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: -1px;
+}
+
+[data-layout="calendar"] .habit-mark-glyph {
+  display: grid;
+  min-inline-size: 14px;
+  min-block-size: 14px;
+  place-items: center;
+  border-radius: 100%;
+  background: var(--md-resting-surface);
+  color: var(--md-on-resting-surface);
+  font-size: 12px;
+}
+
+.habit-day-feedback .confirmation-glyph {
+  color: var(--md-on-confirmation-surface);
+}
+
+.habit-day-button[aria-busy="true"] .confirmation-glyph {
+  color: var(--md-on-resting-surface);
+}
+
+.habit-day-feedback [aria-hidden="true"] .confirmation-glyph:empty {
+  display: none;
+}
+
+.habit-day-feedback[data-confirmed] .confirmation-glyph {
+  border-radius: 50%;
+  background: var(--md-confirmation-surface);
+  animation: habit-confirmation-glyph var(--feedback-halo-duration)
+    var(--ease-default-effects) both;
+}
+
+@keyframes habit-confirmation-glyph {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+[data-layout="week"] .habit-day-target {
+  align-content: start;
+}
+
+[data-layout="week"] .habit-mark {
+  inline-size: 36px;
+  block-size: 88px;
+  border-radius: 999px;
+}
+
+@media (width >= 840px) {
+  [data-layout="week"] .habit-mark {
+    inline-size: 44px;
+    block-size: 104px;
+  }
+}
+
+[data-layout="matrix"] .habit-mark {
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: var(--radius-sm);
+}
+
+.habit-mark.habit-legend-mark {
+  inline-size: 24px;
+  block-size: 24px;
+  flex-shrink: 0;
+}
+
+.habit-legend-mark:is(.habit-mark-done, .habit-mark-partial) {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.habit-legend-mark.habit-mark-partial {
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .habit-day-button:active:not(:focus-visible) .habit-mark-glyph {
+    scale: var(--feedback-press-scale);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .habit-mark-fill {
+    transition: none;
+  }
+
+  .habit-day-feedback[data-confirmed] .confirmation-glyph {
+    display: none;
+  }
+}
