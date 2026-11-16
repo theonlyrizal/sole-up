@@ -20,7 +20,7 @@ A personal management app that helps you decide what matters, turn goals into re
 
 ## Local setup
 
-Requires Node 24 (see `.nvmrc`), pnpm 11 (`corepack enable` picks up the version in `package.json`), and Docker with Compose v2.
+Requires Node 24 (see `.nvmrc`), pnpm 12 (`corepack enable` picks up the version in `package.json`), and Docker with Compose v2.
 
 1. Install dependencies:
 

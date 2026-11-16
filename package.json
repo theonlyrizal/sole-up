@@ -2,10 +2,10 @@
   "name": "soleup",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.24.0",
+  "packageManager": "pnpm@12.21.0",
   "engines": {
     "node": "^24.19.0",
-    "pnpm": ">=11.24.0 <12"
+    "pnpm": ">=12.21.0 <13"
   },
   "scripts": {
     "dev": "next dev",
