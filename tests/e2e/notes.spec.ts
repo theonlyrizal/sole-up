@@ -101,7 +101,9 @@ test("a note is written with every kind of formatting, saved and listed", async 
 
   // A link: anything but http:, https: and mailto: is refused.
   await toolbar.getByRole("button", { name: "Link" }).click();
-  const linkDialog = page.getByRole("dialog", { name: "Add a link" });
+  const linkDialog = page.getByRole("dialog", {
+    name: /^(Add a link|Edit link)$/,
+  });
   await linkDialog.getByLabel("Link address").fill("javascript:alert(1)");
   await linkDialog.getByRole("button", { name: "Add link" }).click();
   await expect(
@@ -113,6 +115,7 @@ test("a note is written with every kind of formatting, saved and listed", async 
   await linkDialog.getByLabel("Link address").fill("https://example.com/");
   await linkDialog.getByRole("button", { name: "Add link" }).click();
   await expect(linkDialog).toHaveCount(0);
+  await expect(noteBody(page)).toBeFocused();
 
   await page.keyboard.press("Enter");
   await toolbar.getByRole("button", { name: "Bulleted list" }).click();

@@ -173,7 +173,8 @@ test("a repeating event from the keyboard, with field errors in the builder", as
   ).toBeVisible();
 
   // Weekly starts on the start's weekday. Break the builder on purpose.
-  await dialog.getByRole("button", { name: "Repeat", exact: true }).click();
+  const repeat = dialog.getByRole("button", { name: "Repeat", exact: true });
+  await repeat.click();
   await dialog.getByLabel("Frequency").selectOption("weekly");
   const weekday = dialog.getByRole("checkbox", { name: longWeekday(1) });
   await expect(weekday).toBeChecked();
@@ -192,6 +193,7 @@ test("a repeating event from the keyboard, with field errors in the builder", as
   await expect(
     dialog.getByRole("group", { name: "On these days" }),
   ).toHaveAccessibleDescription("Choose at least one day.");
+  await repeat.scrollIntoViewIfNeeded();
   await expectNoSeriousViolations(page);
 
   await interval.fill("1");
