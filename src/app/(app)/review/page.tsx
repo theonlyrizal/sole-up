@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 
 import { AdjustStepView } from "@/components/reviews/adjust-step";
@@ -11,7 +10,8 @@ import { ReviewFlow } from "@/components/reviews/review-flow";
 import { PageFrame } from "@/components/shell/page-frame";
 import { ReviewHeader } from "@/components/reviews/review-header";
 import { StartReview } from "@/components/reviews/start-review";
-import { cx, focusRing } from "@/components/ui/cx";
+import { ReviewMenu } from "@/components/reviews/review-menu";
+import { TopAppBar } from "@/components/shell/top-app-bar";
 import { LoadingState } from "@/components/ui/skeleton";
 import { addDays, formatLocalDate } from "@/lib/dates";
 import { formatDateSpan } from "@/lib/habits/track-range";
@@ -37,26 +37,12 @@ export default function ReviewPage({ searchParams }: PageProps<"/review">) {
   return (
     <PageFrame
       title="Weekly review"
-      description="Look back on a week, note what you learned, make a few changes, and choose what matters next week. Every step is optional."
-      subnav={
-        <nav aria-label="Review pages" className="flex flex-wrap gap-4">
-          {[
-            { href: "/review/history", label: "Past reviews" },
-            { href: "/review/insights", label: "Insights" },
-          ].map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className={cx(
-                "rounded-sm text-sm font-medium underline underline-offset-2",
-                focusRing,
-              )}
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
+      hideCreate
+      mobileHeader={
+        <TopAppBar title="Weekly review" actions={<ReviewMenu />} />
       }
+      compactActions={false}
+      actions={<ReviewMenu />}
     >
       <Suspense fallback={<LoadingState label="Loading your review" />}>
         <Review searchParams={searchParams} />
@@ -92,6 +78,7 @@ async function Review({
         {header}
         <ReadOnlyReview
           review={page.review}
+          closed
           lookBack={await lookBack(user.id, page)}
         />
       </>
@@ -103,7 +90,13 @@ async function Review({
     <>
       {header}
       <ReviewFlow
+        key={page.review.id}
         reviewId={page.review.id}
+        editableUntil={formatLocalDate(
+          addDays(page.review.closesOn, -1),
+          page.locale,
+          "full",
+        )}
         week={page.periodStart}
         step={step}
         finished={page.review.completedAt !== null}
@@ -151,7 +144,6 @@ async function stepContent(
               label: formatLocalDate(day, page.locale, "full"),
             })),
           }}
-          today={page.today}
           locale={page.locale}
           timeZone={page.timeZone}
         />

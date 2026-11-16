@@ -65,27 +65,32 @@ async function ReviewView({
   });
   return (
     <>
-      <ReviewHeader page={page} />
-      <div className="flex flex-wrap items-center gap-2">
-        {page.open && (
-          <Link
-            href={reviewHref(page.periodStart)}
-            className={buttonClass({ variant: "secondary", size: "sm" })}
-          >
-            Edit review
-          </Link>
-        )}
-        <DeleteReviewDialog
-          reviewId={page.review.id}
-          weekLabel={reviewWeekLabel(
-            page.periodStart,
-            page.periodEnd,
-            page.locale,
-          )}
-        />
-      </div>
+      <ReviewHeader
+        page={page}
+        actions={
+          <div className="flex flex-wrap items-center gap-1">
+            {page.open && (
+              <Link
+                href={reviewHref(page.periodStart)}
+                className={buttonClass({ variant: "tonal", size: "xs" })}
+              >
+                Edit review
+              </Link>
+            )}
+            <DeleteReviewDialog
+              reviewId={page.review.id}
+              weekLabel={reviewWeekLabel(
+                page.periodStart,
+                page.periodEnd,
+                page.locale,
+              )}
+            />
+          </div>
+        }
+      />
       <ReadOnlyReview
         review={page.review}
+        closed={!page.open}
         lookBack={
           <LookBack summary={summary} today={page.today} locale={page.locale} />
         }

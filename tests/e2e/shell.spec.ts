@@ -163,9 +163,7 @@ test.describe("compact shell", () => {
       .getByRole("dialog", { name: "More" })
       .getByRole("link", { name: "Review", exact: true })
       .click();
-    await expect(
-      page.getByRole("navigation", { name: "Review steps" }),
-    ).toBeVisible();
+    await expect(page.getByText("Step 1 of 4 · Look back")).toBeVisible();
     await expect(create).toBeHidden();
   });
 

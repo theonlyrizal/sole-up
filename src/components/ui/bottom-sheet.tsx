@@ -29,7 +29,7 @@ import {
 } from "./popover";
 
 type SheetProps = {
-  title: string;
+  title: ReactNode;
   description?: ReactNode;
   trigger?: ReactElement;
   open?: boolean;

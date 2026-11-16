@@ -1,11 +1,9 @@
+import { Card } from "@/components/ui/card";
+import { InlineBanner } from "@/components/ui/inline-banner";
+import { ListGroup, ListItem } from "@/components/ui/list";
 import { GOAL_STATUS_LABELS } from "@/lib/goals";
 import { TASK_STATUS_LABELS } from "@/lib/task-list";
 import type { ReviewDetail } from "@/server/modules/weekly-reviews/queries";
-
-// A review read-only (ADR 0015): its text and priorities as written, and
-// the look-back summary as computed now. No adjust actions and no editing.
-// Shown for a closed week in the flow, and for any review in its history
-// view (chunk 7.4).
 
 const TEXT_SECTIONS = [
   { field: "wins", label: "Wins" },
@@ -16,70 +14,75 @@ const TEXT_SECTIONS = [
 export function ReadOnlyReview({
   review,
   lookBack,
+  closed,
 }: {
   review: ReviewDetail;
   lookBack: React.ReactNode;
+  closed: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-8">
-      <section
-        aria-labelledby="review-look-back"
-        className="flex flex-col gap-3"
-      >
-        <h2 id="review-look-back" className="text-xl font-semibold">
+    <div className="grid min-w-0 gap-8">
+      {closed && (
+        <InlineBanner tone="info">
+          This week has closed, so the review is read-only.
+        </InlineBanner>
+      )}
+      <section aria-labelledby="review-look-back" className="grid gap-3">
+        <h2 id="review-look-back" className="text-headline-small">
           Look back
         </h2>
         {lookBack}
       </section>
 
-      <section aria-labelledby="review-reflect" className="flex flex-col gap-3">
-        <h2 id="review-reflect" className="text-xl font-semibold">
+      <section aria-labelledby="review-reflect" className="grid gap-3">
+        <h2 id="review-reflect" className="text-headline-small">
           Reflect
         </h2>
-        <dl className="flex flex-col gap-3">
-          {TEXT_SECTIONS.map(({ field, label }) => (
-            <div key={field} className="flex flex-col gap-1">
-              <dt className="text-sm font-medium">{label}</dt>
-              <dd className="whitespace-pre-wrap text-muted">
-                {review[field] ?? "Nothing written."}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        {TEXT_SECTIONS.map(({ field, label }) => (
+          <Card key={field} as="div" className="grid gap-2">
+            <h3 className="text-title-medium">{label}</h3>
+            <p className="text-body-large wrap-anywhere whitespace-pre-wrap text-on-surface-variant">
+              {review[field] ?? "Nothing written."}
+            </p>
+          </Card>
+        ))}
       </section>
 
-      <section
-        aria-labelledby="review-priorities"
-        className="flex flex-col gap-3"
-      >
-        <h2 id="review-priorities" className="text-xl font-semibold">
+      <section aria-labelledby="review-priorities" className="grid gap-3">
+        <h2 id="review-priorities" className="text-headline-small">
           Priorities
         </h2>
         {review.priorities.length === 0 ? (
-          <p className="text-muted">None chosen.</p>
+          <p className="text-body-medium text-on-surface-variant">
+            None chosen.
+          </p>
         ) : (
-          <ol
-            aria-label="Priorities for next week"
-            className="flex list-decimal flex-col gap-1 pl-6"
-          >
-            {review.priorities.map((item) => (
-              <li key={`${item.kind}:${item.id}`}>
-                <span className="font-medium">{item.title}</span>{" "}
-                <span className="text-sm text-muted">
-                  ({item.kind === "goal" ? "Goal" : "Task"},{" "}
-                  {item.kind === "goal"
-                    ? GOAL_STATUS_LABELS[item.status].toLowerCase()
-                    : TASK_STATUS_LABELS[item.status].toLowerCase()}
-                  )
-                </span>
-              </li>
+          <ListGroup as="ol" label="Priorities for next week">
+            {review.priorities.map((item, index) => (
+              <ListItem
+                key={`${item.kind}:${item.id}`}
+                leading={
+                  <span className="text-label-large text-on-surface-variant tabular-nums">
+                    {index + 1}.
+                  </span>
+                }
+                headline={item.title}
+                supporting={
+                  item.kind === "goal"
+                    ? `Goal · ${GOAL_STATUS_LABELS[item.status]}`
+                    : `Task · ${TASK_STATUS_LABELS[item.status]}`
+                }
+              />
             ))}
-          </ol>
+          </ListGroup>
         )}
         {review.prioritiesNote && (
-          <p className="whitespace-pre-wrap text-muted">
-            {review.prioritiesNote}
-          </p>
+          <Card as="div" className="grid gap-2">
+            <h3 className="text-title-medium">Note</h3>
+            <p className="text-body-large wrap-anywhere whitespace-pre-wrap text-on-surface-variant">
+              {review.prioritiesNote}
+            </p>
+          </Card>
         )}
       </section>
     </div>

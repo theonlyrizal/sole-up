@@ -101,7 +101,7 @@ export function DialogHeading({
   description,
   className,
 }: {
-  title: string;
+  title: React.ReactNode;
   description?: React.ReactNode;
   className?: string;
 }) {
@@ -132,7 +132,7 @@ export function DialogHeading({
 }
 
 type DialogContentProps = {
-  title: string;
+  title: React.ReactNode;
   size?: "m" | "l";
   /** Read out when the dialog opens. Omit only if the title says it all. */
   description?: React.ReactNode;

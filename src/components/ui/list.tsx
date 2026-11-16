@@ -3,18 +3,20 @@ import type { MouseEventHandler, ReactNode } from "react";
 import { cx } from "./cx";
 
 export function ListGroup({
+  as: Tag = "ul",
   label,
   children,
   className,
 }: {
+  as?: "ul" | "ol";
   label: string;
   children: ReactNode;
   className?: string;
 }) {
   return (
-    <ul aria-label={label} className={cx("grid min-w-0 gap-0.5", className)}>
+    <Tag aria-label={label} className={cx("grid min-w-0 gap-0.5", className)}>
       {children}
-    </ul>
+    </Tag>
   );
 }
 

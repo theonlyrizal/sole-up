@@ -90,7 +90,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-7 | Calendar and event/block dialogs | done | chunk/ui-7-calendar | 2026-11-15 | All five views, keyboard date navigation, theme and size pairs, and finish-line checks verified |
 | UI-8 | Goals, goal detail, life areas, archived goals | done | chunk/ui-8-goals-life-areas | 2026-11-15 | Goal journeys, confirmed milestone feedback and all finish-line checks verified |
 | UI-9 | Track, habit form, archived habits | done | chunk/ui-9-track-habits | 2026-11-16 | 5-B approved. Three ranges, confirmed feedback, keyboard targets and finish-line checks verified |
-| UI-10 | Weekly review, history, detail | todo | | | Uses 5-A |
+| UI-10 | Weekly review, history, detail | in progress | chunk/ui-10-weekly-review | | Uses 5-A |
 | UI-11 | Notes, editor, search (and tags if 8.5 shipped) | todo | | | |
 | UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | todo | | | Needs sign-off 5-D |
 | UI-13 | Consistency, cleanup, token lint, accessibility sweep, docs | todo | | | |
@@ -634,5 +634,30 @@ Append one note per phase, newest last. Template:
 | Accessibility | 2 | Keyboard logging and focus return pass in each layout. Local scroll, static marks, reduced motion, 200% text and the theme and size axe matrix pass. |
 | Restraint | 2 | Feedback stays at the day and settles after confirmation. Reload, repeat and correction leave the chart quiet. |
 | Variety | 1 | Tall pills, numbered circles and compact squares give the time scales different shapes within the same card. |
+
+**Total — 15/16.**
+
+### UI-10 · Weekly review (2026-11-16)
+
+- **Branch / PR** — `chunk/ui-10-weekly-review` · [UI-10 pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-10-weekly-review). UI-9 [#102](https://github.com/theonlyrizal/sole-up/pull/102) merged before implementation.
+- **Routes and components** — `/review` uses the period hero, compact four-segment progress, expanded step rail and responsive action bar. Look back uses MetricCard, SplitStat and per-habit rows. Reflect has three optional writing cards and SaveStatus. Adjust groups existing actions with consequence copy. Choose priorities pairs a filtered picker with a ten-item ordered list. `/review/history` uses linked rows. History detail has read-only cards, Edit during the open window, and Delete in the overflow with confirmation. The closed flow and closed detail share the info banner.
+- **Data paths and contracts** — `getReviewPage`, `weeklySummary`, `getAdjustStep`, `getPriorityOptions`, `getReviewHistory`, and `getReviewView` supply the existing fields. The existing review, goal and task actions handle writes. The browser exercised `reviewHref` step links, the default week, the other week, shell and overflow links, save-before-navigation, heading focus, empty Finish, and a write refused by the period lock. A direct Finish link with an implicit week pins the reviewed period in the URL before the default changes.
+- **Decisions** — Followed the approved 5-A and D-16. Each metric keeps its visible range and opens its definition and as-of time in a compact sheet or anchored popover. D-20 uses the existing responsive sheet motion and a static 72 px Sunshine soft-burst. Its open state comes from the successful explicit Finish action. Done and Escape return to the finished, editable review, and a later Save uses quiet status feedback.
+- **Checks run** — `pnpm verify` passed with 1,255 unit and 831 integration tests. Lint reported the existing habit validation warning. `pnpm build` passed. `pnpm test:visual` passed all 38 cases. The UI-10 browser journeys and axe matrix passed. Windows `pnpm test:e2e` hit the pre-existing Home-to-Track fragment-scroll failure, which also reproduced on merged commit `4d48d93` in development and production. The full hosted CI run is pending.
+- **Screenshots** — 64 Playwright PNGs in `test-results/visual/ui-10/` at 390 × 844 and 1280 × 800 in light and dark. See `look-back-first-screen-390-light.png`, `adjust-1280-light.png`, `priorities-zoom-390-dark.png`, `finish-390-light.png`, `finish-1280-dark.png`, `history-1280-dark.png` and `delete-confirmation-1280-dark.png`.
+- **Interaction and accessibility evidence** — Chromium axe found zero serious or critical violations in the four steps, Finish, history, open and closed details, the closed flow, and the delete confirmation in both themes and sizes. The browser checked reflow at 320, 375, 390, 414, 768, 840 and 1280 px and 200% text at both capture sizes. The tests exercised keyboard step navigation and focus, the ten-priority cap and removal, and Escape focus return from Finish, metric information and Delete.
+- **Feedback evidence** — The `reflect-pending-*`, `reflect-error-*` and `reflect-retry-saved-*` PNGs show a real write held under reduced motion, rejected by server validation with the typed draft retained, then successfully retried. A held Finish request kept the week unfinished and the sheet closed. Validation failure kept it closed. Retry opened the sheet, Escape dismissed it, and reload and a subsequent edit kept it closed. The compact capture shows one wide Done action above the safe area.
+- **Unverified** — Physical touch and soft-keyboard behavior, manual screen-reader playback, and engines beyond Chromium.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 2 | The period and current step frame the content. The compact actions stay above the navigation bar. |
+| Character | 2 | Opaque cards give metrics, writing and history a consistent surface. Habit identities carry through from Track. |
+| Color | 2 | Forest leads navigation and Done, Kiwi supports secondary controls, and Sunshine marks the confirmed Finish. |
+| Response | 2 | Chromium exercised pending, validation, retained input, retry, correction and focus return. |
+| Truthfulness | 2 | The seeded browser view shows 2 planned, 1 completed and 1 rescheduled from recorded task events. Zero and missing data render distinctly, and confirmed Finish shows the actual editing window. |
+| Accessibility | 2 | Both size and theme pairs pass axe. Keyboard navigation, reflow, enlarged text and reduced motion were exercised. |
+| Restraint | 2 | The sheet opens after confirmed Finish and leaves a finished review when dismissed. Reload and subsequent correction stay quiet. |
+| Variety | 1 | Metrics, writing cards, adjustment rows and the confirmation have distinct layouts within the review sequence. |
 
 **Total — 15/16.**

@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { THEME_STORAGE_KEY } from "../../src/lib/theme";
+import { seedVisualData } from "./visual-data";
+
 import {
   expectNoSeriousViolations,
   openQuickAdd,
@@ -9,6 +12,8 @@ import {
 // The weekly review flow (chunk 7.3): opened from the navigation on last
 // week, four steps that save as they are left, adjustments through the
 // ordinary goal and task actions, and "Finish review" with nothing filled.
+
+test.use({ viewport: { width: 1280, height: 800 } });
 
 const PAUSED_GOAL = "Learn Spanish";
 const PRIORITY_GOAL = "Write a novel";
@@ -80,7 +85,7 @@ test("a review pauses a goal, plans two tasks for next week and sets priorities"
 
   // The flow opens on last week, with this week offered instead.
   await openReview(page);
-  await expect(reviewedWeek(page)).toContainText("Last week:");
+  await expect(reviewedWeek(page)).toContainText("Last week");
   await expect(reviewedWeek(page)).toContainText("Not finished");
   await expect(
     reviewedWeek(page).getByRole("link", { name: /^Review this week instead/ }),
@@ -91,10 +96,18 @@ test("a review pauses a goal, plans two tasks for next week and sets priorities"
   await expect(
     summary.getByRole("heading", { name: "Tasks completed" }),
   ).toBeVisible();
-  await expect(summary).toContainText(
+  await expect(summary.getByRole("listitem")).toHaveCount(6);
+  const metricInfo = summary.getByRole("button", {
+    name: "How this is counted: Tasks completed",
+  });
+  await metricInfo.press("Enter");
+  const definition = page.getByRole("dialog", { name: "How this is counted" });
+  await expect(definition).toContainText(
     "Tasks marked completed during this week",
   );
-  await expect(summary.getByRole("heading")).toHaveCount(6);
+  await expect(definition).toContainText("As of");
+  await page.keyboard.press("Escape");
+  await expect(metricInfo).toBeFocused();
   await expectNoSeriousViolations(page);
 
   // Reflect: saved on leaving the step.
@@ -108,6 +121,11 @@ test("a review pauses a goal, plans two tasks for next week and sets priorities"
   // Adjust: pause a goal with the ordinary goal action.
   const goals = page.getByRole("list", { name: "Active and paused goals" });
   await goals.getByRole("button", { name: `Pause: ${PAUSED_GOAL}` }).click();
+  const pause = page.getByRole("alertdialog", {
+    name: `Pause ${PAUSED_GOAL}?`,
+  });
+  await expect(pause).toContainText("This moves the goal to Paused");
+  await pause.getByRole("button", { name: "Pause", exact: true }).click();
   await expect(toastSaying(page, "Paused.").first()).toBeVisible();
   await expect(
     goals.getByRole("button", { name: `Resume: ${PAUSED_GOAL}` }),
@@ -138,20 +156,21 @@ test("a review pauses a goal, plans two tasks for next week and sets priorities"
   // Choose priorities: a goal and a task, reordered, with a note.
   await page.getByRole("button", { name: "Next: Choose priorities" }).click();
   await expectStep(page, "Choose priorities");
-  const addForm = page.getByRole("form", { name: "Add a priority" });
-  await addForm
-    .getByLabel("Goal or task")
-    .selectOption({ label: PRIORITY_GOAL });
-  await addForm.getByRole("button", { name: "Add" }).click();
-  await addForm
-    .getByLabel("Goal or task")
-    .selectOption({ label: PRIORITY_TASK });
-  await addForm.getByRole("button", { name: "Add" }).click();
+  const picker = page.getByRole("region", { name: "Add a priority" });
+  await picker
+    .getByRole("searchbox", { name: "Find a goal or task" })
+    .fill("novel");
+  await expect(
+    picker.getByRole("button", { name: `Add ${PRIORITY_TASK}` }),
+  ).toHaveCount(0);
+  await picker.getByRole("button", { name: `Add ${PRIORITY_GOAL}` }).click();
+  await picker.getByRole("searchbox").fill("notebooks");
+  await picker.getByRole("button", { name: `Add ${PRIORITY_TASK}` }).click();
   const priorities = page.getByRole("list", {
     name: "Priorities for next week",
   });
   await priorities
-    .getByRole("button", { name: `Move up: ${PRIORITY_TASK}` })
+    .getByRole("button", { name: `Move ${PRIORITY_TASK} up` })
     .click();
   await expect(priorities.getByRole("listitem")).toHaveText([
     new RegExp(PRIORITY_TASK),
@@ -159,13 +178,18 @@ test("a review pauses a goal, plans two tasks for next week and sets priorities"
   ]);
   // Focus stays with the moved row.
   await expect(
-    priorities.getByRole("button", { name: `Move down: ${PRIORITY_TASK}` }),
+    priorities.getByRole("button", { name: `Move ${PRIORITY_TASK} down` }),
   ).toBeFocused();
   await page.getByLabel("Note (optional)").fill("Mornings first.");
   await expectNoSeriousViolations(page);
 
   await page.getByRole("button", { name: "Finish review" }).click();
-  await expect(toastSaying(page, "Review finished").first()).toBeVisible();
+  const confirmation = page.getByRole("dialog", {
+    name: "Your review is saved",
+  });
+  await expect(confirmation).toContainText("You can change it until");
+  await confirmation.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(confirmation).toHaveCount(0);
   await expect(reviewedWeek(page)).toContainText("Finished on");
 
   // Everything was saved: reload and walk back through the steps.
@@ -193,7 +217,7 @@ test("a review pauses a goal, plans two tasks for next week and sets priorities"
 
   // Last week is finished, so the flow now opens on this week.
   await openReview(page);
-  await expect(reviewedWeek(page)).toContainText("This week:");
+  await expect(reviewedWeek(page)).toContainText("This week");
   await expect(
     reviewedWeek(page).getByRole("link", { name: /^Review last week instead/ }),
   ).toBeVisible();
@@ -220,9 +244,197 @@ test("a review with nothing filled can be finished, with the keyboard alone", as
   const finish = page.getByRole("button", { name: "Finish review" });
   await finish.focus();
   await page.keyboard.press("Enter");
-  await expect(toastSaying(page, "Review finished").first()).toBeVisible();
+  const confirmation = page.getByRole("dialog", {
+    name: "Your review is saved",
+  });
+  await expect(confirmation).toContainText("You can change it until");
+  await confirmation
+    .getByRole("button", { name: "Done", exact: true })
+    .press("Enter");
+  await expect(confirmation).toHaveCount(0);
   await expect(reviewedWeek(page)).toContainText("Finished on");
   // A finished review stays editable while its week is open.
   await expect(page.getByRole("button", { name: "Save review" })).toBeVisible();
   await expectNoSeriousViolations(page);
 });
+
+test("step links save the draft and focus the destination heading", async ({
+  page,
+}) => {
+  await signInAndConfirm(page);
+  await page.goto("/review?step=reflect");
+  await expectStep(page, "Reflect");
+  const wins = page.getByLabel("Wins", { exact: true });
+  await wins.fill("Practised the short route.");
+  await stepsNav(page).getByRole("link", { name: "Adjust" }).press("Enter");
+  await expect(page).toHaveURL(/week=\d{4}-\d{2}-\d{2}&step=adjust$/);
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Adjust", exact: true }),
+  ).toBeFocused();
+  await stepsNav(page).getByRole("link", { name: "Reflect" }).click();
+  await expect(wins).toHaveValue("Practised the short route.");
+
+  await wins.fill("Practised the short route twice.");
+  const otherWeek = reviewedWeek(page).getByRole("link", {
+    name: "Review this week instead",
+  });
+  await otherWeek.click();
+  await expectStep(page, "Look back");
+  await expect(reviewedWeek(page)).toContainText("This week");
+  await reviewedWeek(page)
+    .getByRole("link", { name: "Review last week instead" })
+    .click();
+  await expect(reviewedWeek(page)).toContainText("Last week");
+  await stepsNav(page).getByRole("link", { name: "Reflect" }).click();
+  await expect(wins).toHaveValue("Practised the short route twice.");
+
+  await wins.fill("Walked the short route with a friend.");
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "Home" })
+    .click();
+  await expect(page).toHaveURL(/\/home$/);
+  await page.goto("/review?step=reflect");
+  await expect(wins).toHaveValue("Walked the short route with a friend.");
+});
+
+test("Finish shows the sheet once after success and Escape closes it", async ({
+  page,
+}) => {
+  await signInAndConfirm(page);
+  // A direct link with the default week still needs to stay on the week saved.
+  await page.goto("/review?step=priorities");
+  await expectStep(page, "Choose priorities");
+  const finish = page.getByRole("button", { name: "Finish review" });
+  const sheet = page.getByRole("dialog", { name: "Your review is saved" });
+  const week = reviewedWeek(page);
+  await expect(week).toContainText("Last week");
+  await expect(sheet).toHaveCount(0);
+
+  const requested = Promise.withResolvers<void>();
+  const held = Promise.withResolvers<void>();
+  const reviewRoute = (url: URL) => url.pathname === "/review";
+  await page.route(reviewRoute, async (route) => {
+    const request = route.request();
+    if (request.method() !== "POST" || !request.headers()["next-action"]) {
+      await route.continue();
+      return;
+    }
+    requested.resolve();
+    await held.promise;
+    const body = request.postData()!;
+    const invalid = body.replace(/"id":"[0-9a-f-]{36}"/, '"id":"invalid"');
+    expect(invalid).not.toBe(body);
+    await route.continue({ postData: invalid });
+  });
+  await finish.click();
+  try {
+    await requested.promise;
+    await expect(finish).toBeDisabled();
+    await expect(finish).toHaveAttribute("aria-busy", "true");
+    await expect(week).toContainText("Not finished");
+    await expect(sheet).toHaveCount(0);
+  } finally {
+    held.resolve();
+  }
+  await expect(
+    page.getByRole("alert").getByText("Some of the details need fixing."),
+  ).toBeVisible();
+  await expect(sheet).toHaveCount(0);
+  await page.unroute(reviewRoute);
+  await finish.click();
+  await expect(sheet).toContainText("You can change it until");
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+
+  const save = page.getByRole("button", { name: "Save review" });
+  await expect(save).toBeFocused();
+  await expect(week).toContainText("Last week");
+  await expect(week).toContainText("Finished on");
+  await page.reload();
+  await expect(save).toBeEnabled();
+  await expect(sheet).toHaveCount(0);
+  await page.getByLabel("Note (optional)").fill("Keep the early appointment.");
+  await save.click();
+  await expect(
+    page.getByRole("status").getByText("Saved", { exact: true }),
+  ).toBeVisible();
+  await expect(sheet).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByLabel("Note (optional)")).toHaveValue(
+    "Keep the early appointment.",
+  );
+  await expect(sheet).toHaveCount(0);
+});
+
+test("the priority picker stops at ten and can add again after removal", async ({
+  page,
+}) => {
+  await seedVisualData(page, { plan: true, goalsUI: true });
+  await page.goto("/review?step=priorities");
+  await expectStep(page, "Choose priorities");
+  const candidates = page.getByRole("list", {
+    name: "Available goals and tasks",
+  });
+  const add = candidates.getByRole("button", { name: /^Add / });
+  for (let index = 0; index < 10; index++) {
+    await add.first().click();
+  }
+  await expect(page.getByRole("status").getByText("10 of 10")).toBeVisible();
+  await expect(add.first()).toBeDisabled();
+  const chosen = page.getByRole("list", { name: "Priorities for next week" });
+  await chosen
+    .getByRole("button", { name: /^Remove / })
+    .first()
+    .press("Enter");
+  await expect(page.getByRole("status").getByText("9 of 10")).toBeVisible();
+  await expect(
+    chosen.getByRole("button", { name: /^Remove / }).first(),
+  ).toBeFocused();
+  await expect(add.first()).toBeEnabled();
+});
+
+for (const width of [390, 1280]) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`review steps and finish are accessible at ${width} in ${theme}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 800 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      await seedVisualData(page);
+      await page.goto("/review");
+      for (const [index, label] of [
+        "Look back",
+        "Reflect",
+        "Adjust",
+        "Choose priorities",
+      ].entries()) {
+        await expect(
+          page.getByRole("heading", { level: 2, name: label, exact: true }),
+        ).toBeVisible();
+        if (width === 390) {
+          await expect(
+            page.getByText(`Step ${index + 1} of 4 · ${label}`),
+          ).toBeVisible();
+        } else {
+          await expectStep(page, label);
+        }
+        await expectNoSeriousViolations(page);
+        if (index < 3)
+          await page.getByRole("button", { name: /^Next:/ }).click();
+      }
+      await page.getByRole("button", { name: "Finish review" }).click();
+      const sheet = page.getByRole("dialog", { name: "Your review is saved" });
+      await expect(sheet).toBeVisible();
+      await expectNoSeriousViolations(page);
+      await sheet
+        .getByRole("button", { name: "Done", exact: true })
+        .press("Enter");
+      await expect(sheet).toHaveCount(0);
+    });
+  }
+}

@@ -28,6 +28,7 @@ export function MetricCard({
   plain,
   headerAction,
   rangeInHeader,
+  headingLevel = 2,
 }: MetricContext & {
   id: string;
   title: string;
@@ -39,6 +40,7 @@ export function MetricCard({
   plain?: boolean;
   headerAction?: ReactNode;
   rangeInHeader?: boolean;
+  headingLevel?: 2 | 3;
 }) {
   const headingId = `${id}-heading`;
   const range = metricRangeLabel(metric.range, todayDate, locale);
@@ -60,6 +62,7 @@ export function MetricCard({
       <CardHeader
         id={headingId}
         title={title}
+        headingLevel={headingLevel}
         icon={icon}
         supporting={rangeInHeader ? caption : undefined}
         actions={
@@ -81,7 +84,7 @@ export function MetricCard({
         <EmptyState
           compact
           className="p-0!"
-          headingLevel={3}
+          headingLevel={headingLevel === 3 ? 4 : 3}
           title="Nothing yet"
           description={empty.description}
           action={

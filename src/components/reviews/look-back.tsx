@@ -1,26 +1,20 @@
-import {
-  metricAsOfLabel,
-  metricRangeLabel,
-} from "@/components/home/metric-range";
+import { MetricCard } from "@/components/data/metric-card";
+import { SplitStat } from "@/components/data/split-stat";
+import { StatNumber } from "@/components/data/stat-number";
+import { ListGroup, ListItem } from "@/components/ui/list";
+import { ShapeAvatar } from "@/components/ui/shape-avatar";
 import type { LocalDate } from "@/lib/dates";
-import type { Metric } from "@/server/modules/metrics/metric";
 import type { WeeklySummary } from "@/server/modules/metrics/review";
 
-// Look back (chunk 7.3): the week's summary from 7.1, each figure with its
-// definition and the days it covers. Computed when the page loads, never
-// stored. A metric with nothing to look at says "Nothing yet" rather than
-// a zero, and there is no overall score.
-
-type LookBackProps = {
+export function LookBack({
+  summary,
+  today,
+  locale,
+}: {
   summary: WeeklySummary;
   today: LocalDate;
   locale: string;
-};
-
-const plural = (count: number, one: string, many: string) =>
-  `${count} ${count === 1 ? one : many}`;
-
-export function LookBack({ summary, today, locale }: LookBackProps) {
+}) {
   const {
     tasksCompleted,
     plannedVersusCompleted,
@@ -29,103 +23,130 @@ export function LookBack({ summary, today, locale }: LookBackProps) {
     habits,
     deadlinesNextPeriod,
   } = summary;
-  const planned = plannedVersusCompleted.value;
-  const context = { today, locale };
+  const { planned, completed } = plannedVersusCompleted.value;
+  const context = {
+    todayDate: today,
+    locale,
+    headingLevel: 3 as const,
+    rangeInHeader: true,
+  };
   return (
-    <div className="flex flex-col gap-3">
-      <ul aria-label="Summary of the week" className="flex flex-col gap-3">
-        <SummaryItem
+    <ul
+      aria-label="Summary of the week"
+      className="grid min-w-0 gap-3 large:grid-cols-2"
+    >
+      <li className="grid min-w-0">
+        <MetricCard
+          id="review-completed"
           title="Tasks completed"
           metric={tasksCompleted}
+          empty={{ description: "There is no task history to count." }}
           {...context}
         >
-          {plural(tasksCompleted.value, "task", "tasks")}
-        </SummaryItem>
-        <SummaryItem
-          title="Planned versus completed"
+          <StatNumber
+            value={tasksCompleted.value}
+            unit={tasksCompleted.value === 1 ? "task" : "tasks"}
+          />
+        </MetricCard>
+      </li>
+      <li className="grid min-w-0">
+        <MetricCard
+          id="review-planned"
+          title="Planned vs completed"
           metric={plannedVersusCompleted}
+          empty={{ description: "There is no task history to count." }}
           {...context}
         >
-          {planned.completed} of{" "}
-          {plural(planned.planned, "planned task", "planned tasks")} completed
-        </SummaryItem>
-        <SummaryItem title="Rescheduled" metric={rescheduled} {...context}>
-          {plural(rescheduled.value, "task", "tasks")}
-        </SummaryItem>
-        <SummaryItem
-          title="Goals with no activity"
+          <SplitStat
+            figures={[
+              { value: planned, label: "Planned" },
+              { value: completed, label: "Completed" },
+            ]}
+          />
+        </MetricCard>
+      </li>
+      <li className="grid min-w-0">
+        <MetricCard
+          id="review-rescheduled"
+          title="Rescheduled"
+          metric={rescheduled}
+          empty={{ description: "There is no task history to count." }}
+          {...context}
+        >
+          <StatNumber
+            value={rescheduled.value}
+            unit={rescheduled.value === 1 ? "task" : "tasks"}
+          />
+        </MetricCard>
+      </li>
+      <li className="grid min-w-0">
+        <MetricCard
+          id="review-goals"
+          title="Goals without activity"
           metric={goalsWithoutActivity}
+          empty={{ description: "There are no active goals to count." }}
           {...context}
         >
-          {plural(goalsWithoutActivity.value, "goal", "goals")}
-        </SummaryItem>
-        <SummaryItem
+          <StatNumber
+            value={goalsWithoutActivity.value}
+            unit={goalsWithoutActivity.value === 1 ? "goal" : "goals"}
+          />
+        </MetricCard>
+      </li>
+      <li className="grid min-w-0">
+        <MetricCard
+          id="review-habits"
           title="Habits"
           metric={habits}
-          // A week that doesn't start on the week start can't be counted;
-          // its definition says so, with no figures.
-          nothing={
-            habits.value === null ? "Not available for this week" : undefined
-          }
+          empty={{
+            description:
+              habits.value === null
+                ? "Not available for this week."
+                : "No habit was part of this week.",
+          }}
           {...context}
         >
-          {habits.value && habits.value.length > 0 ? (
-            <ul className="flex flex-col gap-1 text-base font-normal">
-              {habits.value.map((habit) => (
-                <li key={habit.id}>
-                  <span className="font-medium">{habit.title}</span>
-                  {habit.status === "paused" && " (paused)"}: {habit.figure}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            "No habit was part of this week"
-          )}
-        </SummaryItem>
-        <SummaryItem
+          <ListGroup label="Habit figures">
+            {habits.value?.map((habit) => (
+              <ListItem
+                key={habit.id}
+                className="px-0!"
+                wrapActions
+                wrapSupporting
+                leading={
+                  <ShapeAvatar
+                    id={habit.id}
+                    entityType="habit"
+                    label={habit.title}
+                    size={40}
+                  />
+                }
+                headline={habit.title}
+                supporting={habit.status === "paused" ? "Paused" : undefined}
+                trailing={
+                  <span className="text-label-large text-on-surface-variant">
+                    {habit.figure}
+                  </span>
+                }
+              />
+            ))}
+          </ListGroup>
+        </MetricCard>
+      </li>
+      <li className="grid min-w-0">
+        <MetricCard
+          id="review-deadlines"
           title="Deadlines the following week"
           metric={deadlinesNextPeriod}
+          empty={{ description: "There are no task deadlines to count." }}
           {...context}
         >
-          {plural(deadlinesNextPeriod.value, "deadline", "deadlines")}
-        </SummaryItem>
-      </ul>
-      <p className="text-sm text-muted">
-        As of{" "}
-        <time dateTime={tasksCompleted.range.asOf.toISOString()}>
-          {metricAsOfLabel(tasksCompleted.range, locale)}
-        </time>
-        . These are worked out from your records each time you look.
-      </p>
-    </div>
-  );
-}
-
-function SummaryItem({
-  title,
-  metric,
-  nothing,
-  today,
-  locale,
-  children,
-}: {
-  title: string;
-  metric: Metric<unknown>;
-  /** Shown instead of the value; "Nothing yet" when the metric has no data. */
-  nothing?: string;
-  today: LocalDate;
-  locale: string;
-  children: React.ReactNode;
-}) {
-  const empty = nothing ?? (metric.hasData ? null : "Nothing yet");
-  return (
-    <li className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-4">
-      <h3 className="text-sm font-medium text-muted">{title}</h3>
-      <div className="text-lg font-semibold">{empty ?? children}</div>
-      <p className="text-sm text-muted">{metric.definition}</p>
-      <p className="text-sm text-muted">
-        Range: {metricRangeLabel(metric.range, today, locale)}
-      </p>
-    </li>
+          <StatNumber
+            value={deadlinesNextPeriod.value}
+            unit={deadlinesNextPeriod.value === 1 ? "deadline" : "deadlines"}
+          />
+        </MetricCard>
+      </li>
+    </ul>
   );
 }
