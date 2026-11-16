@@ -240,11 +240,7 @@ for (const viewport of [
           THEME_STORAGE_KEY,
         );
         await seedVisualData(page, { track: true });
-        for (const path of [
-          "/track?range=week",
-          "/track",
-          "/track?range=12w",
-        ]) {
+        for (const path of ["/track", "/track?range=4w", "/track?range=12w"]) {
           await page.goto(path);
           await expect(habitItem(page, "Morning stretch")).toBeVisible();
           await expectNoSeriousViolations(page);

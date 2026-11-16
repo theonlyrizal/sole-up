@@ -655,7 +655,7 @@ describe("habitsSummary", () => {
     });
   });
 
-  it("matches Track's default range for the same habit", async () => {
+  it("matches Track's four-week range for the same habit", async () => {
     const user = await tokyoUser(0);
     const habit = await newHabit(user.id, {
       cadenceType: "weekly_days",
@@ -671,7 +671,7 @@ describe("habitsSummary", () => {
       from: "2026-09-27",
       to: "2026-10-24",
     });
-    const track = await getTrackView(user.id, NOW);
+    const track = await getTrackView(user.id, NOW, "4w");
     const [item] = track.habits;
     expect(item!.history.figure).toBe("2 of 11 days · 1 skipped");
     expect(metric.value[0]!.consistency).toMatchObject({

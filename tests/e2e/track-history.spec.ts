@@ -2,9 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 
-// Track's history (chunk 6.5): the last 4 weeks by default, the last 12 or
-// this week alone, kept in the URL; each habit's strip by week with its
-// figure and the definition in its info button; this week as progress, not a figure.
+// Track opens on this week. The four- and twelve-week histories use explicit
+// URLs and show a consistency figure with its definition.
 // The browser (and so the confirmed time zone) is in Tokyo, far from UTC.
 
 const TOKYO = "Asia/Tokyo";
@@ -50,7 +49,16 @@ test("switch ranges, backfill an old week, and see this week as progress", async
   await createHabit(page, "Read", tokyoDate(-90));
   const read = habitItem(page, "Read");
 
-  // The default: the last 4 weeks, this week last, the definition behind the info button.
+  await expect(rangeLink(page, "This week")).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(weekLists(page, "Read")).toHaveCount(1);
+  await expect(read).toContainText("0 of 7 days so far this week");
+
+  // The last four weeks show the historical figure and its definition.
+  await rangeLink(page, "Last 4 weeks").click();
+  await expect(page).toHaveURL(/\/track\?range=4w$/);
   await expect(rangeLink(page, "Last 4 weeks")).toHaveAttribute(
     "aria-current",
     "page",
@@ -95,12 +103,12 @@ test("switch ranges, backfill an old week, and see this week as progress", async
 
   // Out of the last 4 weeks, so not in that figure.
   await rangeLink(page, "Last 4 weeks").click();
-  await expect(page).toHaveURL(/\/track$/);
+  await expect(page).toHaveURL(/\/track\?range=4w$/);
   await expect(read).toContainText(/0 of \d+ days/);
 
   // This week alone: progress so far, never a consistency figure.
   await rangeLink(page, "This week").click();
-  await expect(page).toHaveURL(/\/track\?range=week$/);
+  await expect(page).toHaveURL(/\/track$/);
   await expect(weekLists(page, "Read")).toHaveCount(1);
   await expect(read).toContainText(/0 of 7 days so far this week/);
   await expect(read).not.toContainText(/Last \d+ weeks:/);
@@ -109,13 +117,14 @@ test("switch ranges, backfill an old week, and see this week as progress", async
   await page.keyboard.press("Escape");
   await expectNoSeriousViolations(page);
 
-  // An unknown range falls back to the default.
-  await page.goto("/track?range=52w");
-  await expect(rangeLink(page, "Last 4 weeks")).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
-  await expect(weekLists(page, "Read")).toHaveCount(4);
+  for (const range of ["week", "52w"]) {
+    await page.goto(`/track?range=${range}`);
+    await expect(rangeLink(page, "This week")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(weekLists(page, "Read")).toHaveCount(1);
+  }
 });
 test("Home's habit link places the card below the compact app bar", async ({
   page,

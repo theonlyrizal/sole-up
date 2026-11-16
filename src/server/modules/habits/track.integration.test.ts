@@ -256,10 +256,10 @@ describe("getTrackView", () => {
     const user = await createTestUser();
 
     expect(await getTrackView(user.id, NOW)).toEqual({
-      range: "4w",
-      rangeLabel: "Last 4 weeks",
+      range: "week",
+      rangeLabel: "This week",
       rangeDatesLabel: formatDateSpan(
-        { from: "2026-10-12", to: "2026-11-08" },
+        { from: "2026-11-02", to: "2026-11-08" },
         "en-US",
       ),
       habits: [],
