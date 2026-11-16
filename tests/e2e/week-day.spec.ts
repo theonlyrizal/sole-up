@@ -206,7 +206,7 @@ test("the week starts on the user's week start, and moves through the URL", asyn
     });
   }).toPass();
   await timeAndRegion(page).getByRole("button", { name: "Save" }).click();
-  await expect(timeAndRegion(page).getByRole("status")).toHaveText("Saved.");
+  await expect(timeAndRegion(page).getByRole("status")).toHaveText("Saved");
   await openCalendar(page, "/plan/calendar?view=week");
   await expect(columns(page).first()).toHaveAttribute(
     "datetime",

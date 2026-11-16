@@ -489,7 +489,7 @@ test("unknown and malformed note IDs are not found", async ({ page }) => {
   for (const id of ["00000000-0000-4000-8000-000000000000", "not-a-uuid"]) {
     await page.goto(`/notes/${id}`);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Note not found" }),
+      page.getByRole("heading", { level: 1, name: "We couldn't find that" }),
     ).toBeVisible();
   }
 });

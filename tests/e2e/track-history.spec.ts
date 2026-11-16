@@ -158,7 +158,7 @@ test("keyboard backfill and static non-loggable days in all three layouts", asyn
   await page.getByLabel("Week starts on").selectOption(String(weekStart));
   const settings = page.getByRole("region", { name: "Time and region" });
   await settings.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(settings.getByRole("status")).toHaveText("Saved.");
+  await expect(settings.getByRole("status")).toHaveText("Saved");
   await page.reload();
   await expect(page.getByLabel("Week starts on")).toHaveValue(
     String(weekStart),

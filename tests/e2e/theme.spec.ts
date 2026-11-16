@@ -23,11 +23,9 @@ for (const [choice, colorScheme] of [
     }
     await page.goto("/", { waitUntil: "domcontentloaded" });
     const root = page.locator("html");
-    if (choice !== null) {
-      expect(await root.getAttribute("data-theme")).toBe(choice);
-    } else {
-      expect(await root.getAttribute("data-theme")).toBeNull();
-    }
+    expect(await root.getAttribute("data-theme")).toBe(
+      choice === "system" ? null : choice,
+    );
     expect(
       await root.evaluate((element) => getComputedStyle(element).colorScheme),
     ).toBe(choice === "system" ? colorScheme : (choice ?? "light"));

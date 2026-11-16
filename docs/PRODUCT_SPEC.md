@@ -163,6 +163,8 @@ Initial destinations:
 
 Navigation can change after usability testing. Avoid making every domain a top-level destination if it creates clutter.
 
+Settings → Appearance applies System, Light, or Dark immediately and saves the choice on this device. Light is the default. System follows the device’s color scheme.
+
 On phones the bar shows Home, Plan, Goals, Track and More. More holds Notes, Review, Search and Settings.
 
 ## 8. Dashboard questions

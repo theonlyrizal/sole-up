@@ -103,7 +103,7 @@ Follow-up **F-1** (needs an ADR and a migration, outside this track): an optiona
 
 **D-08 · Theme: Light by default, with a per-device override.**
 - **Where it lives:** Settings → Appearance offers System, Light and Dark. The choice is stored per device in `localStorage["soleup.theme"]`. Its scope matches what it is (a display preference for one device), and it avoids a schema change.
-- **Before paint:** an inline `<script>` in `src/app/layout.tsx` `<head>` (about 10 lines, no external file) sets `document.documentElement.dataset.theme` before first paint. `<html suppressHydrationWarning>`.
+- **Before paint:** an inline `<script>` in `src/app/layout.tsx` `<head>` (about 10 lines, no external file) applies an explicit `data-theme` or the `data-theme-system` attribute before first paint. `<html suppressHydrationWarning>`.
 - **Browser chrome:** `viewport.themeColor` uses the light and dark `canvas` values.
 - Both themes use the same colour meanings and hierarchy.
 
@@ -286,7 +286,7 @@ The redesign changes described behaviour in `PRODUCT_SPEC.md` in these places. T
 | 5-A | §8: "Each card shows its definition, range and the time it was worked out"; §9: "Show the time range and definition for every metric." | Each card shows its range; the definition and "as of" are one labelled tap away ("How this is counted") | UI-4 (Home), UI-10 (Review) |
 | 5-B | §8 (chunk 6.5): Track shows "always visible beside it, how it is counted" | The figure is visible, and the definition is behind the habit card's "How this is counted" button | UI-9 |
 | 5-C | §7: the navigation destinations list | Add: "On phones the bar shows Home, Plan, Goals, Track and More; More holds Notes, Review, Search and Settings." | UI-3 |
-| 5-D | (none) | Settings → Appearance: System, Light or Dark, per device | UI-12 |
+| 5-D | (none) | Settings → Appearance: System, Light or Dark, per device | Approved for UI-12 (2026-11-16) |
 | 5-E | README "UI shell and components" | Rewritten for the new shell, components, icons and the gallery | UI-3, UI-13 |
 
 ## 6. Follow-ups outside this track

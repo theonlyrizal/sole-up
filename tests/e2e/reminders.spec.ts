@@ -116,14 +116,25 @@ test("turning reminders off in Settings stops their delivery", async ({
   await expect(
     form.getByText(/No device is set up for notifications yet/),
   ).toBeVisible();
-  const enabled = form.getByLabel("Send reminders");
+  const enabled = form.getByRole("switch", { name: "Reminders", exact: true });
   await expect(enabled).toBeChecked();
   await enabled.focus();
   await page.keyboard.press("Space");
   await expect(enabled).not.toBeChecked();
   await expect(enabled).toHaveAccessibleDescription(/^Off: nothing is sent/);
-  await form.getByRole("button", { name: "Save reminders" }).click();
-  await expect(form.getByRole("status")).toHaveText("Saved.");
+  await expect(
+    form.getByRole("switch", { name: "Private notifications" }),
+  ).toBeDisabled();
+  await expect(
+    form.getByRole("switch", { name: "Quiet hours" }),
+  ).toBeDisabled();
+  await expect(
+    form.getByRole("switch", { name: "Daily planning nudge", exact: true }),
+  ).toBeDisabled();
+  await expect(form.getByLabel("Daily planning nudge time")).toBeDisabled();
+  await expect(form.getByLabel("Weekly review reminder")).toBeDisabled();
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(form.getByText("Saved", { exact: true })).toBeVisible();
 
   // A sweep (cron-job.org's call) finds the reminder due and sends nothing.
   const sweep = await page.request.post("/api/reminders/sweep", {
@@ -141,7 +152,9 @@ test("turning reminders off in Settings stops their delivery", async ({
 
   // The switch stays off after a reload.
   const reloaded = await openSettings(page);
-  await expect(reloaded.getByLabel("Send reminders")).not.toBeChecked();
+  await expect(
+    reloaded.getByRole("switch", { name: "Reminders", exact: true }),
+  ).not.toBeChecked();
 });
 
 test("new events remind 10 minutes before; a series' reminder applies to every event", async ({
@@ -221,16 +234,16 @@ test("quiet hours and the daily nudge, with field errors and a warning", async (
   const form = await openSettings(page);
 
   // Off by default; turning them on suggests 22:00–07:00.
-  const quiet = form.getByLabel("Quiet hours");
+  const quiet = form.getByRole("switch", { name: "Quiet hours" });
   await expect(quiet).not.toBeChecked();
   await expect(form.getByLabel("From", { exact: true })).toHaveCount(0);
-  await quiet.check();
+  await quiet.click();
   await expect(form.getByLabel("From", { exact: true })).toHaveValue("22:00");
   await expect(form.getByLabel("Until", { exact: true })).toHaveValue("07:00");
 
   // Equal times are refused next to the field, which gets focus.
   await form.getByLabel("Until", { exact: true }).fill("22:00");
-  await form.getByRole("button", { name: "Save reminders" }).click();
+  await form.getByRole("button", { name: "Save" }).click();
   const until = form.getByLabel("Until", { exact: true });
   await expect(until).toHaveAttribute("aria-invalid", "true");
   await expect(until).toHaveAccessibleDescription(
@@ -240,7 +253,11 @@ test("quiet hours and the daily nudge, with field errors and a warning", async (
   await until.fill("07:00");
 
   // A nudge inside quiet hours waits for their end, and says so.
-  const nudge = form.getByLabel("Daily planning nudge", { exact: true });
+  const nudge = form.getByLabel("Daily planning nudge time");
+  await expect(nudge).toBeDisabled();
+  await form
+    .getByRole("switch", { name: "Daily planning nudge", exact: true })
+    .click();
   await expect(nudge).toHaveValue("");
   await nudge.fill("06:30");
   await expect(
@@ -251,31 +268,37 @@ test("quiet hours and the daily nudge, with field errors and a warning", async (
   await nudge.fill("07:30");
   await expect(form.getByText(/inside your quiet hours/)).toHaveCount(0);
 
-  await form.getByLabel("Private mode").check();
+  await form.getByRole("switch", { name: "Private notifications" }).click();
   await expectNoSeriousViolations(page);
-  await form.getByRole("button", { name: "Save reminders" }).click();
-  await expect(form.getByRole("status")).toHaveText("Saved.");
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(form.getByText("Saved", { exact: true })).toBeVisible();
 
   const reloaded = await openSettings(page);
-  await expect(reloaded.getByLabel("Quiet hours")).toBeChecked();
+  await expect(
+    reloaded.getByRole("switch", { name: "Quiet hours" }),
+  ).toBeChecked();
   await expect(reloaded.getByLabel("From", { exact: true })).toHaveValue(
     "22:00",
   );
   await expect(reloaded.getByLabel("Until", { exact: true })).toHaveValue(
     "07:00",
   );
+  await expect(reloaded.getByLabel("Daily planning nudge time")).toHaveValue(
+    "07:30",
+  );
   await expect(
-    reloaded.getByLabel("Daily planning nudge", { exact: true }),
-  ).toHaveValue("07:30");
-  await expect(reloaded.getByLabel("Private mode")).toBeChecked();
+    reloaded.getByRole("switch", { name: "Private notifications" }),
+  ).toBeChecked();
 
-  // Turning the nudge off from its button.
-  await reloaded.getByRole("button", { name: "Turn off the nudge" }).click();
-  await expect(
-    reloaded.getByLabel("Daily planning nudge", { exact: true }),
-  ).toHaveValue("");
-  await reloaded.getByRole("button", { name: "Save reminders" }).click();
-  await expect(reloaded.getByRole("status")).toHaveText("Saved.");
+  // Turning the nudge off clears its time.
+  await reloaded
+    .getByRole("switch", { name: "Daily planning nudge", exact: true })
+    .click();
+  await expect(reloaded.getByLabel("Daily planning nudge time")).toHaveValue(
+    "",
+  );
+  await reloaded.getByRole("button", { name: "Save" }).click();
+  await expect(reloaded.getByText("Saved", { exact: true })).toBeVisible();
 });
 
 test("the weekly review reminder: set with a day and time, warned in quiet hours, then cleared", async ({
@@ -293,7 +316,7 @@ test("the weekly review reminder: set with a day and time, warned in quiet hours
   // A day needs a time, refused next to the field, which gets focus.
   const time = form.getByLabel("Weekly review time");
   await expect(time).toHaveValue("");
-  await form.getByRole("button", { name: "Save reminders" }).click();
+  await form.getByRole("button", { name: "Save" }).click();
   await expect(time).toHaveAttribute("aria-invalid", "true");
   await expect(time).toHaveAccessibleDescription(
     "Enter a time for the weekly review reminder.",
@@ -301,7 +324,7 @@ test("the weekly review reminder: set with a day and time, warned in quiet hours
   await expect(time).toBeFocused();
 
   // Inside quiet hours it waits for their end, and says so.
-  await form.getByLabel("Quiet hours").check();
+  await form.getByRole("switch", { name: "Quiet hours" }).click();
   await time.fill("06:30");
   await expect(
     form.getByText(
@@ -312,8 +335,8 @@ test("the weekly review reminder: set with a day and time, warned in quiet hours
   await expect(form.getByText(/inside your quiet hours/)).toHaveCount(0);
 
   await expectNoSeriousViolations(page);
-  await form.getByRole("button", { name: "Save reminders" }).click();
-  await expect(form.getByRole("status")).toHaveText("Saved.");
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(form.getByText("Saved", { exact: true })).toBeVisible();
 
   const reloaded = await openSettings(page);
   await expect(reloaded.getByLabel("Weekly review reminder")).toHaveValue("0");
@@ -322,8 +345,8 @@ test("the weekly review reminder: set with a day and time, warned in quiet hours
   // Off again: the time goes, and stays gone after saving.
   await reloaded.getByLabel("Weekly review reminder").selectOption("Off");
   await expect(reloaded.getByLabel("Weekly review time")).toHaveCount(0);
-  await reloaded.getByRole("button", { name: "Save reminders" }).click();
-  await expect(reloaded.getByRole("status")).toHaveText("Saved.");
+  await reloaded.getByRole("button", { name: "Save" }).click();
+  await expect(reloaded.getByText("Saved", { exact: true })).toBeVisible();
 
   const cleared = await openSettings(page);
   await expect(cleared.getByLabel("Weekly review reminder")).toHaveValue("");

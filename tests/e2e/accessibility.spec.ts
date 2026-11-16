@@ -4,7 +4,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 
 const publicPages = [
-  ["/", "SoleUp"],
+  ["/", "Decide what matters. Plan what's realistic. See how it went."],
   ["/sign-in", "Sign in to SoleUp"],
   ["/privacy", "Privacy notes"],
 ] as const;
@@ -16,7 +16,7 @@ const signedInPages = [
   ["/goals", "Goals"],
   ["/goals/areas", "Life areas"],
   ["/goals/archived", "Archived goals"],
-  ["/goals/missing", "Goal not found"],
+  ["/goals/missing", "We couldn't find that"],
   ["/plan", "All tasks"],
   ["/plan/today", "Today"],
   ["/plan/upcoming", "Upcoming"],
@@ -29,12 +29,12 @@ const signedInPages = [
   ["/notes/new", "Note"],
   ["/notes/search", "Search"],
   ["/notes/tags", "Tags"],
-  ["/notes/missing", "Note not found"],
+  ["/notes/missing", "We couldn't find that"],
   ["/review", "Weekly review"],
   ["/review/history", "Past reviews"],
-  ["/review/history/missing", "Review not found"],
+  ["/review/history/missing", "We couldn't find that"],
   ["/review/insights", "Insights"],
-  ["/review/insights/missing", "Insight not found"],
+  ["/review/insights/missing", "We couldn't find that"],
   ["/settings", "Settings"],
   ["/settings/delete-account", "Delete account"],
 ] as const;

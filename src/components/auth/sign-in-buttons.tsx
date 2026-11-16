@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { InlineBanner } from "@/components/ui/inline-banner";
 import { authClient } from "@/lib/auth-client";
 
-type Provider = { id: string; label: string };
+import { ProviderMark } from "./provider-mark";
+
+type Provider = { id: "google" | "github"; label: string };
 
 /** One button per configured provider. Starts the OAuth redirect. */
 export function SignInButtons({ providers }: { providers: Provider[] }) {
@@ -14,40 +18,44 @@ export function SignInButtons({ providers }: { providers: Provider[] }) {
   async function signIn(provider: Provider) {
     setPending(provider.id);
     setError(null);
-    const result = await authClient.signIn.social({
-      provider: provider.id,
-      callbackURL: "/home",
-      errorCallbackURL: "/sign-in",
-    });
-    // On success the browser is already leaving for the provider.
-    if (result.error) {
-      setPending(null);
+    const unavailable = `Couldn't start sign-in with ${provider.label}. Please try again.`;
+    try {
+      const result = await authClient.signIn.social({
+        provider: provider.id,
+        callbackURL: "/home",
+        errorCallbackURL: "/sign-in",
+      });
+      // On success the browser is already leaving for the provider.
+      if (!result.error) return;
       setError(
         result.error.status === 429
           ? "Too many sign-in attempts. Please wait a minute and try again."
-          : `Couldn't start sign-in with ${provider.label}. Please try again.`,
+          : unavailable,
       );
+    } catch {
+      setError(unavailable);
     }
+    setPending(null);
   }
 
   return (
     <div className="flex flex-col gap-3">
       {providers.map((provider) => (
-        <button
+        <Button
           key={provider.id}
-          type="button"
+          variant="outlined"
+          size="m"
           onClick={() => signIn(provider)}
           disabled={pending !== null}
-          className="rounded-md border border-border bg-surface px-4 py-3 text-base font-medium hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-60"
+          aria-busy={pending === provider.id || undefined}
         >
+          <ProviderMark provider={provider.id} />
           {pending === provider.id
             ? `Redirecting to ${provider.label}…`
             : `Continue with ${provider.label}`}
-        </button>
+        </Button>
       ))}
-      <p role="alert" className="min-h-5 text-sm text-danger">
-        {error}
-      </p>
+      {error && <InlineBanner tone="error">{error}</InlineBanner>}
     </div>
   );
 }

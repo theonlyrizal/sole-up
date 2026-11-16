@@ -365,7 +365,7 @@ test("unknown pages show the not-found page", async ({ page }) => {
   const response = await page.goto("/no-such-page");
   expect(response?.status()).toBe(404);
   await expect(
-    page.getByRole("heading", { level: 1, name: "Page not found" }),
+    page.getByRole("heading", { level: 1, name: "We couldn't find that" }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Go to Home" })).toBeVisible();
   await expectNoSeriousViolations(page);

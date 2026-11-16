@@ -20,6 +20,7 @@ type PickerFieldProps = {
   errors?: string[];
   className?: string;
   autoFocus?: boolean;
+  disabled?: boolean;
   clearable?: boolean;
   "aria-invalid"?: true;
   "aria-describedby"?: string;
@@ -46,6 +47,7 @@ export function PickerField(props: PickerFieldProps) {
       icon={type === "date" ? "calendar_month" : "schedule"}
       label={context ? `${pickerLabel} for ${context}` : pickerLabel}
       tooltip={false}
+      disabled={props.disabled}
       size={40}
       className="picker-field-trigger"
     />
@@ -62,6 +64,7 @@ export function PickerField(props: PickerFieldProps) {
             value={value}
             min={min}
             autoFocus={props.autoFocus}
+            disabled={props.disabled}
             aria-invalid={props["aria-invalid"] ?? control["aria-invalid"]}
             aria-describedby={
               [control["aria-describedby"], props["aria-describedby"]]

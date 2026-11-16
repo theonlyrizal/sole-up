@@ -21,6 +21,7 @@ import {
   INBOX_TASK,
   QUANTITY_HABIT,
   seedVisualData,
+  seedVisualDevice,
   UPCOMING_TASK,
   VISUAL_ZONE,
 } from "./visual-data";
@@ -1896,6 +1897,185 @@ for (const viewport of sizes) {
       } finally {
         await stale.close();
       }
+    });
+  }
+}
+
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-12 settings and public entry ${viewport.width} ${theme}`, async ({
+      page,
+    }) => {
+      test.setTimeout(150_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      const capture = (state: string, fullPage = true) =>
+        page.screenshot({
+          path: `test-results/visual/ui-12/${state}-${viewport.width}-${theme}.png`,
+          fullPage,
+          animations: "disabled",
+        });
+
+      async function verifyRoute(name: string) {
+        await expectNoSeriousViolations(page);
+        await capture(name);
+        for (const width of [320, 375, 390, 414, 768, 840, 1280]) {
+          await page.setViewportSize({ width, height: viewport.height });
+          await checkRenderedPage(page, theme);
+        }
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        await checkRenderedPage(page, theme);
+        await capture(`${name}-zoom`);
+        await page.evaluate(() => {
+          document.documentElement.style.removeProperty("font-size");
+        });
+      }
+
+      await openPage(page, "/");
+      await verifyRoute("landing");
+      await page
+        .getByRole("link", { name: "Sign in", exact: true })
+        .press("Enter");
+      await expect(page).toHaveURL(/\/sign-in$/);
+      await expect(
+        page.getByRole("button", { name: "Continue with Google" }),
+      ).toBeVisible();
+      await verifyRoute("sign-in");
+
+      await openPage(page, "/sign-in?error=account_not_linked");
+      await expect(page.getByRole("main").getByRole("alert")).toContainText(
+        "Sign in with the provider you used before",
+      );
+      await expectNoSeriousViolations(page);
+      await capture("sign-in-error");
+
+      await openPage(page, "/ui-12-missing");
+      await expect(
+        page.getByRole("heading", { name: "We couldn't find that" }),
+      ).toBeVisible();
+      await verifyRoute("not-found");
+
+      await openPage(page, "/test-errors/render");
+      await expect(
+        page.getByRole("heading", { name: "Something went wrong" }),
+      ).toBeVisible();
+      await expect(page.locator("main")).toContainText(/Reference: \S+/);
+      await verifyRoute("error");
+
+      const userId = await signInAndConfirm(page, "Alex Morgan");
+      await openPage(page, "/settings");
+      const reminders = page.getByRole("form", { name: "Reminder settings" });
+      await expect(reminders).toContainText(
+        "No device is set up for notifications yet",
+      );
+      await verifyRoute("settings");
+      await capture("settings-first-screen", false);
+
+      const index = page.getByRole("navigation", { name: "On this page" });
+      const appearance = index.getByRole("link", { name: "Appearance" });
+      await appearance.press("Enter");
+      await expect(page).toHaveURL(/\/settings#appearance$/);
+      if (viewport.width >= 1200) {
+        await expect(appearance).toHaveAttribute("aria-current", "true");
+        const navBounds = await index.boundingBox();
+        expect(navBounds?.y).toBeLessThan(80);
+      }
+      const group = page.getByRole("radiogroup", { name: "Color theme" });
+      const explicit = group.getByRole("radio", {
+        name: theme === "dark" ? "Dark" : "Light",
+      });
+      await explicit.press("Space");
+      await expect(explicit).toBeChecked();
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await capture("appearance-selected", false);
+
+      const preferences = page.getByRole("region", { name: "Time and region" });
+      await preferences.getByLabel("Language and region").selectOption("de-DE");
+      const save = preferences.getByRole("button", {
+        name: "Save",
+        exact: true,
+      });
+      const requested = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      await page.route("**/settings", async (route) => {
+        const request = route.request();
+        if (request.method() !== "POST" || !request.headers()["next-action"]) {
+          return route.continue();
+        }
+        requested.resolve();
+        await release.promise;
+        return route.abort("failed");
+      });
+      try {
+        await save.press("Enter");
+        await requested.promise;
+        await expect(
+          preferences.getByRole("button", { name: "Saving…" }),
+        ).toBeDisabled();
+        await capture("preferences-pending", false);
+      } finally {
+        release.resolve();
+      }
+      await expect(preferences.getByRole("status")).toHaveText("Not saved");
+      await expect(preferences.getByRole("alert")).toContainText(
+        "Please try again",
+      );
+      await expect(preferences.getByLabel("Language and region")).toHaveValue(
+        "de-DE",
+      );
+      await capture("preferences-error", false);
+      await page.unroute("**/settings");
+      await save.press("Enter");
+      await expect(preferences.getByRole("status")).toHaveText("Saved");
+      await capture("preferences-retry", false);
+
+      await seedVisualDevice(userId);
+      await page.goto("/home");
+      await page.goto("/settings#notifications");
+      const notificationSection = page.getByRole("region", {
+        name: "Notifications",
+        exact: true,
+      });
+      const devices = page.getByRole("region", { name: "Your devices" });
+      await expect(devices.getByText("2 failed attempts")).toBeVisible();
+      await expect(page.getByText("Checking this device…")).toHaveCount(0);
+      await expect
+        .poll(async () => (await notificationSection.boundingBox())?.y)
+        .toBeLessThan(160);
+      if (viewport.width === 390) {
+        await expect(page.locator(".top-app-bar")).not.toHaveCSS(
+          "background-color",
+          "rgba(0, 0, 0, 0)",
+        );
+      }
+      await capture("notifications-device", false);
+      const menu = devices.getByRole("button", {
+        name: "Actions for Chrome on Android",
+      });
+      await menu.press("Enter");
+      await page.getByRole("menuitem", { name: "Remove…" }).press("Enter");
+      const dialog = page.getByRole("alertdialog", {
+        name: "Remove Chrome on Android?",
+      });
+      await expect(dialog).toBeVisible();
+      await expectNoSeriousViolations(page);
+      await capture("notifications-remove", false);
+      await page.keyboard.press("Escape");
+      await expect(menu).toBeFocused();
+
+      await openPage(page, "/goals/missing");
+      await expect(
+        page.getByRole("link", { name: "Back to Goals" }),
+      ).toBeVisible();
+      await expectNoSeriousViolations(page);
+      await capture("goal-not-found");
     });
   }
 }

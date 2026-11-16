@@ -22,20 +22,24 @@ describe("themeInitScript", () => {
   it.each([
     ["dark", { theme: "dark" }],
     ["light", { theme: "light" }],
-    ["system", { theme: "system" }],
+    ["system", {}],
     [null, {}],
     ['</script><script>throw Error("injected")</script>', {}],
   ])("only writes an explicit supported choice (%s)", (choice, expected) => {
     const dataset = {};
     const getItem = vi.fn(() => choice);
+    const setAttribute = vi.fn();
     const script = themeInitScript();
     expect(script).not.toContain("<");
     runInNewContext(script, {
       localStorage: { getItem },
-      document: { documentElement: { dataset } },
+      document: { documentElement: { dataset, setAttribute } },
     });
     expect(getItem).toHaveBeenCalledWith(THEME_STORAGE_KEY);
     expect(dataset).toEqual(expected);
+    if (choice === "system")
+      expect(setAttribute).toHaveBeenCalledWith("data-theme-system", "");
+    else expect(setAttribute).not.toHaveBeenCalled();
   });
 
   it("leaves the light default when storage access throws", () => {

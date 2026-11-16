@@ -70,14 +70,14 @@ async function turnOn(page: Page) {
     "Notifications are off for this device.",
   );
   await notifications(page)
-    .getByRole("button", { name: "Turn on notifications" })
+    .getByRole("button", { name: "Turn on notifications on this device" })
     .click();
   await expect(notifications(page)).toContainText(
     "Notifications are on for this device.",
   );
 }
 
-test("devices turn notifications on, and revoking one stops it", async ({
+test("devices turn notifications on, and removing one stops it", async ({
   page,
   context,
 }) => {
@@ -96,7 +96,7 @@ test("devices turn notifications on, and revoking one stops it", async ({
   await expect(deviceRows(page)).toContainText("No notification delivered yet");
   await expect(
     notifications(page).getByRole("button", {
-      name: "Send test notification",
+      name: "Send a test notification",
     }),
   ).toBeVisible();
 
@@ -113,12 +113,25 @@ test("devices turn notifications on, and revoking one stops it", async ({
 
   // Revoke the other device from the first.
   const otherRow = deviceRows(page).filter({ hasNotText: "(this device)" });
-  await otherRow.getByRole("button", { name: "Revoke" }).click();
+  const menu = otherRow.getByRole("button", { name: /Actions for/ });
+  await menu.press("Enter");
+  await page.getByRole("menuitem", { name: "Remove…" }).press("Enter");
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText("That device stops getting");
-  await dialog.getByRole("button", { name: "Revoke" }).click();
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(menu).toBeFocused();
+  await expect(deviceRows(page)).toHaveCount(2);
+
+  await menu.press("Enter");
+  await page.getByRole("menuitem", { name: "Remove…" }).press("Enter");
+  await dialog.getByRole("button", { name: "Remove", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(deviceRows(page)).toHaveCount(1);
+  await expect(
+    page.getByRole("heading", { name: "Your devices" }),
+  ).toBeFocused();
   await expect(deviceRows(page)).toContainText("(this device)");
 
   // The other browser still holds its subscription, but the server no
@@ -153,6 +166,8 @@ test("blocked notifications say how to allow them", async ({ page }) => {
     "Notifications are blocked for SoleUp in this browser.",
   );
   await expect(
-    notifications(page).getByRole("button", { name: "Turn on notifications" }),
+    notifications(page).getByRole("button", {
+      name: "Turn on notifications on this device",
+    }),
   ).toHaveCount(0);
 });

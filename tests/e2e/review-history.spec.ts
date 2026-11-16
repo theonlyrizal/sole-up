@@ -179,11 +179,11 @@ test("an unknown review is not found", async ({ page }) => {
   await signInAndConfirm(page);
   await page.goto(`/review/history/${crypto.randomUUID()}`);
   await expect(
-    page.getByRole("heading", { level: 1, name: "Review not found" }),
+    page.getByRole("heading", { level: 1, name: "We couldn't find that" }),
   ).toBeVisible();
   await page.goto("/review/history/not-a-review");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Review not found" }),
+    page.getByRole("heading", { level: 1, name: "We couldn't find that" }),
   ).toBeVisible();
 });
 

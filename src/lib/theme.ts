@@ -13,13 +13,38 @@ export function resolveTheme(
   return choice === "system" ? (prefersDark ? "dark" : "light") : choice;
 }
 
+/** Read the choice already applied by the pre-paint script. */
+export function readThemeChoice(): ThemeChoice {
+  const root = document.documentElement;
+  if (root.hasAttribute("data-theme-system")) return "system";
+  return root.dataset.theme === "dark" ? "dark" : "light";
+}
+
+/** The visual change still works when browser storage is blocked. */
+export function saveThemeChoice(choice: ThemeChoice): boolean {
+  const root = document.documentElement;
+  root.toggleAttribute("data-theme-system", choice === "system");
+  if (choice === "system") delete root.dataset.theme;
+  else root.dataset.theme = choice;
+
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, choice);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** The only interpolated value is our fixed storage key, never user input. */
 export function themeInitScript(): string {
   return `(() => {
     try {
       const choice = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
-      if (choice === "light" || choice === "dark" || choice === "system") {
-        document.documentElement.dataset.theme = choice;
+      const root = document.documentElement;
+      if (choice === "light" || choice === "dark") {
+        root.dataset.theme = choice;
+      } else if (choice === "system") {
+        root.setAttribute("data-theme-system", "");
       }
     } catch {
       // Storage can be blocked. CSS keeps the light default.

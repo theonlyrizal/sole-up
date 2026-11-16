@@ -10,8 +10,10 @@ import { authClient } from "@/lib/auth-client";
 
 export function SignOutButton({
   variant = "button",
+  buttonTone = "outlined",
 }: {
   variant?: "button" | "icon" | "menu";
+  buttonTone?: "outlined" | "tonal";
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -20,8 +22,10 @@ export function SignOutButton({
   async function signOut() {
     setPending(true);
     setFailed(false);
-    const result = await authClient.signOut();
-    if (result.error) {
+    try {
+      const result = await authClient.signOut();
+      if (result.error) throw result.error;
+    } catch {
       setPending(false);
       setFailed(true);
       return;
@@ -64,7 +68,7 @@ export function SignOutButton({
         />
       ) : (
         <Button
-          variant="secondary"
+          variant={buttonTone}
           size="sm"
           onClick={signOut}
           disabled={pending}
