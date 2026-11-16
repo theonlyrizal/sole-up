@@ -45,6 +45,7 @@ import {
 import type { EventLinkOptions } from "@/server/modules/calendar-events/queries";
 
 import { DeleteEventDialog } from "./delete-event-dialog";
+import { PickerField } from "./picker-field";
 import { RepeatBuilder } from "./repeat-builder";
 import { type ScopeOption, ScopeChooser } from "./scope-chooser";
 
@@ -393,82 +394,60 @@ function EventForm({
       <div className="calendar-time-fields">
         <fieldset className="calendar-time-group">
           <legend>Start</legend>
-          <FormField
+          <PickerField
             id={`${id}-start-date`}
             label="Start date"
+            name="startDate"
+            type="date"
+            value={values.startDate}
+            locale={locale}
             errors={fieldErrors.startDate}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
-                name="startDate"
-                value={values.startDate}
-                onChange={(change) =>
-                  setValues((current) =>
-                    withStart(current, { startDate: change.target.value }),
-                  )
-                }
-              />
-            )}
-          </FormField>
+            timeZone={values.tz}
+            onChange={(startDate) =>
+              setValues((current) => withStart(current, { startDate }))
+            }
+          />
           {!values.allDay && (
-            <FormField
+            <PickerField
               id={`${id}-start-time`}
               label="Start time"
+              name="startTime"
+              type="time"
+              value={values.startTime}
+              locale={locale}
               errors={fieldErrors.startTime}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  type="time"
-                  name="startTime"
-                  value={values.startTime}
-                  onChange={(change) =>
-                    setValues((current) =>
-                      withStart(current, { startTime: change.target.value }),
-                    )
-                  }
-                />
-              )}
-            </FormField>
+              onChange={(startTime) =>
+                setValues((current) => withStart(current, { startTime }))
+              }
+            />
           )}
         </fieldset>
         <fieldset className="calendar-time-group">
           <legend>End</legend>
-          <FormField
+          <PickerField
             id={`${id}-end-date`}
             label="End date"
-            hint={values.allDay ? "The last day of the event." : undefined}
+            name="endDate"
+            type="date"
+            value={values.endDate}
+            locale={locale}
             errors={fieldErrors.endDate}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
-                name="endDate"
-                value={values.endDate}
-                min={values.startDate || undefined}
-                onChange={(change) => set({ endDate: change.target.value })}
-              />
-            )}
-          </FormField>
+            timeZone={values.tz}
+            hint={values.allDay ? "The last day of the event." : undefined}
+            min={values.startDate || undefined}
+            onChange={(endDate) => set({ endDate })}
+          />
           {!values.allDay && (
-            <FormField
+            <PickerField
               id={`${id}-end-time`}
               label="End time"
+              name="endTime"
+              type="time"
+              value={values.endTime}
+              locale={locale}
               errors={fieldErrors.endTime}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  type="time"
-                  name="endTime"
-                  value={values.endTime}
-                  onChange={(change) => set({ endTime: change.target.value })}
-                />
-              )}
-            </FormField>
+              onChange={(endTime) => set({ endTime })}
+            />
           )}
         </fieldset>
       </div>
@@ -521,6 +500,7 @@ function EventForm({
         }}
         startDate={values.startDate}
         locale={locale}
+        timeZone={values.tz}
         errors={repeatErrors}
         ruleErrors={fieldErrors.rrule}
       />

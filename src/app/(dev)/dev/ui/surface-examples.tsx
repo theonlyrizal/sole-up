@@ -36,6 +36,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ProgressIndicator } from "@/components/ui/progress-indicator";
 import { SaveStatus } from "@/components/ui/save-status";
 import { Select } from "@/components/ui/select";
 import { LoadingState, Skeleton } from "@/components/ui/skeleton";
@@ -527,6 +528,7 @@ function StateExamples() {
     "error",
   );
   const [retry, setRetry] = useState(false);
+  const [progress, setProgress] = useState(35);
   return (
     <>
       <Example title="Loading indicator, skeleton and loading state">
@@ -546,6 +548,42 @@ function StateExamples() {
           <Skeleton className="h-4 w-1/2" />
         </div>
         <LoadingState label="Loading workshop notes" />
+      </Example>
+      <Example title="Progress indicators">
+        <label className="grid gap-2 text-label-large">
+          <span>Progress · {progress}%</span>
+          <input
+            className="w-full accent-primary"
+            type="range"
+            min={0}
+            max={100}
+            value={progress}
+            onChange={(event) => setProgress(event.currentTarget.valueAsNumber)}
+          />
+        </label>
+        {[{}, { wavy: true }, { thick: true }, { thick: true, wavy: true }].map(
+          (variant) => {
+            const label = `${variant.thick ? "Thick" : "Thin"} ${variant.wavy ? "wavy" : "flat"}`;
+            return (
+              <div
+                key={label}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-6"
+              >
+                <ProgressIndicator
+                  value={progress}
+                  label={`${label} linear progress`}
+                  {...variant}
+                />
+                <ProgressIndicator
+                  value={progress}
+                  label={`${label} circular progress`}
+                  shape="circular"
+                  {...variant}
+                />
+              </div>
+            );
+          },
+        )}
       </Example>
       <Example title="Empty and error states">
         <EmptyState

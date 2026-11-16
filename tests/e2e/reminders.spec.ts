@@ -223,15 +223,15 @@ test("quiet hours and the daily nudge, with field errors and a warning", async (
   // Off by default; turning them on suggests 22:00–07:00.
   const quiet = form.getByLabel("Quiet hours");
   await expect(quiet).not.toBeChecked();
-  await expect(form.getByLabel("From")).toHaveCount(0);
+  await expect(form.getByLabel("From", { exact: true })).toHaveCount(0);
   await quiet.check();
-  await expect(form.getByLabel("From")).toHaveValue("22:00");
-  await expect(form.getByLabel("Until")).toHaveValue("07:00");
+  await expect(form.getByLabel("From", { exact: true })).toHaveValue("22:00");
+  await expect(form.getByLabel("Until", { exact: true })).toHaveValue("07:00");
 
   // Equal times are refused next to the field, which gets focus.
-  await form.getByLabel("Until").fill("22:00");
+  await form.getByLabel("Until", { exact: true }).fill("22:00");
   await form.getByRole("button", { name: "Save reminders" }).click();
-  const until = form.getByLabel("Until");
+  const until = form.getByLabel("Until", { exact: true });
   await expect(until).toHaveAttribute("aria-invalid", "true");
   await expect(until).toHaveAccessibleDescription(
     "Quiet hours need to end at a different time than they start.",
@@ -240,7 +240,7 @@ test("quiet hours and the daily nudge, with field errors and a warning", async (
   await until.fill("07:00");
 
   // A nudge inside quiet hours waits for their end, and says so.
-  const nudge = form.getByLabel("Daily planning nudge");
+  const nudge = form.getByLabel("Daily planning nudge", { exact: true });
   await expect(nudge).toHaveValue("");
   await nudge.fill("06:30");
   await expect(
@@ -258,16 +258,22 @@ test("quiet hours and the daily nudge, with field errors and a warning", async (
 
   const reloaded = await openSettings(page);
   await expect(reloaded.getByLabel("Quiet hours")).toBeChecked();
-  await expect(reloaded.getByLabel("From")).toHaveValue("22:00");
-  await expect(reloaded.getByLabel("Until")).toHaveValue("07:00");
-  await expect(reloaded.getByLabel("Daily planning nudge")).toHaveValue(
-    "07:30",
+  await expect(reloaded.getByLabel("From", { exact: true })).toHaveValue(
+    "22:00",
   );
+  await expect(reloaded.getByLabel("Until", { exact: true })).toHaveValue(
+    "07:00",
+  );
+  await expect(
+    reloaded.getByLabel("Daily planning nudge", { exact: true }),
+  ).toHaveValue("07:30");
   await expect(reloaded.getByLabel("Private mode")).toBeChecked();
 
   // Turning the nudge off from its button.
   await reloaded.getByRole("button", { name: "Turn off the nudge" }).click();
-  await expect(reloaded.getByLabel("Daily planning nudge")).toHaveValue("");
+  await expect(
+    reloaded.getByLabel("Daily planning nudge", { exact: true }),
+  ).toHaveValue("");
   await reloaded.getByRole("button", { name: "Save reminders" }).click();
   await expect(reloaded.getByRole("status")).toHaveText("Saved.");
 });

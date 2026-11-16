@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { PickerField } from "@/components/calendar/picker-field";
 import { StatusChip } from "@/components/data/status-chip";
 import { Icon, type IconName } from "@/components/icons/icon";
 import { Button, type ButtonVariant } from "@/components/ui/button";
@@ -598,6 +599,8 @@ function SaveExample({ theme }: { theme: Theme }) {
 }
 
 function FieldExamples({ theme }: { theme: Theme }) {
+  const [date, setDate] = useState("2026-11-12");
+  const [time, setTime] = useState("08:30");
   return (
     <Example title="Fields and number stepper">
       <FormField
@@ -638,14 +641,25 @@ function FieldExamples({ theme }: { theme: Theme }) {
         )}
       </FormField>
       <div className="grid gap-3 medium:grid-cols-2">
-        <FormField id={`${theme}-date`} label="Start date">
-          {(control) => (
-            <Input {...control} type="date" defaultValue="2026-11-12" />
-          )}
-        </FormField>
-        <FormField id={`${theme}-time`} label="Start time">
-          {(control) => <Input {...control} type="time" defaultValue="08:30" />}
-        </FormField>
+        <PickerField
+          id={`${theme}-date`}
+          label="Start date"
+          name="startDate"
+          type="date"
+          value={date}
+          locale="en-US"
+          timeZone="UTC"
+          onChange={setDate}
+        />
+        <PickerField
+          id={`${theme}-time`}
+          label="Start time"
+          name="startTime"
+          type="time"
+          value={time}
+          locale="en-US"
+          onChange={setTime}
+        />
       </div>
       <FormField
         id={`${theme}-invalid-text`}

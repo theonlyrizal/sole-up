@@ -21,7 +21,7 @@ export function MenuContent({
         {...props}
         sideOffset={sideOffset}
         className={cx(
-          "menu-panel floating-panel z-50 max-h-(--radix-dropdown-menu-content-available-height) max-w-70 min-w-28 overflow-y-auto rounded-md bg-surface-container py-2 text-on-surface shadow-2",
+          "menu-panel z-50 grid max-h-(--radix-dropdown-menu-content-available-height) w-max max-w-[min(17.5rem,calc(100vi-2rem))] min-w-28 gap-1 overflow-y-auto overscroll-contain rounded-lg bg-surface-container-low p-1 text-on-surface shadow-2",
           className,
         )}
       />
@@ -49,7 +49,7 @@ export function MenuItem({
       <DropdownMenu.Item
         {...props}
         className={cx(
-          "menu-item state-layer flex min-h-12 cursor-default items-center gap-3 px-3 text-body-large",
+          "menu-item state-layer flex min-h-11 cursor-default items-center gap-3 rounded-md px-3 py-2 text-body-medium",
           destructive && "text-error",
           className,
         )}

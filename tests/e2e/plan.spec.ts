@@ -200,20 +200,35 @@ test("dates and parent are edited inline; date windows filter them", async ({
   const editor = page.getByRole("form", {
     name: "Dates and goal for Renew passport",
   });
-  await expect(editor.getByLabel("Plan for")).toBeFocused();
+  await expect(editor.getByLabel("Plan for", { exact: true })).toBeFocused();
   await expectNoSeriousViolations(page);
 
   // Escape closes it without saving and gives focus back.
-  await editor.getByLabel("Plan for").fill("2030-01-15");
+  await editor.getByLabel("Plan for", { exact: true }).fill("2030-01-15");
   await page.keyboard.press("Escape");
   await expect(editor).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await expect(taskList(page).getByText(/Planned/)).toHaveCount(0);
 
   await chooseTaskAction(page, "Renew passport", "Dates and goal");
-  await editor.getByLabel("Plan for").fill("2030-01-15");
+  await editor.getByLabel("Plan for", { exact: true }).fill("2030-01-15");
   await editor.getByLabel("Due date").fill("2030-01-20");
-  await editor.getByLabel("Due time").fill("17:30");
+  const clock = editor.getByRole("button", { name: "Open clock for due" });
+  await clock.click();
+  const picker = page.getByRole("dialog", { name: "Select time" });
+  await expect(picker).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(clock).toBeFocused();
+  await clock.click();
+  await picker
+    .getByRole("button", { name: "Enter time with keyboard" })
+    .click();
+  const time = page.getByRole("dialog", { name: "Enter time" });
+  await time.getByLabel("Hour").fill("05");
+  await time.getByLabel("Minute").fill("30");
+  await time.getByRole("button", { name: "PM" }).click();
+  await time.getByRole("button", { name: "OK" }).click();
+  await expect(editor.getByLabel("Due time")).toHaveValue("17:30");
   await editor
     .getByLabel("Goal or milestone")
     .selectOption({ label: "Learn Spanish" });
@@ -231,6 +246,9 @@ test("dates and parent are edited inline; date windows filter them", async ({
   // The editor reopens with the saved values.
   await chooseTaskAction(page, "Renew passport", "Dates and goal");
   await expect(editor.getByLabel("Due time")).toHaveValue("17:30");
+  await clock.click();
+  await picker.getByRole("button", { name: "Clear" }).click();
+  await expect(editor.getByLabel("Due time")).toHaveValue("");
   await editor.getByRole("button", { name: "Cancel" }).click();
 
   // Date windows.

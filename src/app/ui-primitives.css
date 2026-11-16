@@ -155,16 +155,17 @@
 
 .loading-indicator {
   --loading-step: 650ms;
-  --loading-cycle: calc(5 * var(--loading-step));
+  --loading-cycle: calc(7 * var(--loading-step));
 }
 
 .loading-indicator > rect {
   clip-path: var(--loading-circle);
+  transform-origin: center;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .loading-indicator {
-    animation: loading-rotate var(--loading-cycle) linear infinite;
+    animation: loading-rotate 4666ms linear infinite;
   }
   .loading-indicator > rect {
     animation: loading-morph var(--loading-cycle)
@@ -185,28 +186,38 @@
   }
 }
 
-/* Each 650ms step allows the 440ms spatial spring to settle before the next. */
 @keyframes loading-morph {
-  0%,
-  93.54%,
-  100% {
-    clip-path: var(--loading-circle);
-  }
-  13.54%,
-  20% {
-    clip-path: var(--loading-sunny);
-  }
-  33.54%,
-  40% {
-    clip-path: var(--loading-cookie);
-  }
-  53.54%,
-  60% {
-    clip-path: var(--loading-pill);
-  }
-  73.54%,
-  80% {
+  0% {
     clip-path: var(--loading-burst);
+    rotate: 0turn;
+  }
+  14.2857% {
+    clip-path: var(--loading-cookie);
+    rotate: calc(2turn / 7);
+  }
+  28.5714% {
+    clip-path: var(--loading-pentagon);
+    rotate: calc(4turn / 7);
+  }
+  42.8571% {
+    clip-path: var(--loading-pill);
+    rotate: calc(6turn / 7);
+  }
+  57.1429% {
+    clip-path: var(--loading-sunny);
+    rotate: calc(8turn / 7);
+  }
+  71.4286% {
+    clip-path: var(--loading-cookie-four);
+    rotate: calc(10turn / 7);
+  }
+  85.7143% {
+    clip-path: var(--loading-oval);
+    rotate: calc(12turn / 7);
+  }
+  100% {
+    clip-path: var(--loading-burst);
+    rotate: 2turn;
   }
 }
 
@@ -220,7 +231,17 @@
   --action-bg: var(--md-surface-container);
   --action-fg: var(--md-on-surface);
   --connected-corner: var(--radius-sm);
-  border-radius: var(--connected-corner);
+  /* Keep the end cap within the painted height so it cannot shrink the inner corners. */
+  --connected-cap: calc(1.5rem - var(--action-inset, 0px));
+  --connected-start: var(--connected-corner);
+  --connected-end: var(--connected-corner);
+  border-radius: var(--connected-start) var(--connected-end)
+    var(--connected-end) var(--connected-start);
+}
+
+.connected-item:dir(rtl) {
+  border-radius: var(--connected-end) var(--connected-start)
+    var(--connected-start) var(--connected-end);
 }
 
 .connected-item.connected-compact {
@@ -232,19 +253,18 @@
 }
 
 .connected-item:first-child {
-  border-start-start-radius: var(--radius-full);
-  border-end-start-radius: var(--radius-full);
+  --connected-start: var(--connected-cap);
 }
 
 .connected-item:last-child {
-  border-start-end-radius: var(--radius-full);
-  border-end-end-radius: var(--radius-full);
+  --connected-end: var(--connected-cap);
 }
 
 .connected-item:is([aria-current="page"], [data-state="on"]) {
   --action-bg: var(--md-secondary);
   --action-fg: var(--md-on-secondary);
-  border-radius: var(--radius-full);
+  --connected-start: var(--connected-cap);
+  --connected-end: var(--connected-cap);
 }
 
 .connected-item:focus-visible,
@@ -421,14 +441,13 @@ textarea.field-control {
   color: var(--md-on-surface-variant);
 }
 
-.filled-field:has(> .field-control, > .native-select) > label::before {
+.filled-field:has(> .field-control) > label::before {
   position: absolute;
   inset: 0;
   content: "";
 }
 
-.filled-field > .field-control,
-.filled-field > .native-select > .field-control {
+.filled-field > .field-control {
   position: relative;
   display: block;
   min-height: 1.5rem;
@@ -513,27 +532,257 @@ textarea.field-control {
   min-width: 0;
 }
 
-.native-select > .field-control,
-.filled-field > .native-select > .field-control {
+.native-select > .field-control {
   appearance: none;
-  padding-inline-end: 2rem;
+  min-height: 3.5rem;
+  padding-inline-end: 3rem;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--radius-xs);
+  background: transparent;
 }
 
 .native-select-icon {
   position: absolute;
   inset-inline-end: 1rem;
   top: 50%;
+  width: 0.625rem;
+  height: 0.3125rem;
   translate: 0 -50%;
-  color: var(--md-on-surface-variant);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: var(--md-on-surface-variant);
   pointer-events: none;
 }
 
-.filled-field .native-select-icon {
-  inset-inline-end: 0;
+.native-select:has(> select:open) .native-select-icon {
+  rotate: 180deg;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .native-select-icon {
+    transition: rotate var(--duration-standard-fast-spatial)
+      var(--ease-standard-fast-spatial);
+  }
 }
 
 .native-select:has(:disabled) .native-select-icon {
-  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+  background: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+}
+
+.native-select > .field-control:disabled {
+  border-color: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+}
+
+.filled-field:has(> .native-select) {
+  --select-outline: var(--md-outline);
+  --select-outline-width: 1px;
+  min-height: 0;
+  margin-block-start: 0.5rem;
+  padding: 0;
+  background: transparent;
+  outline: none;
+}
+
+.filled-field:has(> .native-select):is(
+    :focus-within,
+    :has(> .native-select > select:open)
+  ) {
+  --select-outline: var(--md-primary);
+  --select-outline-width: 2px;
+}
+
+.filled-field:has(> .native-select)[data-invalid="true"],
+.filled-field:has(> .native-select > select[aria-invalid="true"]) {
+  --select-outline: var(--md-error);
+  --select-outline-width: 2px;
+}
+
+.filled-field:has(> .native-select > select:disabled) {
+  --select-outline: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+}
+
+.filled-field:has(> .native-select) > label {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 0;
+  inset-inline: 0;
+  display: grid;
+  grid-template-columns: 0.75rem fit-content(80%) minmax(0.75rem, 1fr);
+  column-gap: 0.25rem;
+  align-items: center;
+  translate: 0 -50%;
+}
+
+/* The label leaves a gap in the outline, including on translucent surfaces. */
+.filled-field:has(> .native-select) > label::before,
+.filled-field:has(> .native-select) > label::after {
+  height: var(--radius-xs);
+  translate: 0 50%;
+  border: var(--select-outline-width) solid var(--select-outline);
+  border-block-end: 0;
+  content: "";
+}
+
+.filled-field:has(> .native-select) > label::before {
+  border-inline-end: 0;
+  border-start-start-radius: var(--radius-xs);
+}
+
+.filled-field:has(> .native-select) > label::after {
+  border-inline-start: 0;
+  border-start-end-radius: var(--radius-xs);
+}
+
+.filled-field > .native-select > .field-control {
+  border: var(--select-outline-width) solid var(--select-outline);
+  border-block-start: var(--radius-xs) solid transparent;
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+  background-clip: padding-box;
+  clip-path: inset(var(--radius-xs) 0 0);
+  outline: none;
+}
+
+.filled-field:has(> .native-select)[data-invalid="true"] .field-control {
+  padding-inline-end: 3.75rem;
+}
+
+.filled-field:has(> .native-select) > .field-error-icon {
+  inset-block-start: 50%;
+  inset-inline-end: 2.25rem;
+  translate: 0 -50%;
+}
+
+@supports (appearance: base-select) and selector(::picker(select)) {
+  .native-select > select.field-control,
+  .native-select > select::picker(select) {
+    appearance: base-select;
+  }
+
+  .native-select > select::picker-icon {
+    content: none;
+  }
+
+  .native-select > select::picker(select) {
+    box-sizing: border-box;
+    min-inline-size: 0;
+    inline-size: anchor-size(inline);
+    max-inline-size: calc(100vi - 1rem);
+    max-block-size: min(24rem, 100%);
+    margin-block: 0.25rem 0.5rem;
+    margin-inline: 0;
+    padding: 0.25rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: var(--radius-lg);
+    background: var(--md-surface-container-low);
+    color: var(--md-on-surface);
+    box-shadow: var(--shadow-2);
+    transform-origin: top;
+  }
+
+  .native-select option {
+    display: flex;
+    min-block-size: 2.75rem;
+    align-items: center;
+    gap: 0.5rem;
+    margin-block-end: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: var(--text-body-medium);
+    line-height: var(--text-body-medium--line-height);
+    overflow-wrap: anywhere;
+  }
+
+  .native-select option:last-child {
+    margin-block-end: 0;
+  }
+
+  .native-select option:checked {
+    background: var(--md-tertiary-container);
+    color: var(--md-on-tertiary-container);
+  }
+
+  .native-select option::checkmark {
+    order: -1;
+    inline-size: 1.25rem;
+    text-align: center;
+  }
+
+  .native-select option:not(:checked)::checkmark {
+    display: none;
+  }
+
+  .native-select option:enabled:hover {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+
+  .native-select option:checked:enabled:hover {
+    background: color-mix(
+      in srgb,
+      var(--md-tertiary-container),
+      var(--md-on-tertiary-container) 8%
+    );
+  }
+
+  .native-select option:focus-visible {
+    outline: 2px solid var(--md-focus);
+    outline-offset: -2px;
+  }
+
+  .native-select option:disabled {
+    opacity: 0.38;
+  }
+
+  .native-select optgroup {
+    padding-inline: 0;
+    color: var(--md-on-surface-variant);
+    font-size: var(--text-label-medium);
+    font-weight: 500;
+  }
+
+  .native-select optgroup option {
+    color: var(--md-on-surface);
+    font-weight: 400;
+  }
+
+  .native-select optgroup option:checked {
+    color: var(--md-on-tertiary-container);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .native-select > select::picker(select) {
+      transition:
+        opacity var(--duration-fast-effects) var(--ease-fast-effects),
+        scale var(--duration-standard-fast-spatial)
+          var(--ease-standard-fast-spatial),
+        display var(--duration-fast-effects) allow-discrete,
+        overlay var(--duration-fast-effects) allow-discrete;
+      opacity: 0;
+      scale: 0.96;
+    }
+
+    .native-select > select:open::picker(select) {
+      opacity: 1;
+      scale: 1;
+
+      @starting-style {
+        opacity: 0;
+        scale: 0.96;
+      }
+    }
+  }
+}
+
+@media (forced-colors: active) {
+  .native-select-icon {
+    forced-color-adjust: none;
+    background: ButtonText;
+  }
+
+  .native-select:has(:disabled) .native-select-icon {
+    background: GrayText;
+  }
 }
 
 .selection-label {

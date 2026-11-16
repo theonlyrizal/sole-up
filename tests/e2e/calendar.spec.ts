@@ -139,15 +139,42 @@ test("a repeating event from the keyboard, with field errors in the builder", as
   const minutes = (time: string) =>
     Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
   expect((minutes(end) - minutes(start) + 1440) % 1440).toBe(60);
-  await dialog.getByLabel("Start date").fill(tokyoDate(1));
-  await startTime.fill("09:00");
+
+  await dialog
+    .getByRole("button", { name: "Open calendar for start" })
+    .press("Enter");
+  const calendar = page.getByRole("dialog", { name: "Select date" });
+  await calendar
+    .getByRole("button", { name: "Enter date with keyboard" })
+    .press("Enter");
+  const dateInput = page
+    .getByRole("dialog", { name: "Enter date" })
+    .getByLabel("Date");
+  await dateInput.fill(tokyoDate(1));
+  await dateInput.press("Enter");
+  await expect(dialog.getByLabel("Start date")).toHaveValue(tokyoDate(1));
+
+  await dialog
+    .getByRole("button", { name: "Open clock for start" })
+    .press("Enter");
+  const clock = page.getByRole("dialog", { name: "Select time" });
+  await clock
+    .getByRole("button", { name: "Enter time with keyboard" })
+    .press("Enter");
+  const timeInput = page.getByRole("dialog", { name: "Enter time" });
+  await timeInput.getByLabel("Hour").fill("09");
+  await timeInput.getByLabel("Minute").fill("00");
+  await timeInput.getByRole("button", { name: "AM" }).press("Enter");
+  await timeInput.getByLabel("Minute").press("Enter");
+  await expect(startTime).toHaveValue("09:00");
   await expect(endTime).toHaveValue("10:00");
   await expect(
     dialog.getByText(`Times are in your time zone, ${TOKYO}.`),
   ).toBeVisible();
 
   // Weekly starts on the start's weekday. Break the builder on purpose.
-  await dialog.getByRole("button", { name: "Repeat", exact: true }).click();
+  const repeat = dialog.getByRole("button", { name: "Repeat", exact: true });
+  await repeat.click();
   await dialog.getByLabel("Frequency").selectOption("weekly");
   const weekday = dialog.getByRole("checkbox", { name: longWeekday(1) });
   await expect(weekday).toBeChecked();
@@ -166,6 +193,7 @@ test("a repeating event from the keyboard, with field errors in the builder", as
   await expect(
     dialog.getByRole("group", { name: "On these days" }),
   ).toHaveAccessibleDescription("Choose at least one day.");
+  await repeat.scrollIntoViewIfNeeded();
   await expectNoSeriousViolations(page);
 
   await interval.fill("1");

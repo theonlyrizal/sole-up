@@ -22,6 +22,6 @@ it("generates the same path data on every load", async () => {
   expect(fresh).toEqual(SHAPES);
   // Snapshot the rounded output without storing each coordinate a second time.
   expect(createHash("sha256").update(JSON.stringify(fresh)).digest("hex")).toBe(
-    "5e3d23988a64296fc0a75c786cd8bccb18c7fe58aa679f5161d9ccb0a8811119",
+    "9f82586a28064503ab27f5b4ad64aeeb7425bdf82e4bdbfb9a01df359e039566",
   );
 });

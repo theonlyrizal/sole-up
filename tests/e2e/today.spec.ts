@@ -65,9 +65,12 @@ async function addTask(
       await parent.selectOption({ label: options.goal });
     }
     if (options.plannedDate) {
-      await dialog.getByLabel("Plan for").fill(options.plannedDate);
+      await dialog
+        .getByLabel("Plan for", { exact: true })
+        .fill(options.plannedDate);
     }
-    if (options.dueDate) await dialog.getByLabel("Due").fill(options.dueDate);
+    if (options.dueDate)
+      await dialog.getByLabel("Due", { exact: true }).fill(options.dueDate);
   }
   await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);
@@ -217,13 +220,13 @@ test("a plan from yesterday waits under Earlier, not done until you decide", asy
   const editor = page.getByRole("form", {
     name: "Plan for: Water the plants",
   });
-  await expect(editor.getByLabel("Plan for")).toBeFocused();
+  await expect(editor.getByLabel("Plan for", { exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(editor).toHaveCount(0);
   await expect(pick).toBeFocused();
   await pick.click();
   await menu.getByRole("menuitem", { name: "Pick a date" }).click();
-  await editor.getByLabel("Plan for").fill(tokyoDate(3));
+  await editor.getByLabel("Plan for", { exact: true }).fill(tokyoDate(3));
   await expectNoSeriousViolations(page);
   await editor.getByRole("button", { name: "Save" }).click();
   await expect(earlier).toHaveCount(0);

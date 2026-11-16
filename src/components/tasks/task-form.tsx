@@ -9,6 +9,7 @@ import {
   useTransition,
 } from "react";
 
+import { PickerField } from "@/components/calendar/picker-field";
 import { StatusChip } from "@/components/data/status-chip";
 import { useLinkedNotes } from "@/components/notes/linked-notes";
 import { ReminderSelect } from "@/components/reminders/reminder-select";
@@ -368,53 +369,40 @@ function TaskDialogBody({
           <fieldset className="grid min-w-0 gap-3">
             <legend className="mb-2 text-title-medium">When</legend>
             <div className="grid min-w-0 gap-3 medium:grid-cols-2">
-              <FormField
+              <PickerField
                 id={`${id}-due`}
                 label="Due date"
+                type="date"
+                value={dueDate}
+                name="dueDate"
                 errors={errors.dueDate}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    name="dueDate"
-                    type="date"
-                    value={dueDate}
-                    onChange={(event) => setDueDate(event.target.value)}
-                  />
-                )}
-              </FormField>
-              <FormField
+                timeZone={zone}
+                clearable
+                onChange={setDueDate}
+              />
+              <PickerField
                 id={`${id}-time`}
                 label="Due time"
+                type="time"
+                value={dueTime}
+                name="dueTime"
                 hint={`Optional. In ${zone}.`}
                 errors={[...(errors.dueTime ?? []), ...(errors.dueTz ?? [])]}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    name="dueTime"
-                    type="time"
-                    value={dueTime}
-                    onChange={(event) => setDueTime(event.target.value)}
-                  />
-                )}
-              </FormField>
+                clearable
+                onChange={setDueTime}
+              />
             </div>
-            <FormField
+            <PickerField
               id={`${id}-planned`}
               label="Planned date"
+              type="date"
+              value={plannedDate}
+              name="plannedDate"
               errors={errors.plannedDate}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  name="plannedDate"
-                  type="date"
-                  value={plannedDate}
-                  onChange={(event) => setPlannedDate(event.target.value)}
-                />
-              )}
-            </FormField>
+              timeZone={timeZone}
+              clearable
+              onChange={setPlannedDate}
+            />
           </fieldset>
           <div className="grid min-w-0 gap-1">
             <span className="text-title-medium">Priority</span>

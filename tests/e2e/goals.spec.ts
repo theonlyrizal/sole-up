@@ -79,8 +79,39 @@ test("create with every field, and edit", async ({ page }) => {
     .getByLabel("Why does this matter?")
     .fill("I want to feel strong again.");
   await dialog.getByLabel("Life area").selectOption({ label: "Health" });
-  await dialog.getByLabel("Priority").selectOption("high");
-  await dialog.getByLabel("Start date").fill("2027-05-01");
+  const priority = dialog.getByLabel("Priority");
+  await priority.click();
+  await expect(priority).toHaveCSS("appearance", "base-select");
+  await expect(dialog.locator("select:open")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  await expect(priority).toBeFocused();
+  await expect(dialog.locator("select:open")).toHaveCount(0);
+  await priority.click();
+  await dialog.getByRole("option", { name: "High", exact: true }).click();
+  await expect(priority).toHaveValue("high");
+  await dialog.getByRole("button", { name: "Open calendar for start" }).click();
+  const calendar = page.getByRole("dialog", { name: "Select date" });
+  await calendar
+    .getByRole("button", { name: "Enter date with keyboard" })
+    .click();
+  const typedDate = page
+    .getByRole("dialog", { name: "Enter date" })
+    .getByLabel("Date");
+  await typedDate.fill("2027-05-01");
+  await typedDate.press("Enter");
+  await expect(dialog.getByLabel("Start date")).toHaveValue("2027-05-01");
+
+  await dialog
+    .getByRole("button", { name: "Open calendar for target" })
+    .click();
+  await expect(
+    calendar.getByRole("button", { name: "Previous month" }),
+  ).toBeDisabled();
+  await expect(calendar.getByRole("columnheader").first()).toHaveAccessibleName(
+    "Monday",
+  );
+  await calendar.getByRole("button", { name: "Cancel" }).click();
   await dialog.getByLabel("Target date").fill("2027-04-01");
   await expectNoSeriousViolations(page);
   await dialog.getByRole("button", { name: "Add goal" }).click();

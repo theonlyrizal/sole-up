@@ -262,6 +262,20 @@
   transform-origin: var(--radix-dropdown-menu-content-transform-origin);
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .menu-panel {
+    transition:
+      opacity var(--duration-fast-effects) var(--ease-fast-effects),
+      scale var(--duration-standard-fast-spatial)
+        var(--ease-standard-fast-spatial);
+
+    @starting-style {
+      opacity: 0;
+      scale: 0.96;
+    }
+  }
+}
+
 .tooltip-panel {
   transform-origin: var(--radix-tooltip-content-transform-origin);
 }
@@ -276,12 +290,17 @@
 
 .menu-item[data-highlighted] {
   --state: 0.1;
-  outline: 2px solid currentColor;
+  outline: none;
+}
+
+.menu-item[data-highlighted]:focus-visible {
+  outline: 2px solid var(--md-focus);
   outline-offset: -2px;
 }
 
 .menu-item[data-disabled] {
-  opacity: 0.38;
+  background: transparent;
+  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
   pointer-events: none;
 }
 

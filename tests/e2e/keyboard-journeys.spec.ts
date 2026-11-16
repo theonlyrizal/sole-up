@@ -27,6 +27,16 @@ async function typeInto(page: Page, target: Locator, text: string) {
   await page.keyboard.type(text);
 }
 
+async function chooseNextOption(page: Page, select: Locator, label: string) {
+  await activate(page, select, "Space");
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    select.getByRole("option", { name: label, exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(select.locator("option:checked")).toHaveText(label);
+}
+
 function navLink(page: Page, name: string) {
   return page
     .getByRole("navigation", { name: "Main", exact: true })
@@ -52,10 +62,7 @@ async function addGoal(
   await page.keyboard.type(title);
   await typeInto(page, dialog.getByLabel("Why does this matter?"), reason);
   if (area) {
-    const picker = dialog.getByLabel("Life area");
-    await tabTo(page, picker);
-    await page.keyboard.press("ArrowDown");
-    await expect(picker.locator("option:checked")).toHaveText(area);
+    await chooseNextOption(page, dialog.getByLabel("Life area"), area);
   }
   await activate(page, dialog.getByRole("button", { name: "Add goal" }));
   await expect(dialog).toBeHidden();
@@ -318,10 +325,11 @@ test("keyboard journey D reflects, adjusts and finishes the weekly review", asyn
     page.getByRole("heading", { name: "Choose priorities", exact: true }),
   ).toBeFocused();
   const form = page.getByRole("form", { name: "Add a priority" });
-  const picker = form.getByLabel("Goal or task");
-  await tabTo(page, picker);
-  await page.keyboard.press("ArrowDown");
-  await expect(picker.locator("option:checked")).toHaveText(`${goal} (paused)`);
+  await chooseNextOption(
+    page,
+    form.getByLabel("Goal or task"),
+    `${goal} (paused)`,
+  );
   await activate(page, form.getByRole("button", { name: "Add", exact: true }));
   await expect(
     page.getByRole("list", { name: "Priorities for next week" }),

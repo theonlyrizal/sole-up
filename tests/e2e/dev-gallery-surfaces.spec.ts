@@ -9,6 +9,103 @@ async function openGallery(page: Page) {
   ).toHaveAttribute("tabindex", "0");
 }
 
+test("calendar and clock pickers stage changes and return focus", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openGallery(page);
+  const column = page.getByRole("region", { name: "Light", exact: true });
+  const calendar = column.getByRole("button", {
+    name: "Open calendar for start",
+  });
+  const clock = column.getByRole("button", { name: "Open clock for start" });
+  const dateField = column.getByLabel("Start date");
+  const timeField = column.getByLabel("Start time");
+
+  await calendar.click();
+  const date = page.getByRole("dialog", { name: "Select date" });
+  const selected = date.getByRole("button", {
+    name: "Thursday, November 12, 2026",
+  });
+  const next = date.getByRole("button", { name: "Friday, November 13, 2026" });
+  await expect(selected).toBeFocused();
+  await selected.press("ArrowRight");
+  await expect(next).toBeFocused();
+  await next.press("Enter");
+  await expect(date.getByRole("gridcell", { selected: true })).toContainText(
+    "13",
+  );
+  await page.keyboard.press("Escape");
+  await expect(calendar).toBeFocused();
+  await expect(dateField).toHaveValue("2026-11-12");
+
+  await calendar.click();
+  await date.getByRole("button", { name: "Enter date with keyboard" }).click();
+  const dateInput = page
+    .getByRole("dialog", { name: "Enter date" })
+    .getByLabel("Date");
+  await dateInput.fill("2026-11-16");
+  await dateInput.press("Enter");
+  await expect(dateField).toHaveValue("2026-11-16");
+
+  await clock.click();
+  const time = page.getByRole("dialog", { name: "Select time" });
+  const dial = time.getByRole("slider", { name: "Hour dial" });
+  await expect(dial).toBeVisible();
+  const bounds = (await dial.boundingBox())!;
+  await page.mouse.click(
+    bounds.x + bounds.width * 0.9,
+    bounds.y + bounds.height * 0.5,
+  );
+  await time.getByRole("slider", { name: "Minute dial" }).press("ArrowRight");
+  await time.getByRole("button", { name: "OK" }).click();
+  await expect(clock).toBeFocused();
+  await expect(timeField).toHaveValue("03:31");
+
+  await clock.click();
+  await time.getByRole("button", { name: "Enter time with keyboard" }).click();
+  const typed = page.getByRole("dialog", { name: "Enter time" });
+  await typed.getByLabel("Hour").fill("13");
+  await expect(typed.getByRole("button", { name: "OK" })).toBeDisabled();
+  await typed.getByLabel("Hour").fill("12");
+  await typed.getByLabel("Minute").fill("05");
+  await typed.getByRole("button", { name: "PM" }).click();
+  await typed.getByLabel("Minute").press("Enter");
+  await expect(timeField).toHaveValue("12:05");
+});
+
+test("wavy progress animates between endpoints and honors reduced motion", async ({
+  page,
+}) => {
+  await openGallery(page);
+  const column = page.getByRole("region", { name: "Light", exact: true });
+  const indicator = column.getByRole("progressbar", {
+    name: "Thin wavy linear progress",
+  });
+  const active = indicator.locator("path").last();
+  const range = column.getByRole("slider", { name: /^Progress/ });
+  await indicator.scrollIntoViewIfNeeded();
+  await expect(active).toHaveAttribute("d", /L/);
+  const initial = await active.getAttribute("d");
+  await expect.poll(() => active.getAttribute("d")).not.toBe(initial);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await range.press("ArrowRight");
+  await expect(indicator).toHaveAttribute("aria-valuenow", "36");
+  const still = await active.getAttribute("d");
+  await active.evaluate(() => new Promise(requestAnimationFrame));
+  await expect(active).toHaveAttribute("d", still!);
+
+  await range.press("Home");
+  await expect(active).toHaveAttribute("d", "");
+  await expect(indicator.locator("circle")).toHaveAttribute("opacity", "1");
+  await range.press("End");
+  await expect(indicator.locator("path").first()).toHaveAttribute("d", "");
+  await expect(active).toHaveAttribute("d", /^M.*H/);
+  await expect(indicator.locator("circle")).toHaveAttribute("opacity", "0");
+});
+
 for (const viewport of [
   { width: 390, height: 844 },
   { width: 1280, height: 800 },
@@ -179,7 +276,12 @@ test("keyboard users can navigate menus, disclosures and tooltips", async ({
   await trigger.focus();
   await page.keyboard.press("Enter");
   const menu = page.getByRole("menu", { name: "Workshop menu" });
+  await expect(menu).toHaveCSS("border-radius", "16px");
   await expect(menu.getByRole("menuitem", { name: "Edit" })).toBeFocused();
+  await expect(menu.getByRole("menuitem", { name: "Edit" })).toHaveCSS(
+    "border-radius",
+    "12px",
+  );
   await page.keyboard.press("ArrowDown");
   await expect(menu.getByRole("menuitem", { name: "Archive" })).toBeFocused();
   await page.keyboard.press("ArrowDown");

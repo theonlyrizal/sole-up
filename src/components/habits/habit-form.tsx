@@ -2,6 +2,7 @@
 
 import { useId, useState, useTransition } from "react";
 
+import { PickerField } from "@/components/calendar/picker-field";
 import { ChoiceGroup, Radio } from "@/components/calendar/choices";
 import { Button } from "@/components/ui/button";
 import { cx, focusRing } from "@/components/ui/cx";
@@ -286,38 +287,27 @@ function HabitForm({ habit, context, onCancel, onSaved }: HabitFormProps) {
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField
+        <PickerField
           id={`${id}-start`}
           label="Start date"
+          type="date"
+          value={startDate}
+          name="startDate"
           errors={fieldErrors.startDate}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              name="startDate"
-              value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
-            />
-          )}
-        </FormField>
-        <FormField
+          onChange={setStartDate}
+        />
+        <PickerField
           id={`${id}-end`}
           label="End date"
+          type="date"
+          value={endDate}
+          name="endDate"
           hint="Optional. The last day it counts."
           errors={fieldErrors.endDate}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              name="endDate"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(event) => setEndDate(event.target.value)}
-            />
-          )}
-        </FormField>
+          min={startDate || undefined}
+          clearable
+          onChange={setEndDate}
+        />
       </div>
 
       <FormField

@@ -109,6 +109,9 @@ export const SHAPES = {
   ),
   "puffy-diamond": path(sample(puffyDiamondRadius)),
   pill: path(sample(pillRadius)),
+  oval: path(
+    sample((angle) => 50 / Math.hypot(Math.cos(angle), Math.sin(angle) / 0.68)),
+  ),
   arch: path(sample(archRadius)),
   gem: path(gem()),
 } as const;

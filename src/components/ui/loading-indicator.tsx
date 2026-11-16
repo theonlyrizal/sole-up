@@ -6,8 +6,11 @@ const shapePaths = {
   "--loading-circle": `path("${SHAPES.circle}")`,
   "--loading-sunny": `path("${SHAPES.sunny}")`,
   "--loading-cookie": `path("${SHAPES["cookie-9"]}")`,
+  "--loading-cookie-four": `path("${SHAPES["cookie-4"]}")`,
+  "--loading-pentagon": `path("${SHAPES.gem}")`,
   "--loading-pill": `path("${SHAPES.pill}")`,
   "--loading-burst": `path("${SHAPES["soft-burst"]}")`,
+  "--loading-oval": `path("${SHAPES.oval}")`,
 } as CSSProperties;
 
 export function LoadingIndicator({
@@ -23,7 +26,7 @@ export function LoadingIndicator({
   decorative?: boolean;
   className?: string;
 }) {
-  const diameter = contained ? Math.min(size, 38) : size;
+  const diameter = Math.min(size, 38);
   return (
     <span
       {...(decorative
@@ -31,6 +34,7 @@ export function LoadingIndicator({
         : { role: "progressbar", "aria-label": label })}
       className={cx(
         "inline-grid shrink-0 place-items-center text-primary",
+        size === 48 && "size-12",
         contained &&
           "size-12 rounded-full bg-primary-container text-on-primary-container",
         className,

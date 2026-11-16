@@ -1,6 +1,7 @@
 "use client";
 
 import { Dialog as DialogPrimitive } from "radix-ui";
+import { useEffect } from "react";
 
 import { useDialogViewport } from "@/components/hooks/use-dialog-viewport";
 import { useMediaQuery } from "@/components/hooks/use-media-query";
@@ -49,8 +50,28 @@ export function closeDialogOnEscape(
   close.click();
 }
 
+function NativeSelectEscape() {
+  useEffect(() => {
+    function letPickerClose(event: KeyboardEvent) {
+      if (
+        event.key === "Escape" &&
+        event.target instanceof Element &&
+        event.target.closest("select:is(:open)")
+      ) {
+        // The browser handles Escape after dispatch. Stop it before Radix's
+        // document listener can dismiss the dialog or cancel the native action.
+        event.stopPropagation();
+      }
+    }
+    window.addEventListener("keydown", letPickerClose, true);
+    return () => window.removeEventListener("keydown", letPickerClose, true);
+  }, []);
+  return null;
+}
+
 export function DialogSurface({
   description,
+  children,
   onKeyDown,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
@@ -67,7 +88,10 @@ export function DialogSurface({
           onKeyDown?.(event);
           closeDialogOnEscape(event);
         }}
-      />
+      >
+        {children}
+        <NativeSelectEscape />
+      </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );
 }

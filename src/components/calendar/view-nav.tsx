@@ -144,8 +144,11 @@ export function CalendarHeader({
     timeZone: "UTC",
   });
   const firstDate = new Date(`${start}T12:00:00Z`);
+  // Server and browser ICU versions can use different spaces around the dash.
   const shortLabel = end
-    ? dates.formatRange(firstDate, new Date(`${end}T12:00:00Z`))
+    ? dates
+        .formatRange(firstDate, new Date(`${end}T12:00:00Z`))
+        .replaceAll("\u2009", " ")
     : dates.format(firstDate);
   return (
     <div className="flex min-w-0 flex-col gap-3">

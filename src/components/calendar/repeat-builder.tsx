@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PickerField } from "./picker-field";
 import { Disclosure } from "@/components/ui/disclosure";
 import { cx, focusRing } from "@/components/ui/cx";
 import { FormField } from "@/components/ui/form-field";
@@ -58,6 +59,7 @@ type RepeatBuilderProps = {
   /** The event's start date: the monthly choices and summary depend on it. */
   startDate: string;
   locale: string;
+  timeZone: string;
   errors: RepeatErrors;
   /** Errors the server returned for the rule as a whole. */
   ruleErrors?: string[];
@@ -66,7 +68,7 @@ type RepeatBuilderProps = {
 /**
  * The repeat builder (ADR 0012): daily, weekly on chosen weekdays, monthly
  * by day or nth/last weekday, yearly, every N, ending never, after N times
- * or on a date. Native controls only, so it is keyboard operable as is.
+ * or on a date.
  */
 export function RepeatBuilder({
   id,
@@ -74,6 +76,7 @@ export function RepeatBuilder({
   onChange,
   startDate,
   locale,
+  timeZone,
   errors,
   ruleErrors,
 }: RepeatBuilderProps) {
@@ -237,23 +240,18 @@ export function RepeatBuilder({
               </FormField>
             )}
             {value.ends === "until" && (
-              <FormField
+              <PickerField
                 id={`${id}-until`}
                 label="Last date"
+                type="date"
+                value={value.until}
                 hint="The last day an event can start on."
                 errors={errors.until}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    type="date"
-                    value={value.until}
-                    min={startDate || undefined}
-                    className="w-auto"
-                    onChange={(event) => set({ until: event.target.value })}
-                  />
-                )}
-              </FormField>
+                min={startDate || undefined}
+                locale={locale}
+                timeZone={timeZone}
+                onChange={(until) => set({ until })}
+              />
             )}
           </>
         )}

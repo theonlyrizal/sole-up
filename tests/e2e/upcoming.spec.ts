@@ -52,9 +52,12 @@ async function addTask(
   if (Object.keys(options).length > 0) {
     await dialog.getByRole("button", { name: "More options" }).click();
     if (options.plannedDate) {
-      await dialog.getByLabel("Plan for").fill(options.plannedDate);
+      await dialog
+        .getByLabel("Plan for", { exact: true })
+        .fill(options.plannedDate);
     }
-    if (options.dueDate) await dialog.getByLabel("Due").fill(options.dueDate);
+    if (options.dueDate)
+      await dialog.getByLabel("Due", { exact: true }).fill(options.dueDate);
   }
   await dialog.getByLabel("Task title").press("Enter");
   await expect(dialog).toHaveCount(0);

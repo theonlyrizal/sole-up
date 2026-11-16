@@ -1,0 +1,263 @@
+.picker-dialog {
+  --picker-width: 22.5rem;
+  width: min(calc(100% - 2rem), var(--picker-width));
+  gap: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.picker-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem 0.5rem 0.75rem;
+}
+
+.picker-date-header {
+  display: grid;
+  gap: 1.625rem;
+  padding: 1rem 0.75rem 0.5rem 1.5rem;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.picker-month {
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem 0;
+}
+
+.date-selection-dialog .picker-actions {
+  padding-block-start: 0.125rem;
+}
+
+.picker-year {
+  min-height: 3rem;
+  margin-inline-start: 0.75rem;
+  color: var(--md-on-surface-variant);
+}
+
+.picker-year:focus-within {
+  outline: 2px solid var(--md-focus);
+  outline-offset: 2px;
+}
+
+.time-selection-dialog {
+  --picker-width: 20.5rem;
+  padding: 1.5rem;
+}
+
+.time-selection-dialog .picker-actions {
+  margin: 1.25rem -0.5rem 0;
+  padding: 0;
+}
+
+.picker-time-fields {
+  --picker-time-height: 5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1.5rem minmax(0, 1fr);
+  align-items: start;
+  margin-top: 1.25rem;
+  direction: ltr;
+}
+
+.picker-time-fields:has(.picker-period) {
+  grid-template-columns: minmax(0, 1fr) 1.5rem minmax(0, 1fr) 4rem;
+}
+
+.picker-time-fields:has(input) {
+  --picker-time-height: 4.5rem;
+}
+
+.picker-time-field {
+  grid-row: 1;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.picker-time-number {
+  display: grid;
+  width: 100%;
+  height: var(--picker-time-height);
+  min-width: 0;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+  font-size: clamp(2.25rem, 60cqi, 3.5625rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+  transition:
+    background-color var(--duration-fast-effects) var(--ease-fast-effects),
+    color var(--duration-fast-effects) var(--ease-fast-effects);
+}
+
+.picker-time-number:is([aria-pressed="true"], input:focus) {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+input.picker-time-number {
+  font-size: clamp(2rem, 52cqi, 2.8125rem);
+  outline-offset: -2px;
+}
+
+input.picker-time-number:focus {
+  outline: 2px solid var(--md-primary);
+}
+
+input.picker-time-number[aria-invalid="true"] {
+  outline: 2px solid var(--md-error);
+}
+
+input.picker-time-number::selection {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.picker-time-colon {
+  display: grid;
+  grid-area: 1 / 2;
+  height: var(--picker-time-height);
+  place-items: center;
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.picker-period {
+  display: grid;
+  grid-area: 1 / 4;
+  grid-template-rows: 1fr 1fr;
+  height: var(--picker-time-height);
+  margin-inline-start: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--radius-sm);
+  color: var(--md-on-surface-variant);
+}
+
+.picker-period > button + button {
+  border-top: 1px solid var(--md-outline);
+}
+
+.picker-period > button[aria-pressed="true"] {
+  background: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+}
+
+.picker-period > button:focus-visible {
+  outline-offset: -3px;
+}
+
+.picker-dial {
+  position: relative;
+  width: min(100%, 16rem);
+  aspect-ratio: 1;
+  margin: 2.25rem auto 0;
+  border-radius: 50%;
+  background: var(--md-surface-container-highest);
+  touch-action: none;
+  user-select: none;
+}
+
+.picker-dial-hand {
+  --hand-length: 40%;
+  --hand-cap: 18.75%;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.picker-dial-hand[data-inner] {
+  --hand-length: 23%;
+  --hand-cap: 13%;
+}
+
+.picker-dial-hand::before,
+.picker-dial-hand > span,
+.picker-dial-pivot,
+.picker-dial-dot {
+  position: absolute;
+  left: 50%;
+  background: var(--md-primary);
+}
+
+.picker-dial-hand::before {
+  top: calc(50% - var(--hand-length));
+  width: 2px;
+  height: var(--hand-length);
+  content: "";
+  translate: -50% 0;
+}
+
+.picker-dial-hand > span,
+.picker-dial-pivot,
+.picker-dial-dot {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+}
+
+.picker-dial-hand > span {
+  top: calc(50% - var(--hand-length));
+  width: var(--hand-cap);
+}
+
+.picker-dial-pivot {
+  top: 50%;
+  width: 8px;
+}
+
+.picker-dial-dot {
+  width: 4px;
+  background: var(--md-on-primary);
+}
+
+.picker-dial-tick {
+  position: absolute;
+  display: grid;
+  width: 15%;
+  aspect-ratio: 1;
+  place-items: center;
+  line-height: 1;
+  pointer-events: none;
+  translate: -50% -50%;
+}
+
+.picker-dial-tick[data-selected] {
+  color: var(--md-on-primary);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .picker-dial:not([data-dragging]) .picker-dial-hand {
+    transition: rotate var(--duration-standard-fast-spatial)
+      var(--ease-standard-fast-spatial);
+  }
+}
+
+.filled-field:has(> .picker-field-trigger) {
+  padding-inline-end: 3.25rem;
+}
+
+.filled-field:has(> .picker-field-trigger)[data-invalid="true"] {
+  padding-inline-end: 4.5rem;
+}
+
+.filled-field:has(> .picker-field-trigger) .field-error-icon {
+  inset-inline-end: 3.25rem;
+}
+
+.filled-field > .picker-field-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.filled-field > .picker-field-input {
+  appearance: none;
+}
+
+.filled-field > .picker-field-trigger {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 0.25rem;
+  translate: 0 -50%;
+}
