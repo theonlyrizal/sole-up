@@ -130,3 +130,8 @@ export async function expectNoSeriousViolations(page: Page) {
     }));
   expect(serious).toEqual([]);
 }
+
+export async function chooseNoteMenuItem(page: Page, name: string) {
+  await page.getByRole("button", { name: "Note options", exact: true }).click();
+  await page.getByRole("menuitem", { name, exact: true }).click();
+}

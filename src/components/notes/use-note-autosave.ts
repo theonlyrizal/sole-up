@@ -35,6 +35,7 @@ export type SaveState =
   | { kind: "conflict" };
 
 type NoteContentSnapshot = { title: string; body: NoteDocument };
+type ConfirmedNote = { id: string; updatedAt: Date };
 
 function errorMessage(error: ActionError): string {
   if (error.code === "VALIDATION") {
@@ -52,7 +53,7 @@ export function useNoteAutosave({
   updatedAt,
   linkTo,
   read,
-  onCreated,
+  onSaved,
 }: {
   noteId: string | null;
   updatedAt: Date | null;
@@ -60,8 +61,12 @@ export function useNoteAutosave({
   linkTo?: LinkTargetInput | null;
   /** The editor's title and body as they are now. */
   read: () => NoteContentSnapshot;
-  /** After the first save that created the note. */
-  onCreated: (id: string) => void;
+  /** After a save is confirmed, with the exact snapshot it saved. */
+  onSaved: (
+    note: ConfirmedNote,
+    snapshot: NoteContentSnapshot,
+    created: boolean,
+  ) => void;
 }) {
   const [state, setState] = useState<SaveState>(
     noteId ? { kind: "saved" } : { kind: "idle" },
@@ -78,10 +83,10 @@ export function useNoteAutosave({
   const stoppedRef = useRef(false);
   const readRef = useRef(read);
   const linkToRef = useRef(linkTo);
-  const onCreatedRef = useRef(onCreated);
+  const onSavedRef = useRef(onSaved);
   useLayoutEffect(() => {
     readRef.current = read;
-    onCreatedRef.current = onCreated;
+    onSavedRef.current = onSaved;
   });
 
   const clearTimer = useCallback(() => {
@@ -139,7 +144,7 @@ export function useNoteAutosave({
       const created = idRef.current === null;
       idRef.current = result.data.id;
       tokenRef.current = result.data.updatedAt;
-      if (created) onCreatedRef.current(result.data.id);
+      onSavedRef.current(result.data, { title, body }, created);
     }
     savedRevisionRef.current = revision;
     if (revisionRef.current === revision) {

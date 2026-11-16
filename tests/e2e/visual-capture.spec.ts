@@ -1679,3 +1679,223 @@ for (const viewport of sizes) {
     });
   }
 }
+
+for (const viewport of sizes) {
+  for (const theme of themes) {
+    test(`@visual UI-11 notes and search ${viewport.width} ${theme}`, async ({
+      page,
+      context,
+    }) => {
+      test.setTimeout(150_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      const { noteId, archivedNoteId, goalId } = await seedVisualData(page, {
+        notesUI: true,
+        goalsUI: true,
+        plan: true,
+      });
+      const editorPath = `/notes/${noteId}`;
+      const body = page.getByRole("textbox", { name: "Note", exact: true });
+      const title = page.getByRole("textbox", { name: "Title" });
+      const status = page
+        .getByRole("status")
+        .filter({ hasText: /^(Saving…|Saved|Not saved)$/ });
+      const search = page.getByRole("searchbox", { name: "Search for" });
+      const capture = (state: string, fullPage = true) =>
+        page.screenshot({
+          path: `test-results/visual/ui-11/${state}-${viewport.width}-${theme}.png`,
+          fullPage,
+          animations: "disabled",
+          caret: "initial",
+        });
+
+      for (const [state, href, ready] of [
+        [
+          "notes",
+          "/notes",
+          page.getByRole("link", { name: "Weekend walking routes" }),
+        ],
+        [
+          "new",
+          `/notes/new?goal=${goalId}`,
+          page.getByText(`Will link to: ${GOAL_TITLE}`, { exact: true }),
+        ],
+        ["editor", editorPath, body],
+        [
+          "archived",
+          "/notes/archived",
+          page.getByRole("list", { name: "Archived notes" }),
+        ],
+        [
+          "archived-note",
+          `/notes/${archivedNoteId}`,
+          page.getByRole("article", { name: "Note" }),
+        ],
+        ["tags", "/notes/tags", page.getByRole("list", { name: "Tags" })],
+        ["search", "/notes/search", search],
+      ] as const) {
+        await openPage(page, href);
+        await expect(ready).toBeVisible();
+        if (state === "editor")
+          await expect(
+            page.getByRole("button", { name: "Unlink " + GOAL_TITLE }),
+          ).toBeVisible();
+        await expectNoSeriousViolations(page);
+        await checkRenderedPage(page, theme);
+        await capture(state);
+        for (const width of [320, 375, 390, 414, 768, 1280]) {
+          await page.setViewportSize({ width, height: viewport.height });
+          await checkRenderedPage(page, theme);
+        }
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        await checkRenderedPage(page, theme);
+        if (state === "editor" || state === "search")
+          await capture(`${state}-zoom`);
+        await page.evaluate(() =>
+          document.documentElement.style.removeProperty("font-size"),
+        );
+      }
+
+      await expect(search).toBeFocused();
+      await search.fill("walk");
+      await search.press("Enter");
+      await expect(
+        page
+          .getByRole("region", { name: "Tasks", exact: true })
+          .locator("mark"),
+      ).toBeVisible();
+      await expectNoSeriousViolations(page);
+      await capture("search-results");
+
+      await openPage(page, editorPath);
+      const pickerTrigger = page.getByRole("button", {
+        name: "Link a goal or task",
+      });
+      await pickerTrigger.click();
+      const picker = page.getByRole("dialog", { name: "Link a goal or task" });
+      await expect(picker.getByRole("searchbox")).toBeFocused();
+      await expect(picker.getByRole("region", { name: "Goals" })).toContainText(
+        "Linked",
+      );
+      await expectNoSeriousViolations(page);
+      await capture("link-picker", false);
+      await page.keyboard.press("Escape");
+      await expect(pickerTrigger).toBeFocused();
+
+      if (viewport.width === 390) {
+        // Emulate a soft keyboard that also pans the visual viewport.
+        await body.focus();
+        await page.evaluate(() => {
+          const vv = window.visualViewport!;
+          Object.defineProperties(vv, {
+            height: { configurable: true, value: 480 },
+            offsetTop: { configurable: true, value: 32 },
+          });
+          vv.dispatchEvent(new Event("resize"));
+          vv.dispatchEvent(new Event("scroll"));
+        });
+        const toolbar = page.getByRole("group", { name: "Formatting" });
+        await expect
+          .poll(async () => {
+            const bounds = await toolbar.boundingBox();
+            return bounds && Math.round(bounds.y + bounds.height);
+          })
+          .toBe(504);
+        await expect(
+          page.getByRole("navigation", { name: "Main" }),
+        ).toBeHidden();
+        await capture("keyboard-dock", false);
+        await page.evaluate(() => {
+          const vv = window.visualViewport!;
+          Reflect.deleteProperty(vv, "height");
+          Reflect.deleteProperty(vv, "offsetTop");
+          vv.dispatchEvent(new Event("resize"));
+        });
+      }
+
+      // Hold the POST until Saving is visible, then simulate an offline failure.
+      const requested = Promise.withResolvers<void>();
+      const held = Promise.withResolvers<void>();
+      const noteRoute = (url: URL) => url.pathname === editorPath;
+      const savedTitle = "Walking route draft";
+      await page.route(noteRoute, async (route) => {
+        const request = route.request();
+        if (
+          request.method() !== "POST" ||
+          !request.headers()["next-action"] ||
+          !request.postData()?.includes(savedTitle)
+        ) {
+          await route.fallback();
+          return;
+        }
+        requested.resolve();
+        await held.promise;
+        await route.abort("internetdisconnected");
+      });
+      await title.fill(savedTitle);
+      try {
+        await requested.promise;
+        await expect(status).toHaveText("Saving…");
+        await expect(status.locator(".loading-indicator")).toHaveCSS(
+          "animation-name",
+          "none",
+        );
+        await capture("saving", false);
+      } finally {
+        held.resolve();
+      }
+      await expect(status).toHaveText("Not saved");
+      await expect(title).toHaveValue(savedTitle);
+      await expectNoSeriousViolations(page);
+      await capture("save-error");
+      await page.unroute(noteRoute);
+      await page
+        .getByRole("button", { name: "Retry", exact: true })
+        .press("Enter");
+      await expect(status).toHaveText("Saved");
+      await expect(title).toHaveValue(savedTitle);
+      await expect(page.locator("[data-feedback-halo]")).toHaveCount(0);
+      await expect(
+        page.getByRole("region", { name: /Notifications/ }).getByText(/saved/i),
+      ).toHaveCount(0);
+      await capture("retry-saved");
+
+      const stale = await context.newPage();
+      try {
+        await stale.setViewportSize(viewport);
+        await stale.emulateMedia({
+          colorScheme: theme,
+          reducedMotion: "reduce",
+        });
+        await openPage(stale, editorPath);
+        const staleTitle = stale.getByRole("textbox", { name: "Title" });
+        await expect(staleTitle).toHaveValue(savedTitle);
+        await title.fill("Saved in the first tab");
+        await expect(status).toHaveText("Saved");
+        await staleTitle.fill("Local text in tab two");
+        await expect(
+          stale.getByRole("alert").filter({
+            hasText: "This note changed somewhere else.",
+          }),
+        ).toBeVisible();
+        await expect(staleTitle).toHaveValue("Local text in tab two");
+        await expectNoSeriousViolations(stale);
+        await stale.screenshot({
+          path: `test-results/visual/ui-11/conflict-${viewport.width}-${theme}.png`,
+          fullPage: true,
+          animations: "disabled",
+          caret: "initial",
+        });
+      } finally {
+        await stale.close();
+      }
+    });
+  }
+}

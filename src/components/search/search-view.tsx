@@ -1,14 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
-import { noteTitle } from "@/components/notes/note-list";
+import { Icon } from "@/components/icons/icon";
 import { TaskFormDialog } from "@/components/tasks/task-form";
 import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
+import { Chip } from "@/components/ui/chip";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListGroup, ListItem } from "@/components/ui/list";
 import { FormError } from "@/components/ui/form-error";
-import { Input } from "@/components/ui/input";
+import { SearchBar } from "@/components/ui/search-bar";
 import { Select } from "@/components/ui/select";
 import type { TagSummary } from "@/lib/notes/tags";
 import type { ActionError } from "@/lib/result";
@@ -62,6 +63,8 @@ export function SearchView({
   function run(text: string) {
     const trimmed = text.trim();
     if (!trimmed) {
+      ++latest.current;
+      lastQuery.current = "";
       setSearched(null);
       setError({
         code: "VALIDATION",
@@ -101,10 +104,8 @@ export function SearchView({
   useEffect(() => {
     function takeRequest() {
       const requested = takeRequestedSearch();
-      if (requested === null) {
-        inputRef.current?.focus();
-        return;
-      }
+      inputRef.current?.focus();
+      if (requested === null) return;
       setQuery(requested);
       run(requested);
     }
@@ -118,6 +119,7 @@ export function SearchView({
   return (
     <div className="flex flex-col gap-6">
       <form
+        method="post"
         role="search"
         aria-label="Notes, goals and tasks"
         className="flex flex-col gap-2"
@@ -126,38 +128,51 @@ export function SearchView({
           run(query);
         }}
       >
-        <label htmlFor={`${id}-query`} className="text-sm font-medium">
+        <label htmlFor={`${id}-query`} className="sr-only">
           Search for
         </label>
-        <div className="flex gap-2">
-          <Input
+        <div className="flex items-center gap-2">
+          <SearchBar
             ref={inputRef}
             id={`${id}-query`}
-            type="search"
-            name="query"
+            placeholder="Search notes, goals and tasks"
             autoComplete="off"
             enterKeyHint="search"
             maxLength={SEARCH_QUERY_MAX}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onClear={() => {
+              ++latest.current;
+              lastQuery.current = "";
+              setQuery("");
+              setSearched(null);
+              setError(null);
+              inputRef.current?.focus();
+            }}
             aria-describedby={`${id}-hint${fieldError ? ` ${id}-error` : ""}`}
             aria-invalid={fieldError ? true : undefined}
-            className="min-w-0 flex-1"
           />
           <Button type="submit">Search</Button>
         </div>
-        <p id={`${id}-hint`} className="text-sm text-muted">
+        <p
+          id={`${id}-hint`}
+          className="text-body-medium text-on-surface-variant"
+        >
           Finds words in any form: “run” finds “running”. Use quotes for a
           phrase, and a minus sign to leave a word out.
         </p>
         {fieldError && (
-          <p id={`${id}-error`} role="alert" className="text-sm text-danger">
+          <p
+            id={`${id}-error`}
+            role="alert"
+            className="text-body-medium text-error"
+          >
             {fieldError}
           </p>
         )}
         {tags.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={`${id}-tag`} className="text-sm font-medium">
+          <div className="flex max-w-xs flex-col gap-1.5">
+            <label htmlFor={`${id}-tag`} className="text-label-large">
               Notes with tag
             </label>
             <Select
@@ -169,7 +184,6 @@ export function SearchView({
                 // Search again with the new filter, once there is a search.
                 if (lastQuery.current) run(lastQuery.current);
               }}
-              className="max-w-xs"
             >
               <option value="">Any tag</option>
               {tags.map((tag) => (
@@ -183,7 +197,10 @@ export function SearchView({
         {error?.code !== "VALIDATION" && <FormError error={error} />}
       </form>
 
-      <p role="status" className="text-sm text-muted empty:hidden">
+      <p
+        role="status"
+        className="text-body-medium text-on-surface-variant empty:hidden"
+      >
         {pending
           ? "Searching…"
           : searched?.status === "results"
@@ -192,7 +209,7 @@ export function SearchView({
       </p>
 
       {searched?.status === "nothing_to_search" && (
-        <p className="rounded-lg border border-dashed border-border bg-surface p-6 text-muted">
+        <p className="rounded-lg bg-resting-surface p-5 text-on-resting-surface">
           {NOTHING_TO_SEARCH}
         </p>
       )}
@@ -248,61 +265,57 @@ function count(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
 
-const resultLink = cx(
-  "rounded-sm font-medium break-words hover:underline",
-  focusRing,
-);
-
 function Results({
   found,
   tagged,
   onOpenTask,
 }: {
   found: Found;
-  /** The notes group is filtered by a tag. */
   tagged: boolean;
   onOpenTask: (task: Task, button: HTMLElement) => void;
 }) {
-  if (
-    found.notes.length === 0 &&
-    found.goals.length === 0 &&
-    found.tasks.length === 0
-  ) {
+  if (!found.notes.length && !found.goals.length && !found.tasks.length) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-surface p-6">
-        <h2 className="text-lg font-semibold">No matches</h2>
-        <p className="text-muted">
-          Nothing in your notes, goals or tasks matched. Archived notes
-          aren&apos;t searched.
-        </p>
-      </div>
+      <EmptyState
+        title="No matches"
+        description="Nothing in your notes, goals or tasks matched. Archived notes aren't searched."
+        className="rounded-lg bg-resting-surface"
+      />
     );
   }
   return (
-    <div className="flex flex-col gap-8">
+    <div className="grid min-w-0 gap-6">
       <ResultGroup
         title="Notes"
         empty={tagged ? "No notes with this tag matched." : "No notes matched."}
         count={found.notes.length}
       >
         {found.notes.map((hit) => (
-          <li key={hit.id} className="flex min-w-0 flex-col gap-1 p-4">
-            <h3>
-              <Link href={`/notes/${hit.id}`} className={resultLink}>
-                {hit.titleHighlight === null ? (
-                  noteTitle(null)
-                ) : (
-                  <Highlighted text={hit.titleHighlight} />
+          <ListItem
+            key={hit.id}
+            href={`/notes/${hit.id}`}
+            leading={<ResultIcon name="sticky_note_2" />}
+            headline={
+              hit.titleHighlight === null ? (
+                <span className="text-on-surface-variant italic">Untitled</span>
+              ) : (
+                <Highlighted text={hit.titleHighlight} />
+              )
+            }
+            supporting={
+              <>
+                {hit.excerptHighlight && (
+                  <p>
+                    <Highlighted text={hit.excerptHighlight} />
+                  </p>
                 )}
-              </Link>
-            </h3>
-            {hit.excerptHighlight && (
-              <p className="text-sm break-words text-muted">
-                <Highlighted text={hit.excerptHighlight} />
-              </p>
-            )}
-            <p className="text-xs text-muted">Updated {hit.updatedLabel}</p>
-          </li>
+                <p className="mt-1 text-label-medium">
+                  Updated {hit.updatedLabel}
+                </p>
+              </>
+            }
+            wrapSupporting
+          />
         ))}
       </ResultGroup>
       <ResultGroup
@@ -311,17 +324,13 @@ function Results({
         count={found.goals.length}
       >
         {found.goals.map((hit) => (
-          <li
+          <ListItem
             key={hit.id}
-            className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 p-4"
-          >
-            <h3 className="min-w-0">
-              <Link href={`/goals/${hit.id}`} className={resultLink}>
-                <Highlighted text={hit.titleHighlight} />
-              </Link>
-            </h3>
-            <span className="text-sm text-muted">{hit.statusLabel}</span>
-          </li>
+            href={`/goals/${hit.id}`}
+            leading={<ResultIcon name="flag" />}
+            headline={<Highlighted text={hit.titleHighlight} />}
+            meta={<Chip type="status" label={hit.statusLabel} />}
+          />
         ))}
       </ResultGroup>
       <ResultGroup
@@ -330,26 +339,26 @@ function Results({
         count={found.tasks.length}
       >
         {found.tasks.map((hit) => (
-          <li
+          <ListItem
             key={hit.task.id}
-            className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 p-4"
-          >
-            <h3 className="min-w-0">
-              <button
-                type="button"
-                onClick={(event) => onOpenTask(hit.task, event.currentTarget)}
-                aria-haspopup="dialog"
-                className={cx(resultLink, "text-left")}
-              >
-                <Highlighted text={hit.titleHighlight} />
-              </button>
-            </h3>
-            <span className="text-sm text-muted">{hit.statusLabel}</span>
-          </li>
+            onClick={(event) => onOpenTask(hit.task, event.currentTarget)}
+            popup="dialog"
+            leading={<ResultIcon name="checklist" />}
+            headline={<Highlighted text={hit.titleHighlight} />}
+            meta={<Chip type="status" label={hit.statusLabel} />}
+          />
         ))}
       </ResultGroup>
     </div>
   );
+}
+
+function ResultIcon({
+  name,
+}: {
+  name: "sticky_note_2" | "flag" | "checklist";
+}) {
+  return <Icon name={name} size={20} className="text-on-surface-variant" />;
 }
 
 function ResultGroup({
@@ -365,19 +374,19 @@ function ResultGroup({
 }) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-3">
-      <h2 id={id} className="text-lg font-semibold">
-        {title}
-      </h2>
+    <section aria-labelledby={id} className="grid min-w-0 gap-2">
+      <div className="flex items-center gap-2">
+        <h2 id={id} className="text-title-medium">
+          {title}
+        </h2>
+        <span className="rounded-full bg-surface-container px-2 py-0.5 text-label-medium text-on-surface-variant">
+          {total}
+        </span>
+      </div>
       {total === 0 ? (
-        <p className="text-sm text-muted">{empty}</p>
+        <p className="text-body-medium text-on-surface-variant">{empty}</p>
       ) : (
-        <ul
-          aria-label={title}
-          className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface"
-        >
-          {children}
-        </ul>
+        <ListGroup label={title}>{children}</ListGroup>
       )}
     </section>
   );

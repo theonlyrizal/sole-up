@@ -26,7 +26,9 @@ import {
   lifeAreas,
   milestones,
   noteGoals,
+  noteTags,
   notes,
+  tags,
   tasks,
   timeBlocks,
   userPreferences,
@@ -104,6 +106,7 @@ export async function seedVisualData(
     goalsUI = false,
     track = false,
     reviewUI = false,
+    notesUI = false,
   } = {},
 ) {
   const userId = await signInAndConfirm(page, "Alex Morgan");
@@ -130,6 +133,7 @@ export async function seedVisualData(
   const dailyId = randomUUID();
   const weekdaysId = randomUUID();
   const flexibleId = randomUUID();
+  const archivedNoteId = randomUUID();
   const noteText = "Take the riverside path when there is enough daylight.";
 
   try {
@@ -566,6 +570,47 @@ export async function seedVisualData(
             ],
           },
         });
+        if (notesUI) {
+          const writeFixture = (text: string) => ({
+            bodyText: text,
+            body: {
+              type: "doc" as const,
+              content: [
+                {
+                  type: "paragraph" as const,
+                  content: [{ type: "text" as const, text }],
+                },
+              ],
+            },
+          });
+          await db.insert(notes).values([
+            {
+              userId,
+              title: null,
+              ...writeFixture(
+                "Check whether the south path stays dry after rain. Bring a spare layer and leave by the shorter exit if the river rises.",
+              ),
+            },
+            {
+              userId,
+              title:
+                "Notes from a long Saturday walk along the river with the neighborhood group",
+              ...writeFixture(
+                "The lower trail was muddy past the footbridge. The upper path has room to stop for a snack.",
+              ),
+            },
+            {
+              userId,
+              id: archivedNoteId,
+              title: "Last winter's walking checklist",
+              archivedAt: now,
+              ...writeFixture("Carry a thermos and check the sunset time."),
+            },
+          ]);
+          const tagId = randomUUID();
+          await db.insert(tags).values({ userId, id: tagId, name: "Outdoors" });
+          await db.insert(noteTags).values({ userId, noteId, tagId });
+        }
         if (goalsUI) {
           await db.insert(noteGoals).values([
             { userId, noteId, goalId },
@@ -636,6 +681,7 @@ export async function seedVisualData(
     lastWeek,
     goalId,
     noteId,
+    archivedNoteId,
     reviewId,
     pastReviewId,
     eventId,

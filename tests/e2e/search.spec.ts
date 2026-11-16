@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  chooseNoteMenuItem,
   expectNoSeriousViolations,
   openQuickAdd,
   signInAndConfirm,
@@ -64,7 +65,7 @@ test("searches a note, a goal and a task with highlights as text, from the shell
   await signInAndConfirm(page);
   await createNote(page, "<b>Marathon</b> plan", "Started running again");
   await createNote(page, "Old log", "Running in the rain");
-  await page.getByRole("button", { name: "Archive" }).click();
+  await chooseNoteMenuItem(page, "Archive");
   await expect(page).toHaveURL(/\/notes$/);
   await createGoal(page, "Run a marathon");
   await createTask(page, "Running shoes");
@@ -81,6 +82,12 @@ test("searches a note, a goal and a task with highlights as text, from the shell
   await shellField.press("Enter");
   await expect(page).toHaveURL(/\/notes\/search$/);
   await expect(pageSearchbox(page)).toHaveValue("runs");
+  await expect(pageSearchbox(page)).toBeFocused();
+  for (const name of ["Notes", "Goals", "Tasks"] as const) {
+    await expect(
+      group(page, name).getByText("1", { exact: true }),
+    ).toBeVisible();
+  }
   await expect(
     page.getByRole("status").filter({ hasText: /^Found/ }),
   ).toHaveText("Found 1 note, 1 goal, 1 task.");
@@ -145,6 +152,11 @@ test("searches a note, a goal and a task with highlights as text, from the shell
   await expect(pageSearchbox(page)).toBeFocused();
   await expectNoSeriousViolations(page);
 
+  await pageSearchbox(page).fill("temporary");
+  await page.getByRole("button", { name: "Clear search" }).press("Enter");
+  await expect(pageSearchbox(page)).toBeEmpty();
+  await expect(pageSearchbox(page)).toBeFocused();
+
   // A note result opens the note.
   await pageSearchbox(page).fill("marathon");
   await pageSearchbox(page).press("Enter");
@@ -157,7 +169,7 @@ test("searches a note, a goal and a task with highlights as text, from the shell
   );
 
   // No term was ever in a URL.
-  for (const term of ["runs", "rent", "spaceship", "marathon"]) {
+  for (const term of ["runs", "rent", "spaceship", "marathon", "temporary"]) {
     for (const url of urls) {
       expect(new URL(url).search.toLowerCase()).not.toContain(term);
       expect(new URL(url).hash.toLowerCase()).not.toContain(term);
@@ -183,6 +195,7 @@ test("search finds only the signed-in user's notes, goals and tasks", async ({
   const other = await otherContext.newPage();
   await signInAndConfirm(other, "Charles Babbage");
   await other.goto("/notes/search");
+  await expect(pageSearchbox(other)).toBeFocused();
   await pageSearchbox(other).fill("engine");
   await pageSearchbox(other).press("Enter");
   await expect(

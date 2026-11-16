@@ -11,7 +11,8 @@ import { Highlighted } from "./highlighted";
 const render = (text: string) =>
   renderToStaticMarkup(<Highlighted text={text} />);
 
-const MARK = '<mark class="rounded-sm bg-accent/20 font-semibold text-fg">';
+const MARK =
+  '<mark class="rounded-xs bg-reward-container font-semibold text-on-reward-container">';
 
 describe("Highlighted", () => {
   it("renders matches as <mark> and the rest as text", () => {

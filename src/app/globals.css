@@ -1010,3 +1010,67 @@ body:has(.header-wash) {
 .note-content strong {
   font-weight: 600;
 }
+
+/* Notes keep the route's own flow until the list and canvas fit side by side. */
+.notes-layout {
+  display: contents;
+}
+
+.notes-pane {
+  display: none;
+}
+
+@media (width >= 75rem) {
+  .notes-layout:has([data-note-editor], [data-notes-index]) {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .notes-layout:has([data-note-editor], [data-notes-index]) > .notes-pane {
+    position: sticky;
+    inset-block-start: 0;
+    display: block;
+    height: 100dvh;
+    overflow: auto;
+    overscroll-behavior: contain;
+    border-inline-end: 1px solid var(--md-outline-variant);
+    background: var(--md-canvas);
+  }
+}
+
+.note-editor-header {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
+  padding-block-start: env(safe-area-inset-top);
+}
+
+.note-toolbar {
+  position: sticky;
+  inset-block-start: calc(var(--app-bar-height) + env(safe-area-inset-top));
+  z-index: 10;
+}
+
+.note-toolbar > [role="group"] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-outline) transparent;
+}
+
+@media (width < 37.5rem) {
+  .note-toolbar[data-docked] > [role="group"] {
+    position: fixed;
+    inset: auto 0 calc(var(--note-keyboard-bottom, 0px) + 0.5rem);
+    z-index: 25;
+    max-width: calc(100% - 1rem);
+    margin-inline: auto;
+  }
+
+  .note-toolbar[data-docked] {
+    min-block-size: 3.5rem;
+  }
+
+  html:has(.note-toolbar[data-docked]) {
+    scroll-padding-block-end: 4rem;
+  }
+}

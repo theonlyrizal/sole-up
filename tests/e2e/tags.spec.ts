@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
+import {
+  chooseNoteMenuItem,
+  expectNoSeriousViolations,
+  signInAndConfirm,
+} from "./helpers";
 import { auditEventsOf } from "./test-database";
 
 // Tags (chunk 8.5): tag a note inline from the editor, filter the Notes
@@ -37,10 +41,10 @@ async function addTag(page: Page, name: string) {
 const noteTagList = (page: Page) =>
   tagsSection(page).getByRole("list", { name: "Tags on this note" });
 
-/** The note's tag chips, by name (each also holds a hidden "×"). */
+/** The note's tag chips, by name. */
 async function expectNoteTags(page: Page, names: string[]) {
   const chips = noteTagList(page).getByRole("listitem");
-  await expect(chips).toHaveText(names.map((name) => `${name}×`));
+  await expect(chips).toHaveText(names);
 }
 
 /** Every URL the page requests, to check no tag name is in one. */
@@ -86,13 +90,16 @@ test("tags a note, filters by the tag, renames it and deletes it", async ({
   await page.goto("/notes");
   const list = page.getByRole("list", { name: "Notes", exact: true });
   await expect(list.getByRole("heading")).toHaveCount(3);
-  await page.getByLabel("Tag", { exact: true }).selectOption("Zucchini");
-  await page.getByRole("button", { name: "Show" }).click();
+  const filter = page.getByRole("navigation", { name: "Filter notes by tag" });
+  await filter.getByRole("link", { name: "Zucchini", exact: true }).click();
+  await expect(
+    filter.getByRole("link", { name: "Zucchini", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
   await expect(page).toHaveURL(/\/notes\?tag=[0-9a-f-]{36}$/);
   const tagId = new URL(page.url()).searchParams.get("tag")!;
-  await expect(page.getByText("Showing notes tagged")).toContainText(
-    "Zucchini",
-  );
+  await expect(
+    page.getByText("Showing notes tagged").filter({ visible: true }),
+  ).toContainText("Zucchini");
   await expect(list.getByRole("heading")).toHaveText([
     "Grocery list",
     "Interval plan",
@@ -121,7 +128,7 @@ test("tags a note, filters by the tag, renames it and deletes it", async ({
 
   // Rename from the Tags manager; a taken name is refused.
   await page.goto("/notes");
-  await page.getByRole("link", { name: "Tags", exact: true }).click();
+  await page.getByRole("link", { name: "Manage tags", exact: true }).click();
   await expect(page).toHaveURL(/\/notes\/tags$/);
   const tagRows = page.getByRole("list", { name: "Tags" });
   await expect(tagRows.getByRole("listitem")).toHaveCount(2);
@@ -147,9 +154,9 @@ test("tags a note, filters by the tag, renames it and deletes it", async ({
 
   // The filtered list shows the new name.
   await page.goto(`/notes?tag=${tagId}`);
-  await expect(page.getByText("Showing notes tagged")).toContainText(
-    "Courgette",
-  );
+  await expect(
+    page.getByText("Showing notes tagged").filter({ visible: true }),
+  ).toContainText("Courgette");
 
   // Another user sees none of it, even with the tag's ID.
   const otherContext = await browser.newContext();
@@ -157,9 +164,13 @@ test("tags a note, filters by the tag, renames it and deletes it", async ({
   await signInAndConfirm(other, "Grace Hopper");
   await other.goto(`/notes?tag=${tagId}`);
   await expect(
-    other.getByText("That tag doesn't exist any more"),
+    other
+      .getByText("That tag doesn't exist any more")
+      .filter({ visible: true }),
   ).toBeVisible();
-  await expect(other.getByText("No notes yet")).toBeVisible();
+  await expect(
+    other.getByText("No notes yet").filter({ visible: true }),
+  ).toBeVisible();
   await other.goto("/notes/tags");
   await expect(other.getByText("No tags yet")).toBeVisible();
   await otherContext.close();
@@ -181,7 +192,9 @@ test("tags a note, filters by the tag, renames it and deletes it", async ({
   await expect(list.getByRole("heading")).toHaveCount(3);
   await expect(list.getByRole("link", { name: "Courgette" })).toHaveCount(0);
   await page.goto(`/notes?tag=${tagId}`);
-  await expect(page.getByText("That tag doesn't exist any more")).toBeVisible();
+  await expect(
+    page.getByText("That tag doesn't exist any more").filter({ visible: true }),
+  ).toBeVisible();
 
   // No tag name in any requested URL or in the audit log.
   const audit = JSON.stringify(await auditEventsOf(userId)).toLowerCase();
@@ -197,7 +210,7 @@ test("an archived note shows its tags read-only", async ({ page }) => {
   await createNote(page, "Old plan", "Kept for later");
   await addTag(page, "Archive me");
   await expectNoteTags(page, ["Archive me"]);
-  await page.getByRole("button", { name: "Archive", exact: true }).click();
+  await chooseNoteMenuItem(page, "Archive");
   await expect(page).toHaveURL(/\/notes$/);
   await page.goto("/notes/archived");
   await page.getByRole("link", { name: "Old plan" }).click();

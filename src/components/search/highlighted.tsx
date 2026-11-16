@@ -12,7 +12,7 @@ export function Highlighted({ text }: { text: string }) {
     part.highlighted ? (
       <mark
         key={index}
-        className="rounded-sm bg-accent/20 font-semibold text-fg"
+        className="rounded-xs bg-reward-container font-semibold text-on-reward-container"
       >
         {part.text}
       </mark>

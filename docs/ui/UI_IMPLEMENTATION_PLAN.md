@@ -91,7 +91,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-8 | Goals, goal detail, life areas, archived goals | done | chunk/ui-8-goals-life-areas | 2026-11-15 | Goal journeys, confirmed milestone feedback and all finish-line checks verified |
 | UI-9 | Track, habit form, archived habits | done | chunk/ui-9-track-habits | 2026-11-16 | 5-B approved. Three ranges, confirmed feedback, keyboard targets and finish-line checks verified |
 | UI-10 | Weekly review, history, detail | done | chunk/ui-10-weekly-review | 2026-11-16 | Save, period lock and one-time Finish verified. Full E2E passed on Ubuntu |
-| UI-11 | Notes, editor, search (and tags if 8.5 shipped) | todo | | | |
+| UI-11 | Notes, editor, search (and tags if 8.5 shipped) | in progress | chunk/ui-11-notes-search | | |
 | UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | todo | | | Needs sign-off 5-D |
 | UI-13 | Consistency, cleanup, token lint, accessibility sweep, docs | todo | | | |
 

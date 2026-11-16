@@ -5,6 +5,7 @@ import { Button, buttonClass, type ButtonVariant } from "./button";
 import { ConnectedButtonGroup } from "./button-group";
 import { Checkbox } from "./checkbox";
 import { Chip } from "./chip";
+import { SearchBar } from "./search-bar";
 import { Fab, FabMenu } from "./fab";
 import { FormField } from "./form-field";
 import { IconButton, IconLink } from "./icon-button";
@@ -207,6 +208,48 @@ describe("Chip", () => {
     expect(html).toContain(">2 planned</span>");
     expect(html).not.toMatch(/<a\b|<button\b/);
   });
+});
+
+it("lets a linked input chip expose a separate, named removal button", () => {
+  const html = render(
+    <Chip
+      type="input"
+      href="/goals/example"
+      label="Weekend walk"
+      detail={<Chip type="status" label="Active" />}
+      onRemove={noop}
+      removeLabel="Unlink Weekend walk"
+      removeDisabled
+    />,
+  );
+  expect(html).toMatch(
+    /<a [^>]*href="\/goals\/example">.*Active.*<\/a><button/,
+  );
+  expect(html).toMatch(
+    /<button[^>]*disabled=""[^>]*aria-label="Unlink Weekend walk"/,
+  );
+  expect(
+    render(<Chip type="input" label="Will link to: Weekend walk" />),
+  ).not.toContain("<button");
+});
+
+it("renders a labelled search input and gives the clear action a button name", () => {
+  const search = (value: string) =>
+    render(
+      <SearchBar
+        aria-label="Search for"
+        value={value}
+        onChange={noop}
+        onClear={noop}
+      />,
+    );
+  expect(search("walk")).toMatch(
+    /<input[^>]*aria-label="Search for"[^>]*type="search"/,
+  );
+  expect(search("walk")).toMatch(
+    /<button[^>]*type="button"[^>]*aria-label="Clear search"/,
+  );
+  expect(search("")).not.toContain("Clear search");
 });
 
 it("Checkbox links the visible label to square, round and mixed controls", () => {

@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { cx, focusRing } from "@/components/ui/cx";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Chip } from "@/components/ui/chip";
+import { ListGroup, ListItem } from "@/components/ui/list";
+import { ResponsiveSheet } from "@/components/ui/bottom-sheet";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { NOTE_LINK_QUERY_MAX } from "@/lib/notes/note";
@@ -36,11 +36,14 @@ const targetKey = (target: Pick<LinkTarget, "targetType" | "targetId">) =>
 export function NoteLinks({
   noteId,
   pendingLink,
+  children,
 }: {
   noteId: string | null;
   pendingLink: LinkTarget | null;
+  children: React.ReactNode;
 }) {
   const headingId = useId();
+  const pickerTrigger = useRef<HTMLButtonElement>(null);
   const [links, setLinks] = useState<LinkTarget[] | null>(null);
   const [failed, setFailed] = useState(false);
   // Bumped to read the links again.
@@ -82,6 +85,7 @@ export function NoteLinks({
         return;
       }
       toast({ title: "Unlinked", variant: "success" });
+      pickerTrigger.current?.focus();
       setVersion((count) => count + 1);
     });
   }
@@ -89,14 +93,15 @@ export function NoteLinks({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-2 border-t border-border pt-4"
+      className="mt-4 grid min-w-0 gap-3 rounded-lg bg-resting-surface p-4 text-on-resting-surface"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={headingId} className="text-lg font-semibold">
+        <h2 id={headingId} className="text-title-medium">
           Linked to
         </h2>
         {noteId && links && (
           <LinkTargetDialog
+            triggerRef={pickerTrigger}
             noteId={noteId}
             linked={links}
             onLinked={() => setVersion((count) => count + 1)}
@@ -105,30 +110,30 @@ export function NoteLinks({
       </div>
       {!noteId ? (
         pendingLink ? (
-          <>
-            <LinkTargetList targets={[pendingLink]} />
-            <p className="text-sm text-muted">
-              Linked once the note has a title or some text.
-            </p>
-          </>
+          <p className="text-body-medium text-on-surface-variant">
+            Linked once the note has a title or some text.
+          </p>
         ) : (
-          <p className="text-sm text-muted">
+          <p className="text-body-medium text-on-surface-variant">
             Give the note a title or some text, then link it to goals and tasks.
           </p>
         )
       ) : failed ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-body-medium text-error">
           Couldn&apos;t load the links. Try reloading the note.
         </p>
       ) : !links ? (
-        <p className="text-sm text-muted">Loading links…</p>
+        <p className="text-body-medium text-on-surface-variant">
+          Loading links…
+        </p>
       ) : links.length === 0 ? (
-        <p className="text-sm text-muted">
+        <p className="text-body-medium text-on-surface-variant">
           Not linked to any goals or tasks yet.
         </p>
       ) : (
         <LinkTargetList targets={links} pending={pending} onUnlink={unlink} />
       )}
+      {children}
     </section>
   );
 }
@@ -140,48 +145,34 @@ function LinkTargetList({
 }: {
   targets: LinkTarget[];
   pending?: boolean;
-  onUnlink?: (target: LinkTarget) => void;
+  onUnlink: (target: LinkTarget) => void;
 }) {
   return (
     <ul
       aria-label="Linked goals and tasks"
-      className="flex flex-col divide-y divide-border rounded-lg border border-border"
+      className="flex min-w-0 flex-wrap gap-2"
     >
       {targets.map((target) => (
-        <li
-          key={targetKey(target)}
-          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2"
-        >
-          <div className="flex min-w-0 flex-col">
-            {target.targetType === "goal" ? (
-              <Link
-                href={`/goals/${target.targetId}`}
-                className={cx(
-                  "self-start rounded-sm font-medium break-words hover:underline",
-                  focusRing,
-                )}
-              >
-                {target.title}
-              </Link>
-            ) : (
-              // Tasks have no page of their own; their dialog is on Plan.
-              <span className="font-medium break-words">{target.title}</span>
-            )}
-            <span className="text-sm text-muted">
-              {TARGET_TYPE_LABELS[target.targetType]} · {target.statusLabel}
-            </span>
-          </div>
-          {onUnlink && (
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              aria-label={`Unlink ${target.title}`}
-              onClick={() => onUnlink(target)}
-            >
-              Unlink
-            </Button>
-          )}
+        <li key={targetKey(target)} className="max-w-full min-w-0">
+          <Chip
+            type="input"
+            label={target.title}
+            icon={target.targetType === "goal" ? "flag" : "checklist"}
+            href={
+              target.targetType === "goal"
+                ? `/goals/${target.targetId}`
+                : undefined
+            }
+            detail={
+              <Chip
+                type="status"
+                label={`${TARGET_TYPE_LABELS[target.targetType]} · ${target.statusLabel}`}
+              />
+            }
+            removeLabel={`Unlink ${target.title}`}
+            onRemove={() => onUnlink(target)}
+            removeDisabled={pending}
+          />
         </li>
       ))}
     </ul>
@@ -193,26 +184,32 @@ function LinkTargetDialog({
   noteId,
   linked,
   onLinked,
+  triggerRef,
 }: {
   noteId: string;
   linked: LinkTarget[];
   onLinked: () => void;
+  triggerRef: React.Ref<HTMLButtonElement>;
 }) {
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="secondary" size="sm">
-          Link a goal or task
+    <ResponsiveSheet
+      fitKeyboard
+      title="Link a goal or task"
+      description="Search your goals and tasks, whatever their status."
+      trigger={
+        <Button
+          ref={triggerRef}
+          variant="tonal"
+          size="xs"
+          icon="link"
+          aria-label="Link a goal or task"
+        >
+          Link
         </Button>
-      </DialogTrigger>
-      <DialogContent
-        title="Link a goal or task"
-        description="Search your goals and tasks, whatever their status."
-        className="max-w-lg"
-      >
-        <LinkTargetPicker noteId={noteId} linked={linked} onLinked={onLinked} />
-      </DialogContent>
-    </Dialog>
+      }
+    >
+      <LinkTargetPicker noteId={noteId} linked={linked} onLinked={onLinked} />
+    </ResponsiveSheet>
   );
 }
 
@@ -255,13 +252,14 @@ function LinkTargetPicker({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={searchId} className="text-sm font-medium">
+        <label htmlFor={searchId} className="text-label-large">
           Search goals and tasks
         </label>
         <Input
           id={searchId}
           ref={searchRef}
           type="search"
+          autoFocus
           value={query}
           maxLength={NOTE_LINK_QUERY_MAX}
           autoComplete="off"
@@ -269,9 +267,11 @@ function LinkTargetPicker({
         />
       </div>
       {search.kind === "loading" ? (
-        <p className="text-sm text-muted">Loading goals and tasks…</p>
+        <p className="text-body-medium text-on-surface-variant">
+          Loading goals and tasks…
+        </p>
       ) : search.kind === "error" ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-body-medium text-error">
           {search.message}
         </p>
       ) : (
@@ -311,39 +311,37 @@ function TargetGroup({
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-1.5">
-      <h3 id={headingId} className="text-sm font-semibold">
+      <h3 id={headingId} className="text-title-small">
         {label}
       </h3>
       {targets.length === 0 ? (
-        <p className="text-sm text-muted">{empty}</p>
+        <p className="text-body-medium text-on-surface-variant">{empty}</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
+        <ListGroup label={label}>
           {targets.map((target) => (
-            <li
+            <ListItem
               key={targetKey(target)}
-              className="flex items-center justify-between gap-3 px-3 py-2"
-            >
-              <div className="flex min-w-0 flex-col">
-                <span className="font-medium break-words">{target.title}</span>
-                <span className="text-sm text-muted">{target.statusLabel}</span>
-              </div>
-              {isLinked(target) ? (
-                <span className="shrink-0 text-sm text-muted">Linked</span>
-              ) : (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="shrink-0"
-                  disabled={pending}
-                  aria-label={`Link ${target.title}`}
-                  onClick={() => onLink(target)}
-                >
-                  Link
-                </Button>
-              )}
-            </li>
+              headline={target.title}
+              supporting={target.statusLabel}
+              trailing={
+                isLinked(target) ? (
+                  <Chip type="status" label="Linked" tone="success" />
+                ) : (
+                  <Button
+                    variant="tonal"
+                    size="xs"
+                    disabled={pending}
+                    aria-label={`Link ${target.title}`}
+                    onClick={() => onLink(target)}
+                  >
+                    Link
+                  </Button>
+                )
+              }
+              wrapActions
+            />
           ))}
-        </ul>
+        </ListGroup>
       )}
     </section>
   );

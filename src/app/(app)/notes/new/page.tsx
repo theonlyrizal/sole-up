@@ -3,7 +3,8 @@ import { Suspense } from "react";
 import { z } from "zod";
 
 import { NoteEditor } from "@/components/notes/note-editor";
-import { PageFrame } from "@/components/shell/page-frame";
+import { NoteHeader } from "@/components/notes/note-header";
+import { PageContainer } from "@/components/shell/page-container";
 import { LoadingState } from "@/components/ui/skeleton";
 import { requireUser } from "@/server/auth/session";
 import { getLinkTarget } from "@/server/modules/notes/queries";
@@ -18,16 +19,16 @@ export const metadata: Metadata = { title: "Note · SoleUp" };
  */
 export default function NewNotePage({ searchParams }: PageProps<"/notes/new">) {
   return (
-    <PageFrame
-      title="Note"
-      width="reading"
-      back={{ href: "/notes", label: "Notes" }}
-      hideCreate
+    <Suspense
+      fallback={
+        <PageContainer width="reading">
+          <NoteHeader />
+          <LoadingState label="Loading the editor" />
+        </PageContainer>
+      }
     >
-      <Suspense fallback={<LoadingState label="Loading the editor" />}>
-        <NewNote searchParams={searchParams} />
-      </Suspense>
-    </PageFrame>
+      <NewNote searchParams={searchParams} />
+    </Suspense>
   );
 }
 

@@ -1,12 +1,7 @@
-import { buttonClass } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Chip } from "@/components/ui/chip";
 import type { TagSummary } from "@/lib/notes/tags";
 
-/**
- * The Notes list's tag filter (chunk 8.5): a plain GET form, so it works
- * before the page's script loads. The URL carries the tag's ID only
- * (`?tag=<id>`), never its name.
- */
+/** The URL carries only the tag's ID (chunk 8.5). */
 export function TagFilter({
   tags,
   selected,
@@ -16,34 +11,27 @@ export function TagFilter({
 }) {
   if (tags.length === 0) return null;
   return (
-    <form
-      method="get"
-      action="/notes"
-      role="search"
+    <nav
       aria-label="Filter notes by tag"
-      className="flex flex-wrap items-end gap-2"
+      className="flex min-w-0 gap-2 overflow-x-auto p-1"
     >
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <label htmlFor="notes-tag-filter" className="text-sm font-medium">
-          Tag
-        </label>
-        <Select
-          id="notes-tag-filter"
-          name="tag"
-          defaultValue={selected ?? ""}
-          className="max-w-xs"
-        >
-          <option value="">All notes</option>
-          {tags.map((tag) => (
-            <option key={tag.id} value={tag.id}>
-              {tag.name}
-            </option>
-          ))}
-        </Select>
-      </div>
-      <button type="submit" className={buttonClass({ variant: "secondary" })}>
-        Show
-      </button>
-    </form>
+      <Chip
+        type="filter"
+        label="All notes"
+        selected={!selected}
+        href="/notes"
+        className="shrink-0"
+      />
+      {tags.map((tag) => (
+        <Chip
+          key={tag.id}
+          type="filter"
+          label={tag.name}
+          selected={tag.id === selected}
+          href={`/notes?tag=${tag.id}`}
+          className="shrink-0"
+        />
+      ))}
+    </nav>
   );
 }

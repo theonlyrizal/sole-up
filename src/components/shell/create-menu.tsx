@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useRef } from "react";
 import { FabMenu } from "@/components/ui/fab";
 
@@ -13,6 +14,18 @@ export function CreateMenu({
   rail?: boolean;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
+  const pathname = usePathname();
+  const note = {
+    label: "New note",
+    icon: "note_add",
+    href: "/notes/new",
+  } as const;
+  const task = {
+    label: "New task",
+    icon: "add_task",
+    shortcut: "Q",
+    onSelect: () => onQuickAdd(trigger.current),
+  } as const;
   return (
     <FabMenu
       triggerRef={trigger}
@@ -39,15 +52,7 @@ export function CreateMenu({
       side={rail ? "bottom" : "top"}
       align={rail ? "start" : "end"}
       extended={rail}
-      items={[
-        {
-          label: "New task",
-          icon: "add_task",
-          shortcut: "Q",
-          onSelect: () => onQuickAdd(trigger.current),
-        },
-        { label: "New note", icon: "note_add", href: "/notes/new" },
-      ]}
+      items={!rail && pathname === "/notes" ? [note, task] : [task, note]}
     />
   );
 }

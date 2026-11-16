@@ -139,6 +139,9 @@ test("a note linked from a goal and a task shows on both, unlinks, and outlives 
     .getByRole("button", { name: "Unlink Buy rosin" })
     .click();
   await expect(links.getByRole("listitem")).toHaveCount(1);
+  await expect(
+    noteLinks(page).getByRole("button", { name: "Link a goal or task" }),
+  ).toBeFocused();
   await page.goto(goalUrl);
   const reopened = await openTaskDialog(page, "Buy rosin");
   await expect(
@@ -183,6 +186,9 @@ test("the editor links goals and tasks of any status from its picker", async ({
     .getByRole("button", { name: "Link a goal or task" })
     .click();
   const picker = page.getByRole("dialog", { name: "Link a goal or task" });
+  await expect(
+    picker.getByRole("searchbox", { name: "Search goals and tasks" }),
+  ).toBeFocused();
   await picker
     .getByRole("searchbox", { name: "Search goals and tasks" })
     .fill("MARATHON");
@@ -228,7 +234,9 @@ test("New note from a task links it on its first save, and the task delete keeps
   const dialog = await openTaskDialog(page, "Order brake pads");
   await dialog.getByRole("link", { name: "New note" }).click();
   await expect(page).toHaveURL(/\/notes\/new\?task=[0-9a-f-]{36}$/);
-  await expect(noteLinks(page)).toContainText("Order brake pads");
+  await expect(
+    page.getByText("Will link to: Order brake pads", { exact: true }),
+  ).toBeVisible();
   await expect(noteLinks(page)).toContainText(
     "Linked once the note has a title or some text.",
   );
