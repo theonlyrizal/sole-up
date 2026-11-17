@@ -32,11 +32,13 @@ export function TaskNotes({
         Linked notes
       </h3>
       {failed ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-body-medium text-error">
           Couldn&apos;t load the linked notes. Try reopening the task.
         </p>
       ) : !data ? (
-        <p className="text-sm text-muted">Loading linked notes…</p>
+        <p className="text-body-medium text-on-surface-variant">
+          Loading linked notes…
+        </p>
       ) : (
         <LinkedNotesList
           owner={{ targetType: "task", targetId: task.id, title: task.title }}

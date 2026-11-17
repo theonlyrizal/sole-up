@@ -79,7 +79,7 @@ export function StarterLifeAreasOffer() {
           </div>
         </fieldset>
         {error && (
-          <p role="alert" className="text-sm text-danger">
+          <p role="alert" className="text-body-medium text-error">
             {error}
           </p>
         )}
@@ -91,7 +91,7 @@ export function StarterLifeAreasOffer() {
           >
             {pending ? "Adding…" : "Add selected"}
           </Button>
-          <Button variant="secondary" disabled={pending} onClick={dismiss}>
+          <Button variant="outlined" disabled={pending} onClick={dismiss}>
             No thanks
           </Button>
         </div>

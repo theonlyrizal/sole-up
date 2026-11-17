@@ -197,7 +197,8 @@ export function NoteToolbar({
         <div
           role="group"
           aria-label="Formatting"
-          className="flex w-fit max-w-full items-center overflow-x-auto overscroll-x-contain rounded-full bg-surface-container p-1 shadow-2"
+          tabIndex={0}
+          className="flex w-fit max-w-full items-center overflow-x-auto overscroll-x-contain rounded-full bg-surface-container p-1.5 shadow-2 focus-visible:outline-3 focus-visible:outline-offset-2"
         >
           {MARK_ITEMS.map((item, index) => renderItem(item, index))}
           <IconButton
@@ -350,7 +351,7 @@ function LinkDialog({
           </FormField>
           <div className="flex flex-wrap justify-end gap-3">
             {hasLink && (
-              <Button variant="secondary" onClick={remove}>
+              <Button variant="outlined" onClick={remove}>
                 Remove link
               </Button>
             )}

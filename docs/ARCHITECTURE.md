@@ -66,6 +66,8 @@ Preferred starting point for a new project:
 
 This was the starting proposal. The concrete choices are now settled in [ADR 0001](decisions/0001-stack.md) (stack), [ADR 0002](decisions/0002-auth.md) (auth) and [ADR 0003](decisions/0003-hosting-and-jobs.md) (hosting and jobs), whose worker is replaced for v1 by [ADR 0013](decisions/0013-reminders-sweep-and-delivery.md).
 
+The Next.js App Router pages load scoped data through the server modules. Client components own interaction and call the existing Server Actions. `src/components/shell/` owns navigation and framing, `src/components/ui/` owns the Radix-backed primitives, and `src/components/data/` owns shared data displays. Tailwind utilities resolve semantic roles from `src/app/globals.css`. FullCalendar maps its own CSS variables to those roles. [UI design system](ui/DESIGN_SYSTEM.md)
+
 ## 4. Modular monolith
 
 Use domain modules with clear responsibilities. A module should own its domain rules and persistence operations, and expose a small service interface to other modules.

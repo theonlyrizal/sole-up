@@ -176,7 +176,7 @@ export function RepeatBuilder({
                               : value.weekdays.filter((other) => other !== day),
                           })
                         }
-                        className={cx("size-4 accent-accent", focusRing)}
+                        className={cx("size-4 accent-primary", focusRing)}
                       />
                       <span aria-hidden="true">{WEEKDAY_LABELS[day][0]}</span>
                     </label>
@@ -257,12 +257,15 @@ export function RepeatBuilder({
         )}
 
         {summary && (
-          <p id={summaryId} className="text-sm text-muted">
+          <p
+            id={summaryId}
+            className="text-body-medium text-on-surface-variant"
+          >
             {summary}
           </p>
         )}
         {ruleErrors && ruleErrors.length > 0 && (
-          <p id={ruleErrorId} className="text-sm text-danger">
+          <p id={ruleErrorId} className="text-body-medium text-error">
             {ruleErrors.join(" ")}
           </p>
         )}

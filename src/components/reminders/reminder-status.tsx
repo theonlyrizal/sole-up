@@ -64,7 +64,7 @@ export function ReminderStatus({ item }: { item: ReminderItem }) {
 
   if (failed) {
     return (
-      <p role="alert" className="text-sm text-danger">
+      <p role="alert" className="text-body-medium text-error">
         Couldn&apos;t load the reminder. Try reopening this dialog.
       </p>
     );
@@ -76,12 +76,12 @@ export function ReminderStatus({ item }: { item: ReminderItem }) {
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-2 border-t border-border pt-4"
+      className="flex flex-col gap-2 border-t border-outline-variant pt-4"
     >
       <h3 id={headingId} className="font-semibold">
         Reminder
       </h3>
-      <p className="text-sm" aria-live="polite">
+      <p className="text-body-medium" aria-live="polite">
         {next
           ? `Next reminder: ${next.when}${next.snoozed ? " (snoozed)" : ""}`
           : last}
@@ -91,8 +91,8 @@ export function ReminderStatus({ item }: { item: ReminderItem }) {
           {SNOOZE_MINUTES.map((minutes) => (
             <Button
               key={minutes}
-              variant="secondary"
-              size="sm"
+              variant="outlined"
+              size="xs"
               disabled={pending}
               onClick={() => snooze(snoozeId, minutes)}
             >

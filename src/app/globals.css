@@ -122,41 +122,12 @@
   --md-on-confirmation-surface: var(--md-on-reward-container);
   --md-reflection-surface: var(--area-violet-container);
   --md-on-reflection-surface: var(--area-violet-on);
-  /* Legacy aliases, kept through UI-13. Hover fills keep their paired text. */
-  --bg: var(--md-canvas);
-  --surface: var(--md-resting-surface);
-  --surface-muted: var(--md-surface-container);
-  --fg: var(--md-on-surface);
-  --fg-muted: var(--md-on-surface-variant);
-  --border: var(--md-outline-variant);
-  --accent: var(--md-primary);
-  --accent-fg: var(--md-on-primary);
-  --focus: var(--md-focus);
-  --danger: var(--md-error);
-  --danger-fg: var(--md-on-error);
-  --success: var(--md-success);
-  --accent-hover: color-mix(
-    in srgb,
-    var(--md-primary),
-    var(--md-on-primary) 8%
-  );
-  --danger-hover: color-mix(in srgb, var(--md-error), var(--md-on-error) 8%);
 }
 
 :root {
   --feedback-halo-duration: 600ms;
   --feedback-press-scale: 0.96;
   --space-unit: 0.25rem;
-  --corner-sm: 8px;
-  --corner-md: 12px;
-  --corner-lg: 16px;
-  --fs-xs: 0.75rem;
-  --fs-sm: 0.875rem;
-  --fs-base: 1rem;
-  --fs-lg: 1.125rem;
-  --fs-xl: 1.25rem;
-  --fs-2xl: 1.5rem;
-  --fs-3xl: 1.875rem;
 
   /* Tailwind accepts duration-(--duration-<token>) for these durations. */
   --duration-expressive-fast-spatial: 360ms;
@@ -256,38 +227,20 @@
   --color-area-pink-on: var(--area-pink-on);
   --color-area-pink-dot: var(--area-pink-dot);
 
-  --color-bg: var(--bg);
-  --color-surface: var(--surface);
-  --color-surface-muted: var(--surface-muted);
-  --color-fg: var(--fg);
-  --color-muted: var(--fg-muted);
-  --color-border: var(--border);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-fg: var(--accent-fg);
-  --color-danger: var(--danger);
-  --color-danger-hover: var(--danger-hover);
-  --color-danger-fg: var(--danger-fg);
   --spacing: var(--space-unit);
   --radius-xs: 4px;
-  --radius-sm: var(--corner-sm);
-  --radius-md: var(--corner-md);
-  --radius-lg: var(--corner-lg);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-2xl: 28px;
   --radius-3xl: 32px;
   --radius-4xl: 48px;
-  --text-xs: var(--fs-xs);
-  --text-sm: var(--fs-sm);
-  --text-base: var(--fs-base);
-  --text-lg: var(--fs-lg);
-  --text-xl: var(--fs-xl);
-  --text-2xl: var(--fs-2xl);
-  --text-3xl: var(--fs-3xl);
   --shadow-card: var(--md-card-shadow);
 }
 
 @theme static {
+  --text-*: initial;
   --radius-full: 9999px;
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px 1px rgb(0 0 0 / 0.15);
   --shadow-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 6px 2px rgb(0 0 0 / 0.15);
@@ -295,7 +248,8 @@
   --shadow-4: 0 2px 3px rgb(0 0 0 / 0.3), 0 6px 10px 4px rgb(0 0 0 / 0.15);
   --shadow-5: 0 4px 4px rgb(0 0 0 / 0.3), 0 8px 12px 6px rgb(0 0 0 / 0.15);
 
-  /* Same units as the legacy Tailwind breakpoints, for correct variant order. */
+  /* Material 3 window-size classes. */
+  --breakpoint-*: initial;
   --breakpoint-medium: 37.5rem;
   --breakpoint-expanded: 52.5rem;
   --breakpoint-large: 75rem;
@@ -832,13 +786,13 @@
       var(--ease-expressive-fast-spatial);
 
     &:active:not(:disabled, [aria-disabled="true"]) {
-      border-radius: var(--morph-pressed-radius, var(--corner-md));
+      border-radius: var(--morph-pressed-radius, var(--radius-md));
     }
   }
 }
 
 @utility morph-select {
-  border-radius: var(--corner-md);
+  border-radius: var(--radius-md);
 
   &[aria-pressed="true"],
   &[aria-selected="true"],
@@ -884,7 +838,7 @@ body:has(.header-wash) {
 @media (prefers-contrast: more) {
   :root,
   [data-theme] {
-    --border: var(--md-outline);
+    --md-outline-variant: var(--md-outline);
   }
 
   body:has(.header-wash) {
@@ -975,21 +929,21 @@ body:has(.header-wash) {
   margin-top: 0.25em;
 }
 .note-content blockquote {
-  border-left: 3px solid var(--border);
+  border-left: 3px solid var(--md-outline-variant);
   padding-left: 1em;
-  color: var(--fg-muted);
+  color: var(--md-on-surface-variant);
 }
 .note-content code {
   font-family: var(--font-mono);
   font-size: 0.9em;
-  background: var(--surface-muted);
-  border-radius: var(--corner-sm);
+  background: var(--md-surface-container);
+  border-radius: var(--radius-sm);
   padding: 0.1em 0.3em;
 }
 .note-content pre {
   font-family: var(--font-mono);
-  background: var(--surface-muted);
-  border-radius: var(--corner-md);
+  background: var(--md-surface-container);
+  border-radius: var(--radius-md);
   padding: 0.75em 1em;
   overflow-x: auto;
   white-space: pre-wrap;
@@ -1000,12 +954,12 @@ body:has(.header-wash) {
   font-size: 0.9em;
 }
 .note-content a {
-  color: var(--accent);
+  color: var(--md-primary);
   text-decoration: underline;
 }
 .note-content hr {
   border: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--md-outline-variant);
 }
 .note-content strong {
   font-weight: 600;

@@ -163,7 +163,7 @@ export default function SettingsPage() {
                   </p>
                   <Link
                     href={ACCOUNT_PATH}
-                    className={buttonClass({ variant: "secondary" })}
+                    className={buttonClass({ variant: "outlined" })}
                   >
                     Open account
                   </Link>

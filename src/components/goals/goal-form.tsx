@@ -173,7 +173,7 @@ export function GoalFormDialog(props: GoalFormDialogProps) {
             />
           )}
         </FormField>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 medium:grid-cols-2">
           <FormField
             id={`${id}-area`}
             label="Life area"

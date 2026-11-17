@@ -430,13 +430,16 @@ test("the editor works with the keyboard alone", async ({ page }) => {
 
   await noteTitle(page).focus();
   await page.keyboard.type("Keyboard note");
-  // From the title, Tab reaches each toolbar button, then the body.
+  // From the title, Tab reaches the scrollable toolbar, its buttons and the body.
   const toolbar = page.getByRole("group", { name: "Formatting" });
   await expect(toolbar.getByRole("button")).toHaveCount(15);
   const buttons = await toolbar.getByRole("button", { disabled: false }).all();
   expect(buttons.length).toBe(13);
   const bold = toolbar.getByRole("button", { name: "Bold" });
   await expect(bold).toHaveAttribute("aria-pressed", "false");
+  await page.keyboard.press("Tab");
+  await expect(toolbar).toBeFocused();
+  await expect(toolbar).toHaveCSS("outline-style", "solid");
   for (const button of buttons) {
     await page.keyboard.press("Tab");
     await expect(button).toBeFocused();

@@ -42,7 +42,7 @@ export type CalendarFeedItem<Data> = {
   start: string;
   end: string | null;
   order: number;
-  /** The item's colour, a CSS colour such as `var(--accent)`. */
+  /** The item's colour, a CSS colour such as `var(--md-primary)`. */
   color?: string;
   /** Its text colour on the time grids, where `color` fills the block. */
   contrastColor?: string;
@@ -200,7 +200,7 @@ export function Calendar<Data>({
           // outside, is not one of our items: show its title and times.
           if (data === undefined) {
             return (
-              <span className="block px-1 py-0.5 text-xs">
+              <span className="block px-1 py-0.5 text-label-medium">
                 {[info.event.title, info.timeText].filter(Boolean).join(" · ")}
               </span>
             );

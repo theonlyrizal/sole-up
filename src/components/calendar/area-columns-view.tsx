@@ -140,11 +140,11 @@ export function AreaColumnsView({
           </p>
         )}
         {!hasActiveArea && (
-          <p className="text-sm text-muted">
+          <p className="text-body-medium text-on-surface-variant">
             You have no active life areas yet, so everything is under No area.{" "}
             <Link
               href="/goals/areas"
-              className={cx("rounded-sm text-fg underline", focusRing)}
+              className={cx("rounded-sm text-on-surface underline", focusRing)}
             >
               Manage areas
             </Link>
@@ -267,7 +267,7 @@ function Column({
     >
       <h2
         id={headingId}
-        className="border-b border-outline-variant px-2 py-2 text-sm font-semibold break-words"
+        className="border-b border-outline-variant px-2 py-2 text-body-medium font-semibold break-words"
       >
         <AreaChip name={column.name} color={color} archived={column.archived} />
       </h2>

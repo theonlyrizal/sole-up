@@ -23,7 +23,7 @@ These six swatches are the fixed SoleUp brand colours. Cream covers most of the 
 
 ### 1.2 Roles
 
-The six swatches above supply exact base values. The role table adds supporting tones and paired foregrounds for light and dark themes. Use the role utilities below in components. Expose roles as CSS variables `--md-<role>` and Tailwind utilities such as `bg-canvas` and `text-on-primary`. `canvas` is the M3 surface role. The legacy `bg-surface` remains an alias until UI-13 (§12).
+The six swatches above supply exact base values. The role table adds supporting tones and paired foregrounds for light and dark themes. Use the role utilities below in components. Roles are exposed as CSS variables `--md-<role>` and Tailwind utilities such as `bg-canvas` and `text-on-primary`. `canvas` is the M3 surface role.
 
 | Role | Light | Dark | Use |
 |---|---|---|---|
@@ -170,7 +170,7 @@ Numbers use `font-variant-numeric: tabular-nums` (utility `tabular-nums`) wherev
 
 Note body (`.note-content`) uses `body-large` with line height 1.6. Headings inside notes map h1 to `title-large`-emphasized, h2 to `title-medium`-emphasized and h3 to `title-small`-emphasized. Code uses Geist Mono 0.9 em.
 
-The legacy `text-xs … text-3xl` utilities stay until UI-13 (§12).
+Use the type roles above in components.
 
 ## 3. Shape
 
@@ -383,9 +383,9 @@ The destination icons are home (Home), checklist (Plan), flag (Goals), cycle (Tr
 - Dark mode pairs a light Forest-derived `primary` with dark `on-primary` for legible buttons and links. Kiwi, Crisp Carrot, Sunshine and Tomato Burst keep their meanings in both themes.
 - FullCalendar's variables follow automatically through `calendar-theme.css` (§12).
 
-## 12. Migration from the current tokens (UI-1)
+## 12. Token migration and enforcement
 
-`globals.css` keeps the legacy variables as **aliases**, so pages that haven't been redesigned re-skin consistently straight away:
+UI-13 completed the migration from the pre-redesign variables:
 
 | Legacy var / utility | Becomes |
 |---|---|
@@ -400,8 +400,8 @@ The destination icons are home (Home), checklist (Plan), flag (Goals), cycle (Tr
 | `--focus` | `var(--md-focus)` |
 | `--danger` / `--danger-fg` | `var(--md-error)` / `var(--md-on-error)` |
 | `--success` | `var(--md-success)` |
-| `--corner-sm/md/lg` | 8 / 12 / 16 px |
-| `--fs-*` | unchanged until UI-13 |
+| `--corner-sm/md/lg` | `--radius-sm/md/lg` |
+| `--fs-*` | Typography roles from §2 |
 
 `calendar-theme.css` is remapped to M3 roles in UI-1:
 
@@ -413,7 +413,7 @@ The destination icons are home (Home), checklist (Plan), flag (Goals), cycle (Tr
 | highlight | 12 % primary |
 | button | `surface-container-high` |
 
-UI-13 removes every alias and every legacy utility use. It deletes the default Tailwind breakpoints and the `--fs-*` scale, and adds a CI-friendly check: `pnpm lint:tokens`, a small Node script that greps `src/` for `bg-surface\b`, `text-muted\b`, `bg-accent`, `border-border`, `\b(sm|md|lg|xl):`, `bg-(red|blue|…)-\d` and raw `#hex` in `.tsx`, and exits non-zero on any match.
+`pnpm lint:tokens` checks `src/` for retired utilities and type tokens, default Tailwind breakpoint variants and palette colors, and raw hex colors in TSX. The calendar retains its 768 px Week-to-Day cutoff as a feature-specific breakpoint.
 
 ## 13. Experience composition tokens
 

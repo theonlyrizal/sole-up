@@ -25,7 +25,7 @@ export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
       id="main"
       className="header-wash grid w-full flex-1 place-items-center px-4 py-10"
     >
-      <Card as="div" padding="l" className="grid w-full max-w-100 gap-5">
+      <Card as="div" className="grid w-full max-w-100 gap-5">
         <div className="grid gap-2">
           <Link
             href="/"
