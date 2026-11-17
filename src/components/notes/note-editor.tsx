@@ -315,16 +315,16 @@ function LeaveWithoutSavingDialog({
       <AlertDialog.Portal>
         <AlertDialog.Overlay className={overlayClass} />
         <AlertDialog.Content className={contentClass}>
-          <AlertDialog.Title className="text-lg font-semibold">
+          <AlertDialog.Title className="text-title-medium-emphasized font-semibold">
             Leave without saving?
           </AlertDialog.Title>
-          <AlertDialog.Description className="text-muted">
+          <AlertDialog.Description className="text-on-surface-variant">
             Your latest changes to this note aren&apos;t saved. If you leave
             now, they&apos;re lost.
           </AlertDialog.Description>
           <div className="flex flex-wrap justify-end gap-3">
             <AlertDialog.Cancel asChild>
-              <Button variant="secondary">Stay on this note</Button>
+              <Button variant="outlined">Stay on this note</Button>
             </AlertDialog.Cancel>
             <Button variant="danger" onClick={() => target && onLeave(target)}>
               Leave without saving

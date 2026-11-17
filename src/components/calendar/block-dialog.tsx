@@ -290,8 +290,8 @@ function BlockDetails({
   const otherErrors = otherBlockErrors(error);
   return (
     <div className="flex flex-col gap-5">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-muted">When</dt>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-body-medium">
+        <dt className="text-on-surface-variant">When</dt>
         <dd>
           {timeRangeLabel(
             block.startAt,
@@ -301,27 +301,30 @@ function BlockDetails({
             true,
           )}
           {block.tz !== userTimeZone && (
-            <span className="text-muted">
+            <span className="text-on-surface-variant">
               {` (${timeRangeLabel(block.startAt, block.endAt, locale, block.tz)} ${block.tz})`}
             </span>
           )}
         </dd>
-        <dt className="text-muted">Status</dt>
+        <dt className="text-on-surface-variant">Status</dt>
         <dd>{label}</dd>
         {repeatSummary && (
           <>
-            <dt className="text-muted">Repeats</dt>
+            <dt className="text-on-surface-variant">Repeats</dt>
             <dd>
               {repeatSummary}
               {block.modified && (
-                <span className="text-muted"> (this one changed)</span>
+                <span className="text-on-surface-variant">
+                  {" "}
+                  (this one changed)
+                </span>
               )}
             </dd>
           </>
         )}
         {taskStatus !== "open" && (
           <>
-            <dt className="text-muted">Task</dt>
+            <dt className="text-on-surface-variant">Task</dt>
             <dd>
               {taskStatus === "completed" ? "Task completed" : "Task cancelled"}
             </dd>
@@ -333,8 +336,8 @@ function BlockDetails({
         {blockStatusActions(status).map((action) => (
           <Button
             key={action.status}
-            variant={action.status === "done" ? "primary" : "secondary"}
-            size="sm"
+            variant={action.status === "done" ? "filled" : "outlined"}
+            size="xs"
             disabled={statusPending}
             onClick={() => changeStatus(action.status, action.toast)}
           >
@@ -343,8 +346,8 @@ function BlockDetails({
         ))}
         {offersCompleteTask(current) && (
           <Button
-            variant="secondary"
-            size="sm"
+            variant="outlined"
+            size="xs"
             disabled={statusPending}
             onClick={completeTask}
           >
@@ -354,7 +357,7 @@ function BlockDetails({
         {offersEndSeries(current, now) && originalStart !== null && (
           <CalendarConfirmDialog
             trigger={
-              <Button variant="secondary" size="sm" disabled={statusPending}>
+              <Button variant="outlined" size="xs" disabled={statusPending}>
                 End series here
               </Button>
             }
@@ -377,7 +380,7 @@ function BlockDetails({
         )}
       </div>
       {statusError && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-body-medium text-error">
           {statusError}
         </p>
       )}
@@ -388,7 +391,7 @@ function BlockDetails({
         onSubmit={submit}
         noValidate
         aria-label="Change the block's times"
-        className="flex flex-col gap-4 border-t border-border pt-4"
+        className="flex flex-col gap-4 border-t border-outline-variant pt-4"
       >
         <BlockTimesFields
           id={id}
@@ -402,7 +405,7 @@ function BlockDetails({
         />
         <FormError error={error} />
         {otherErrors.length > 0 && (
-          <p role="alert" className="text-sm text-danger">
+          <p role="alert" className="text-body-medium text-error">
             {otherErrors.join(" ")}
           </p>
         )}
@@ -436,7 +439,7 @@ function DeleteBlockDialog({
   onDeleted: () => void;
 }) {
   const trigger = (
-    <Button variant="ghost" size="sm" aria-label="Delete block">
+    <Button variant="text" size="xs" aria-label="Delete block">
       Delete
     </Button>
   );

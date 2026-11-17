@@ -73,7 +73,7 @@ function AddToTodayForm({
     return (
       <div className="flex flex-col gap-2">
         <p className="font-medium">Nothing to suggest right now.</p>
-        <p className="text-sm text-muted">
+        <p className="text-body-medium text-on-surface-variant">
           Tasks show up here when they have no plan yet and are due in the next
           7 days, or sit under an active goal. Close this and use Add task to
           capture one.
@@ -124,7 +124,7 @@ function AddToTodayForm({
     >
       {groups.map((group) => (
         <fieldset key={group.key} className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm font-semibold break-words">
+          <legend className="mb-1 text-body-medium font-semibold break-words">
             {group.label}
           </legend>
           {group.tasks.map((task) => (
@@ -150,7 +150,10 @@ function AddToTodayForm({
         </p>
       )}
       <div className="flex items-center justify-end gap-3">
-        <span aria-live="polite" className="text-sm text-muted">
+        <span
+          aria-live="polite"
+          className="text-body-medium text-on-surface-variant"
+        >
           {count === 0 ? "None selected" : `${count} selected`}
         </span>
         <Button

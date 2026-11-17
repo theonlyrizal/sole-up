@@ -59,7 +59,7 @@
 
 .action-m {
   min-height: 3.5rem;
-  padding: 1rem 1.5rem;
+  padding: 1rem min(1.5rem, 5vw);
 }
 
 .ui-action:is(.action-xs, .action-s, .action-m):is(

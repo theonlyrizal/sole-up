@@ -238,7 +238,7 @@ export function NoteTags({ noteId }: { noteId: string | null }) {
                 className="min-w-0 flex-1"
               />
               {/* Never disabled: a disabled default button blocks Enter. */}
-              <Button type="submit" variant="secondary">
+              <Button type="submit" variant="outlined">
                 Add
               </Button>
             </div>

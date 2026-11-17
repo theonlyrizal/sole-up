@@ -17,6 +17,7 @@
 
 .rail-scroll {
   padding-block: 1rem;
+  padding-inline: 12px;
 }
 
 .shell-nav-indicator {
@@ -87,10 +88,6 @@
 }
 
 @media (width < 1200px) {
-  .rail-scroll {
-    padding-inline: 12px;
-  }
-
   .rail-create .fab {
     width: 56px;
     min-width: 56px;
@@ -101,10 +98,6 @@
       display: none;
     }
   }
-}
-
-[data-rail="collapsed"] .rail-scroll {
-  padding-inline: 12px;
 }
 
 [data-rail="collapsed"] .rail-create .fab {

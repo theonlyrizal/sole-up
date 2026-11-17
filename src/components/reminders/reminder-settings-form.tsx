@@ -261,7 +261,7 @@ export function ReminderSettingsForm({ initial }: Props) {
             />
           )}
           {enabled && reviewInQuietHours && (
-            <p className="text-sm font-medium">
+            <p className="text-body-medium font-medium">
               This time is inside your quiet hours, so the weekly review
               reminder will wait until they end at {quietHours.end}.
             </p>

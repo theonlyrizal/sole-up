@@ -89,7 +89,7 @@ export function UpcomingView({
               longer ? (
                 <Link
                   href={upcomingHref(longer)}
-                  className={buttonClass({ variant: "secondary" })}
+                  className={buttonClass({ variant: "outlined" })}
                 >
                   Show the next {longer} days
                 </Link>

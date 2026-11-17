@@ -347,23 +347,23 @@ function Detail({
 
 function GoalHistory({ history }: { history: GoalHistoryEntry[] }) {
   if (history.length === 0) {
-    return <p className="text-muted">No changes recorded yet.</p>;
+    return <p className="text-on-surface-variant">No changes recorded yet.</p>;
   }
   return (
-    <ol className="flex flex-col gap-3 border-l border-border pl-4">
+    <ol className="flex flex-col gap-3 border-l border-outline-variant pl-4">
       {history.map((entry) => (
         <li key={entry.id} className="flex flex-col gap-0.5">
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="font-medium">{entry.summary}</span>
             <time
               dateTime={entry.occurredAt.toISOString()}
-              className="text-sm text-muted"
+              className="text-body-medium text-on-surface-variant"
             >
               {entry.occurredAtLabel}
             </time>
           </div>
           {entry.details.length > 0 && (
-            <ul className="text-sm text-muted">
+            <ul className="text-body-medium text-on-surface-variant">
               {entry.details.map((detail) => (
                 <li key={detail}>{detail}</li>
               ))}

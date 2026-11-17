@@ -5,10 +5,12 @@ export const metadata: Metadata = { title: "Privacy · SoleUp" };
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-4 py-10 text-sm leading-relaxed">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-4 py-10 text-body-medium leading-relaxed">
       <header className="flex flex-col gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Privacy notes</h1>
-        <p className="text-muted">
+        <h1 className="text-headline-small font-semibold tracking-tight">
+          Privacy notes
+        </h1>
+        <p className="text-on-surface-variant">
           Updated <time dateTime="2026-11-08">8 November 2026</time>. These
           notes describe the current implementation and documented deployment.
           They do not certify the live host settings.
@@ -16,7 +18,10 @@ export default function PrivacyPage() {
       </header>
 
       <section aria-labelledby="stored-heading" className="flex flex-col gap-3">
-        <h2 id="stored-heading" className="text-lg font-semibold">
+        <h2
+          id="stored-heading"
+          className="text-title-medium-emphasized font-semibold"
+        >
           What is stored
         </h2>
         <ul className="list-disc space-y-3 pl-5">
@@ -59,7 +64,10 @@ export default function PrivacyPage() {
         aria-labelledby="hosting-heading"
         className="flex flex-col gap-3"
       >
-        <h2 id="hosting-heading" className="text-lg font-semibold">
+        <h2
+          id="hosting-heading"
+          className="text-title-medium-emphasized font-semibold"
+        >
           Hosting and other services
         </h2>
         <p>
@@ -73,7 +81,7 @@ export default function PrivacyPage() {
           connections. Storage relies on{" "}
           <a
             href="https://neon.com/docs/security/security-overview#data-at-rest-encryption"
-            className="text-accent underline underline-offset-4"
+            className="text-primary underline underline-offset-4"
           >
             Neon&apos;s provider-managed encryption at rest
           </a>
@@ -101,7 +109,10 @@ export default function PrivacyPage() {
         aria-labelledby="deletion-heading"
         className="flex flex-col gap-3"
       >
-        <h2 id="deletion-heading" className="text-lg font-semibold">
+        <h2
+          id="deletion-heading"
+          className="text-title-medium-emphasized font-semibold"
+        >
           Retention, deletion and account closure
         </h2>
         <p>
@@ -151,7 +162,10 @@ export default function PrivacyPage() {
         aria-labelledby="backups-heading"
         className="flex flex-col gap-3"
       >
-        <h2 id="backups-heading" className="text-lg font-semibold">
+        <h2
+          id="backups-heading"
+          className="text-title-medium-emphasized font-semibold"
+        >
           Backups
         </h2>
         <p>
@@ -172,7 +186,10 @@ export default function PrivacyPage() {
       </section>
 
       <section aria-labelledby="logs-heading" className="flex flex-col gap-3">
-        <h2 id="logs-heading" className="text-lg font-semibold">
+        <h2
+          id="logs-heading"
+          className="text-title-medium-emphasized font-semibold"
+        >
           Logs and their retention
         </h2>
         <p>
@@ -199,7 +216,10 @@ export default function PrivacyPage() {
       </section>
 
       <section aria-labelledby="ai-heading" className="flex flex-col gap-3">
-        <h2 id="ai-heading" className="text-lg font-semibold">
+        <h2
+          id="ai-heading"
+          className="text-title-medium-emphasized font-semibold"
+        >
           No AI processing yet
         </h2>
         <p>
@@ -214,13 +234,13 @@ export default function PrivacyPage() {
       <nav aria-label="Privacy navigation" className="flex flex-wrap gap-6">
         <Link
           href="/settings"
-          className="text-accent underline underline-offset-4"
+          className="text-primary underline underline-offset-4"
         >
           Settings
         </Link>
         <Link
           href="/sign-in"
-          className="text-accent underline underline-offset-4"
+          className="text-primary underline underline-offset-4"
         >
           Sign in
         </Link>

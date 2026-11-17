@@ -5,10 +5,17 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { galleryBaseURL } from "../../playwright.config";
 import {
+  auditThemes as themes,
+  desktop,
+  phone,
+  seedAuditRoutes,
+} from "./audit-routes";
+import {
   chooseGoalMenuItem,
   expectNoSeriousViolations,
   holdMilestoneSave,
   openQuickAdd,
+  openRenderedPage as openPage,
   signInAndConfirm,
 } from "./helpers";
 import { seedInsightEvidence } from "./insight-evidence";
@@ -31,11 +38,187 @@ test.skip(!process.env.SOLEUP_VISUAL, "visual capture only");
 test.use({ timezoneId: VISUAL_ZONE, locale: "en-US" });
 
 const output = "test-results/visual/ui-3";
-const sizes = [
-  { width: 390, height: 844 },
-  { width: 1280, height: 800 },
+const sizes = [phone, desktop] as const;
+
+const auditSizes = [
+  { width: 360, height: 800 },
+  phone,
+  { width: 768, height: 1024 },
+  { width: 1024, height: 800 },
+  desktop,
+  { width: 1600, height: 1000 },
 ] as const;
-const themes = ["light", "dark"] as const;
+
+for (const viewport of auditSizes) {
+  for (const theme of themes) {
+    test(`@visual UI-13 route sweep ${viewport.width} ${theme}`, async ({
+      page,
+      browser,
+      baseURL,
+    }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      let homeHabitIdentity:
+        { shape: string | null; color: string } | undefined;
+
+      async function captureRoutes(
+        target: Page,
+        routes: ReadonlyArray<readonly [string, string]>,
+      ) {
+        for (const [name, path] of routes) {
+          await test.step(name, async () => {
+            await openPage(target, path);
+            if (name === "note-detail" || name === "note-new") {
+              await expect(
+                target.getByText(/^Loading (tags|links)/),
+              ).toHaveCount(0);
+              await expect(
+                target.getByRole("textbox", { name: "Note", exact: true }),
+              ).toBeEditable();
+            }
+            if (name === "landing" || name === "landing-signed-in") {
+              const action = target.getByRole("link", {
+                name: name === "landing" ? "Sign in" : "Go to Home",
+                exact: true,
+              });
+              await expect(action).toBeVisible();
+              const lines = await action.evaluate((element) => {
+                const text = document.createRange();
+                text.selectNodeContents(element);
+                return new Set(
+                  Array.from(text.getClientRects(), (rect) => rect.top),
+                ).size;
+              });
+              expect(lines, "the main action should fit on one line").toBe(1);
+            }
+            if (name === "home" || name === "today" || name === "track") {
+              const habit = target
+                .getByRole(name === "today" ? "listitem" : "article")
+                .filter({
+                  has: target.getByText(DAILY_HABIT, { exact: true }),
+                });
+              const identity = await habit
+                .locator('svg[viewBox="0 0 100 100"] path')
+                .evaluate((mark) => ({
+                  shape: mark.getAttribute("d"),
+                  color: getComputedStyle(mark).fill,
+                }));
+              if (name === "home") homeHabitIdentity = identity;
+              else expect(identity).toEqual(homeHabitIdentity);
+            }
+            await target.screenshot({
+              path: `test-results/visual/ui-13/${name}-${viewport.width}-${theme}.png`,
+              fullPage: true,
+              animations: "disabled",
+            });
+            await checkRenderedPage(target, theme);
+          });
+        }
+      }
+
+      await captureRoutes(page, [
+        ...(await seedAuditRoutes(page)),
+        ["landing-signed-in", "/"],
+        ["calendar-day", "/plan/calendar?view=day"],
+        ["calendar-week", "/plan/calendar?view=week"],
+        ["calendar-areas", "/plan/calendar?view=areas"],
+        ["calendar-timeline", "/plan/calendar?view=timeline"],
+        ["track-week", "/track?range=week"],
+        ["track-4w", "/track?range=4w"],
+        ["track-12w", "/track?range=12w"],
+        ["review-reflect", "/review?step=reflect"],
+        ["review-adjust", "/review?step=adjust"],
+        ["review-priorities", "/review?step=priorities"],
+        ["goal-not-found", "/goals/missing"],
+        ["note-not-found", "/notes/missing"],
+        ["review-not-found", "/review/history/missing"],
+      ]);
+
+      await openPage(page, "/test-errors/action");
+      const fail = page.getByRole("button", { name: "Fail on purpose" });
+      const alert = page.getByRole("alert").filter({ hasText: "Reference:" });
+      await expect(async () => {
+        if (!(await alert.isVisible())) await fail.press("Enter");
+        await expect(alert).toBeVisible({ timeout: 1_000 });
+      }).toPass();
+      await checkRenderedPage(page, theme);
+      if (viewport.width === phone.width || viewport.width === desktop.width) {
+        await expectNoSeriousViolations(page);
+      }
+      await page.screenshot({
+        path: `test-results/visual/ui-13/action-error-${viewport.width}-${theme}.png`,
+        fullPage: true,
+      });
+
+      if (viewport.width === phone.width) {
+        await test.step("Compact navigation and event form clear emulated safe areas", async () => {
+          const cdp = await page.context().newCDPSession(page);
+          await cdp.send("Emulation.setSafeAreaInsetsOverride", {
+            insets: { top: 24, bottom: 34 },
+          });
+          await openPage(page, "/plan/calendar?view=day");
+          await expect(page.locator(".top-app-bar")).toHaveCSS(
+            "padding-top",
+            "24px",
+          );
+          await expect(page.locator(".navigation-bar")).toHaveCSS(
+            "padding-bottom",
+            "34px",
+          );
+          const newEvent = page.getByRole("button", {
+            name: "New event",
+            exact: true,
+          });
+          const event = page.getByRole("dialog", { name: "New event" });
+          await expect(async () => {
+            if (!(await event.isVisible())) await newEvent.press("Enter");
+            await expect(event).toBeVisible({ timeout: 1_000 });
+          }).toPass({ timeout: 10_000 });
+          await expect(event.locator(".form-dialog-footer")).toHaveCSS(
+            "padding-bottom",
+            "50px",
+          );
+          await expect(
+            event.getByRole("button", { name: "Add event" }),
+          ).toBeInViewport();
+          await page.screenshot({
+            path: `test-results/visual/ui-13/event-form-safe-area-390-${theme}.png`,
+            animations: "disabled",
+          });
+        });
+      }
+
+      const guest = await browser.newContext({
+        baseURL,
+        viewport,
+        colorScheme: theme,
+        reducedMotion: "reduce",
+      });
+      await guest.addInitScript(
+        (key) => localStorage.setItem(key, "system"),
+        THEME_STORAGE_KEY,
+      );
+      try {
+        const guestPage = await guest.newPage();
+        await captureRoutes(guestPage, [
+          ["landing", "/"],
+          ["sign-in", "/sign-in"],
+          ["sign-in-error", "/sign-in?error=account_not_linked"],
+          ["privacy", "/privacy"],
+          ["render-error", "/test-errors/render"],
+          ["not-found", "/ui-13-missing"],
+        ]);
+      } finally {
+        await guest.close();
+      }
+    });
+  }
+}
 
 test.describe("Review Insights evidence", () => {
   test.use({ timezoneId: "UTC" });
@@ -1112,15 +1295,6 @@ for (const viewport of sizes) {
   });
 }
 
-async function openPage(page: Page, path: string) {
-  await page.goto(path);
-  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
-  await expect(
-    page.getByRole("status").filter({ hasText: /^Loading/ }),
-  ).toHaveCount(0);
-  await page.evaluate(() => document.fonts.ready.then(() => undefined));
-}
-
 for (const viewport of sizes) {
   for (const theme of themes) {
     test(`@visual UI-2b ${viewport.width} ${theme}`, async ({ page }) => {
@@ -1163,6 +1337,20 @@ for (const viewport of sizes) {
           animations: "disabled",
           style,
         });
+      const loadingStates = column
+        .locator("section.card")
+        .filter({
+          has: page.getByRole("heading", {
+            name: "Loading indicator, skeleton and loading state",
+          }),
+        })
+        .last();
+      await expect(loadingStates).toBeVisible();
+      await loadingStates.screenshot({
+        path: path("loading-states"),
+        animations: "disabled",
+        style,
+      });
 
       const edit = column.getByRole("button", { name: "Edit workshop form" });
       await edit.focus();

@@ -71,7 +71,7 @@ First paint shows true values without progress reveals or count-ups. Home gets o
 - **`useMediaQuery` / `useKeyboardOpen` / `useScrolled`** live in `src/components/hooks/`, as client-only hooks with `useSyncExternalStore` (copy the pattern in `time-grid-view.tsx`).
 - **Icons pipeline.** `pnpm icons:generate` runs `node scripts/generate-material-icons.mts` and writes `src/components/icons/icon-paths.generated.ts`, which is committed and starts with a "generated, do not edit" header. Adding an icon means editing the allowlist and regenerating. CI doesn't regenerate.
 - **Palette script.** `scripts/generate-palette.mts` (UI-1) prints the fixed brand swatches, resolved role pairs and their contrast report from DESIGN_SYSTEM §1. It uses the documented role values as inputs.
-- **Legacy aliases** (DESIGN_SYSTEM §12) exist from UI-1 to UI-13 so pages not yet redesigned stay coherent.
+- **Token migration** (DESIGN_SYSTEM §12). UI-13 retires the transitional aliases and enforces the current token vocabulary.
 
 ## 4. UI phase tracker
 
@@ -95,7 +95,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 | UI-12 | Settings plus Appearance, landing, sign-in, errors, not-found, loading | done | chunk/ui-12-settings-public | 2026-11-16 | 5-D approved. Settings, public states and finish-line checks verified |
 | UI-12a | Account page, Settings findability, and signed-in landing action | done | `chunk/ui-12a-account-settings` | 2026-11-17 | Validated account scoping, Settings search and the session-aware landing |
 | UI-12b | Review Insights navigation and presentation | done | `chunk/ui-12b-review-insights` | 2026-11-17 | Verified visible navigation, draft saving, correction and dismissal |
-| UI-13 | Consistency, cleanup, token lint, accessibility sweep, docs | todo | | | |
+| UI-13 | Consistency, cleanup, token lint, accessibility sweep, docs | done | `chunk/ui-13-consistency-accessibility` | 2026-11-17 | 62 visual cases, 108 axe scans and 15/16 experience rubric. |
 
 ## 5. Visual capture harness (built in UI-1, extended by each phase)
 
@@ -103,6 +103,7 @@ Statuses: `todo`, `in progress`, `done`, `blocked`, `skipped` (user only). Updat
 - **No assertions on pixels** (D-29).
 - **It doesn't run by default.** The spec calls `test.skip(!process.env.SOLEUP_VISUAL, "visual capture only")`. `pnpm test:visual` runs `node scripts/run-visual.mts`, which sets `SOLEUP_VISUAL=1` and spawns `playwright test tests/e2e/visual-capture.spec.ts` so it works in both PowerShell and bash.
 - **Output:** `/test-results/` is in `.gitignore`, so the screenshots are never committed. Attach them to the PR or reference their paths in the handoff.
+- **UI-13 route sweep:** 360 × 800, 390 × 844, 768 × 1024, 1024 × 800, 1280 × 800 and 1600 × 1000 in both themes. The existing phase cases continue to exercise dialogs, local feedback and alternate states at 390 × 844 and 1280 × 800.
 
 ## 6. Phases
 
@@ -779,3 +780,33 @@ Append one note per phase, newest last. Template:
 | Variety | 1 | The evidence cards, comparison tables and record correction list have distinct structures. |
 
 **Total — 15/16.**
+
+
+<a id="ui-13-handoff"></a>
+
+### UI-13 · Consistency, cleanup and accessibility sweep (2026-11-17)
+
+- **Branch and PR** — `chunk/ui-13-consistency-accessibility` · [UI-13 pull request](https://github.com/theonlyrizal/sole-up/pulls?q=head%3Achunk%2Fui-13-consistency-accessibility). UI-12b merged in [#107](https://github.com/theonlyrizal/sole-up/pull/107).
+- **Presentation** — Retired the transitional color and corner aliases, the old type scale, Tailwind's default breakpoints and the Button aliases. The Calendar Week-to-Day cutoff still uses 768 px. Fixed the Notes formatting strip's keyboard focus and outline, the rail's text reflow and the public action labels at 200% text size. Account closure uses the shared filled input and error treatment. The Google provider mark keeps its artwork in a local SVG asset.
+- **Component inventory** — `rg` found no AppNav or PlanSubnav files or references. Home and Weekly review use the current `MetricCard`, which is also covered by `home-data.test.tsx`.
+- **Contracts** — The browser exercises existing queries, Server Actions, URL filters, range and date parameters, deep links, and save flows with synthetic records in the test database. The diff is limited to UI presentation, check tooling, tests and documentation. The README UI section and the architecture description now point to the shared roles and verification commands.
+- **Checks** — `pnpm lint:tokens` passed and rejected a temporary probe containing a legacy utility, a default breakpoint, a palette color, an old type utility and a raw hex color. `pnpm verify` passed with 1,256 unit and 832 integration tests. `pnpm build` passed. `pnpm test:e2e` passed all 219 cases. The 62 opt-in Chromium cases passed in `pnpm test:visual`.
+- **Route evidence** — Reviewed 578 PNGs in `test-results/visual/ui-13/`. The 48 route and state specimens cover 360, 390, 768, 1024, 1280 and 1600 px in both themes. Two more PNGs record the compact Calendar form with emulated insets. The matrix includes Account, account deletion, Tags, Review Insights, public pages and rendered system errors. Protocol endpoints are exercised by the existing request tests. Reviewed the available earlier phase captures. The UI-1 reconstruction from `1c1253e` produced 148 reviewed images before the historical test time limits left some states uncaptured.
+- **Keyboard and axe** — 108 WCAG A/AA scans passed across 26 authenticated route templates, including both active and archived note detail, at 390 × 844 and 1280 × 800 in light and dark. Both keyboard passes opened a goal, completed its linked task on Today, logged and reloaded a habit, wrote and finished a weekly review, wrote and reopened an autosaved note, and saved a theme through Settings. See `test-results/ui-13-e2e-final/ui-keyboard-keyboard-walkthrough-*/`. The Notes test now checks the scroll strip and each toolbar button in order. The Track history test checks 48 px non-overlapping controls and keyboard correction at 320 px.
+- **Recovery and motion** — A held milestone request left the arc at 1 of 3. Validation failure preserved that count and a confirmed retry advanced it to 2 of 3. Today showed 4.5 of 12 pages after retry while Undo returned it to 6 of 12. The habit tests confirmed that the halo follows a new save, skips identical saves and corrections, and disappears under reduced motion. Notes retained the draft after a failed autosave and showed a persistent retry. Settings showed pending, failure and confirmed retry. Review opened the finish sheet after saving and kept it closed on reload.
+- **Screenshot samples** — `ui-13/home-390-light.png`, `ui-13/home-390-dark.png`, `ui-13/goal-detail-1280-light.png`, `ui-13/goal-detail-1280-dark.png`, `ui-13/track-4w-360-dark.png`, `ui-13/track-12w-360-light.png`, `ui-13/calendar-week-768-dark.png`, `ui-13/event-form-safe-area-390-dark.png`, `ui-13/landing-signed-in-768-light.png`, and `ui-13/action-error-390-dark.png`. The phase folders include `ui-2b/loading-states-390-dark.png`, `ui-4/home-empty-390-light.png`, `ui-5/today-amount-error-390-dark.png`, `ui-8/milestone-pending-1280-light.png`, `ui-8/milestone-retry-saved-1280-light.png`, `ui-10/finish-1280-dark.png`, `ui-11/save-error-390-light.png`, and `ui-12/preferences-retry-1280-dark.png`.
+- **Remaining visual issues** — Dense Calendar Week events abbreviate some labels at 768 px. The item dialog and accessible names retain the full text. Two simultaneous Settings notices push Appearance farther down on compact screens.
+- **Unverified and manual steps** — Install SoleUp on a physical phone and check the safe areas, soft keyboard and notification interaction. Walk the five journeys and the Track cells with a screen reader. Live OAuth and engines beyond the Chromium runner were outside this pass.
+
+| Experience dimension | Score | Evidence |
+|---|---:|---|
+| Hierarchy | 1 | Home's commitment leads when present and Today takes over when it is absent. When both notice banners apply on compact Settings, they push Appearance down. |
+| Character | 2 | The same habit shape and resolved palette carry across Home, Today and Track. Goal detail pairs the area, reason and next action. |
+| Color | 2 | Carrot identifies the featured Home module, Forest guides action and progress, Kiwi marks selection, Sunshine confirms the review and Tomato flags warnings. Error roles identify failures. Captures show the paired roles in both themes. |
+| Response | 2 | Held requests, retained drafts, failure and retry are visible at the point of action in Today, Goals, Calendar, Notes, Review and Settings. |
+| Truthfulness | 2 | The first paint shows the actual figure. The browser checks partial quantity, milestone counts, measured zero and unavailable evidence, and reloads a saved habit, review and note. |
+| Accessibility | 2 | Route scans, keyboard walkthroughs, local chart overflow, 200% text, simulated safe areas and reduced motion passed in Chromium. |
+| Restraint | 2 | Undo restores the confirmed value. Corrections, reload and identical saves leave confirmation animation at rest. Review ends with Done and its genuine editing deadline. |
+| Variety | 2 | The compact action rows, habit charts, goal arc, calendar grids and quiet editor support different jobs with the shared roles. |
+
+**Total — 15/16.** Truthfulness and accessibility both scored 2.

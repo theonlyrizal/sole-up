@@ -56,7 +56,7 @@ function ViewNav({
         value: view,
         label: CALENDAR_VIEW_LABELS[view],
         href: href(view),
-        className: view === "week" ? "max-md:hidden" : undefined,
+        className: view === "week" ? "max-[48rem]:hidden" : undefined,
       }))}
     />
   );

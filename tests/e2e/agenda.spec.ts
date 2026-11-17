@@ -238,34 +238,23 @@ test("dark theme and phone width use the app's tokens and fit the screen", async
   await expect(item(page, tokyoDate(1), "Dentist")).toBeVisible();
   await expect(item(page, tokyoDate(1), "Renew passport")).toBeVisible();
 
-  // The calendar's surface is the app's dark surface token.
-  const surface = await page.evaluate(() =>
-    getComputedStyle(document.documentElement)
-      .getPropertyValue("--surface")
-      .trim(),
-  );
+  // Compare painted colors because the semantic token uses light-dark().
   await expect
     .poll(() =>
-      page
-        .locator(".soleup-calendar")
-        .evaluate((calendar) =>
-          getComputedStyle(calendar)
-            .getPropertyValue("--fc-classic-background")
-            .trim(),
-        ),
+      page.locator(".soleup-calendar").evaluate((calendar) => {
+        const probe = document.createElement("span");
+        calendar.append(probe);
+        const colors = ["--fc-classic-background", "--md-resting-surface"].map(
+          (role) => {
+            probe.style.backgroundColor = `var(${role})`;
+            return getComputedStyle(probe).backgroundColor;
+          },
+        );
+        probe.remove();
+        return colors;
+      }),
     )
-    .toBe(surface);
-  const background = await page
-    .locator(".soleup-calendar")
-    .evaluate((calendar) => {
-      const probe = document.createElement("span");
-      probe.style.backgroundColor = "var(--fc-classic-background)";
-      calendar.append(probe);
-      const color = getComputedStyle(probe).backgroundColor;
-      probe.remove();
-      return color;
-    });
-  expect(background).toBe("rgb(33, 41, 35)");
+    .toEqual(["rgb(33, 41, 35)", "rgb(33, 41, 35)"]);
   await expectNoSeriousViolations(page);
   // No sideways scrolling on a phone.
   expect(

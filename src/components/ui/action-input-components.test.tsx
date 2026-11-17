@@ -41,19 +41,8 @@ it("renders named swatches with checked radio semantics", () => {
 });
 
 describe("Button", () => {
-  it.each([
-    ["primary", "filled"],
-    ["secondary", "outlined"],
-    ["ghost", "text"],
-  ] as const)("maps %s to %s", (alias, variant) => {
-    expect(buttonClass({ variant: alias })).toBe(buttonClass({ variant }));
-  });
-
-  it.each([
-    ["sm", "xs"],
-    ["md", "s"],
-  ] as const)("maps %s to %s", (alias, size) => {
-    expect(buttonClass({ size: alias })).toBe(buttonClass({ size }));
+  it.each(["xs", "s", "m"] as const)("uses the %s action size", (size) => {
+    expect(buttonClass({ size }).split(" ")).toContain(`action-${size}`);
   });
 
   it.each<ButtonVariant>([

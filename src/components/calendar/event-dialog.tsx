@@ -385,7 +385,7 @@ function EventForm({
           }
         />
         {fieldErrors.allDay && (
-          <p id={`${id}-all-day-error`} className="text-sm text-danger">
+          <p id={`${id}-all-day-error`} className="text-body-medium text-error">
             {fieldErrors.allDay.join(" ")}
           </p>
         )}
@@ -483,9 +483,9 @@ function EventForm({
             )}
           </FormField>
         ) : (
-          <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted">
+          <p className="flex flex-wrap items-center gap-x-2 text-body-medium text-on-surface-variant">
             <span>Times are in your time zone, {userTimeZone}.</span>
-            <Button variant="ghost" size="sm" onClick={() => setShowZone(true)}>
+            <Button variant="text" size="xs" onClick={() => setShowZone(true)}>
               Change time zone
             </Button>
           </p>
@@ -624,7 +624,7 @@ function EventForm({
 
       <FormError error={error} />
       {otherErrors.length > 0 && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-body-medium text-error">
           {otherErrors.join(" ")}
         </p>
       )}
@@ -677,7 +677,7 @@ function ScopeStep({
       }}
       className="flex flex-col gap-4"
     >
-      <p className="text-muted">This event repeats.</p>
+      <p className="text-on-surface-variant">This event repeats.</p>
       <ScopeChooser
         id={id}
         legend="Save the changes to"

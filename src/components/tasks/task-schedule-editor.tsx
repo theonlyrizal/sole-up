@@ -146,7 +146,7 @@ function ScheduleForm({
       }}
       className="grid min-w-0 gap-3"
     >
-      <div className="grid min-w-0 gap-3 sm:grid-cols-3">
+      <div className="grid min-w-0 gap-3 medium:grid-cols-3">
         <PickerField
           id={`${id}-planned`}
           label="Plan for"
@@ -155,7 +155,7 @@ function ScheduleForm({
           name="plannedDate"
           errors={fieldErrors.plannedDate}
           timeZone={timeZone}
-          className="py-1.5 text-sm"
+          className="py-1.5 text-body-medium"
           autoFocus
           clearable
           onChange={setPlannedDate}
@@ -168,7 +168,7 @@ function ScheduleForm({
           name="dueDate"
           errors={fieldErrors.dueDate}
           timeZone={zone}
-          className="py-1.5 text-sm"
+          className="py-1.5 text-body-medium"
           clearable
           onChange={setDueDate}
         />
@@ -183,7 +183,7 @@ function ScheduleForm({
             ...(fieldErrors.dueTime ?? []),
             ...(fieldErrors.dueTz ?? []),
           ]}
-          className="py-1.5 text-sm"
+          className="py-1.5 text-body-medium"
           clearable
           onChange={setDueTime}
         />
@@ -200,7 +200,7 @@ function ScheduleForm({
           <TaskParentSelect
             {...control}
             name="parent"
-            className="py-1.5 text-sm"
+            className="py-1.5 text-body-medium"
             options={parentOptions}
             noneLabel="No goal"
             current={currentParent(task)}
@@ -211,12 +211,12 @@ function ScheduleForm({
       </FormField>
       <FormError error={error} />
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button type="submit" size="sm" disabled={pending}>
+        <Button type="submit" size="xs" disabled={pending}>
           {pending ? "Saving…" : "Save"}
         </Button>
         <Button
-          variant="secondary"
-          size="sm"
+          variant="outlined"
+          size="xs"
           disabled={pending}
           onClick={onDone}
         >

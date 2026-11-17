@@ -216,8 +216,8 @@ function QuickAddForm({
       </FormField>
 
       <Button
-        variant="ghost"
-        size="sm"
+        variant="text"
+        size="xs"
         className="self-start"
         aria-expanded={showOptions}
         aria-controls={`${id}-options`}
@@ -253,7 +253,7 @@ function QuickAddForm({
             />
           )}
         </FormField>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 medium:grid-cols-2">
           <PickerField
             id={`${id}-planned`}
             label="Plan for"

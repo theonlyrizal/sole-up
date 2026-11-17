@@ -24,10 +24,10 @@ export function ChoiceGroup({
       data-invalid={errorId ? "" : undefined}
       className="flex flex-col gap-2"
     >
-      <legend className="mb-1.5 text-sm font-medium">{legend}</legend>
+      <legend className="mb-1.5 text-body-medium font-medium">{legend}</legend>
       {children}
       {errorId && (
-        <p id={errorId} className="text-sm text-danger">
+        <p id={errorId} className="text-body-medium text-error">
           {errors!.join(" ")}
         </p>
       )}
@@ -73,7 +73,7 @@ export function Radio({
           disabled={disabled}
           aria-describedby={description ? descriptionId : undefined}
           onChange={onChange}
-          className={cx("size-4 shrink-0 accent-accent", focusRing)}
+          className={cx("size-4 shrink-0 accent-primary", focusRing)}
         />
         <span>{label}</span>
       </label>

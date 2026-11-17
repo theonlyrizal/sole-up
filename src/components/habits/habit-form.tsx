@@ -213,7 +213,7 @@ export function HabitFormDialog({
         </FormField>
 
         {habit ? (
-          <p className="text-sm text-muted">
+          <p className="text-body-medium text-on-surface-variant">
             {habit.measure === "quantity"
               ? `Measured as an amount, in ${habit.unit}.`
               : "Measured as done or not."}{" "}
@@ -290,7 +290,7 @@ export function HabitFormDialog({
           </InlineBanner>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 medium:grid-cols-2">
           <PickerField
             id={`${id}-start`}
             label="Start date"

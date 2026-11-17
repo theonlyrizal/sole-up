@@ -62,8 +62,8 @@ export function TaskBlocks({
             onCreated={() => setVersion((count) => count + 1)}
             trigger={
               <Button
-                variant="secondary"
-                size="sm"
+                variant="outlined"
+                size="xs"
                 aria-label={`Block time: ${task.title}`}
               >
                 Block time
@@ -73,19 +73,23 @@ export function TaskBlocks({
         )}
       </div>
       {failed ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-body-medium text-error">
           Couldn&apos;t load the time blocks. Try reopening the task.
         </p>
       ) : !data ? (
-        <p className="text-sm text-muted">Loading time blocks…</p>
+        <p className="text-body-medium text-on-surface-variant">
+          Loading time blocks…
+        </p>
       ) : data.blocks.length === 0 ? (
-        <p className="text-sm text-muted">No upcoming time blocks.</p>
+        <p className="text-body-medium text-on-surface-variant">
+          No upcoming time blocks.
+        </p>
       ) : (
         <ul aria-label="Upcoming time blocks" className="flex flex-col gap-1">
           {data.blocks.map((block) => (
             <li
               key={`${block.id}:${block.originalStart?.toISOString() ?? ""}`}
-              className="text-sm"
+              className="text-body-medium"
             >
               {timeRangeLabel(
                 block.startAt,
@@ -94,7 +98,7 @@ export function TaskBlocks({
                 data.timeZone,
                 true,
               )}
-              <span className="text-muted">
+              <span className="text-on-surface-variant">
                 {` · ${blockStatusLabel(block, new Date())}`}
                 {block.rrule ? " · Repeats" : ""}
               </span>

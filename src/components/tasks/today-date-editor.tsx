@@ -103,7 +103,7 @@ export function TodayDateEditor({
       className={
         inSheet
           ? "today-quiet-form grid gap-3"
-          : "flex flex-wrap items-end gap-2 rounded-md border border-border bg-surface-muted p-3"
+          : "flex flex-wrap items-end gap-2 rounded-md border border-outline-variant bg-surface-container p-3"
       }
     >
       <PickerField
@@ -120,7 +120,7 @@ export function TodayDateEditor({
         errors={error && !inSheet ? [error] : undefined}
         aria-invalid={error ? true : undefined}
         aria-describedby={inSheet && error ? `${id}-error` : undefined}
-        className="py-1.5 text-sm"
+        className="py-1.5 text-body-medium"
         locale={locale}
         timeZone={kind === "due" ? zone : timeZone}
         autoFocus
@@ -142,8 +142,8 @@ export function TodayDateEditor({
           {pending ? "Saving…" : "Save"}
         </Button>
         <Button
-          variant={inSheet ? "text" : "secondary"}
-          size="sm"
+          variant={inSheet ? "text" : "outlined"}
+          size="xs"
           disabled={pending}
           onClick={onDone}
         >

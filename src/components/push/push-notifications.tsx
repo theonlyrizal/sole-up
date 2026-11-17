@@ -428,7 +428,7 @@ function ThisDeviceStatus({
 }) {
   switch (browser.kind) {
     case "checking":
-      return <p className="text-muted">Checking this device…</p>;
+      return <p className="text-on-surface-variant">Checking this device…</p>;
     case "unsupported":
       return browser.needsInstall ? (
         <p>

@@ -48,7 +48,7 @@ export function DeleteGoalDialog({
       description={
         <>
           This permanently deletes the goal and its history.{" "}
-          <strong className="font-medium text-fg">
+          <strong className="font-medium text-on-surface">
             {goalDeleteConsequences(milestoneCount, taskCounts)}
             {noteLinkCount > 0 && ` ${linkedNotesKept(noteLinkCount)}`}
           </strong>{" "}

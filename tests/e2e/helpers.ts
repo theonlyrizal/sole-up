@@ -131,6 +131,27 @@ export async function expectNoSeriousViolations(page: Page) {
   expect(serious).toEqual([]);
 }
 
+/** Wait for route content and fonts before inspecting the rendered page. */
+export async function openRenderedPage(page: Page, path: string) {
+  await page.goto(path);
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: /^Loading/ }),
+  ).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+}
+
+/** Reach a control through the browser's tab order. */
+export async function tabTo(page: Page, target: Locator) {
+  await expect(target).toBeVisible();
+  for (let tabs = 0; tabs < 120; tabs++) {
+    if (await target.evaluate((element) => element === document.activeElement))
+      break;
+    await page.keyboard.press("Tab");
+  }
+  await expect(target).toBeFocused();
+}
+
 export async function chooseNoteMenuItem(page: Page, name: string) {
   await page.getByRole("button", { name: "Note options", exact: true }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();

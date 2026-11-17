@@ -40,7 +40,7 @@ export function TagManager({ tags }: { tags: TagWithCount[] }) {
         title="No tags yet"
         description="Add a tag to a note from its editor: type a name, and it's created as you tag."
         action={
-          <Link href="/notes" className={buttonClass({ variant: "secondary" })}>
+          <Link href="/notes" className={buttonClass({ variant: "outlined" })}>
             Back to notes
           </Link>
         }
@@ -50,7 +50,7 @@ export function TagManager({ tags }: { tags: TagWithCount[] }) {
   return (
     <ul
       aria-label="Tags"
-      className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface"
+      className="flex flex-col divide-y divide-outline-variant rounded-lg border border-outline-variant bg-resting-surface"
     >
       {tags.map((tag) => (
         <TagRow key={tag.id} tag={tag} />
@@ -112,7 +112,10 @@ function TagRow({ tag }: { tag: TagWithCount }) {
             save();
           }}
         >
-          <label htmlFor={`${id}-name`} className="text-sm font-medium">
+          <label
+            htmlFor={`${id}-name`}
+            className="text-body-medium font-medium"
+          >
             Tag name
           </label>
           <div className="flex flex-wrap gap-2">
@@ -141,7 +144,7 @@ function TagRow({ tag }: { tag: TagWithCount }) {
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="text"
               disabled={pending}
               onClick={stopEditing}
             >
@@ -149,7 +152,11 @@ function TagRow({ tag }: { tag: TagWithCount }) {
             </Button>
           </div>
           {error && (
-            <p id={`${id}-error`} role="alert" className="text-sm text-danger">
+            <p
+              id={`${id}-error`}
+              role="alert"
+              className="text-body-medium text-error"
+            >
               {error}
             </p>
           )}
@@ -174,13 +181,15 @@ function TagRow({ tag }: { tag: TagWithCount }) {
         ) : (
           <span className="font-medium break-all">{tag.name}</span>
         )}
-        <span className="text-sm text-muted">On {count}</span>
+        <span className="text-body-medium text-on-surface-variant">
+          On {count}
+        </span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           ref={renameButton}
-          variant="secondary"
-          size="sm"
+          variant="outlined"
+          size="xs"
           aria-label={`Rename ${tag.name}`}
           onClick={() => setEditing(true)}
         >
@@ -188,7 +197,7 @@ function TagRow({ tag }: { tag: TagWithCount }) {
         </Button>
         <ConfirmDialog
           trigger={
-            <Button variant="ghost" size="sm" aria-label={`Delete ${tag.name}`}>
+            <Button variant="text" size="xs" aria-label={`Delete ${tag.name}`}>
               Delete
             </Button>
           }

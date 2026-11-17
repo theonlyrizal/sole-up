@@ -61,11 +61,13 @@ export function TaskPanel({
       <h2 id="task-panel-heading" className="text-title-medium">
         Open tasks
       </h2>
-      <p className="text-sm text-muted">
+      <p className="text-body-medium text-on-surface-variant">
         Drag a task onto the week to block time for it, or use Block time.
       </p>
       {!hasTasks ? (
-        <p className="text-sm text-muted">No open tasks.</p>
+        <p className="text-body-medium text-on-surface-variant">
+          No open tasks.
+        </p>
       ) : (
         <ul
           ref={listRef}
@@ -81,19 +83,21 @@ export function TaskPanel({
                 data-task-id={task.id}
                 data-title={task.title}
                 data-minutes={minutes}
-                className="soleup-task-drag flex flex-col gap-1 rounded-lg bg-surface-container-low p-2 text-sm"
+                className="soleup-task-drag flex flex-col gap-1 rounded-lg bg-surface-container-low p-2 text-body-medium"
               >
                 <span className="font-medium break-words">{task.title}</span>
                 <span className="flex items-center justify-between gap-2">
-                  <span className="text-muted">{formatEstimate(minutes)}</span>
+                  <span className="text-on-surface-variant">
+                    {formatEstimate(minutes)}
+                  </span>
                   <BlockTimeDialog
                     task={task}
                     timeZone={timeZone}
                     locale={locale}
                     trigger={
                       <Button
-                        variant="ghost"
-                        size="sm"
+                        variant="text"
+                        size="xs"
                         aria-label={`Block time: ${task.title}`}
                       >
                         Block time

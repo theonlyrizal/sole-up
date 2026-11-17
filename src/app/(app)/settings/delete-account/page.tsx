@@ -35,7 +35,7 @@ export default function DeleteAccountPage({
       width="reading"
       back={{ href: "/account", label: "Account" }}
     >
-      <p className="text-muted-fg text-sm">
+      <p className="text-body-medium text-on-surface-variant">
         This suspends your account, signs you out on every device, and pauses
         push reminders. Sign in within {ACCOUNT_RECOVERY_DAYS} days to restore
         access. After that, your account and related data will be permanently
@@ -47,7 +47,7 @@ export default function DeleteAccountPage({
       <Link
         href="/account"
         className={buttonClass({
-          variant: "secondary",
+          variant: "outlined",
           className: "self-start",
         })}
       >
