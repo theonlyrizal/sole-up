@@ -297,11 +297,20 @@ test("step links save the draft and focus the destination heading", async ({
   await page.goto("/review?step=reflect");
   await expect(wins).toHaveValue("Walked the short route with a friend.");
 
-  await wins.press("End");
-  await wins.pressSequentially(" Saved before opening Insights.");
-  const draft =
-    "Walked the short route with a friend. Saved before opening Insights.";
-  await expect(wins).toHaveValue(draft);
+  const saved = "Walked the short route with a friend.";
+  const addition = " Saved before opening Insights.";
+  const draft = saved + addition;
+  const reflect = page.getByRole("form", { name: "Reflect" });
+  await expect(async () => {
+    await wins.fill(saved);
+    await wins.press("End");
+    await wins.pressSequentially(addition);
+    await expect(wins).toHaveValue(draft, { timeout: 1_000 });
+    // The saved status clears when the client receives the edit.
+    await expect(reflect.getByText("Saved", { exact: true })).toHaveCount(0, {
+      timeout: 1_000,
+    });
+  }).toPass({ timeout: 10_000 });
   await page
     .getByRole("navigation", { name: "Review pages" })
     .getByRole("link", { name: "Insights" })

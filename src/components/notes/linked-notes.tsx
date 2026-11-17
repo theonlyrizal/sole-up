@@ -73,11 +73,13 @@ export function LinkedNotesList({
   return (
     <div className="flex flex-col gap-3">
       {notes.length === 0 ? (
-        <p className="text-sm text-muted">No notes linked yet.</p>
+        <p className="text-body-medium text-on-surface-variant">
+          No notes linked yet.
+        </p>
       ) : (
         <ul
           aria-label="Linked notes"
-          className="flex flex-col divide-y divide-border rounded-lg border border-border"
+          className="flex flex-col divide-y divide-outline-variant rounded-lg border border-outline-variant"
         >
           {notes.map((note) => (
             <li
@@ -94,7 +96,7 @@ export function LinkedNotesList({
                 >
                   {noteTitle(note.title)}
                 </Link>
-                <span className="text-sm text-muted">
+                <span className="text-body-medium text-on-surface-variant">
                   Updated{" "}
                   <time dateTime={note.updatedAt.toISOString()}>
                     {note.updatedLabel}
@@ -102,8 +104,8 @@ export function LinkedNotesList({
                 </span>
               </div>
               <Button
-                variant="ghost"
-                size="sm"
+                variant="text"
+                size="xs"
                 disabled={pending}
                 aria-label={`Unlink ${noteTitle(note.title)}`}
                 onClick={() => unlink(note)}
@@ -118,7 +120,7 @@ export function LinkedNotesList({
         <LinkNoteDialog owner={owner} onLinked={onChanged} />
         <Link
           href={`/notes/new?${owner.targetType}=${owner.targetId}`}
-          className={buttonClass({ variant: "secondary", size: "sm" })}
+          className={buttonClass({ variant: "outlined", size: "xs" })}
         >
           New note
         </Link>
@@ -138,7 +140,7 @@ function LinkNoteDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="secondary" size="sm">
+        <Button variant="outlined" size="xs">
           Link a note
         </Button>
       </DialogTrigger>
@@ -196,7 +198,7 @@ function NotePicker({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={searchId} className="text-sm font-medium">
+        <label htmlFor={searchId} className="text-body-medium font-medium">
           Search notes
         </label>
         <Input
@@ -210,13 +212,15 @@ function NotePicker({
         />
       </div>
       {search.kind === "loading" ? (
-        <p className="text-sm text-muted">Loading notes…</p>
+        <p className="text-body-medium text-on-surface-variant">
+          Loading notes…
+        </p>
       ) : search.kind === "error" ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-body-medium text-error">
           {search.message}
         </p>
       ) : search.data.length === 0 ? (
-        <p className="text-sm text-muted">
+        <p className="text-body-medium text-on-surface-variant">
           {query.trim()
             ? "No notes match."
             : "No notes to link yet. Use New note to write one."}
@@ -224,7 +228,7 @@ function NotePicker({
       ) : (
         <ul
           aria-label="Notes to link"
-          className="flex flex-col divide-y divide-border rounded-lg border border-border"
+          className="flex flex-col divide-y divide-outline-variant rounded-lg border border-outline-variant"
         >
           {search.data.map((note) => (
             <li
@@ -236,17 +240,19 @@ function NotePicker({
                   {noteTitle(note.title)}
                 </span>
                 {note.preview && (
-                  <span className="truncate text-sm text-muted">
+                  <span className="truncate text-body-medium text-on-surface-variant">
                     {note.preview}
                   </span>
                 )}
               </div>
               {linked.has(note.id) ? (
-                <span className="shrink-0 text-sm text-muted">Linked</span>
+                <span className="shrink-0 text-body-medium text-on-surface-variant">
+                  Linked
+                </span>
               ) : (
                 <Button
-                  variant="secondary"
-                  size="sm"
+                  variant="outlined"
+                  size="xs"
                   className="shrink-0"
                   disabled={pending}
                   aria-label={`Link ${noteTitle(note.title)}`}

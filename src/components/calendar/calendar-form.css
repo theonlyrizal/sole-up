@@ -11,7 +11,7 @@
   gap: 0.75rem;
   padding: 0.75rem;
   border: 1px solid var(--md-outline-variant);
-  border-radius: var(--corner-lg);
+  border-radius: var(--radius-lg);
 }
 
 .calendar-time-group legend {

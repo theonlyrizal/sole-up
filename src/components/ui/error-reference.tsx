@@ -6,7 +6,7 @@
 export function ErrorReference({ id }: { id: string | undefined }) {
   if (!id) return null;
   return (
-    <p className="text-sm text-muted">
+    <p className="text-body-medium text-on-surface-variant">
       Reference: <code className="font-mono select-all">{id}</code>
     </p>
   );

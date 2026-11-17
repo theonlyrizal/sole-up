@@ -41,7 +41,7 @@ export function DeleteEventDialog({
   onDeleted,
 }: DeleteEventDialogProps) {
   const trigger = (
-    <Button variant="ghost" size="sm" aria-label={`Delete: ${event.title}`}>
+    <Button variant="text" size="xs" aria-label={`Delete: ${event.title}`}>
       Delete
     </Button>
   );

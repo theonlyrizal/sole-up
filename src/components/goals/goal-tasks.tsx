@@ -96,7 +96,9 @@ export function GoalTasks({
             {...listProps}
           />
         ) : (
-          <p className="text-sm text-muted">No tasks directly under it.</p>
+          <p className="text-body-medium text-on-surface-variant">
+            No tasks directly under it.
+          </p>
         )}
         <AddTaskForm
           parent={{ goalId }}
@@ -121,7 +123,7 @@ export function GoalTasks({
                 {...listProps}
               />
             ) : (
-              <p className="text-sm text-muted">
+              <p className="text-body-medium text-on-surface-variant">
                 {tasks.some((task) => task.milestoneId === milestone.id)
                   ? "Every task here is completed or cancelled."
                   : "No tasks under this milestone yet."}
@@ -225,7 +227,9 @@ function TaskGroup({
       >
         {title}
         {status && (
-          <span className="text-xs font-normal text-muted">{status}</span>
+          <span className="text-label-medium font-normal text-on-surface-variant">
+            {status}
+          </span>
         )}
       </h3>
       {children}
@@ -248,8 +252,8 @@ function AddMilestoneTask({ milestone }: { milestone: Milestone }) {
     return (
       <Button
         ref={button}
-        variant="ghost"
-        size="sm"
+        variant="text"
+        size="xs"
         className="self-start"
         aria-label={`Add a task to ${milestone.title}`}
         onClick={() => setOpen(true)}
@@ -346,7 +350,7 @@ function AddTaskForm({
           {adding ? "Adding…" : "Add"}
         </Button>
         {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>
+          <Button type="button" variant="text" onClick={onCancel}>
             Cancel
           </Button>
         )}

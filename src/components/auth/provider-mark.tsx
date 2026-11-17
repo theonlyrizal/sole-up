@@ -1,12 +1,9 @@
-"use client";
-
-import { useId } from "react";
+import Image from "next/image";
 
 // Paths and colors from the providers' official sign-in and brand assets.
 // https://developers.google.com/identity/branding-guidelines
 // https://brand.github.com/foundations/logo
 export function ProviderMark({ provider }: { provider: "google" | "github" }) {
-  const id = useId();
   if (provider === "github") {
     return (
       <svg
@@ -24,92 +21,13 @@ export function ProviderMark({ provider }: { provider: "google" | "github" }) {
   }
 
   return (
-    <svg
-      viewBox="8 8 24 24"
-      width="24"
-      height="24"
-      aria-hidden="true"
-      focusable="false"
+    <Image
+      src="/brand/google.svg"
+      width={24}
+      height={24}
+      alt=""
+      unoptimized
       className="shrink-0"
-    >
-      <circle cx="20" cy="20" r="12" fill="white" />
-      <defs>
-        <clipPath id={id}>
-          <path d="M29.3987 18.1814H19.9849V22.0445H25.3598C25.1286 23.294 24.4294 24.3596 23.3676 25.0712C22.4746 25.6716 21.3266 26.0211 19.9849 26.0211C17.3864 26.0211 15.1823 24.2666 14.3947 21.9004C14.1952 21.2989 14.0853 20.6599 14.0853 19.9983C14.0853 19.3367 14.1952 18.6966 14.3947 18.0962C15.1823 15.7311 17.3864 13.9755 19.9849 13.9755C21.4524 13.9755 22.767 14.4816 23.8039 15.4713L26.6653 12.6057C24.936 10.9908 22.6786 10 19.9849 10C16.0832 10 12.705 12.2414 11.0618 15.5076C10.383 16.8592 10 18.3834 10 19.9994C10 21.6155 10.383 23.1396 11.0618 24.4913C12.705 27.7597 16.0832 30 19.9849 30C22.6797 30 24.9485 29.1137 26.6018 27.5861C28.4887 25.8452 29.5732 23.2702 29.5732 20.2275C29.5732 19.5182 29.5131 18.835 29.3987 18.1825V18.1814Z" />
-        </clipPath>
-        <filter
-          id={id + "-soften"}
-          x="-50%"
-          y="-50%"
-          width="200%"
-          height="200%"
-          colorInterpolationFilters="sRGB"
-        >
-          <feGaussianBlur stdDeviation="1" />
-        </filter>
-      </defs>
-      <g clipPath={`url(#${id})`}>
-        <foreignObject x="8" y="8" width="24" height="24">
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              background:
-                "conic-gradient(from 45deg, #ff4641 0.00deg, #ff4641 4.15deg, #3186ff 39.15deg, #3186ff 72.00deg, #00a5b7 96.75deg, #0ebc5f 120.90deg, #0ebc5f 154.72deg, #6cc400 179.14deg, #ffcc00 203.59deg, #ffd314 226.91deg, #ffcc00 251.69deg, #ff6a2b 273.13deg, #fd4641 289.31deg, #ff4641 359.59deg, #ff4641 360.00deg)",
-            }}
-          />
-        </foreignObject>
-        <ellipse
-          cx="20.0496"
-          cy="20.2413"
-          rx="5.39634"
-          ry="2.83537"
-          transform="rotate(24.4473 20.0496 20.2413)"
-          fill="#3186FF"
-          filter={`url(#${id}-soften)`}
-        />
-        <ellipse
-          cx="33.3538"
-          cy="18.2155"
-          rx="7.43918"
-          ry="3.09357"
-          fill="#3186FF"
-          filter={`url(#${id}-soften)`}
-        />
-        <ellipse
-          cx="25.2744"
-          cy="16.2195"
-          rx="7.40854"
-          ry="2.37805"
-          fill="#FF4641"
-          filter={`url(#${id}-soften)`}
-        />
-        <ellipse
-          cx="29.5427"
-          cy="12.9268"
-          rx="7.40854"
-          ry="2.37805"
-          fill="#FF5B8B"
-          filter={`url(#${id}-soften)`}
-        />
-        <ellipse
-          cx="24.4817"
-          cy="19.878"
-          rx="8.5061"
-          ry="3.10976"
-          fill="#3186FF"
-          filter={`url(#${id}-soften)`}
-        />
-        <ellipse
-          cx="25.1842"
-          cy="14.0197"
-          rx="4.53882"
-          ry="2.37805"
-          transform="rotate(-28.6599 25.1842 14.0197)"
-          fill="#FF4641"
-          filter={`url(#${id}-soften)`}
-        />
-      </g>
-    </svg>
+    />
   );
 }

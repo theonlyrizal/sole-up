@@ -175,13 +175,15 @@ export function BlockTimesFields({
           )}
         </fieldset>
       </div>
-      <p className="text-sm text-muted">
+      <p className="text-body-medium text-on-surface-variant">
         {values.tz === userTimeZone
           ? `Times are in your time zone, ${userTimeZone}.`
           : `Times are in this block's time zone, ${values.tz}.`}
       </p>
       {fieldErrors.tz && (
-        <p className="text-sm text-danger">{fieldErrors.tz.join(" ")}</p>
+        <p className="text-body-medium text-error">
+          {fieldErrors.tz.join(" ")}
+        </p>
       )}
       <RepeatBuilder
         id={`${id}-repeat`}
@@ -425,7 +427,7 @@ function BlockTimeForm({
       />
       <FormError error={error} />
       {otherErrors.length > 0 && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-body-medium text-error">
           {otherErrors.join(" ")}
         </p>
       )}
@@ -483,7 +485,7 @@ export function BlockScopeStep({
       }}
       className="flex flex-col gap-4"
     >
-      <p className="text-muted">{intro}</p>
+      <p className="text-on-surface-variant">{intro}</p>
       <ScopeChooser
         id={id}
         noun="block"

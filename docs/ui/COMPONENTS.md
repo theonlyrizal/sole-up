@@ -9,7 +9,7 @@ Rules for every component:
 3. **Behaviour.** It is built on Radix whenever Radix has the primitive. It never re-implements focus trapping, roving tabindex or menus by hand.
 4. **Gallery.** It has an entry in `/dev/ui` (D-30) showing every variant and state in light and dark side by side.
 5. **Unit tests.** It has a unit test in `src/components/ui/*.test.tsx` that renders static markup (the project's existing pattern, `renderToStaticMarkup` in the node environment). The test checks the accessible markup: roles, names, `aria-*`, `disabled`, and that each variant gets its classes.
-6. **Compatibility.** **Existing exports keep their names and props** (`Button`, `buttonClass`, `Input`, `Textarea`, `Select`, `FormField`, `FormError`, `Dialog`, `DialogContent`, `DialogTrigger`, `DialogClose`, `ConfirmDialog`, `toast`, `Toaster`, `EmptyState`, `ErrorState`, `ErrorReference`, `Skeleton`, `LoadingState`). Old prop values keep working as aliases until UI-13, so unredesigned pages don't break.
+6. **Shared APIs.** Use the variants and sizes below for shared buttons and controls.
 
 ---
 
@@ -51,8 +51,7 @@ These are utilities in `globals.css`, described in DESIGN_SYSTEM §3 and §5:
 ### `Button`: `src/components/ui/button.tsx` (rewrite, same exports)
 ```ts
 type ButtonVariant = "filled" | "tonal" | "outlined" | "text" | "elevated" | "danger" | "danger-text"
-  // legacy aliases until UI-13: primary→filled, secondary→outlined, ghost→text
-type ButtonSize = "xs" | "s" | "m";            // legacy: sm→xs, md→s
+type ButtonSize = "xs" | "s" | "m";
 type ButtonProps = ComponentProps<"button"> & {
   variant?: ButtonVariant; size?: ButtonSize;
   icon?: IconName;            // leading icon

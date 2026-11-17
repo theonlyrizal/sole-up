@@ -3,7 +3,8 @@
 import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { focusRing } from "@/components/ui/cx";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 import {
   DELETE_ACCOUNT_CONFIRMATION,
   DELETE_ACCOUNT_PATH,
@@ -45,25 +46,25 @@ export function VerifyAccountButtons({
   return (
     <div className="flex flex-col gap-3">
       {providers.length ? (
-        <p className="text-muted-fg text-sm">
+        <p className="text-body-medium text-on-surface-variant">
           Verify your identity with a linked sign-in provider to continue.
         </p>
       ) : (
-        <p className="text-muted-fg text-sm">
+        <p className="text-body-medium text-on-surface-variant">
           No linked sign-in provider is available for verification.
         </p>
       )}
       {providers.map(({ id, label }) => (
         <Button
           key={id}
-          variant="secondary"
+          variant="outlined"
           disabled={pending !== null}
           onClick={() => verify(id)}
         >
           {pending === id ? `Opening ${label}…` : `Verify with ${label}`}
         </Button>
       ))}
-      <p role="alert" className="text-sm text-danger">
+      <p role="alert" className="text-body-medium text-error">
         {error}
       </p>
     </div>
@@ -86,22 +87,18 @@ export function DeleteAccountForm() {
 
   return (
     <form action={submit} className="flex flex-col gap-3">
-      <label htmlFor="delete-confirmation" className="text-sm font-medium">
-        Type {DELETE_ACCOUNT_CONFIRMATION} to confirm
-      </label>
-      <input
+      <FormField
         id="delete-confirmation"
-        name="confirmation"
-        required
-        autoComplete="off"
-        aria-describedby={error ? "delete-error" : undefined}
-        className={`rounded-md border border-border bg-surface px-3 py-2 ${focusRing}`}
-      />
-      {error && (
-        <p id="delete-error" role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      )}
+        label={`Type ${DELETE_ACCOUNT_CONFIRMATION} to confirm`}
+        errors={error ? [error] : undefined}
+      >
+        {(control) => (
+          <Input {...control} name="confirmation" required autoComplete="off" />
+        )}
+      </FormField>
+      <span role="alert" className="sr-only">
+        {error}
+      </span>
       <Button
         type="submit"
         variant="danger"

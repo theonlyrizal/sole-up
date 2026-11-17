@@ -12,14 +12,8 @@ const variants = {
   "danger-text": "action-danger-text",
 } as const;
 
-const variantAliases = {
-  primary: "filled",
-  secondary: "outlined",
-  ghost: "text",
-} as const;
-const sizeAliases = { sm: "xs", md: "s" } as const;
-export type ButtonVariant = keyof typeof variants | keyof typeof variantAliases;
-export type ButtonSize = "xs" | "s" | "m" | keyof typeof sizeAliases;
+export type ButtonVariant = keyof typeof variants;
+export type ButtonSize = "xs" | "s" | "m";
 
 type ButtonOptions = {
   variant?: ButtonVariant;
@@ -41,18 +35,13 @@ export function buttonClass({
   fullWidth,
   className,
 }: ButtonOptions = {}) {
-  const look =
-    variant === "primary" || variant === "secondary" || variant === "ghost"
-      ? variantAliases[variant]
-      : variant;
-  const scale = size === "sm" || size === "md" ? sizeAliases[size] : size;
   return cx(
     "ui-action state-layer morph-press inline-flex min-w-12 max-w-full items-center justify-center gap-2 text-center wrap-anywhere",
     focusRing,
-    variants[look],
-    scale === "xs" && "action-xs text-label-large",
-    scale === "s" && "action-s text-label-large",
-    scale === "m" && "action-m text-title-medium",
+    variants[variant],
+    size === "xs" && "action-xs text-label-large",
+    size === "s" && "action-s text-label-large",
+    size === "m" && "action-m text-title-medium",
     Boolean(icon || trailingIcon) && "action-with-icon",
     pending && "action-pending",
     fullWidth && "w-full",

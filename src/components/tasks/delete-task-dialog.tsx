@@ -47,7 +47,7 @@ export function DeleteTaskDialog({
       icon="delete"
       trigger={
         open === undefined ? (
-          <Button variant="danger" size="sm" disabled={disabled}>
+          <Button variant="danger" size="xs" disabled={disabled}>
             Delete…
           </Button>
         ) : undefined
@@ -59,7 +59,9 @@ export function DeleteTaskDialog({
           blocks and reminders.{" "}
           {notesKept && (
             <>
-              <strong className="font-medium text-fg">{notesKept}</strong>{" "}
+              <strong className="font-medium text-on-surface">
+                {notesKept}
+              </strong>{" "}
             </>
           )}
           It can&apos;t be undone.

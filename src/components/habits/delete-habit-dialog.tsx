@@ -31,7 +31,7 @@ export function DeleteHabitDialog({
       description={
         <>
           This permanently deletes the habit, its schedule and its history.{" "}
-          <strong className="font-medium text-fg">
+          <strong className="font-medium text-on-surface">
             {habitDeleteConsequences(logCount)}
           </strong>{" "}
           It can&apos;t be undone.

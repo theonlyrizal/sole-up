@@ -69,7 +69,7 @@ export function SignOutButton({
       ) : (
         <Button
           variant={buttonTone}
-          size="sm"
+          size="xs"
           onClick={signOut}
           disabled={pending}
         >

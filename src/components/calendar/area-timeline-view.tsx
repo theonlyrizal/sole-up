@@ -74,8 +74,8 @@ const ROW_PADDING_REM = 0.25;
  * The row headings' width. They stay in view while the axis scrolls, so
  * the region's scroll padding matches them (focus never lands under one).
  */
-const HEADING_WIDTH = "w-28 sm:w-36";
-const HEADING_SCROLL_PADDING = "scroll-pl-28 sm:scroll-pl-36";
+const HEADING_WIDTH = "w-28 medium:w-36";
+const HEADING_SCROLL_PADDING = "scroll-pl-28 medium:scroll-pl-36";
 
 const noSubscription = () => () => {};
 
@@ -191,11 +191,11 @@ export function AreaTimelineView({
           </p>
         )}
         {!hasActiveArea && (
-          <p className="text-sm text-muted">
+          <p className="text-body-medium text-on-surface-variant">
             You have no active life areas yet, so everything is under No area.{" "}
             <Link
               href="/goals/areas"
-              className={cx("rounded-sm text-fg underline", focusRing)}
+              className={cx("rounded-sm text-on-surface underline", focusRing)}
             >
               Manage areas
             </Link>
@@ -289,7 +289,7 @@ function TimeAxis({
                 "absolute top-2 leading-none whitespace-nowrap",
                 tick.label === "day" &&
                   tick.day === today &&
-                  "font-semibold text-fg",
+                  "font-semibold text-on-surface",
               )}
               style={{ left: `calc(${tick.offset * 100}% + 4px)` }}
             >
@@ -337,7 +337,7 @@ function Row({
       <h2
         id={headingId}
         className={cx(
-          "sticky left-0 z-10 shrink-0 border-r border-outline-variant bg-resting-surface px-2 py-2 text-sm font-semibold break-words",
+          "sticky left-0 z-10 shrink-0 border-r border-outline-variant bg-resting-surface px-2 py-2 text-body-medium font-semibold break-words",
           HEADING_WIDTH,
         )}
       >

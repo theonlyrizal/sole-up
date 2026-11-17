@@ -69,7 +69,7 @@ export function NavigationRail({
   );
   return (
     <aside className="navigation-rail sticky top-0 hidden h-dvh shrink-0 flex-col medium:flex">
-      <div className="rail-scroll flex h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-3">
+      <div className="rail-scroll flex h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain">
         <div className="rail-heading hidden min-h-12 items-center justify-center large:flex">
           <Link
             href="/home"
@@ -134,14 +134,14 @@ export function NavigationRail({
               aria-label="Account"
               aria-current={pathname === ACCOUNT_PATH ? "page" : undefined}
               className={cx(
-                "state-layer flex min-h-12 min-w-0 flex-1 items-center gap-2 rounded-full pe-2",
+                "state-layer flex min-h-12 min-w-0 flex-[1_1_7rem] items-center gap-2 rounded-full pe-2",
                 pathname === ACCOUNT_PATH &&
                   "bg-secondary-container text-on-secondary-container",
                 focusRing,
               )}
             >
               {avatar}
-              <span className="min-w-0 truncate text-label-large">
+              <span className="min-w-0 text-label-large wrap-anywhere">
                 {account.name}
               </span>
             </Link>

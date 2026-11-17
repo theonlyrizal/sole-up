@@ -56,6 +56,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Design tokens
+        run: pnpm lint:tokens
+
       - name: Format check
         run: pnpm format:check
 

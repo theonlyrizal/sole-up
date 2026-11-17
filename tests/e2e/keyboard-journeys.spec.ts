@@ -1,22 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { signInForTest } from "./helpers";
+import { signInForTest, tabTo } from "./helpers";
 
 // Exercise the four primary journeys in docs/PRODUCT_SPEC.md. Only the
 // test session is set up directly. Every journey action uses the keyboard.
-async function tabTo(page: Page, target: Locator) {
-  await expect(target).toBeVisible();
-  for (let tabs = 0; tabs < 80; tabs += 1) {
-    if (
-      await target.evaluate((element) => element === document.activeElement)
-    ) {
-      break;
-    }
-    await page.keyboard.press("Tab");
-  }
-  await expect(target).toBeFocused({ timeout: 500 });
-}
-
 async function activate(page: Page, target: Locator, key = "Enter") {
   await tabTo(page, target);
   await page.keyboard.press(key);
@@ -264,6 +251,10 @@ test("keyboard journey C creates, logs, corrects and pauses a habit", async ({
   );
   await expect(page.getByText("Marked done", { exact: true })).toBeVisible();
   await activate(page, navLink(page, "Track"));
+  await activate(
+    page,
+    page.getByRole("link", { name: "Last 4 weeks", exact: true }),
+  );
   await expect(page.getByText("1 of 1 day", { exact: true })).toBeVisible();
   const logged = page.getByRole("button", { name: /: Done$/ });
   await activate(page, logged);

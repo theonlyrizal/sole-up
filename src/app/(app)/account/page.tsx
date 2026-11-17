@@ -83,7 +83,7 @@ async function AccountDetails() {
         <div className="flex flex-wrap gap-2">
           <a
             href="/api/export"
-            className={buttonClass({ variant: "secondary" })}
+            className={buttonClass({ variant: "outlined" })}
           >
             Download export
           </a>
