@@ -2,9 +2,8 @@
  * Better Auth logs extra arguments as-is, including database errors whose
  * message and `params` hold OAuth state, PKCE verifiers or tokens. That breaks
  * the "Never log" rule (docs/IMPLEMENTATION_PLAN.md), so this logger keeps
- * Better Auth's own message and, for errors, only the error class and the
- * Postgres error code and message (which name tables and constraints, never
- * values). Every other argument is dropped.
+ * a fixed event label and, for errors, only the
+ * Postgres SQLSTATE code. Messages can quote private input; drop them.
  */
 
 import { currentRequestId, loggerFor } from "@/server/logging/request";
@@ -14,30 +13,28 @@ type Level = "debug" | "info" | "warn" | "error";
 const SQLSTATE = /^[0-9A-Z]{5}$/;
 
 function describeError(error: Error): string {
-  const parts = [error.name];
+  const parts = ["Error"];
   // Drizzle wraps the driver error; its own message embeds the SQL params.
   const cause = error.cause;
   if (cause instanceof Error) {
     const code = (cause as { code?: unknown }).code;
     if (typeof code === "string" && SQLSTATE.test(code)) {
-      parts.push(`postgres ${code}: ${cause.message}`);
+      parts.push(`postgres ${code}`);
     } else {
-      parts.push(cause.name);
+      parts.push("Error");
     }
   }
   return parts.join(" | ");
 }
 
 /**
- * Better Auth sometimes logs a database error's message directly, and
- * Drizzle's messages embed the query and its params. Keep only the part
- * before the query.
+ * Better Auth and database driver messages may contain private values even
+ * without a recognizable SQL prefix. Drop the entire free-form message.
  */
-function safeMessage(message: string): string {
-  const query = message.search(/failed query:|params:/i);
-  return (
-    query === -1 ? message : message.slice(0, query) + "[query redacted]"
-  ).trim();
+function safeMessage(_message: string): string {
+  void _message;
+  // Free-form framework and driver messages can contain private values.
+  return "Authentication event";
 }
 
 /** Formats one log line. Exported for tests. */

@@ -18,17 +18,17 @@ function drizzleError() {
 }
 
 describe("formatAuthLog", () => {
-  it("keeps the message, error class and Postgres code, never params", () => {
+  it("keeps a fixed message and Postgres code, never params", () => {
     const line = formatAuthLog("error", "Error", [drizzleError()]);
     expect(line).toBe(
-      '[Better Auth] ERROR Error (DrizzleQueryError | postgres 42P01: relation "verifications" does not exist)',
+      "[Better Auth] ERROR Authentication event (Error | postgres 42P01)",
     );
     expect(line).not.toContain("SECRET");
   });
 
   it("redacts a query embedded in the message itself", () => {
     const line = formatAuthLog("error", drizzleError().message, []);
-    expect(line).toBe("[Better Auth] ERROR [query redacted]");
+    expect(line).toBe("[Better Auth] ERROR Authentication event");
   });
 
   it("drops non-error arguments such as profiles or tokens", () => {
@@ -37,7 +37,19 @@ describe("formatAuthLog", () => {
       "SECRET-STRING",
     ]);
     expect(line).toBe(
-      "[Better Auth] WARN Unable to link account (2 detail(s) redacted)",
+      "[Better Auth] WARN Authentication event (2 detail(s) redacted)",
     );
+  });
+
+  it("drops private values in driver messages, names and plain messages", () => {
+    const cause = Object.assign(new Error('invalid input: "PRIVATE-NOTE"'), {
+      code: "22P02",
+    });
+    const error = Object.assign(new Error("PRIVATE-TOKEN", { cause }), {
+      name: "PRIVATE-EMAIL",
+    });
+    const line = formatAuthLog("error", "Failed for PRIVATE-USER", [error]);
+    expect(line).toContain("22P02");
+    expect(line).not.toContain("PRIVATE");
   });
 });
