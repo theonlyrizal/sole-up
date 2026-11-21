@@ -20,22 +20,22 @@ import {
 const TODAY = "2026-11-04";
 
 describe("parseTrackRange and trackHref", () => {
-  it("reads the three ranges and falls back to the last 4 weeks", () => {
-    expect(DEFAULT_TRACK_RANGE).toBe("4w");
+  it("reads the three ranges and falls back to this week", () => {
+    expect(DEFAULT_TRACK_RANGE).toBe("week");
     expect(parseTrackRange("12w")).toBe("12w");
     expect(parseTrackRange("week")).toBe("week");
     expect(parseTrackRange("4w")).toBe("4w");
     expect(parseTrackRange(["week", "12w"])).toBe("week");
     for (const junk of [undefined, "", "2w", "12", "WEEK", "52w"]) {
-      expect(parseTrackRange(junk)).toBe("4w");
+      expect(parseTrackRange(junk)).toBe("week");
     }
   });
 
   it("keeps the default range on the plain path", () => {
     expect(TRACK_RANGES.map(trackHref)).toEqual([
-      "/track",
+      "/track?range=4w",
       "/track?range=12w",
-      "/track?range=week",
+      "/track",
     ]);
     for (const range of TRACK_RANGES) {
       expect(

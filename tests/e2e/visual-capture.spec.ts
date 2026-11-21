@@ -1496,7 +1496,7 @@ for (const viewport of sizes) {
         ["goal-detail", `/goals/${goalId}`],
         ["goals-areas", "/goals/areas"],
         ["goals-archived", "/goals/archived"],
-        ["track-week", "/track?range=week"],
+        ["track-4w", "/track?range=4w"],
         ["track-12w", "/track?range=12w"],
         ["track-archived", "/track/archived"],
         ["notes", "/notes"],
@@ -1748,8 +1748,8 @@ for (const viewport of sizes) {
           caret: "initial",
         });
       for (const [range, path] of [
-        ["week", "/track?range=week"],
-        ["4w", "/track"],
+        ["week", "/track"],
+        ["4w", "/track?range=4w"],
         ["12w", "/track?range=12w"],
       ]) {
         await openPage(page, path!);
@@ -1773,7 +1773,7 @@ for (const viewport of sizes) {
         );
       }
 
-      await openPage(page, "/track");
+      await openPage(page, "/track?range=4w");
       await page.getByRole("button", { name: "Legend", exact: true }).click();
       await expect(
         page

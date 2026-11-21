@@ -15,12 +15,13 @@ A personal management app that helps you decide what matters, turn goals into re
 - [Roadmap](docs/ROADMAP.md): product phases
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md): chunk-by-chunk build order and progress log
 - [Decisions (ADRs)](docs/decisions/README.md): settled architecture and product decisions
-- [Deploying](docs/DEPLOY.md): production on Render and Neon, environment, OAuth callbacks, deploy, rollback, backup and restore
+- [Deployment guide](Deploy.md): free no-card hosting choices, Vercel or Render setup, where to get every environment variable, OAuth, reminders, verification and recovery
+- [Render operations](docs/DEPLOY.md): existing Render and Neon deployment, rollback, backup and restore rehearsal
 - [Agent prompts](docs/AGENT_PROMPTS.md): one session prompt per chunk
 
 ## Local setup
 
-Requires Node 24 (see `.nvmrc`), pnpm 11 (`corepack enable` picks up the version in `package.json`), and Docker with Compose v2.
+Requires Node 24 (see `.nvmrc`), pnpm 12 (`corepack enable` picks up the version in `package.json`), and Docker with Compose v2.
 
 1. Install dependencies:
 

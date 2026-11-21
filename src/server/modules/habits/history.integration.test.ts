@@ -9,11 +9,8 @@ import { getTrackView, type TrackHabit } from "./queries";
 import { createHabit, setHabitLog } from "./service";
 import { createHabitSchema, setHabitLogSchema } from "./validation";
 
-// The Track page's ranges (chunk 6.5): the last 4 weeks (default), the
-// last 12 or this week alone, each in whole weeks from the saved zone and
-// week start. The figures are the 6.2 engine's; these tests check that the
-// read model hands it the right weeks and logs, and that "This week" shows
-// progress rather than a figure.
+// Track offers this week by default and the last 4 or 12 weeks. Check that
+// the read model uses whole weeks from the saved zone and week start.
 
 // Wednesday 4 Nov 2026, midday UTC. With no confirmed zone the user's today
 // is 2026-11-04; with the default Monday week start the week began 11-02.
@@ -58,13 +55,34 @@ const weekStarts = (habit: TrackHabit) =>
   habit.history.weeks.map((week) => week.from);
 
 describe("Track ranges", () => {
-  it("defaults to the last 4 weeks, ending with this week", async () => {
+  it("defaults to this week and leaves older logs outside the range", async () => {
     const user = await createTestUser();
     const habit = await newHabit(user.id);
     await log(user.id, habit.id, "2026-10-20");
 
     const view = await getTrackView(user.id, NOW);
+    expect(view).toMatchObject({
+      range: "week",
+      rangeLabel: "This week",
+      rangeDatesLabel: formatDateSpan(
+        { from: "2026-11-02", to: "2026-11-08" },
+        "en-US",
+      ),
+    });
     const [item] = view.habits;
+    expect(weekStarts(item!)).toEqual(["2026-11-02"]);
+    expect(item!.history).toMatchObject({
+      figure: null,
+      progressLabel: "0 of 7 days so far this week",
+    });
+  });
+
+  it("shows four weeks ending with this week in the 4w range", async () => {
+    const user = await createTestUser();
+    const habit = await newHabit(user.id);
+    await log(user.id, habit.id, "2026-10-20");
+
+    const { view, habit: item } = await trackHabit(user.id, habit.id, "4w");
 
     expect(view).toMatchObject({
       range: "4w",
@@ -74,32 +92,32 @@ describe("Track ranges", () => {
         "en-US",
       ),
     });
-    expect(weekStarts(item!)).toEqual([
+    expect(weekStarts(item)).toEqual([
       "2026-10-12",
       "2026-10-19",
       "2026-10-26",
       "2026-11-02",
     ]);
-    expect(item!.history.weeks[0]).toMatchObject({
+    expect(item.history.weeks[0]).toMatchObject({
       label: "Week of Oct 12, 2026",
       shortLabel: "Oct 12",
     });
-    expect(item!.history.weeks.every((week) => week.days.length === 7)).toBe(
+    expect(item.history.weeks.every((week) => week.days.length === 7)).toBe(
       true,
     );
     // 12 Oct to 3 Nov are counted; today counts once done.
-    expect(item!.history.figure).toBe("1 of 23 days");
-    expect(item!.history.definition).toContain(
+    expect(item.history.figure).toBe("1 of 23 days");
+    expect(item.history.definition).toContain(
       "Today counts only once it's logged as completed.",
     );
-    expect(item!.history.progressLabel).toBeNull();
+    expect(item.history.progressLabel).toBeNull();
   });
 
   it("the last 12 weeks reach logs the 4 weeks don't, and take backfills", async () => {
     const user = await createTestUser();
     const habit = await newHabit(user.id);
     await log(user.id, habit.id, "2026-10-20");
-    // Ten weeks back: outside the default range, still loggable.
+    // Ten weeks back: outside the four-week range, still loggable.
     await log(user.id, habit.id, "2026-09-01");
     await log(user.id, habit.id, "2026-09-02", "skipped");
 

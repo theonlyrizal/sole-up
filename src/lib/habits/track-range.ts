@@ -13,10 +13,10 @@ import {
 } from "./consistency";
 import type { HabitCadenceType, HabitMeasure } from "./habit";
 
-/** The ranges Track offers; the first is the default. */
+/** The ranges Track offers. */
 export const TRACK_RANGES = ["4w", "12w", "week"] as const;
 export type TrackRange = (typeof TRACK_RANGES)[number];
-export const DEFAULT_TRACK_RANGE: TrackRange = "4w";
+export const DEFAULT_TRACK_RANGE: TrackRange = "week";
 
 /** Each range's tab label, also the figure's label. */
 export const TRACK_RANGE_LABELS: Record<TrackRange, string> = {

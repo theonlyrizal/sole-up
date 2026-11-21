@@ -111,7 +111,7 @@ async function logRows(habitId: string) {
 }
 
 async function trackHabit(userId: string, habitId: string) {
-  const view = await getTrackView(userId, NOW);
+  const view = await getTrackView(userId, NOW, "4w");
   const habit = view.habits.find((item) => item.id === habitId);
   if (!habit) throw new Error("Habit not on Track");
   return habit;

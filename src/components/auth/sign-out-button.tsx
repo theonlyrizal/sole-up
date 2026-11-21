@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { MenuItem } from "@/components/ui/menu";
 import { authClient } from "@/lib/auth-client";
+import { clearBrowserNotifications } from "@/lib/sign-out-privacy";
 
 export function SignOutButton({
   variant = "button",
@@ -15,7 +15,6 @@ export function SignOutButton({
   variant?: "button" | "icon" | "menu";
   buttonTone?: "outlined" | "tonal";
 }) {
-  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -23,6 +22,7 @@ export function SignOutButton({
     setPending(true);
     setFailed(false);
     try {
+      await clearBrowserNotifications();
       const result = await authClient.signOut();
       if (result.error) throw result.error;
     } catch {
@@ -30,8 +30,8 @@ export function SignOutButton({
       setFailed(true);
       return;
     }
-    router.replace("/sign-in");
-    router.refresh();
+    // Discard this tab's private React state and router cache.
+    window.location.replace("/sign-in");
   }
 
   const label = pending ? "Signing out…" : "Sign out";

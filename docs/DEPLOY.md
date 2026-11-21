@@ -1,5 +1,7 @@
 # Deploying SoleUp
 
+For the complete no-card setup guide, environment-variable sources and the Vercel alternative, start with [Deploy.md](../Deploy.md). This document retains the existing Render runbook and historical restore rehearsal. Provider limits should be checked against the current dashboard and linked official documentation.
+
 The production deployment plan calls for two free services selected in chunk 0.14. As of 2026-11-11, SoleUp has only run locally.
 
 | Part | Service | Plan | Region |
@@ -399,7 +401,7 @@ Once you finish inspecting the scratch database, remove it with `docker compose 
 ## Free-plan limits
 
 - **The app sleeps after 15 idle minutes.** The first request after that takes about a minute while Render wakes it. 750 instance hours a month are free; a sleeping service uses none.
-- **Neon Free** suspends its compute after 5 idle minutes (wake-up is well under a second). It allows 0.5 GB of storage per project and a 6-hour restore window.
+- **Neon Free** suspends its compute after idle time; allow for wake-up latency. As checked on 2026-11-21, [current pricing](https://neon.com/pricing) advertises 1 GB of storage per project. Confirm the actual restore window in the project dashboard before relying on recovery.
 - **No background worker.** Render runs workers on paid plans only, and a sleeping web service can't fire reminders on time. Decision gate 5.0 kept the free plans: an external cron (cron-job.org) calls a reminder sweep route every 15 minutes, so reminders may arrive up to 15 minutes early ([ADR 0013](decisions/0013-reminders-sweep-and-delivery.md)). See "Reminder sweep" for the setup and its cost in free hours.
 - **Build minutes and bandwidth** have monthly allowances. Without a card, Render suspends the service when they run out instead of billing.
 

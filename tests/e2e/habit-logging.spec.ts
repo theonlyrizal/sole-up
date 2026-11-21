@@ -176,6 +176,7 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await signInAndConfirm(page);
   // Started a week ago: the seven days before today are expected.
   await createHabit(page, "Read", { startDate: tokyoDate(-7) });
+  await page.goto("/track?range=4w");
 
   const read = habitItem(page, "Read");
   await expect(read).toContainText("0 of 7 days");
@@ -235,7 +236,7 @@ test("backfill and correct past days on Track, and the figure follows at once", 
   await expect(todayRow(page, "Read")).toContainText("Done");
   // The row changes at once; the toast confirms the save.
   await expect(toastSaying(page, "Marked done")).toBeVisible();
-  await page.goto("/track");
+  await page.goto("/track?range=4w");
   await expect(read).toContainText("1 of 8 days");
   await expect(read.getByRole("button", { name: /: Done$/ })).toHaveCount(1);
 });
@@ -342,6 +343,11 @@ test("Track waits for persistence and keeps a failed amount for retry", async ({
     startDate: tokyoDate(-3),
     quantity: { unit: "cups", target: "8" },
   });
+  const fourWeeks = page
+    .getByRole("navigation", { name: "Range to show" })
+    .getByRole("link", { name: "Last 4 weeks" });
+  await fourWeeks.click();
+  await expect(fourWeeks).toHaveAttribute("aria-current", "page");
   const cardId = await habitItem(page, "Water").getAttribute("id");
   // The sheet aria-hides the surrounding Track content while it is open.
   const card = page.locator("#" + cardId);
@@ -376,7 +382,7 @@ test("Track waits for persistence and keeps a failed amount for retry", async ({
   const requestStarted = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
   const matches = (url: URL) =>
-    url.pathname === "/track" && !url.searchParams.has("range");
+    url.pathname === "/track" && url.searchParams.get("range") === "4w";
   await page.route(matches, async (route) => {
     const request = route.request();
     if (request.method() !== "POST" || !request.headers()["next-action"])

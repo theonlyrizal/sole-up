@@ -397,8 +397,8 @@ Compact
 
 | `range` | Layout |
 |---|---|
-| `week` | A `HabitWeekChart` (tall day pills, reference 3 "Favorite Habits") with `progressLabel` as the main figure; no consistency figure, as now |
-| `4w` (default) | The 4 × 7 grid of `HabitDayCell` (44 px) with date numbers |
+| `week` (default) | A `HabitWeekChart` (tall day pills, reference 3 "Favorite Habits") with `progressLabel` as the main figure; no consistency figure, as now |
+| `4w` | The 4 × 7 grid of `HabitDayCell` (44 px) with date numbers |
 | `12w` | `DotMatrix` (28 px cells, no numbers), with week row labels |
 
 On compact, compute fit from the available card content width after gutters and padding, not the viewport alone. Seven non-overlapping 48 px targets may require local horizontal overflow. Move week labels above rows at narrow widths, keep a visible overflow affordance and scroll focused cells into view. The twelve-week matrix uses 28 px visual dots inside 48 px interactive cells. Never shrink targets or permit document-wide overflow; test at 320/375/390 px. See EXPERIENCE_DESIGN §5.
