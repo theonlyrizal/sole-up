@@ -1,6 +1,7 @@
 # Agent instructions (kept local)
 CLAUDE.md
 .agents
+/docs
 
 # dependencies
 /node_modules
@@ -20,6 +21,7 @@ CLAUDE.md
 
 # production
 /build
+Deploy.md
 
 # misc
 .DS_Store
