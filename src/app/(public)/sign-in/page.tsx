@@ -49,7 +49,7 @@ export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
             className: "justify-self-start",
           })}
         >
-          Privacy notes
+          Privacy Policy
         </Link>
       </Card>
     </main>
