@@ -88,7 +88,7 @@ async function AccountDetails() {
             Download export
           </a>
           <Link href="/privacy" className={buttonClass({ variant: "text" })}>
-            Privacy notes
+            Privacy Policy
           </Link>
         </div>
       </Card>

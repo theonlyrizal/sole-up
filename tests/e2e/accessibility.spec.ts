@@ -6,7 +6,7 @@ import { expectNoSeriousViolations, signInAndConfirm } from "./helpers";
 const publicPages = [
   ["/", "Decide what matters. Plan what's realistic. See how it went."],
   ["/sign-in", "Sign in to SoleUp"],
-  ["/privacy", "Privacy notes"],
+  ["/privacy", "Privacy Policy"],
 ] as const;
 
 // Record-backed detail pages and populated states are scanned by the goal,

@@ -110,7 +110,7 @@ export default function HomePage() {
           href="/privacy"
           className={buttonClass({ variant: "text", size: "xs" })}
         >
-          Privacy notes
+          Privacy Policy
         </Link>
       </footer>
     </div>
