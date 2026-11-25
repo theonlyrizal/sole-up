@@ -34,7 +34,10 @@
     "reminders:failed": "node scripts/reminders-failed.mts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1176.0",
     "@fullcalendar/react": "7.1.1",
+    "@neon/config": "^1.14.6",
+    "@neon/env": "^2.1.9",
     "@tiptap/core": "3.32.0",
     "@tiptap/pm": "3.32.0",
     "@tiptap/react": "3.32.0",

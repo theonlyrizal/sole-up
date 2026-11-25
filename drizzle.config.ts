@@ -5,9 +5,11 @@ import { defineConfig } from "drizzle-kit";
 // drizzle-kit runs outside Next.js, so load .env.local the way `next dev`
 // would. Variables already set in the shell win, which is how you point a
 // command at another database (see README > Database and migrations).
+const shellUrl = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
-const url = process.env.DATABASE_URL;
+const url =
+  shellUrl || process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 if (!url) {
   throw new Error(
     "DATABASE_URL is not set. Copy .env.example to .env.local (see README > Local setup).",
