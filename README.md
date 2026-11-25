@@ -155,13 +155,27 @@ The schema is defined with [Drizzle ORM](https://orm.drizzle.team) in `src/serve
 | `pnpm db:explain:performance` | Captures application query plans and five warm timings per query, with `--out=<file.json>` |
 | `pnpm db:reset` | Drops every table in the database, then re-applies all migrations. Local only: refuses when `NODE_ENV=production` or when `DATABASE_URL` is not on `localhost` |
 
-These commands read `DATABASE_URL` from `.env.local`; a value set in the shell wins. To target the test database:
+These commands read `.env.local`; migrations prefer `DATABASE_URL_UNPOOLED` (Neon's direct connection) and fall back to `DATABASE_URL`. A database URL explicitly set in the shell wins for Drizzle Kit. The release script (`pnpm db:migrate:deploy`) reads only the process environment, preferring `DATABASE_URL_UNPOOLED`. To target the test database:
 
 ```bash
 DATABASE_URL=postgres://soleup:soleup@localhost:5432/soleup_test pnpm db:migrate
 ```
 
-In PowerShell, set `$env:DATABASE_URL = "postgres://soleup:soleup@localhost:5432/soleup_test"` first, and `Remove-Item Env:DATABASE_URL` afterwards.
+In PowerShell, set `$env:DATABASE_URL = "postgres://soleup:soleup@localhost:5432/soleup_test"` first, and `Remove-Item Env:DATABASE_URL` afterwards. If `DATABASE_URL_UNPOOLED` is also set in the shell, clear it or point it at the same test database.
+
+### Neon services
+
+`neon.ts` declares the private `assets` bucket and preserves the existing Better Auth integration. `neon deploy` provisions the bucket and pulls the linked branch's database URLs and `AWS_*` storage credentials into the local env file. Keep these credentials server-only and out of Git. For Node `pg`, use `sslmode=verify-full` on both Neon URLs after an env pull. Use pooled `DATABASE_URL` for app traffic and direct `DATABASE_URL_UNPOOLED` for migrations. Configure these same variables on the app host; Neon provisions the backend services, while Next.js still runs on your chosen host.
+
+The authenticated `/api/files` API stores files in Neon under a session-owned prefix. It has no upload UI yet:
+
+- `POST /api/files`: raw file bytes, at most 4 MiB; returns `{ id, url }`.
+- `GET /api/files?id=<uuid>`: downloads the current user's file as an attachment.
+- `DELETE /api/files?id=<uuid>`: removes the current user's file.
+
+POST and DELETE require an `Origin` header matching `BETTER_AUTH_URL`. The bucket stays private; downloads require an active app session.
+
+To verify live services, run `npm run build`, then `npm start`. In another terminal run `node --env-file=.env.local scripts/neon-smoke.mts` (use `.env` if that is where credentials were pulled). The check creates two temporary users with real database sessions, tests database-backed exports and storage upload/download/deletion, verifies access controls, and removes its fixtures. It does not require an OAuth browser login or enable the test sign-in endpoint.
 
 The development performance tools accept `--as-of=YYYY-MM-DD` for reproducible runs. The seed also accepts `--users=1..100` and defaults to 24. Setup, workload details and the evidence for migration 0023 are recorded in the [performance report](docs/performance/10.7.md).
 

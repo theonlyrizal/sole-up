@@ -40,6 +40,31 @@ type Review = { hash: string; endpoints: Record<string, Checks> };
 // These endpoints use a deliberately different security boundary. A source
 // change invalidates the review. Verify the boundary before updating its hash.
 const reviewed: Record<string, Review> = {
+  "src/app/api/files/route.ts": {
+    hash: "5e7f930e7b8a2d83a404e03acb385f3f74acde508544fbfb346635d5a50936bf",
+    endpoints: {
+      POST: {
+        auth: "active DB session plus exact origin check",
+        input: "streamed body capped at 4 MiB; generated UUID key",
+        owner: "storage prefix derived only from session user.id",
+      },
+      GET: {
+        auth: "active DB session",
+        input: "Zod UUID query parameter",
+        owner: "storage prefix derived only from session user.id",
+      },
+      DELETE: {
+        auth: "active DB session plus exact origin check",
+        input: "Zod UUID query parameter",
+        owner: "storage prefix derived only from session user.id",
+      },
+      HEAD: {
+        auth: "same active DB session as GET",
+        input: "same UUID validation as GET",
+        owner: "same session-owned storage prefix as GET",
+      },
+    },
+  },
   "src/app/manifest.ts": {
     hash: "25feda0b3fe5caed7d5cd962538dc0f7466d4be8a3e2b5be5eaa723eb8c3f6f6",
     endpoints: {
