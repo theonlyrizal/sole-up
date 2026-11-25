@@ -1,7 +1,8 @@
 /**
  * `pnpm db:migrate:deploy`: applies pending migrations to the database in
- * DATABASE_URL. This is the release step: the host runs it after the build
- * and before the new version serves traffic (render.yaml, docs/DEPLOY.md).
+ * DATABASE_URL_UNPOOLED (falling back to DATABASE_URL). This is the release
+ * step: the host runs it after the build and before the new version serves
+ * traffic (render.yaml, docs/DEPLOY.md).
  *
  * Unlike `pnpm db:migrate` (drizzle-kit, a dev dependency, reads .env.local),
  * it reads only the process environment, uses the app's own drizzle-orm
@@ -19,7 +20,8 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString =
+  process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 if (!connectionString) fail("DATABASE_URL is not set.");
 
 let target: string;
